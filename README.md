@@ -1,19 +1,19 @@
 # Slime
 
-Slime is a CRD controller for istio. Designed to use istio/envoy advanced functions more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
+Slime is a CRD controller for istio. Designed to use istio/envoy advanced features more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
 
 **[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration on demand.
 
 **[Http Plugin Management](#http-plugin-management):** Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
 
-**[Adaptive Ratelimit](#adaptive-ratelimit):** It can be automatically combined with monitoring information Adjust ratelimit strategy.
+**[Adaptive Ratelimit](#adaptive-ratelimit):** It can be automatically combined with adaptive ratelimit strategy based on metrics.
 
 ## Install slime-boot
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
 ```
 kubectl create ns mesh-operator
-kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/crds.yaml
-kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/slime-boot-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/crds.yaml
+kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/slime-boot-install.yaml
 ```
 
 ## Configure lazy loading
@@ -42,7 +42,7 @@ spec:
    globalSidecar:
      enable: true
      namespace:
-       - {{you namespace}} # application namespaces
+       - {{your namespace}} # application namespaces
    pilot:
      enable: true
      image:
@@ -154,7 +154,7 @@ ratings       11s
 reviews       11s
 ```
 ```
-$ kubectl get sidecar productpage -oyaml
+$ kubectl get sidecar productpage -o yaml
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
@@ -292,9 +292,9 @@ status:
         seconds: 1
       quota: "3"
 ```
-####  ratelimit based on monitoring
+####  Adaptive ratelimit based on metrics
 
-The monitoring information entry can be configured in `condition`. For example, if the current limit is triggered when the cpu exceeds 300ms, the following configuration can be performed:
+The metrics information entry can be configured in `condition`. For example, if the current limit is triggered when the cpu exceeds 300ms, the following configuration can be performed:
 
 ```yaml
 apiVersion: microservice.netease.com/v1alpha1
