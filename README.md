@@ -2,11 +2,11 @@
 
 Slime is a CRD controller for istio. Designed to use istio/envoy advanced functions more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
 
-**[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration/service discovery information on demand
+**[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration on demand.
 
-**[Http Plugin Management](#http-plugin-management):** Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient
+**[Http Plugin Management](#http-plugin-management):** Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
 
-**[Adaptive Ratelimit](#adaptive-ratelimit):** Local current limiting is realized, and it can be automatically combined with monitoring information Adjust current limiting strategy
+**[Adaptive Ratelimit](#adaptive-ratelimit):** It can be automatically combined with monitoring information Adjust ratelimit strategy.
 
 ## Install slime-boot
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
@@ -326,8 +326,8 @@ status:
 The formula in the condition will be rendered according to the entry of endPointStatus. If the result of the rendered formula is true, the limit will be triggered.
 
 #### Service ratelimit
-Due to the lack of global quota management components, we cannot achieve precise service current limit, but assuming that the load balance is ideal, the number of instance current limit = the number of service current limit/the number of instances. The service current limit of test-svc is 3, then the quota field can be configured to 3/{pod} to achieve service-level current limit. When the service is expanded, you can see the change of the instance current limit in the current limit status bar
-。
+Due to the lack of global quota management components, we cannot achieve precise service ratelimit, but assuming that the load balance is ideal, 
+(instance quota) = (service quota)/(the number of instances). The service quota of test-svc is 3, then the quota field can be configured to 3/{pod} to achieve service-level ratelimit. When the service is expanded, you can see the change of the instance quota in status.
 ```yaml
 apiVersion: microservice.netease.com/v1alpha1
 kind: SmartLimiter
@@ -454,7 +454,7 @@ spec:
 Review service can get 3 quotas every 10s, and the service has 3 instances, so each instance can get 1 quota every 10s.
 
 7. visit productpage  
-The fourth visit within 10s will trigger limit. View the accesslog of productpage to see the current limiting effect more intuitively:
+The fourth visit within 10s will trigger limit. View the accesslog of productpage to see the ratelimit effect more intuitively:
 ```
 [2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default
 ```                          
