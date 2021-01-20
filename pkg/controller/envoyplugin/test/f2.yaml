@@ -1,0 +1,43 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  namespace: test
+  name: e2
+spec:
+  workloadSelector:
+    labels:
+      app: gateway-proxy
+  configPatches:
+    - applyTo: VIRTUAL_HOST
+      match:
+        routeConfiguration:
+          vhost:
+            name: 1505
+      patch:
+        operation: MERGE
+        value:
+          typedPerFilterConfig:
+            com.netease.transformations:
+              "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+              type_url: ""
+              value:
+    - applyTo: VIRTUAL_HOST
+      match:
+        routeConfiguration:
+          vhost:
+            name: 1505
+      patch:
+        operation: MERGE
+        value:
+          rate_limits:
+            - actions:
+                - header_value_match:
+                    descriptor_value: Service[o.default]-User[none]-Gateway[null]-Api[null]-Id[hash:-803434496]
+                    headers:
+                      - invert_match: true
+                        name: plugin1
+                        present_match: true
+                      - invert_match: false
+                        name: plugin2
+                        regex_match: ratelimit
+              stage: 0

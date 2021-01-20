@@ -1,0 +1,24 @@
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  component:
+    globalSidecarNamespace:
+      - default # 替换为bookinfo安装的ns
+    reportServer: true
+  image:
+    pullPolicy: IfNotPresent
+    repository: hub.c.163.com/qingzhou/slime
+    tag: opensource-0b5c348
+  module:
+    - name: lazyload
+      fence:
+        enable: true
+        wormholePort:
+          - "9080" # bookinfo的访问端口
+      limiter:
+        enable: true
+        backend: 1
+        name: limiter

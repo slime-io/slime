@@ -1,0 +1,12 @@
+apiVersion: microservice.netease.com/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: e1
+  namespace: test
+spec:
+  plugins:
+    - name: com.netease.transformations
+  route:
+    - "1505"
+  workloadLabels:
+    app: gateway-proxy

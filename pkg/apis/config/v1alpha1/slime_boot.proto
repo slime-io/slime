@@ -1,0 +1,34 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+
+import "pkg/apis/config/v1alpha1/config.proto";
+
+
+package netease.config.v1alpha1;
+
+option go_package = "yun.netease.com/slime/pkg/apis/config/v1alpha1";
+message SlimeBootStatus {
+
+}
+
+message SlimeBootSpec {
+    repeated Module module = 1;
+    Component component = 2;
+}
+
+message Module {
+    Limiter limiter = 1;
+    Plugin plugin = 2;
+    Fence fence = 3;
+    Global global = 4;
+    string name = 5;
+}
+
+message Component {
+    repeated string globalSidecarNamespace = 1;
+    bool reportServer = 2;
+}

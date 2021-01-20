@@ -1,0 +1,237 @@
+{{ if .Values.component}}
+{{ if .Values.component.globalSidecar.enable }}
+  {{ range $_,$ns :=  .Values.component.globalSidecar.namespace }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+spec:
+  progressDeadlineSeconds: 2147483647
+  replicas: 1
+  revisionHistoryLimit: 2147483647
+  selector:
+    matchLabels:
+      app: qz-ingress
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+      creationTimestamp: null
+      labels:
+        app: qz-ingress
+        nsf.skiff.netease.com/app: qz-ingress
+        nsf.skiff.netease.com/isIngress: "true"
+    spec:
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+              weight: 2
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - ppc64le
+              weight: 2
+            - preference:
+                matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - s390x
+              weight: 2
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: beta.kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+                      - ppc64le
+                      - s390x
+      containers:
+        - args:
+            - proxy
+            - --domain
+            - $(POD_NAMESPACE).svc.cluster.local
+            - --log_output_level=default:info
+            - --drainDuration
+            - 45s
+            - --parentShutdownDuration
+            - 1m0s
+            - --connectTimeout
+            - 10s
+            - --serviceCluster
+            - qz-ingress
+            - --zipkinAddress
+            - zipkin.istio-system:9411
+            - --proxyAdminPort
+            - "15000"
+            - --statusPort
+            - "15020"
+            - --controlPlaneAuthPolicy
+            - NONE
+            - --discoveryAddress
+            - istio-pilot.mesh-operator:15010
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: INSTANCE_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: ISTIO_META_POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: ISTIO_META_CONFIG_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: ISTIO_META_ROUTER_MODE
+              value: sni-dnat
+            - name: ISTIO_META_INTERCEPTION_MODE
+              value: NONE
+            - name: ISTIO_METAJSON_ANNOTATIONS
+              value: '{"sidecar.istio.io/statsInclusionPrefixes": "listener,cluster.outbound,cluster_manager,listener_manager,http_mixer_filter,tcp_mixer_filter,server,cluster.xds-grpc"}'
+          image: istio/proxyv2:1.3.0
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz/ready
+              port: 15020
+              scheme: HTTP
+            initialDelaySeconds: 600
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 15
+          name: istio-proxy
+          readinessProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /healthz/ready
+              port: 15020
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+           {{- toYaml $.Values.component.globalSidecar.resources | nindent 12 }}         
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/certs
+              name: istio-certs
+              readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: { }
+      serviceAccountName: global-sidecar
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: istio-certs
+          secret:
+            defaultMode: 420
+            optional: true
+            secretName: istio.global-sidecar
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: global-sidecar
+  namespace: {{$ns}}
+spec:
+  ports:
+    {{range $.Values.module }}
+    {{ if .fence }}
+    {{ range .fence.wormholePort}}
+    - name: http-{{ . }}
+      port: {{ int . }}
+      protocol: TCP
+      targetPort: {{ int . }}
+  {{end}}
+  {{end}}
+  {{end}}
+  selector:
+    app: qz-ingress
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: to-global-sidecar
+  namespace: {{$ns}}
+spec:
+  configPatches:
+    {{range $.Values.module }}
+    {{ if .fence }}
+    {{ range .fence.wormholePort}}
+    - applyTo: VIRTUAL_HOST
+      match:
+        routeConfiguration:
+          name: "{{ . }}"
+          vhost:
+            name: allow_any
+      patch:
+        operation: REMOVE
+    - applyTo: ROUTE_CONFIGURATION
+      match:
+        routeConfiguration:
+          name: "{{ . }}"
+      patch:
+        operation: MERGE
+        value:
+          virtual_hosts:
+            - domains:
+                - '*'
+              name: to_global_sidecar
+              routes:
+                - match:
+                    prefix: /
+                  route:
+                    cluster: outbound|{{.}}||global-sidecar.{{$ns}}.svc.cluster.local
+  {{ end }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
+  {{ end }}
+  {{ end }}

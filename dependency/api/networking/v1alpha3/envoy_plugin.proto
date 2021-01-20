@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+// $title: GatewayPlugin
+// $description: Plugin settings for gateway-proxy
+// $location: https://istio.io/docs/reference/config/networking/v1alpha3/gateway_plugin.html
+
+// GatewayPlugin 用于设置网关扩展插件配置，配置生效范围有3个级别
+// route级别，对应同一route name下的路由规则
+// host级别，对应同一host下的路由规则
+// service级别，对应统一service下的路由规则vs中的destination可以确认该规则隶属的服务
+
+// 示例如下：
+// apiVersion: networking.istio.io/v1alpha3
+// kind: GatewayPlugin
+// metadata:
+//   name: project1-3-458-rewrite
+// spec:
+//   gateway:
+//   - gateway-proxy-1
+//   host:
+//   - 103.196.65.178
+//   plugins:
+//   - name: com.netease.rewrite
+//     settings:
+//       request_transformations:
+//       - conditions:
+//         - headers:
+//           - name: :path
+//             regex_match: /aaaaaaa/(.*)
+//         transformation_template:
+//           extractors:
+//             $1:
+//               header: :path
+//               regex: /aaaaaaa/(.*)
+//               subgroup: 1
+//           headers:
+//             :path:
+//               text: /{{$1}}
+//           parse_body_behavior: DontParse
+import "networking/v1alpha3/pluginmanager.proto";
+
+package istio.networking.v1alpha3;
+
+option go_package = "istio.io/api/networking/v1alpha3";
+
+
+message EnvoyPlugin {
+    map<string,string> workload_labels = 9;
+
+    // route level plugin
+    repeated string route = 1;
+
+    // host level plugin
+    repeated string host = 2;
+
+    // service level plugin
+    repeated string service = 3;
+
+    repeated Plugin plugins = 4;
+
+    // which gateway should use this plugin setting
+    repeated string gateway = 5;
+
+    // which user should use this plugin setting
+    repeated string user = 6;
+
+    // group setting 用于路由组级别的配置设置，其优先级低于路由级别的配置
+    bool isGroupSetting = 7;
+
+    message Listener {
+        uint32 port = 1;
+        bool outbound = 2;
+    }
+
+    // listener level
+    repeated Listener listener = 8;
+}

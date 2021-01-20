@@ -1,0 +1,5 @@
+---
+- version: v1alpha1
+  group: config.netease.com
+  kind: SlimeBoot
+  chart: helm-charts/slimeboot

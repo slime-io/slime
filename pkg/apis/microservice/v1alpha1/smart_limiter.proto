@@ -1,0 +1,78 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+import "google/protobuf/duration.proto";
+package netease.microservice.v1alpha1;
+
+option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+
+// SmartLimiter 用于配置自适应限流插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
+// 示例如下：
+// apiVersion: microservice.netease.com/v1alpha1
+// kind: SmartLimiter
+// metadata:
+//   name: a
+//   namespace: powerful
+// spec:
+//   descriptors:
+//   - action:
+//       fill_interval:
+//         seconds: 60
+//       quota: "30/{pod}"
+//     condition: "true"
+
+message Action {
+    string quota = 1;
+    google.protobuf.Duration fill_interval = 2;
+}
+
+message ActionStatus {
+    uint32 quota = 1;
+    google.protobuf.Duration fill_interval = 2;
+}
+
+message SmartLimitDescriptor {
+    string condition = 2;
+    Action action = 3;
+    repeated HeaderMatcher match = 4;
+}
+
+message SmartLimitDescriptorStatus {
+    string condition = 2;
+    ActionStatus action = 3;
+    repeated HeaderMatcher match = 4;
+}
+
+message SmartLimiterSpec {
+    string domain = 1;
+    repeated SmartLimitDescriptor descriptors = 2;
+}
+
+message SmartLimiterStatus {
+    repeated SmartLimitDescriptor ratelimitStatus = 1;
+    map<string, string> endPointStatus = 2;
+    message ServiceStatus {
+        map<string, string> selector = 1;
+        message Listener {
+            string name = 1;
+            uint32 port = 2;
+        }
+        repeated Listener listener = 2;
+    }
+    ServiceStatus serviceStatus = 3;
+}
+
+message HeaderMatcher {
+    string name = 1;
+
+    string exact_match = 2;
+    string regex_match = 3;
+    bool present_match = 7;
+    string prefix_match = 9;
+    string suffix_match = 10;
+
+    bool invert_match = 8;
+}

@@ -1,0 +1,121 @@
+{{ range .Values.module }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace}}
+data:
+  cfg: |
+    {{ . | toJson }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app: {{.name}}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{.name}}
+  template:
+    metadata:
+      labels:
+        app: {{.name}}
+    spec:
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{.name}}
+      securityContext:
+      {{- toYaml $.Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: slime
+          securityContext:
+          {{- toYaml $.Values.securityContext | nindent 12 }}
+          image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag}}"
+          command:
+            - slime
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "slime"
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          resources:
+          {{- toYaml $.Values.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /etc/slime/config
+              name: config-volume
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: {{ .name }}
+          name: config-volume
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.affinity }}
+      affinity:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+  {{- toYaml . | nindent 8 }}
+  {{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{.name}}
+subjects:
+  - kind: ServiceAccount
+    name: {{.name}}
+    namespace: {{ $.Values.namespace}}
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+  {{- if $.Values.serviceAccount.create -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace}}
+  labels:
+    app: {{ .name }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace}}
+  labels:
+    app: {{.name}}
+spec:
+  type: {{ $.Values.service.type }}
+  ports:
+    - port: {{ $.Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: {{.name}}
+  {{end}}

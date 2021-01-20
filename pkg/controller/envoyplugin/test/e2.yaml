@@ -1,0 +1,26 @@
+apiVersion: microservice.netease.com/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: e2
+  namespace: test
+spec:
+  plugins:
+    - name: com.netease.transformations
+    - name: "envoy.ratelimit"
+      settings:
+        rate_limits:
+          - actions:
+              - header_value_match:
+                  descriptor_value: Service[o.default]-User[none]-Gateway[null]-Api[null]-Id[hash:-803434496]
+                  headers:
+                    - invert_match: true
+                      name: plugin1
+                      present_match: true
+                    - invert_match: false
+                      name: plugin2
+                      regex_match: ratelimit
+            stage: 0
+  host:
+    - "1505"
+  workloadLabels:
+    app: gateway-proxy

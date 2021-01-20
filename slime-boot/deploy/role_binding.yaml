@@ -1,0 +1,13 @@
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: slime-boot
+  namespace: mesh-operator
+subjects:
+- kind: ServiceAccount
+  name: slime-boot
+  namespace: mesh-operator
+roleRef:
+  kind: Role
+  name: slime-boot
+  apiGroup: rbac.authorization.k8s.io
