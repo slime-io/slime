@@ -1,5 +1,7 @@
 # Slime
 
+[中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)
+
 Slime is a CRD controller for istio. Designed to use istio/envoy advanced features more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
 
 **[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration on demand.
@@ -115,7 +117,7 @@ for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
 1. install istio ( > 1.8 )
 2. install slime 
 ```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ydh926/slime/master/install/easy_install_lazyload.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/master/install/easy_install_lazyload.sh)"
 ```
 3. Make sure all components are running
 ```
@@ -370,7 +372,7 @@ Take bookinfo as an example.
 1. Install istio ( > 1.8 ).
 2. Install slime.
 ```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ydh926/slime/master/install/easy_install_limiter.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/master/install/easy_install_limiter.sh)"
 ```
 3. Install bookinfo.
 4. Create smartlimiter resource for reviews service.
