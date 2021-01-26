@@ -3,7 +3,7 @@
 * @Date: 2020/5/21
  */
 
-package env
+package virtualservice
 
 import (
 	"sync"
