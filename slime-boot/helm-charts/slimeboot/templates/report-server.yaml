@@ -75,7 +75,7 @@ spec:
           env:
             - name: GOMAXPROCS
               value: "2"
-          image: "{{ $.Values.component.reportServer.image.repository }}:{{ $.Values.component.reportServer.image.tag}}"
+          image: "{{ $.Values.component.reportServer.mixerImage.repository }}:{{ $.Values.component.reportServer.mixerImage.tag}}"
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -114,7 +114,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.name
-          image: docker.io/bcxq/report-server:preview-v0.0.1
+          image: "{{ $.Values.component.reportServer.inspectorImage.repository }}:{{ $.Values.component.reportServer.inspectorImage.tag}}"
           imagePullPolicy: Always
           livenessProbe:
             failureThreshold: 3
