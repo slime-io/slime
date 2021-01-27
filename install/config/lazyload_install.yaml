@@ -47,6 +47,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
-      image:
+      mixerImage:
         repository: docker.io/bcxq/mixer
         tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/bcxq/report-server
+        tag: preview-v0.0.1
