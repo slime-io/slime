@@ -5,34 +5,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/ghodss/yaml"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/hashicorp/go-multierror"
+	cmap "github.com/orcaman/concurrent-map"
 	yaml2 "gopkg.in/yaml.v2"
 )
 
-const (
-	ServiceLabel           = "SERVICE_LABEL"
-	GlobalSidecarNamespace = "GLOBAL_SIDECAR_NAMESPACE"
-	TelemetryNamespace     = "istio-telemetry"
-)
-
-var SystemNamespace string
-
-func init() {
-	if ns, ok := os.LookupEnv(GlobalSidecarNamespace); ok {
-		SystemNamespace = ns
-	} else {
-		SystemNamespace = "istio-system"
-	}
-}
-
+// Map operation
 func IsContain(farther, child map[string]string) bool {
 	if len(child) > len(farther) {
 		return false
@@ -45,6 +31,56 @@ func IsContain(farther, child map[string]string) bool {
 	return true
 }
 
+func CopyMap(m1 map[string]string) map[string]string {
+	ret := make(map[string]string)
+	for k, v := range m1 {
+		ret[k] = v
+	}
+	return ret
+}
+
+func MapToMapInterface(m map[string]string) map[string]interface{} {
+	out := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		ks := strings.Split(k, ".")
+		r, ks, err := findSubNode(ks, out)
+		if err != nil {
+			fmt.Printf("===err:%s", err.Error())
+		}
+		for k1, v1 := range createSubmap(ks, v) {
+			r[k1] = v1
+		}
+	}
+	return out
+}
+
+func createSubmap(ks []string, value string) map[string]interface{} {
+	if len(ks) == 1 {
+		return map[string]interface{}{
+			ks[0]: value,
+		}
+	}
+	return map[string]interface{}{
+		ks[0]: createSubmap(ks[1:], value),
+	}
+}
+
+func findSubNode(ks []string, root map[string]interface{}) (map[string]interface{}, []string, error) {
+	if len(ks) == 0 {
+		return root, ks, nil
+	} else if _, ok := root[ks[0]]; !ok {
+		return root, ks, nil
+	} else {
+		if m, ok := root[ks[0]].(map[string]interface{}); !ok {
+			return nil, ks, fmt.Errorf("Leaf node reached,%v", ks)
+		} else {
+			return findSubNode(ks[1:], m)
+		}
+
+	}
+}
+
+// General type conversion
 func MessageToStruct(msg proto.Message) (*types.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
@@ -77,22 +113,6 @@ func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
 	} else {
 		return nil, err
 	}
-}
-
-func CopyMap(m1 map[string]string) map[string]string {
-	ret := make(map[string]string)
-	for k, v := range m1 {
-		ret[k] = v
-	}
-	return ret
-}
-
-func IsK8SService(host string) (string, string, bool) {
-	ss := strings.Split(host, ".")
-	if len(ss) != 2 && len(ss) != 5 {
-		return "", "", false
-	}
-	return ss[0], ss[1], true
 }
 
 func Make(messageName string) (proto.Message, error) {
@@ -163,4 +183,61 @@ func StructToMessage(pbst *types.Struct, out proto.Message) error {
 	}
 
 	return jsonpb.Unmarshal(buf, out)
+}
+
+// K8S operation
+func IsK8SService(host string) (string, string, bool) {
+	ss := strings.Split(host, ".")
+	if len(ss) != 2 && len(ss) != 5 {
+		return "", "", false
+	}
+	return ss[0], ss[1], true
+}
+
+func UnityHost(host string, namespace string) string {
+	if len(strings.Split(host, ".")) == 1 {
+		return host + "." + namespace + Wellkonw_K8sSuffix
+	}
+	if svc, ns, ok := IsK8SService(host); !ok {
+		return host
+	} else {
+		return svc + "." + ns + Wellkonw_K8sSuffix
+	}
+}
+
+//Subscribeable map
+type SubcribeableMap struct {
+	data           cmap.ConcurrentMap
+	subscriber     []func(key string, value interface{})
+	subscriberLock sync.RWMutex
+}
+
+func NewSubcribeableMap() *SubcribeableMap {
+	return &SubcribeableMap{
+		data:           cmap.New(),
+		subscriber:     make([]func(key string, value interface{}), 0),
+		subscriberLock: sync.RWMutex{},
+	}
+}
+
+func (s *SubcribeableMap) Set(key string, value interface{}) {
+	s.data.Set(key, value)
+	s.subscriberLock.RLock()
+	for _, f := range s.subscriber {
+		f(key, value)
+	}
+	s.subscriberLock.RUnlock()
+}
+
+func (s *SubcribeableMap) Get(host string) interface{} {
+	if i, ok := s.data.Get(host); ok {
+		return i
+	}
+	return nil
+}
+
+func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{})) {
+	s.subscriberLock.Lock()
+	s.subscriber = append(s.subscriber, subscribe)
+	s.subscriberLock.Unlock()
 }

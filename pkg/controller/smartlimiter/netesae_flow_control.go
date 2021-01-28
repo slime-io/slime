@@ -2,9 +2,9 @@
 * @Author: yangdihang
 * @Date: 2020/11/5
  */
-
 package smartlimiter
 
+/*
 import (
 	"context"
 	"fmt"
@@ -259,3 +259,4 @@ func (r *ReconcileSmartLimiter) GenerateNeteaseFlowControl(rateLimitConf microse
 	ef := GenerateNeteaseFlowControlEnvoyFilter(instance, r, actions, flowControlConf)
 	return ef, descriptor
 }
+*/

@@ -8,7 +8,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+
+	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/model/source"
+	"yun.netease.com/slime/pkg/util"
 )
 
 type Source struct {
@@ -38,6 +41,7 @@ func (m *Source) SetHandler(
 
 func (m *Source) Start(stop <-chan struct{}) {
 	ticker := time.NewTicker(30 * time.Second)
+	destinationrule.HostSubsetMapping.Subscribe(m.subscribe)
 	go func() {
 		for {
 			select {
@@ -76,4 +80,10 @@ func (m *Source) SourceClusterHandler() func(*kubernetes.Clientset) {
 		m.multiClusterLock.Unlock()
 	}
 	return f
+}
+
+func (m *Source) subscribe(key string, value interface{}) {
+	if name, ns, ok := util.IsK8SService(key); ok {
+		m.Get(types.NamespacedName{Namespace: ns, Name: name})
+	}
 }

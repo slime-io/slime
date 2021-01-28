@@ -16,7 +16,7 @@ import (
 	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
 	"yun.netease.com/slime/pkg/bootstrap"
 	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/controller/virtualservice/env"
+	"yun.netease.com/slime/pkg/controller/virtualservice"
 	"yun.netease.com/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
@@ -33,6 +33,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 )
 
@@ -48,7 +49,7 @@ var config *v1alpha1.Config
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, environment *bootstrap.Environment) error {
 	r := newReconciler(mgr, environment).(*ReconcileServiceFence)
-	env.Subscribe(r.Subscribe)
+	virtualservice.HostDestinationMapping.Subscribe(r.Subscribe)
 	return add(mgr, r)
 }
 
@@ -245,7 +246,7 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 	now := time.Now().Unix()
 	for k, v := range host.Spec.Host {
 		allHost := []string{k}
-		hs := env.GetHostDestinationMapping(k)
+		hs := virtualservice.HostDestinationMapping.Get(k).([]string)
 		if len(hs) > 0 {
 			allHost = append(allHost, hs...)
 		}
@@ -334,7 +335,7 @@ func newSidecar(vhost *microservicev1alpha1.ServiceFence, env *bootstrap.Environ
 	}
 }
 
-func (r *ReconcileServiceFence) Subscribe(host string, destination []string) {
+func (r *ReconcileServiceFence) Subscribe(host string, destination interface{}) {
 	if svc, namespace, ok := util.IsK8SService(host); ok {
 		vih := &microservicev1alpha1.ServiceFence{}
 		if err := r.client.Get(context.TODO(), types.NamespacedName{Name: svc, Namespace: namespace}, vih); err != nil {

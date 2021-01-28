@@ -8,9 +8,9 @@ package smartlimiter
 import (
 	"context"
 	"fmt"
+	networking "istio.io/api/networking/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
-	"strings"
-
 	config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
@@ -18,7 +18,6 @@ import (
 	event_source "yun.netease.com/slime/pkg/model/source"
 	"yun.netease.com/slime/pkg/util"
 
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -37,12 +36,26 @@ func (r *ReconcileSmartLimiter) getMaterial(loc types.NamespacedName) map[string
 func refreshEnvoyFilter(instance *microservicev1alpha1.SmartLimiter, r *ReconcileSmartLimiter, obj *v1alpha3.EnvoyFilter) (reconcile.Result, error) {
 	name := obj.GetName()
 	namespace := obj.GetNamespace()
+
 	if err := controllerutil.SetControllerReference(instance, obj, r.scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 	found := &v1alpha3.EnvoyFilter{}
 
 	err := r.client.Get(context.TODO(), types.NamespacedName{Name: name, Namespace: namespace}, found)
+
+	// Delete
+	if obj.Spec == nil {
+		if err != nil && !errors.IsNotFound(err) {
+			return reconcile.Result{}, err
+		} else if err == nil {
+			err = r.client.Delete(context.TODO(), obj)
+			return reconcile.Result{}, err
+		} else {
+			// nothing to do
+			return reconcile.Result{}, nil
+		}
+	}
 
 	// Create
 	if err != nil && errors.IsNotFound(err) {
@@ -136,27 +149,47 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 		Name:      instance.Name,
 	}
 	material := r.getMaterial(loc)
-	if instance.Spec.Descriptors == nil {
+	if instance.Spec.Sets == nil {
 		return reconcile.Result{}, util.Error{M: "invalid rateLimit spec"}
 	}
 	rateLimitConf := instance.Spec
 
-	var ef *v1alpha3.EnvoyFilter
-	var descriptor []*microservicev1alpha1.SmartLimitDescriptor
+	var efs map[string]*networking.EnvoyFilter
+	var descriptor map[string]*microservicev1alpha1.SmartLimitDescriptors
 
 	backend := r.env.Config.Limiter.Backend
-	if backend == config.Limiter_netEaseLocalFlowControl {
+	/*if backend == config.Limiter_netEaseLocalFlowControl {
 		ef, descriptor = r.GenerateNeteaseFlowControl(rateLimitConf, material, instance)
-	}
+	}*/
 
 	if backend == config.Limiter_envoyLocalRateLimit {
-		ef, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
-	}
-
-	if ef != nil {
-		result, err := refreshEnvoyFilter(instance, r, ef)
-		if err != nil {
-			return result, err
+		efs, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
+		for k, ef := range efs {
+			var efcr *v1alpha3.EnvoyFilter
+			if k == "@base" {
+				efcr = &v1alpha3.EnvoyFilter{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),
+						Namespace: instance.Namespace,
+					},
+				}
+			} else {
+				efcr = &v1alpha3.EnvoyFilter{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      fmt.Sprintf("%s.%s.%s.ratelimit", instance.Name, instance.Namespace, k),
+						Namespace: instance.Namespace,
+					},
+				}
+			}
+			if ef != nil {
+				if mi, err := util.ProtoToMap(ef); err == nil {
+					efcr.Spec = mi
+				}
+			}
+			_, err := refreshEnvoyFilter(instance, r, efcr)
+			if err != nil {
+				log.Error(err, fmt.Sprintf("generated/deleted EnvoyFilter failed:%s", efcr.Name))
+			}
 		}
 	}
 
@@ -170,15 +203,17 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 	return reconcile.Result{}, nil
 }
 
-func svcToName(svc *v1.Service) string {
-	for _, p := range svc.Spec.Ports {
-		if isHttp(p.Name) {
-			return fmt.Sprintf("inbound|http|%d", p.Port)
+func (r *ReconcileSmartLimiter) subscribe(host string, subset interface{}) {
+	if name, ns, ok := util.IsK8SService(host); ok {
+		loc := types.NamespacedName{Name: name, Namespace: ns}
+		instance := &microservicev1alpha1.SmartLimiter{}
+		err := r.client.Get(context.TODO(), loc, instance)
+		if err != nil {
+			if !errors.IsNotFound(err) {
+				log.Error(err, "failed to get smartlimiter, host: "+host)
+			}
+		} else {
+			_, _ = r.refresh(instance)
 		}
 	}
-	return ""
-}
-
-func isHttp(n string) bool {
-	return strings.HasPrefix(n, "http")
 }

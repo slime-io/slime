@@ -1,57 +1,57 @@
 package util
 
 import (
+	"bytes"
+	"html/template"
 	"strconv"
-	"strings"
 )
 
-func CalculateTemplate(expression string, material map[string]string) (int, error) {
-	if a, err := Calculate(parse1(expression, material)); err != nil {
+func CalculateTemplate(expression string, material map[string]interface{}) (int, error) {
+	if s, err := parse1(expression, material); err != nil {
 		return 0, err
 	} else {
-		return a, nil
+		if a, err := Calculate(s); err != nil {
+			return 0, err
+		} else {
+			return a, nil
+		}
 	}
 }
 
-func CalculateTemplateBool(expression string, material map[string]string) (bool, error) {
+func CalculateTemplateBool(expression string, material map[string]interface{}) (bool, error) {
 	if expression == "true" {
 		return true, nil
 	}
 	if expression == "false" {
 		return false, nil
 	}
-	if a, err := Calculate(parse1(expression, material)); err != nil {
+	if s, err := parse1(expression, material); err != nil {
 		return false, err
 	} else {
-		if a == 1 {
-			return true, nil
+		if a, err := Calculate(s); err != nil {
+			return false, err
+		} else {
+			if a == 1 {
+				return true, nil
+			}
 		}
 	}
 	return false, nil
 }
 
-func parse1(expression string, material map[string]string) string {
-	if expression == "" || strings.Index(expression, "{") == -1 || strings.Index(expression, "}") == -1 {
-		return expression
-	}
-	sp1 := strings.Index(expression, "{")
-	sp2 := strings.Index(expression, "}")
-	if sp1 > sp2 {
-		return expression
-	}
-	findKey := expression[sp1+1 : sp2]
-	var parsedKey string
-	if m, ok := material[findKey]; ok {
-		parsedKey = m
-	} else {
-		parsedKey = "undefined"
+func parse1(expression string, material map[string]interface{}) (string, error) {
+	t, err := template.New("express").Parse(expression)
+	if err != nil {
+		return "", err
 	}
 
-	if sp2 == len(expression) {
-		return expression[:sp1] + parsedKey
-	} else {
-		return expression[:sp1] + parsedKey + parse1(expression[sp2+1:], material)
+	var tpl bytes.Buffer
+	err = t.Execute(&tpl, material)
+	if err != nil {
+		return "", err
 	}
+
+	return tpl.String(), nil
 }
 
 type Node struct {

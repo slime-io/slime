@@ -11,7 +11,7 @@ import (
 	"strconv"
 
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
+	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/util"
 
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -21,37 +21,70 @@ import (
 	"github.com/golang/protobuf/ptypes/duration"
 	networking "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservicev1alpha1.SmartLimiterSpec,
 	material map[string]string, instance *microservicev1alpha1.SmartLimiter) (
-	*v1alpha3.EnvoyFilter, []*microservicev1alpha1.SmartLimitDescriptor) {
-	descriptor := make([]*microservicev1alpha1.SmartLimitDescriptor, 0, len(rateLimitConf.Descriptors))
-	for _, des := range rateLimitConf.Descriptors {
-		podDes := &microservicev1alpha1.SmartLimitDescriptor{}
-		if shouldUpdate, _ := util.CalculateTemplateBool(des.Condition, material); shouldUpdate {
-			if des.Action != nil {
-				if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, material); err == nil {
-					podDes.Action = &microservicev1alpha1.Action{
-						Quota:        fmt.Sprintf("%d", rateLimitValue),
-						FillInterval: des.Action.FillInterval,
+	map[string]*networking.EnvoyFilter, map[string]*microservicev1alpha1.SmartLimitDescriptors) {
+
+	materialInterface := util.MapToMapInterface(material)
+
+	setsEnvoyFilter := make(map[string]*networking.EnvoyFilter)
+	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha1.SmartLimitDescriptors)
+
+	host := util.UnityHost(instance.Name, instance.Namespace)
+	if destinationrule.HostSubsetMapping.Get(host) != nil {
+		sets := destinationrule.HostSubsetMapping.Get(host).([]*networking.Subset)
+		loc := types.NamespacedName{
+			Namespace: instance.Namespace,
+			Name:      instance.Name,
+		}
+		svc := &v1.Service{}
+		_ = r.client.Get(context.TODO(), loc, svc)
+		svcSelector := svc.Spec.Selector
+		// 使用@base作为key，可以为基础集合配置限流
+		sets = append(sets, &networking.Subset{Name: "@base"})
+		for _, set := range sets {
+			if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
+				descriptor := &microservicev1alpha1.SmartLimitDescriptors{}
+				for _, des := range setDescriptor.Descriptor_ {
+					setDes := &microservicev1alpha1.SmartLimitDescriptor{}
+					if shouldUpdate, _ := util.CalculateTemplateBool(des.Condition, materialInterface); shouldUpdate {
+						if des.Action != nil {
+							if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err == nil {
+								setDes.Action = &microservicev1alpha1.SmartLimitDescriptor_Action{
+									Quota:        fmt.Sprintf("%d", rateLimitValue),
+									FillInterval: des.Action.FillInterval,
+								}
+							}
+							descriptor.Descriptor_ = append(descriptor.Descriptor_, setDes)
+						}
 					}
 				}
-				descriptor = append(descriptor, podDes)
+				selector := util.CopyMap(svcSelector)
+				for k, v := range set.Labels {
+					selector[k] = v
+				}
+				if len(descriptor.Descriptor_) > 0 {
+					ef := descriptorsToEnvoyFilter(descriptor.Descriptor_, selector)
+					setsEnvoyFilter[set.Name] = ef
+					setsSmartLimitDescriptor[set.Name] = descriptor
+				}
+			} else {
+				// Used to delete
+				setsEnvoyFilter[set.Name] = nil
 			}
 		}
+		return setsEnvoyFilter, setsSmartLimitDescriptor
 	}
-	loc := types.NamespacedName{
-		Namespace: instance.Namespace,
-		Name:      instance.Name,
-	}
-	svc := &v1.Service{}
-	_ = r.client.Get(context.TODO(), loc, svc)
+	return nil, nil
+}
+
+func descriptorsToEnvoyFilter(descriptor []*microservicev1alpha1.SmartLimitDescriptor, labels map[string]string) *networking.EnvoyFilter {
 	ef := &networking.EnvoyFilter{
 		WorkloadSelector: &networking.WorkloadSelector{
-			Labels: svc.Spec.Selector,
+			Labels: labels,
 		},
 	}
 	ef.ConfigPatches = make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
@@ -130,16 +163,6 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 			},
 		}
 		ef.ConfigPatches = append(ef.ConfigPatches, patch)
-		if mi, err := util.ProtoToMap(ef); err == nil {
-			x := &v1alpha3.EnvoyFilter{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      instance.Name + "." + instance.Namespace + "." + "local-ratelimit",
-					Namespace: instance.Namespace,
-				},
-				Spec: mi,
-			}
-			return x, descriptor
-		}
 	}
-	return nil, nil
+	return ef
 }

@@ -8,11 +8,6 @@ package virtualservice
 import (
 	"context"
 
-	networkingv1alpha3 "yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/controller/virtualservice/env"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -23,6 +18,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	networkingv1alpha3 "yun.netease.com/slime/pkg/apis/networking/v1alpha3"
+	"yun.netease.com/slime/pkg/bootstrap"
+	controller2 "yun.netease.com/slime/pkg/controller"
 )
 
 var log = logf.Log.WithName("controller_virtualservice")
@@ -39,18 +38,6 @@ var AddHook = make([]func(networkingv1alpha3.VirtualService, ...interface{}), 0)
 // and Start it when the Manager is Started.
 func Add(mgr manager.Manager, env *bootstrap.Environment) error {
 	return add(mgr, newReconciler(mgr))
-}
-
-func OnDelete(f func(reconcile.Request, ...interface{})) {
-	DeleteHook = append(DeleteHook, f)
-}
-
-func OnUpdate(f func(networkingv1alpha3.VirtualService, ...interface{})) {
-	UpdateHook = append(UpdateHook, f)
-}
-
-func OnAdd(f func(networkingv1alpha3.VirtualService, ...interface{})) {
-	AddHook = append(UpdateHook, f)
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -115,6 +102,7 @@ func (r *ReconcileVirtualService) Reconcile(request reconcile.Request) (reconcil
 	}
 
 	// 资源更新
+
 	for _, f := range controller2.UpdateHook[controller2.VirtualService] {
 		if err := f(instance); err != nil {
 			return reconcile.Result{}, err
@@ -128,7 +116,7 @@ func ServiceFenceProcess(i v1.Object, args ...interface{}) error {
 	if instance, ok := i.(*networkingv1alpha3.VirtualService); ok {
 		m := parseDestination(instance)
 		for k, v := range m {
-			env.SetHostDestinationMapping(k, v)
+			HostDestinationMapping.Set(k, v)
 		}
 	}
 	return nil

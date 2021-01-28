@@ -159,3 +159,7 @@ func DoUpdate(instance metav1.Object, args ...interface{}) error {
 	}
 	return nil
 }
+
+func (r *ReconcileSmartLimiter) Subscribe(host string, subset interface{}) {
+
+}
