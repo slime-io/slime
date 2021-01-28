@@ -40,21 +40,24 @@ spec:
         - {{port2}}
         - ...
       name: slime-fence
- component:
-   globalSidecar:
-     enable: true
-     namespace:
-       - {{your namespace}} # application namespaces
-   pilot:
-     enable: true
-     image:
-       repository: docker.io/bcxq/pilot
-       tag: preview-1.3.7-v0.0.1
-   reportServer:
-     enable: true
-     image:
-       repository: docker.io/bcxq/mixer
-       tag: preview-1.3.7-v0.0.1  
+  component:
+    globalSidecar:
+      enable: true
+      namespace:
+      - {{your namespace}} # application namespaces
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
+    reportServer:
+      enable: true
+      mixImage:
+        repository: docker.io/bcxq/mixer
+        tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/bcxq/report-server
+        tag: preview-v0.0.1-rc
 ```
 2. make sure all components are running
 ```
