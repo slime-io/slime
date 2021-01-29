@@ -11,7 +11,6 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
-	config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
 	"yun.netease.com/slime/pkg/model"
@@ -157,39 +156,37 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 	var efs map[string]*networking.EnvoyFilter
 	var descriptor map[string]*microservicev1alpha1.SmartLimitDescriptors
 
-	backend := r.env.Config.Limiter.Backend
+	// TODO: Since the com.netease.local_flow_control has not yet been opened, this function is disabled
 	/*if backend == config.Limiter_netEaseLocalFlowControl {
 		ef, descriptor = r.GenerateNeteaseFlowControl(rateLimitConf, material, instance)
 	}*/
 
-	if backend == config.Limiter_envoyLocalRateLimit {
-		efs, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
-		for k, ef := range efs {
-			var efcr *v1alpha3.EnvoyFilter
-			if k == "@base" {
-				efcr = &v1alpha3.EnvoyFilter{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),
-						Namespace: instance.Namespace,
-					},
-				}
-			} else {
-				efcr = &v1alpha3.EnvoyFilter{
-					ObjectMeta: metav1.ObjectMeta{
-						Name:      fmt.Sprintf("%s.%s.%s.ratelimit", instance.Name, instance.Namespace, k),
-						Namespace: instance.Namespace,
-					},
-				}
+	efs, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
+	for k, ef := range efs {
+		var efcr *v1alpha3.EnvoyFilter
+		if k == "@base" {
+			efcr = &v1alpha3.EnvoyFilter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),
+					Namespace: instance.Namespace,
+				},
 			}
-			if ef != nil {
-				if mi, err := util.ProtoToMap(ef); err == nil {
-					efcr.Spec = mi
-				}
+		} else {
+			efcr = &v1alpha3.EnvoyFilter{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      fmt.Sprintf("%s.%s.%s.ratelimit", instance.Name, instance.Namespace, k),
+					Namespace: instance.Namespace,
+				},
 			}
-			_, err := refreshEnvoyFilter(instance, r, efcr)
-			if err != nil {
-				log.Error(err, fmt.Sprintf("generated/deleted EnvoyFilter failed:%s", efcr.Name))
+		}
+		if ef != nil {
+			if mi, err := util.ProtoToMap(ef); err == nil {
+				efcr.Spec = mi
 			}
+		}
+		_, err := refreshEnvoyFilter(instance, r, efcr)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("generated/deleted EnvoyFilter failed:%s", efcr.Name))
 		}
 	}
 
