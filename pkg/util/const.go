@@ -37,4 +37,6 @@ const (
 
 	Wellknow_Waidcard = "*"
 	Wellknow_RootPath = "/"
+	Wellkonw_BaseSet  = "@base"
+	Wellkonw_K8sSuffix = ".svc.cluster.local"
 )

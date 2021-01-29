@@ -3,6 +3,7 @@ package metric
 import (
 	"encoding/json"
 	cmap "github.com/orcaman/concurrent-map"
+	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/model/source"
 	"yun.netease.com/slime/pkg/model/source/k8s"
 	"yun.netease.com/slime/pkg/util"
@@ -177,6 +179,17 @@ func metricGetHandler(m *k8s.Source, meta types.NamespacedName) map[string]strin
 	if service != nil {
 		for _, pod := range pods {
 			if util.IsContain(pod.Labels, service.Spec.Selector) && pod.DeletionTimestamp == nil {
+				host := util.UnityHost(meta.Name, meta.Namespace)
+				if destinationrule.HostSubsetMapping.Get(host) != nil {
+					if sbs, ok := destinationrule.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
+						for _, sb := range sbs {
+							subPod := 0
+							subPod++
+							material[sb.Name+".pod"] = strconv.Itoa(subPod)
+						}
+					}
+				}
+
 				var metrics PodMetrics
 				var err error
 				for _, k := range m.K8sClient {
@@ -201,10 +214,10 @@ func metricGetHandler(m *k8s.Source, meta types.NamespacedName) map[string]strin
 				PodNum = PodNum + 1
 			}
 		}
-		material["cpu"] = strconv.Itoa(CPUSum)
-		material["memory"] = strconv.Itoa(MemorySum)
-		material["cpu_max"] = strconv.Itoa(CPUMax)
-		material["memory_max"] = strconv.Itoa(MemoryMax)
+		material["cpu.sum"] = strconv.Itoa(CPUSum)
+		material["memory.sum"] = strconv.Itoa(MemorySum)
+		material["cpu.max"] = strconv.Itoa(CPUMax)
+		material["memory.max"] = strconv.Itoa(MemoryMax)
 		material["pod"] = strconv.Itoa(PodNum)
 	} else {
 		reqLogger.Error(nil, "Service Not Found")

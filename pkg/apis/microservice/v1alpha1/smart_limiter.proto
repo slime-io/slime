@@ -24,35 +24,13 @@ option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
 //       quota: "30/{pod}"
 //     condition: "true"
 
-message Action {
-    string quota = 1;
-    google.protobuf.Duration fill_interval = 2;
-}
-
-message ActionStatus {
-    uint32 quota = 1;
-    google.protobuf.Duration fill_interval = 2;
-}
-
-message SmartLimitDescriptor {
-    string condition = 2;
-    Action action = 3;
-    repeated HeaderMatcher match = 4;
-}
-
-message SmartLimitDescriptorStatus {
-    string condition = 2;
-    ActionStatus action = 3;
-    repeated HeaderMatcher match = 4;
-}
-
 message SmartLimiterSpec {
     string domain = 1;
-    repeated SmartLimitDescriptor descriptors = 2;
+    map<string, SmartLimitDescriptors> sets = 2;
 }
 
 message SmartLimiterStatus {
-    repeated SmartLimitDescriptor ratelimitStatus = 1;
+    map<string, SmartLimitDescriptors> ratelimitStatus = 1;
     map<string, string> endPointStatus = 2;
     message ServiceStatus {
         map<string, string> selector = 1;
@@ -65,14 +43,30 @@ message SmartLimiterStatus {
     ServiceStatus serviceStatus = 3;
 }
 
-message HeaderMatcher {
-    string name = 1;
+message SmartLimitDescriptor {
+    message HeaderMatcher {
+        string name = 1;
 
-    string exact_match = 2;
-    string regex_match = 3;
-    bool present_match = 7;
-    string prefix_match = 9;
-    string suffix_match = 10;
+        string exact_match = 2;
+        string regex_match = 3;
+        bool present_match = 7;
+        string prefix_match = 9;
+        string suffix_match = 10;
 
-    bool invert_match = 8;
+        bool invert_match = 8;
+    }
+    message Action {
+        string quota = 1;
+        google.protobuf.Duration fill_interval = 2;
+    }
+    string condition = 2;
+    Action action = 3;
+    repeated HeaderMatcher match = 4;
 }
+
+message SmartLimitDescriptors {
+    repeated SmartLimitDescriptor descriptor = 4;
+}
+
+
+

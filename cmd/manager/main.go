@@ -12,6 +12,7 @@ import (
 	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
 	"yun.netease.com/slime/pkg/bootstrap"
 	"yun.netease.com/slime/pkg/controller"
+	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/controller/envoyplugin"
 	"yun.netease.com/slime/pkg/controller/pluginmanager"
 	"yun.netease.com/slime/pkg/controller/servicefence"
@@ -237,7 +238,9 @@ func processConfig(Config *v1alpha1.Config) map[controller.Collection]func(manag
 	if Config.Limiter != nil && Config.Limiter.Enable {
 		controller.UpdateHook[controller.SmartLimiter] = []func(object v12.Object, args ...interface{}) error{smartlimiter.DoUpdate}
 		controller.DeleteHook[controller.SmartLimiter] = []func(reconcile.Request, ...interface{}) error{smartlimiter.DoRemove}
+		controller.UpdateHook[controller.DestinationRule] = []func(object v12.Object, args ...interface{}) error{destinationrule.DoUpdate}
 		f[controller.SmartLimiter] = smartlimiter.Add
+		f[controller.DestinationRule] = destinationrule.Add
 	}
 
 	if Config.Plugin != nil && Config.Plugin.Enable {

@@ -2,9 +2,11 @@
 * @Author: yangdihang
 * @Date: 2020/11/5
  */
-
 package smartlimiter
 
+// TODO: Since the com.netease.local_flow_control has not yet been opened, this function is disabled
+
+/*
 import (
 	"context"
 	"fmt"
@@ -259,3 +261,4 @@ func (r *ReconcileSmartLimiter) GenerateNeteaseFlowControl(rateLimitConf microse
 	ef := GenerateNeteaseFlowControlEnvoyFilter(instance, r, actions, flowControlConf)
 	return ef, descriptor
 }
+*/
