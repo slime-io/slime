@@ -1,10 +1,15 @@
 package k8s
 
 import (
+	prometheus_client "github.com/prometheus/client_golang/api"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sync"
 	"time"
+	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	"yun.netease.com/slime/pkg/bootstrap"
 
 	"github.com/orcaman/concurrent-map"
+	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
@@ -15,8 +20,11 @@ import (
 )
 
 type Source struct {
-	EventChan        chan<- source.Event
-	K8sClient        []*kubernetes.Clientset
+	EventChan chan<- source.Event
+	K8sClient []*kubernetes.Clientset
+	api       prometheus.API
+	//
+	items            map[string]string
 	Watcher          watch.Interface
 	Interest         cmap.ConcurrentMap
 	UpdateChan       chan types.NamespacedName
@@ -86,4 +94,42 @@ func (m *Source) subscribe(key string, value interface{}) {
 	if name, ns, ok := util.IsK8SService(key); ok {
 		m.Get(types.NamespacedName{Namespace: ns, Name: name})
 	}
+}
+
+func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*Source, error) {
+	k8sClient := env.K8SClient
+	watcher, err := k8sClient.CoreV1().Endpoints("").Watch(metav1.ListOptions{})
+	es := &Source{
+		EventChan:  eventChan,
+		Watcher:    watcher,
+		K8sClient:  []*kubernetes.Clientset{k8sClient},
+		UpdateChan: make(chan types.NamespacedName),
+		Interest:   cmap.New(),
+	}
+	switch m := env.Config.Metric.Source.(type) {
+	case *v1alpha1.Metric_Prometheus:
+		if m.Prometheus == nil {
+			break
+		} else {
+			promClient, err := prometheus_client.NewClient(prometheus_client.Config{
+				Address:      m.Prometheus.Address,
+				RoundTripper: nil,
+			})
+			if err != nil {
+				log.Error(err, "failed create prometheus client")
+				break
+			}
+			es.api = prometheus.NewAPI(promClient)
+			es.items = make(map[string]string)
+			for k, v := range m.Prometheus.Handlers {
+				es.items[k] = v.Query
+			}
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	es.SetHandler(metricGetHandler, metricWatcherHandler, metricTimerHandler, update)
+	return es, nil
 }
