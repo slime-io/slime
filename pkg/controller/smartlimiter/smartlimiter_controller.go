@@ -2,6 +2,8 @@ package smartlimiter
 
 import (
 	"context"
+	"sync"
+
 	cmap "github.com/orcaman/concurrent-map"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	"sync"
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 	"yun.netease.com/slime/pkg/bootstrap"
 	controller2 "yun.netease.com/slime/pkg/controller"
@@ -158,4 +159,3 @@ func DoUpdate(instance metav1.Object, args ...interface{}) error {
 	}
 	return nil
 }
-

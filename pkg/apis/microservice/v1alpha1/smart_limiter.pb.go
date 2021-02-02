@@ -181,8 +181,10 @@ type SmartLimiterStatus_ServiceStatus_Listener struct {
 func (m *SmartLimiterStatus_ServiceStatus_Listener) Reset() {
 	*m = SmartLimiterStatus_ServiceStatus_Listener{}
 }
-func (m *SmartLimiterStatus_ServiceStatus_Listener) String() string { return proto.CompactTextString(m) }
-func (*SmartLimiterStatus_ServiceStatus_Listener) ProtoMessage()    {}
+func (m *SmartLimiterStatus_ServiceStatus_Listener) String() string {
+	return proto.CompactTextString(m)
+}
+func (*SmartLimiterStatus_ServiceStatus_Listener) ProtoMessage() {}
 func (*SmartLimiterStatus_ServiceStatus_Listener) Descriptor() ([]byte, []int) {
 	return fileDescriptor_76bfc6c51416fcda, []int{1, 2, 1}
 }

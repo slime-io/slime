@@ -3,6 +3,10 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/prometheus/common/model"
 	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
@@ -11,9 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"strconv"
-	"strings"
-	"time"
 	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/model/source"
 	"yun.netease.com/slime/pkg/util"

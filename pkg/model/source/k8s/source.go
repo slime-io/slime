@@ -1,19 +1,19 @@
 package k8s
 
 import (
-	prometheus_client "github.com/prometheus/client_golang/api"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sync"
 	"time"
-	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
-	"yun.netease.com/slime/pkg/bootstrap"
 
 	"github.com/orcaman/concurrent-map"
+	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 
+	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	"yun.netease.com/slime/pkg/bootstrap"
 	"yun.netease.com/slime/pkg/controller/destinationrule"
 	"yun.netease.com/slime/pkg/model/source"
 	"yun.netease.com/slime/pkg/util"

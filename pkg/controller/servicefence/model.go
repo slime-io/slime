@@ -5,8 +5,7 @@
 
 package servicefence
 
-
 type Diff struct {
 	Deleted []string
-	Added []string
+	Added   []string
 }
