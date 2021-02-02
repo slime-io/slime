@@ -81,7 +81,7 @@ func parse2(expression string) *Node {
 	for i := range expression {
 		var nodeLevel int
 		if expression[i] == '.' {
-			r = r+ string(expression[i])
+			r = r + string(expression[i])
 			continue
 		}
 		if expression[i] >= '0' && expression[i] <= '9' {
@@ -209,7 +209,7 @@ func parse3(node *Node) int {
 		}
 	}
 
-	if r, err := strconv.ParseFloat(node.value,64); err != nil {
+	if r, err := strconv.ParseFloat(node.value, 64); err != nil {
 		return 0
 	} else {
 		return int(r)

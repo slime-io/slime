@@ -35,8 +35,8 @@ const (
 
 	EnvoyFilter_GlobalSidecar = "to_global_sidecar"
 
-	Wellknow_Waidcard = "*"
-	Wellknow_RootPath = "/"
-	Wellkonw_BaseSet  = "@base"
+	Wellknow_Waidcard  = "*"
+	Wellknow_RootPath  = "/"
+	Wellkonw_BaseSet   = "@base"
 	Wellkonw_K8sSuffix = ".svc.cluster.local"
 )

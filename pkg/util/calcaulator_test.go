@@ -57,16 +57,16 @@ func TestCalcaulator(t *testing.T) {
 func TestCalculateTemplate(t *testing.T) {
 	tmap := map[string]string{
 		"v1.cpu.sum": "8845.137062837",
-		"v1.pod": "1",
+		"v1.pod":     "1",
 		"v2.cpu.sum": "10598.478665913",
-		"v2.pod": "1",
+		"v2.pod":     "1",
 		"v3.cpu.sum": "10636.432688953",
-		"v3.pod": "1",
+		"v3.pod":     "1",
 	}
 	imap := MapToMapInterface(tmap)
-	actual,err := CalculateTemplateBool("{{.v1.cpu.sum}}>8000",imap)
+	actual, err := CalculateTemplateBool("{{.v1.cpu.sum}}>8000", imap)
 	if err != nil {
-		t.Fatalf("test failed, got error:%s",err.Error())
+		t.Fatalf("test failed, got error:%s", err.Error())
 	}
 	if !actual {
 		t.Fatalf("test failed, excepted: true, but got false")
