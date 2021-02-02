@@ -16,19 +16,11 @@ message SlimeBootStatus {
 }
 
 message SlimeBootSpec {
-    repeated Module module = 1;
-    Component component = 2;
-}
-
-message Module {
-    Limiter limiter = 1;
-    Plugin plugin = 2;
-    Fence fence = 3;
-    Global global = 4;
-    string name = 5;
+  repeated Config module = 1;
+  Component component = 2;
 }
 
 message Component {
-    repeated string globalSidecarNamespace = 1;
-    bool reportServer = 2;
+  repeated string globalSidecarNamespace = 1;
+  bool reportServer = 2;
 }

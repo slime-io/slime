@@ -1,6 +1,8 @@
 package util
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestCalcaulator(t *testing.T) {
 	a1, _ := Calculate("11+1")
@@ -32,22 +34,41 @@ func TestCalcaulator(t *testing.T) {
 	if a4 != 35*23 {
 		t.Fatalf("test failed, expected: %d, actual: %d", 35*23, a4)
 	}
-	if a5 != 4+5*6+((7+8)/6-8) {
-		t.Fatalf("test failed, expected: %d, actual: %d", 4+5*6+((7+8)/6), a5)
+	if a5 != 29 {
+		t.Fatalf("test failed, expected: %d, actual: %d", 29, a5)
 	}
 	if a6 != 1 {
-		t.Fatalf("test failed, expected: %d, actual: %d", 4+5*6+((7+8)/6), a5)
+		t.Fatalf("test failed, expected: %d, actual: %d", 1, a5)
 	}
 	if a7 != 1 {
-		t.Fatalf("test failed, expected: %d, actual: %d", 4+5*6+((7+8)/6), a5)
+		t.Fatalf("test failed, expected: %d, actual: %d", 1, a5)
 	}
 	if a8 != 0 {
-		t.Fatalf("test failed, expected: %d, actual: %d", 4+5*6+((7+8)/6), a5)
+		t.Fatalf("test failed, expected: %d, actual: %d", 0, a5)
 	}
 	if a9 != 10 {
 		t.Fatalf("test failed, expected: %d, actual: %d", 10, a9)
 	}
 	if a10 != 50 {
 		t.Fatalf("test failed, expected: %d, actual: %d", 50, a10)
+	}
+}
+
+func TestCalculateTemplate(t *testing.T) {
+	tmap := map[string]string{
+		"v1.cpu.sum": "8845.137062837",
+		"v1.pod": "1",
+		"v2.cpu.sum": "10598.478665913",
+		"v2.pod": "1",
+		"v3.cpu.sum": "10636.432688953",
+		"v3.pod": "1",
+	}
+	imap := MapToMapInterface(tmap)
+	actual,err := CalculateTemplateBool("{{.v1.cpu.sum}}>8000",imap)
+	if err != nil {
+		t.Fatalf("test failed, got error:%s",err.Error())
+	}
+	if !actual {
+		t.Fatalf("test failed, excepted: true, but got false")
 	}
 }

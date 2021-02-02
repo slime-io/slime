@@ -80,3 +80,4 @@ tags
 
 ### kubeconfig ###
 .kube/*
+/build

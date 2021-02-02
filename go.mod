@@ -11,7 +11,8 @@ require (
 	github.com/onsi/ginkgo v1.10.1
 	github.com/operator-framework/operator-sdk v0.15.2
 	github.com/orcaman/concurrent-map v0.0.0-20190826125027-8c72a8bb44f6
-	github.com/prometheus/client_golang v1.6.0 // indirect
+	github.com/prometheus/client_golang v1.6.0
+	github.com/prometheus/common v0.9.1
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.5
 	istio.io/api v0.0.0-20210104172659-a364d5657c55

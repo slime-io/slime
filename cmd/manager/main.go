@@ -84,7 +84,7 @@ func main() {
 	}
 
 	env := bootstrap.Environment{}
-	env.Config = bootstrap.GetConfig()
+	env.Config = bootstrap.GetModuleConfig()
 	fmt.Printf("%v\n", env.Config)
 
 	// Get a config to talk to the apiserver

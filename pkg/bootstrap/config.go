@@ -1,22 +1,19 @@
 package bootstrap
 
 import (
-	"io/ioutil"
-	"os"
-
 	"github.com/gogo/protobuf/jsonpb"
+	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
 
 	netease_config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
 )
 
 const (
-	ConfigPath        = "CONFIG_PATH"
-	DefaultConfigPath = "/etc/slime/config/cfg"
+	DefaultModuleConfigPath = "/etc/slime/config/cfg"
 )
 
 var (
-	defaultConfig = &netease_config.Config{
+	defaultModuleConfig = &netease_config.Config{
 		Limiter: &netease_config.Limiter{
 			Enable: false,
 		},
@@ -31,39 +28,40 @@ var (
 			IstioNamespace: "istio-system",
 			SlimeNamespace: "mesh-operator",
 		},
+		Metric: &netease_config.Metric{
+			Source: &netease_config.Metric_Prometheus{
+				Prometheus: &netease_config.Prometheus_Source{
+					Address: "localhost:9090",
+					Handlers: map[string]*netease_config.Prometheus_Source_Handler{
+					},
+				},
+			},
+		},
 	}
 )
 
-func GetConfig() *netease_config.Config {
-	var path string
-	if p, found := os.LookupEnv(ConfigPath); !found {
-		path = DefaultConfigPath
-	} else {
-		path = p
-	}
-
-	if config, err := read(path); err != nil {
-		return defaultConfig
+func GetModuleConfig() *netease_config.Config {
+	if config, err := readModuleConfig(); err != nil {
+		return defaultModuleConfig
 	} else {
 		if config.Fence == nil {
-			config.Fence = defaultConfig.Fence
+			config.Fence = defaultModuleConfig.Fence
 		}
 		if config.Limiter == nil {
-			config.Limiter = defaultConfig.Limiter
+			config.Limiter = defaultModuleConfig.Limiter
 		}
 		if config.Plugin == nil {
-			config.Plugin = defaultConfig.Plugin
+			config.Plugin = defaultModuleConfig.Plugin
 		}
 		if config.Global == nil {
-			config.Global = defaultConfig.Global
+			config.Global = defaultModuleConfig.Global
 		}
 		return config
 	}
-
 }
 
-func read(config string) (*netease_config.Config, error) {
-	y, err := ioutil.ReadFile(config)
+func readModuleConfig() (*netease_config.Config, error) {
+	y, err := ioutil.ReadFile(DefaultModuleConfigPath)
 	if err != nil {
 		return nil, err
 	}

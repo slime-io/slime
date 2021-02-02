@@ -2,8 +2,6 @@ package smartlimiter
 
 import (
 	"context"
-	"sync"
-
 	cmap "github.com/orcaman/concurrent-map"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,13 +15,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+	"sync"
 	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 	"yun.netease.com/slime/pkg/bootstrap"
 	controller2 "yun.netease.com/slime/pkg/controller"
 	"yun.netease.com/slime/pkg/controller/smartlimiter/multicluster"
 	event_source "yun.netease.com/slime/pkg/model/source"
 	"yun.netease.com/slime/pkg/model/source/aggregate"
-	"yun.netease.com/slime/pkg/model/source/k8s/metric"
+	"yun.netease.com/slime/pkg/model/source/k8s"
 )
 
 const MATCH_KEY = "header_value_match"
@@ -42,7 +41,7 @@ func Add(mgr manager.Manager, env *bootstrap.Environment) error {
 func newReconciler(mgr manager.Manager, env *bootstrap.Environment) reconcile.Reconciler {
 	eventChan := make(chan event_source.Event)
 	src := &aggregate.Source{}
-	ms, err := metric.NewMetricSource(env.K8SClient, eventChan)
+	ms, err := k8s.NewMetricSource(eventChan, env)
 	if err != nil {
 		return nil
 	}
@@ -160,6 +159,3 @@ func DoUpdate(instance metav1.Object, args ...interface{}) error {
 	return nil
 }
 
-func (r *ReconcileSmartLimiter) Subscribe(host string, subset interface{}) {
-
-}
