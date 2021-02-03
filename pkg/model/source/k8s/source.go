@@ -24,7 +24,7 @@ type Source struct {
 	K8sClient []*kubernetes.Clientset
 	api       prometheus.API
 	//
-	items            map[string]string
+	items            map[string]*v1alpha1.Prometheus_Source_Handler
 	Watcher          watch.Interface
 	Interest         cmap.ConcurrentMap
 	UpdateChan       chan types.NamespacedName
@@ -120,10 +120,7 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 				break
 			}
 			es.api = prometheus.NewAPI(promClient)
-			es.items = make(map[string]string)
-			for k, v := range m.Prometheus.Handlers {
-				es.items[k] = v.Query
-			}
+			es.items = m.Prometheus.Handlers
 		}
 	}
 	if err != nil {

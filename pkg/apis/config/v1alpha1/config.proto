@@ -50,8 +50,13 @@ message Fence {
 }
 
 message Prometheus_Source{
+  enum Type{
+    Value = 0;
+    Group = 1;
+  }
   message Handler{
     string query = 1;
+    Type type = 2;
   }
   string address = 1;
   map<string, Handler> handlers = 2;

@@ -44,6 +44,7 @@ func newReconciler(mgr manager.Manager, env *bootstrap.Environment) reconcile.Re
 	src := &aggregate.Source{}
 	ms, err := k8s.NewMetricSource(eventChan, env)
 	if err != nil {
+		log.Error(err,"failed to create slime-metric")
 		return nil
 	}
 	src.AppendSource(ms)

@@ -11,6 +11,9 @@ import (
 	"reflect"
 	"strings"
 	"time"
+	event_source "yun.netease.com/slime/pkg/model/source"
+	"yun.netease.com/slime/pkg/model/source/aggregate"
+	"yun.netease.com/slime/pkg/model/source/k8s"
 
 	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
 	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
@@ -55,6 +58,26 @@ func Add(mgr manager.Manager, environment *bootstrap.Environment) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, env *bootstrap.Environment) reconcile.Reconciler {
+	if env.Config.Metric != nil {
+		eventChan := make(chan event_source.Event)
+		src := &aggregate.Source{}
+		if ms, err := k8s.NewMetricSource(eventChan, env); err != nil {
+			log.Error(err, "failed to create slime-metric")
+		} else {
+			src.Sources = append(src.Sources, ms)
+
+			r := &ReconcileServiceFence{
+				client:    mgr.GetClient(),
+				scheme:    mgr.GetScheme(),
+				env:       env,
+				eventChan: eventChan,
+				source:    src,
+			}
+			r.source.Start(env.Stop)
+			r.WatchSource(env.Stop)
+			return r
+		}
+	}
 	return &ReconcileServiceFence{client: mgr.GetClient(), scheme: mgr.GetScheme(), env: env}
 }
 
@@ -85,7 +108,9 @@ type ReconcileServiceFence struct {
 	client client.Client
 	scheme *runtime.Scheme
 
-	env *bootstrap.Environment
+	env       *bootstrap.Environment
+	eventChan chan event_source.Event
+	source    event_source.Source
 }
 
 // Reconcile reads that state of the cluster for a ServiceFence object and makes changes based on the state read
@@ -140,35 +165,40 @@ func DoUpdate(i metav1.Object, args ...interface{}) error {
 		} else {
 			diff := this.updateVisitedHostStatus(instance)
 			this.recordVisitor(instance, diff)
-			sidecar, err := newSidecar(instance, this.env)
-			if err != nil {
-				log.Error(err, "servicefence生产sidecar的过程中发生错误")
-				return err
-			}
-			if sidecar == nil {
-				return nil
-			}
-			// Set VisitedHost instance as the owner and controller
-			if err := controllerutil.SetControllerReference(instance, sidecar, this.scheme); err != nil {
-				log.Error(err, "servicefence为sidecar添加ownerReference的过程中发生错误")
-				return err
-			}
-			// Check if this Pod already exists
-			found := &v1alpha3.Sidecar{}
-			err = this.client.Get(context.TODO(), types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}, found)
-			if err != nil && errors.IsNotFound(err) {
-				log.Info("Creating a new Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
-				err = this.client.Create(context.TODO(), sidecar)
+			if instance.Spec.Enable {
+				if this.source != nil {
+					this.source.WatchAdd(types.NamespacedName{Name: instance.Name, Namespace: instance.Namespace})
+				}
+				sidecar, err := newSidecar(instance, this.env)
 				if err != nil {
+					log.Error(err, "servicefence生产sidecar的过程中发生错误")
 					return err
 				}
-			} else if err == nil {
-				if !reflect.DeepEqual(found.Spec, sidecar.Spec) {
-					log.Info("Update a  Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
-					sidecar.ResourceVersion = found.ResourceVersion
-					err = this.client.Update(context.TODO(), sidecar)
+				if sidecar == nil {
+					return nil
+				}
+				// Set VisitedHost instance as the owner and controller
+				if err := controllerutil.SetControllerReference(instance, sidecar, this.scheme); err != nil {
+					log.Error(err, "servicefence为sidecar添加ownerReference的过程中发生错误")
+					return err
+				}
+				// Check if this Pod already exists
+				found := &v1alpha3.Sidecar{}
+				err = this.client.Get(context.TODO(), types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}, found)
+				if err != nil && errors.IsNotFound(err) {
+					log.Info("Creating a new Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
+					err = this.client.Create(context.TODO(), sidecar)
 					if err != nil {
 						return err
+					}
+				} else if err == nil {
+					if !reflect.DeepEqual(found.Spec, sidecar.Spec) {
+						log.Info("Update a  Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
+						sidecar.ResourceVersion = found.ResourceVersion
+						err = this.client.Update(context.TODO(), sidecar)
+						if err != nil {
+							return err
+						}
 					}
 				}
 			}
@@ -246,8 +276,7 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 	now := time.Now().Unix()
 	for k, v := range host.Spec.Host {
 		allHost := []string{k}
-		hs := virtualservice.HostDestinationMapping.Get(k).([]string)
-		if len(hs) > 0 {
+		if hs := getDestination(k); len(hs) > 0 {
 			allHost = append(allHost, hs...)
 		}
 		var status microservicev1alpha1.Destinations_Status
@@ -273,6 +302,32 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 		domains[k] = &microservicev1alpha1.Destinations{
 			Hosts:  allHost,
 			Status: status,
+		}
+	}
+
+	for mk, _ := range host.Status.MetricStatus {
+		mk = strings.Trim(mk, "{}")
+		if strings.HasPrefix(mk, "destination_service") {
+			ss := strings.Split(mk, "\"")
+			if len(ss) != 3 {
+				continue
+			} else {
+				k := ss[1]
+				if !isValidHost(k) {
+					continue
+				}
+				if domains[k] != nil {
+					continue
+				}
+				allHost := []string{k}
+				if hs := getDestination(k); len(hs) > 0 {
+					allHost = append(allHost, hs...)
+				}
+				domains[k] = &microservicev1alpha1.Destinations{
+					Hosts:  allHost,
+					Status: microservicev1alpha1.Destinations_ACTIVE,
+				}
+			}
 		}
 	}
 	delta := Diff{
@@ -380,4 +435,24 @@ func (r *ReconcileServiceFence) Subscribe(host string, destination interface{}) 
 		}
 	}
 	return
+}
+
+func getDestination(k string) []string {
+	if i := virtualservice.HostDestinationMapping.Get(k); i != nil {
+		if hs, ok := i.([]string); ok {
+			return hs
+		}
+	}
+	return nil
+}
+
+// TODO: More rigorous verification
+func isValidHost(h string) bool {
+	if strings.Contains(h, "global-sidecar") {
+		return false
+	}
+	if strings.Contains(h, ":") {
+		return false
+	}
+	return true
 }
