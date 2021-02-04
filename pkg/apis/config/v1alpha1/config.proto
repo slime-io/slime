@@ -62,11 +62,14 @@ message Prometheus_Source{
   map<string, Handler> handlers = 2;
 }
 
-message Metric{
+message K8S_Source{
+  repeated string handlers = 1;
+}
 
-  oneof source{
-    Prometheus_Source prometheus = 1;
-  }
+
+message Metric{
+  Prometheus_Source prometheus = 1;
+  K8S_Source k8s = 2;
 }
 
 

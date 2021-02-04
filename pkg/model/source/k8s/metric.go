@@ -123,15 +123,19 @@ func (m *Source) processSubsetPod(subsetsPods map[string][]string, svc *v1.Servi
 		return
 	}
 	for k, v := range m.items {
+		// This is inline handler
 		if k == "pod" {
 			for subsetName, subsetPods := range subsetsPods {
 				material[subsetName+".pod"] = strconv.Itoa(len(subsetPods))
 			}
 			continue
 		}
+		if v.Query == "" {
+			continue
+		}
 		query := strings.ReplaceAll(v.Query, "$namespace", svc.Namespace)
 		// TODO: Use more accurate replacements
-		query = strings.ReplaceAll(v.Query, "$source_app", svc.Name)
+		query = strings.ReplaceAll(query, "$source_app", svc.Name)
 		switch v.Type {
 		case v1alpha1.Prometheus_Source_Value:
 			if k == "" {
@@ -140,24 +144,32 @@ func (m *Source) processSubsetPod(subsetsPods map[string][]string, svc *v1.Servi
 			// Could be grouped by subset
 			if strings.Contains(v.Query, "$pod_name") {
 				for subsetName, subsetPods := range subsetsPods {
-					query = strings.ReplaceAll(query, "$pod_name", strings.Join(subsetPods, "|"))
-					m.queryValue(query, material, subsetName+"."+k)
+					subQuery := strings.ReplaceAll(query, "$pod_name", strings.Join(subsetPods, "|"))
+					if result := m.queryValue(subQuery); result != "" {
+						material[subsetName+"."+k] = result
+					}
 				}
 			} else {
-				m.queryValue(query, material, k)
+				if result := m.queryValue(query); result != "" {
+					material[k] = result
+				}
 			}
 		case v1alpha1.Prometheus_Source_Group:
-			m.queryGroup(query, material)
+			for k, v := range m.queryGroup(query) {
+				material[k] = v
+			}
 		}
 	}
 }
 
-func (m *Source) queryValue(q string, material map[string]string, key string) {
+func (m *Source) queryValue(q string) string {
 	qv, w, e := m.api.Query(context.Background(), q, time.Now())
 	if e != nil {
 		log.Error(e, "failed get metric from prometheus")
+		return ""
 	} else if w != nil {
 		log.Error(fmt.Errorf(strings.Join(w, ";")), "failed get metric from prometheus")
+		return ""
 	} else {
 		switch qv.Type() {
 		case model.ValVector:
@@ -165,28 +177,31 @@ func (m *Source) queryValue(q string, material map[string]string, key string) {
 			if vector.Len() != 1 {
 				log.Error(fmt.Errorf("Invaild Query"), "You need to sum up the monitoring data")
 			}
-			for _, vx := range vector {
-				material[key] = vx.Value.String()
-			}
+			return vector[0].Value.String()
 		}
 	}
+	return ""
 }
 
-func (m *Source) queryGroup(q string, material map[string]string) {
+func (m *Source) queryGroup(q string) map[string]string {
 	qv, w, e := m.api.Query(context.Background(), q, time.Now())
+	result := make(map[string]string)
 	if e != nil {
 		log.Error(e, "failed get metric from prometheus")
+		return nil
 	} else if w != nil {
 		log.Error(fmt.Errorf(strings.Join(w, ";")), "failed get metric from prometheus")
+		return nil
 	} else {
 		switch qv.Type() {
 		case model.ValVector:
 			vector := qv.(model.Vector)
 			for _, vx := range vector {
-				material[vx.Metric.String()] = vx.Value.String()
+				result[vx.Metric.String()] = vx.Value.String()
 			}
 		}
 	}
+	return result
 }
 
 func update(m *Source, loc types.NamespacedName) {

@@ -1,0 +1,31 @@
+{
+  "limiter": {
+    "enable": true,
+    "backend": 1
+  },
+  "fence": {
+    "enable": false
+  },
+  "plugin": {
+    "enable": false,
+    "local": {
+      "mount": "/tmp/envoy"
+    }
+  },
+  "global": {
+    "service": "app",
+    "istioNamespace": "istio-system",
+    "slimeNamespace": "mesh-operator"
+  },
+  "metric": {
+    "prometheus": {
+      "address": "http://localhost:9090",
+      "handlers": {
+        "cpu.sum": {
+          "type": "Group",
+          "query": "sum(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod_name\",image=\"\"})"
+        }
+      }
+    }
+  }
+}

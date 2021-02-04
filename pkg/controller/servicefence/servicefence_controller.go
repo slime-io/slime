@@ -11,15 +11,16 @@ import (
 	"reflect"
 	"strings"
 	"time"
-	event_source "yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/model/source/aggregate"
-	"yun.netease.com/slime/pkg/model/source/k8s"
 
 	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
 	"yun.netease.com/slime/pkg/bootstrap"
 	controller2 "yun.netease.com/slime/pkg/controller"
 	"yun.netease.com/slime/pkg/controller/virtualservice"
+	event_source "yun.netease.com/slime/pkg/model/source"
+	"yun.netease.com/slime/pkg/model/source/aggregate"
+	"yun.netease.com/slime/pkg/model/source/k8s"
 	"yun.netease.com/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
@@ -36,8 +37,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
 )
 
 var log = logf.Log.WithName("controller_servicefence")
@@ -313,14 +312,21 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 				continue
 			} else {
 				k := ss[1]
-				if !isValidHost(k) {
+				ks := strings.Split(k, ".")
+				var unityHost string
+				if len(ks) == 1 {
+					unityHost = fmt.Sprintf("%s.%s.svc.cluster.local", ks[0], host.Namespace)
+				} else if len(ks) == 2 {
+					unityHost = fmt.Sprintf("%s.%s.svc.cluster.local", ks[0], ks[1])
+				}
+				if !isValidHost(unityHost) {
 					continue
 				}
-				if domains[k] != nil {
+				if domains[unityHost] != nil {
 					continue
 				}
-				allHost := []string{k}
-				if hs := getDestination(k); len(hs) > 0 {
+				allHost := []string{unityHost}
+				if hs := getDestination(unityHost); len(hs) > 0 {
 					allHost = append(allHost, hs...)
 				}
 				domains[k] = &microservicev1alpha1.Destinations{
@@ -448,10 +454,9 @@ func getDestination(k string) []string {
 
 // TODO: More rigorous verification
 func isValidHost(h string) bool {
-	if strings.Contains(h, "global-sidecar") {
-		return false
-	}
-	if strings.Contains(h, ":") {
+	if strings.Contains(h, "global-sidecar") ||
+		strings.Contains(h, ":") ||
+		strings.Contains(h, "unknown") {
 		return false
 	}
 	return true
