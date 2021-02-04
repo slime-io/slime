@@ -73,6 +73,8 @@ affinity: { }
 
 namespace: mesh-operator
 
+istioNamespace: istio-system
+
 component:
   globalSidecar:
     enable: false

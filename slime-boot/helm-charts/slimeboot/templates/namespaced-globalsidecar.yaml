@@ -1,6 +1,7 @@
 {{ if .Values.component}}
 {{ if .Values.component.globalSidecar.enable }}
-  {{ range $_,$ns :=  .Values.component.globalSidecar.namespace }}
+{{ with (eq  .Values.component.globalSidecar.type "namespaced") }}
+  {{ range $_,$ns :=  $.Values.component.globalSidecar.namespace }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -229,6 +230,7 @@ spec:
                     prefix: /
                   route:
                     cluster: outbound|{{.}}||global-sidecar.{{$ns}}.svc.cluster.local
+  {{ end }}
   {{ end }}
   {{ end }}
   {{ end }}
