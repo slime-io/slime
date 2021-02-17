@@ -2,6 +2,8 @@
 
 [中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)
 
+![slime-logo](logo/slime-logo.png)
+
 Slime is a CRD controller for istio. Designed to use istio/envoy advanced features more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
 
 **[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration on demand.
@@ -22,7 +24,7 @@ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install
 ### Install & Use
 
 **make sure [slime-boot](#install-slime-boot) has been installed.**
-  
+
 1. Install the lazyload module and additional components, through slime-boot configuration:
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -233,7 +235,7 @@ Successful access, the backend services are reviews and details.
 
 ## Adaptive Ratelimit
 ### Install & Use
-  
+
 **make sure [slime-boot](#install-slime-boot) has been installed.**   
 
 1. Install the limiter module, through slime-boot:
@@ -251,7 +253,7 @@ spec:
         backend: 1
       name: slime-limiter
   //...      
-``` 
+```
 
 2. Define smartlimiter resources
 
@@ -462,4 +464,4 @@ Review service can get 3 quotas every 10s, and the service has 3 instances, so e
 The fourth visit within 10s will trigger limit. View the accesslog of productpage to see the ratelimit effect more intuitively:
 ```
 [2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default
-```                          
+```

@@ -1,5 +1,9 @@
 # Slime
 
+![slime-logo](logo/slime-logo.png)
+
+---
+
 slime是针对istio的CRD控制器。旨在通过简单配置，自动更便捷的使用istio/envoy高阶功能。不同功能对应slime中的不同模块，目前slime包含了三个子模块：
 
 **[配置懒加载](#配置懒加载):** 无须配置SidecarScope，自动按需加载配置/服务发现信息  
@@ -22,7 +26,7 @@ kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/s
 ### 安装和使用
 
 **请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**     
-  
+
 1. 使用Slime的配置懒加载功能需打开Fence模块，同时安装附加组件，如下：
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -229,7 +233,7 @@ reviews 和 details 被自动加入！
 ### 安装和使用
 
 **注意:** 自适应限流功能可以对接envoy社区支持的限流插件`envoy.filters.http.local_ratelimit`，也可以对接网易自研插件`com.netease.local_flow_control`。envoy社区的限流插件暂不支持HeaderMatch的配置，使用`com.netease.local_flow_control`插件前需确认envoy二进制中是否包含该插件。      
-  
+
 **请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**  
 
 使用Slime的自适应限流功能需打开Limiter模块：
@@ -247,7 +251,7 @@ spec:
         backend: 1
       name: slime-limiter
   //...      
-``` 
+```
 
 根据限流规则为目标服务定义SmartLimite资源，如下所示：
 
@@ -465,7 +469,8 @@ spec:
 
 **访问productpage页面**     
 多次访问productpage页面将触发限流，查看productpage的accesslog可以更直观的看出限流效果：
+
 ```
 $ kubectl logs {productpage pod} -c istio-proxy
-[2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default
-```%                               
+[2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default                              
+```
