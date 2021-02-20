@@ -24,7 +24,7 @@ type Source struct {
 	K8sClient []*kubernetes.Clientset
 	api       prometheus.API
 	//
-	items            map[string]string
+	items            map[string]*v1alpha1.Prometheus_Source_Handler
 	Watcher          watch.Interface
 	Interest         cmap.ConcurrentMap
 	UpdateChan       chan types.NamespacedName
@@ -97,6 +97,9 @@ func (m *Source) subscribe(key string, value interface{}) {
 }
 
 func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*Source, error) {
+	if env.Config.Metric == nil {
+		return nil, nil
+	}
 	k8sClient := env.K8SClient
 	watcher, err := k8sClient.CoreV1().Endpoints("").Watch(metav1.ListOptions{})
 	es := &Source{
@@ -106,30 +109,27 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 		UpdateChan: make(chan types.NamespacedName),
 		Interest:   cmap.New(),
 	}
-	switch m := env.Config.Metric.Source.(type) {
-	case *v1alpha1.Metric_Prometheus:
-		if m.Prometheus == nil {
-			break
+	if m := env.Config.Metric.Prometheus; m != nil {
+		promClient, err := prometheus_client.NewClient(prometheus_client.Config{
+			Address:      m.Address,
+			RoundTripper: nil,
+		})
+		if err != nil {
+			log.Error(err, "failed create prometheus client")
 		} else {
-			promClient, err := prometheus_client.NewClient(prometheus_client.Config{
-				Address:      m.Prometheus.Address,
-				RoundTripper: nil,
-			})
-			if err != nil {
-				log.Error(err, "failed create prometheus client")
-				break
-			}
 			es.api = prometheus.NewAPI(promClient)
-			es.items = make(map[string]string)
-			for k, v := range m.Prometheus.Handlers {
-				es.items[k] = v.Query
-			}
+			es.items = m.Handlers
+		}
+	}
+	if m := env.Config.Metric.K8S; m != nil {
+		for _, v := range m.Handlers {
+			// TODO: Transformed into a function
+			es.items[v] = &v1alpha1.Prometheus_Source_Handler{}
 		}
 	}
 	if err != nil {
 		return nil, err
 	}
-
 	es.SetHandler(metricGetHandler, metricWatcherHandler, metricTimerHandler, update)
 	return es, nil
 }

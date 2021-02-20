@@ -1,0 +1,28 @@
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: smartlimiter
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: slime-metric-35a37dd
+  module:
+    - limiter:
+        enable: true
+        backend: 1
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            cpu.sum:
+              query: |
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.max:
+              query: |
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+        k8s:
+          handlers:
+            - pod # inline
+      name: limiter

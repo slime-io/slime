@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
 
 	"github.com/prometheus/common/model"
 	"istio.io/api/networking/v1alpha3"
@@ -110,48 +111,104 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 				}
 			}
 		}
-		m.processSubsetPod(subsetsPods, service.Namespace, material)
+		m.processSubsetPod(subsetsPods, service, material)
 	} else {
 		reqLogger.Error(nil, "Service Not Found")
 	}
 	return material
 }
 
-func (m *Source) processSubsetPod(subsetsPods map[string][]string, namespace string, material map[string]string) {
+func (m *Source) processSubsetPod(subsetsPods map[string][]string, svc *v1.Service, material map[string]string) {
 	if material == nil {
 		return
 	}
-	for subsetName, subsetPods := range subsetsPods {
-		material[subsetName+".pod"] = strconv.Itoa(len(subsetPods))
-		for k, v := range m.items {
-			v := strings.ReplaceAll(v, "$namespace", namespace)
-			query := strings.ReplaceAll(v, "$pod_name", strings.Join(subsetPods, "|"))
-			qv, w, e := m.api.Query(context.Background(), query, time.Now())
-			if e != nil {
-				log.Error(e, "failed get metric from prometheus")
-			} else if w != nil {
-				log.Error(fmt.Errorf(strings.Join(w, ";")), "failed get metric from prometheus")
-			} else {
-				switch qv.Type() {
-				case model.ValVector:
-					vector := qv.(model.Vector)
-					if vector.Len() != 1 {
-						log.Error(fmt.Errorf("bad data"), "You need to sum up the monitoring data")
-					}
-					for _, vx := range vector {
-						material[subsetName+"."+k] = vx.Value.String()
+	for k, v := range m.items {
+		// This is inline handler
+		if k == "pod" {
+			for subsetName, subsetPods := range subsetsPods {
+				material[subsetName+".pod"] = strconv.Itoa(len(subsetPods))
+			}
+			continue
+		}
+		if v.Query == "" {
+			continue
+		}
+		query := strings.ReplaceAll(v.Query, "$namespace", svc.Namespace)
+		// TODO: Use more accurate replacements
+		query = strings.ReplaceAll(query, "$source_app", svc.Name)
+		switch v.Type {
+		case v1alpha1.Prometheus_Source_Value:
+			if k == "" {
+				log.Error(fmt.Errorf("Invaild Query"), "value type must have a item")
+			}
+			// Could be grouped by subset
+			if strings.Contains(v.Query, "$pod_name") {
+				for subsetName, subsetPods := range subsetsPods {
+					subQuery := strings.ReplaceAll(query, "$pod_name", strings.Join(subsetPods, "|"))
+					if result := m.queryValue(subQuery); result != "" {
+						material[subsetName+"."+k] = result
 					}
 				}
+			} else {
+				if result := m.queryValue(query); result != "" {
+					material[k] = result
+				}
+			}
+		case v1alpha1.Prometheus_Source_Group:
+			for k, v := range m.queryGroup(query) {
+				material[k] = v
 			}
 		}
 	}
 }
 
+func (m *Source) queryValue(q string) string {
+	qv, w, e := m.api.Query(context.Background(), q, time.Now())
+	if e != nil {
+		log.Error(e, "failed get metric from prometheus")
+		return ""
+	} else if w != nil {
+		log.Error(fmt.Errorf(strings.Join(w, ";")), "failed get metric from prometheus")
+		return ""
+	} else {
+		switch qv.Type() {
+		case model.ValVector:
+			vector := qv.(model.Vector)
+			if vector.Len() != 1 {
+				log.Error(fmt.Errorf("Invaild Query"), "You need to sum up the monitoring data")
+			}
+			return vector[0].Value.String()
+		}
+	}
+	return ""
+}
+
+func (m *Source) queryGroup(q string) map[string]string {
+	qv, w, e := m.api.Query(context.Background(), q, time.Now())
+	result := make(map[string]string)
+	if e != nil {
+		log.Error(e, "failed get metric from prometheus")
+		return nil
+	} else if w != nil {
+		log.Error(fmt.Errorf(strings.Join(w, ";")), "failed get metric from prometheus")
+		return nil
+	} else {
+		switch qv.Type() {
+		case model.ValVector:
+			vector := qv.(model.Vector)
+			for _, vx := range vector {
+				result[vx.Metric.String()] = vx.Value.String()
+			}
+		}
+	}
+	return result
+}
+
 func update(m *Source, loc types.NamespacedName) {
 	material := m.Get(loc)
-	if material["@base.pod"] == "0" || material["@base.pod"] == "" {
+	/*if material["@base.pod"] == "0" || material["@base.pod"] == "" {
 		return
-	}
+	}*/
 	m.EventChan <- source.Event{
 		EventType: source.Add,
 		Loc:       loc,

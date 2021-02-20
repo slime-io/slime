@@ -3,6 +3,9 @@
     "enable": true,
     "backend": 1
   },
+  "fence": {
+    "enable": false
+  },
   "plugin": {
     "enable": false,
     "local": {
@@ -10,17 +13,17 @@
     }
   },
   "global": {
-    "service": "app"
+    "service": "app",
+    "istioNamespace": "istio-system",
+    "slimeNamespace": "mesh-operator"
   },
   "metric": {
     "prometheus": {
       "address": "http://localhost:9090",
       "handlers": {
         "cpu.sum": {
+          "type": "Group",
           "query": "sum(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod_name\",image=\"\"})"
-        },
-        "cpu.max": {
-          "query": "max(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod_name\",image=\"\"})"
         }
       }
     }

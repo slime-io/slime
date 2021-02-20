@@ -50,18 +50,26 @@ message Fence {
 }
 
 message Prometheus_Source{
+  enum Type{
+    Value = 0;
+    Group = 1;
+  }
   message Handler{
     string query = 1;
+    Type type = 2;
   }
   string address = 1;
   map<string, Handler> handlers = 2;
 }
 
-message Metric{
+message K8S_Source{
+  repeated string handlers = 1;
+}
 
-  oneof source{
-    Prometheus_Source prometheus = 1;
-  }
+
+message Metric{
+  Prometheus_Source prometheus = 1;
+  K8S_Source k8s = 2;
 }
 
 

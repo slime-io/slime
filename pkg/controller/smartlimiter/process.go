@@ -192,7 +192,7 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 
 	instance.Status = microservicev1alpha1.SmartLimiterStatus{
 		RatelimitStatus: descriptor,
-		EndPointStatus:  material,
+		MetricStatus:  material,
 	}
 	if err := r.client.Status().Update(context.TODO(), instance); err != nil {
 		return reconcile.Result{}, err

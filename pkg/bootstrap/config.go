@@ -28,14 +28,6 @@ var (
 			IstioNamespace: "istio-system",
 			SlimeNamespace: "mesh-operator",
 		},
-		Metric: &netease_config.Metric{
-			Source: &netease_config.Metric_Prometheus{
-				Prometheus: &netease_config.Prometheus_Source{
-					Address:  "localhost:9090",
-					Handlers: map[string]*netease_config.Prometheus_Source_Handler{},
-				},
-			},
-		},
 	}
 )
 

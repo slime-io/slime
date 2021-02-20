@@ -15,16 +15,16 @@ metadata:
   name: {{ .name }}
   namespace: {{ $.Values.namespace }}
   labels:
-    app: {{.name}}
+    app: {{.name }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{.name}}
+      app: {{.name }}
   template:
     metadata:
       labels:
-        app: {{.name}}
+        app: {{.name }}
     spec:
       {{- with $.Values.imagePullSecrets }}
       imagePullSecrets:

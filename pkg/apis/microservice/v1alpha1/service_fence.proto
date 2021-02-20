@@ -127,5 +127,6 @@ message Destinations {
 
 message ServiceFenceStatus {
     map<string, Destinations> domains = 1;
+    map<string, string> metricStatus = 3;
     map<string, bool> visitor = 2;
 }

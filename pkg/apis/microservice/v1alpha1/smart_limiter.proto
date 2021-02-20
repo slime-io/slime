@@ -31,7 +31,7 @@ message SmartLimiterSpec {
 
 message SmartLimiterStatus {
     map<string, SmartLimitDescriptors> ratelimitStatus = 1;
-    map<string, string> endPointStatus = 2;
+    map<string, string> metricStatus = 2;
     message ServiceStatus {
         map<string, string> selector = 1;
         message Listener {
