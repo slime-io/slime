@@ -43,8 +43,8 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 		svc := &v1.Service{}
 		_ = r.client.Get(context.TODO(), loc, svc)
 		svcSelector := svc.Spec.Selector
-		// 使用@base作为key，可以为基础集合配置限流
-		sets = append(sets, &networking.Subset{Name: "@base"})
+		// 使用base作为key，可以为基础集合配置限流
+		sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
 		for _, set := range sets {
 			if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
 				descriptor := &microservicev1alpha1.SmartLimitDescriptors{}

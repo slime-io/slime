@@ -164,7 +164,7 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 	efs, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
 	for k, ef := range efs {
 		var efcr *v1alpha3.EnvoyFilter
-		if k == "@base" {
+		if k == util.Wellkonw_BaseSet {
 			efcr = &v1alpha3.EnvoyFilter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),

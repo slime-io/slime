@@ -15,8 +15,8 @@ func TestCalcaulator(t *testing.T) {
 	a8, _ := Calculate("4+5*6+((7+8)/6)>10&16/2>10")
 	a9, _ := Calculate("10")
 
-	a10, _ := CalculateTemplate("{{.ratelimit}}/{{.v1.epNum}}", map[string]interface{}{
-		"ratelimit": "100",
+	a10, _ := CalculateTemplate("{{._ratelimit}}/{{.v1.epNum}}", map[string]interface{}{
+		"_ratelimit": "100",
 		"v1": map[string]interface{}{
 			"epNum": "2",
 		},

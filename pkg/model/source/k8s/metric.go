@@ -206,9 +206,6 @@ func (m *Source) queryGroup(q string) map[string]string {
 
 func update(m *Source, loc types.NamespacedName) {
 	material := m.Get(loc)
-	/*if material["@base.pod"] == "0" || material["@base.pod"] == "" {
-		return
-	}*/
 	m.EventChan <- source.Event{
 		EventType: source.Add,
 		Loc:       loc,
