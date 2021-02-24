@@ -37,33 +37,34 @@ metadata:
   name: lazyload
   namespace: mesh-operator
 spec:
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # application svc port
+        - {{port1}} # svc port
         - {{port2}}
         - ...
       name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
   component:
     globalSidecar:
       enable: true
+      type: namespaced
       namespace:
-      - {{your namespace}} # application namespaces
+        - default # app namespace
+        - {{you namespace}}
     pilot:
       enable: true
       image:
         repository: docker.io/bcxq/pilot
         tag: preview-1.3.7-v0.0.1
-    reportServer:
-      enable: true
-      mixImage:
-        repository: docker.io/bcxq/mixer
-        tag: preview-1.3.7-v0.0.1
-      inspectorImage:
-        repository: docker.io/bcxq/report-server
-        tag: preview-v0.0.1-rc
 ```
 2. make sure all components are running
 ```
@@ -112,6 +113,129 @@ spec:
     labels:
       app: {{your svc}}
 ```
+#### Other installation options
+
+**Disable global-sidecar**
+
+In the ServiceMesh with allow_any enabled, the global-sidecar component can be omitted. Use the following configuration:
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} 
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+```
+Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
+
+**Use the cluster's only global-sidecar**
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} 
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: cluster
+      namespace:
+        - default 
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1      
+```
+
+**Use report-server to report the dependency**
+When prometheus is not configured in the cluster, the dependency can be reported through report-server  
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} 
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default 
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
+    reportServer:
+      enable: true
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
+      mixerImage:
+        repository: docker.io/bcxq/mixer
+        tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/bcxq/report-server
+        tag: preview-v0.0.1-rc    
+```
+
 
 ### Uninstall
 
@@ -229,11 +353,107 @@ reviews and details are automatically added！
 ```
 Successful access, the backend services are reviews and details.
 
-
 ## Http Plugin Management
-// TODO
 ### Install & Use
-// TODO
+Use the following configuration to install the HTTP plugin management module:
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: example-slimeboot
+  namespace: mesh-operator
+spec:
+  module:
+    - plugin:
+        enable: true
+        local:
+          mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
+```
+#### inline plugin
+**Note:** Envoy binary needs to support extension plugins
+**enable/disable**
+Configure PluginManager in the following format to open the built-in plugin:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # switch
+    name: {plugin-1}
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+{plugin-N} is the name of the plug-in, and the sort in PluginManager is the execution order of the plug-in.
+Set the enable field to false to disable the plugin.
+**Global configuration**
+
+The global configuration corresponds to the plug-in configuration in LDS. Set the global configuration in the following format:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # 插件开关
+    name: {plugin-1}      # 插件名称
+    inline:
+      settings:
+        {plugin settings} # 插件配置
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+
+
+**Host/route level configuration**
+
+Configure EnvoyPlugin in the following format:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: project1-abc
+  namespace: gateway-system
+spec:
+  workload_labels:
+    app: my-app
+  host:                          # Effective range(host level)              
+  - jmeter.com
+  - istio.com
+  - 989.mock.qa.netease.com
+  - demo.test.com
+  - netease.com
+  route:                         # Effective range(route level), The route field must correspond to the name in VirtualService
+  - abc
+  plugins:
+  - name: com.netease.supercache # plugin name
+    settings:                    # plugin settings
+      cache_ttls:
+        LocalHttpCache:
+          default: 60000
+      enable_rpx:
+        headers:
+        - name: :status
+          regex_match: 200|
+      key_maker:
+        exclude_host: false
+        ignore_case: true
+      low_level_fill: true
+```
 ### Uninstall
 // TODO
 
@@ -242,24 +462,84 @@ Successful access, the backend services are reviews and details.
 
 **make sure [slime-boot](#install-slime-boot) has been installed.**   
 
-1. Install the limiter module, through slime-boot:
+Install the limiter module, through slime-boot:
 ```yaml
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: limiter
+  name: smartlimiter
   namespace: mesh-operator
 spec:
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
   module:
     - limiter:
         enable: true
-        backend: 1
-      name: slime-limiter
-  //...      
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            cpu.sum:
+              query: |
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.max:
+              query: |
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+        k8s:
+          handlers:
+            - pod # inline
+      name: limiter    
+```
+In the example, we configure prometheus as the monitoring source, and "prometheus handlers" defines the attributes that we want to obtain from monitoring. These attributes can be used as parameters in the traffic rules to achieve the purpose of adaptive ratelimit. Refer to [Adaptive current limiting based on monitoring] (#Adaptive current limiting based on monitoring).
+Users can also define the monitoring attributes that the limiter module needs to obtain according to their needs. The following are some commonly used statements for obtaining monitoring attributes:
+```
+CPU:
+Sum：
+sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+Max：
+max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+Limit:
+container_spec_cpu_quota{pod=~"$pod_name"}
+
+Memory：
+Sum：
+sum(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+Max：
+max(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+Limit:
+sum(container_spec_memory_limit_bytes{pod=~"$pod_name"})
+
+Request Duration：
+90：
+histogram_quantile(0.90, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+95：
+histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+99：
+histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
 ```
 
-2. Define smartlimiter resources
+#### Subset RateLimit
+In istio's system, users can define subsets for services through DestinationRule, and customize service traffic rules such as load balancing and connection pooling for them. RateLimit also belongs to this kind of service traffic rules. Through the slime framework, we can not only customize the rateLimit rules for services, but also for subsets, as shown below:
+
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: SmartLimiter
+metadata:
+  name: reviews
+  namespace: default
+spec:
+  sets:
+    v1: # reviews v1
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
+        condition: "true"
+```
+The above configuration limits 10 requests per second for the v1 version of the reviews service. After submitting the configuration, the status information and ratelimit information of the instance under the service will be displayed in `status`, as follows:
 
 ```yaml
 apiVersion: microservice.netease.com/v1alpha1
@@ -268,72 +548,65 @@ metadata:
   name: test-svc
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3"      # quota
-      fill_interval:
-        seconds: 1    # statistical period
-    condition: "true" # Turn on limit when the formula in condition is true
-```
-The above configuration limits 3 requests per second for the test-svc service. After submitting the configuration, the status information and current limit information of the instance under the service will be displayed in `status`, as follows:
-
-```yaml
-apiVersion: microservice.netease.com/v1alpha1
-kind: SmartLimiter
-metadata:
-  name: test-svc
-  namespace: default
-spec:
-  descriptors:
-  - action:
-      quota: "3"
-      fill_interval:
-        seconds: 1
-    condition: "true"
+  sets:
+    v1: # reviews的v1版本
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
+        condition: "true"
 status:
-  endPointStatus:
-    cpu: "398293"        # cpu(ns)
-    cpu_max: "286793"    # map_cpu(ns)
-    memory: "68022"      # memory(kb)  
-    memory_max: "55236"  # memory_max(kb)
-    pod: "1"
+  metricStatus:
+  # ...
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "3"
+    v1:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
 ```
 ####  Adaptive ratelimit based on metrics
-
 The metrics information entry can be configured in `condition`. For example, if the current limit is triggered when the cpu exceeds 300ms, the following configuration can be performed:
 
 ```yaml
 apiVersion: microservice.netease.com/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3"
-      fill_interval:
-        seconds: 1
-    condition: "{cpu}>300000" # The unit of cpu is ns. If the cpu value is greater than 300000ns, the limit will be triggered
+  sets:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "5"
+        condition: '{{.v2.cpu.sum}}>10000' 
 status:
-  endPointStatus:
-    cpu: "398293"        
-    cpu_max: "286793"    
-    memory: "68022"      
-    memory_max: "55236"  
-    pod: "1"
+  metricStatus:
+    '_base.cpu.max': "11279.791407871"
+    '_base.cpu.sum': "31827.916205633"
+    '_base.pod': "3"
+    v1.cpu.max: "9328.098703551"
+    v1.cpu.sum: "9328.098703551"
+    v1.pod: "1"
+    v2.cpu.max: "11220.026094211"
+    v2.cpu.sum: "11220.026094211"
+    v2.pod: "1"
+    v3.cpu.max: "11279.791407871"
+    v3.cpu.sum: "11279.791407871"
+    v3.pod: "1"
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "3"
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "5"
 ```
-
 The formula in the condition will be rendered according to the entry of endPointStatus. If the result of the rendered formula is true, the limit will be triggered.
 
 #### Service ratelimit
@@ -343,31 +616,37 @@ Due to the lack of global quota management components, we cannot achieve precise
 apiVersion: microservice.netease.com/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3/{pod}" # The calculation will be rendered as 3/3 according to the pod value in endPointStatus
-      fill_interval:
-        seconds: 1
-    condition: "{cpu}>300000" 
-    match:
-    - exact_match: user
-      invert_match: false
-      name: Bob
+  sets:
+    "_base":
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "3/{{._base.pod}}"
 status:
-  endPointStatus:
-    cpu: "xxxxx"        
-    cpu_max: "xxxx"    
-    memory: "xxx"       
-    memory_max: "xx" 
-    pod: "3" # The endpoint of test-svc is expanded to 3
+  metricStatus:
+    '_base.cpu.max': "11279.791407871"
+    '_base.cpu.sum': "31827.916205633"
+    '_base.pod': "3"
+    v1.cpu.max: "9328.098703551"
+    v1.cpu.sum: "9328.098703551"
+    v1.pod: "1"
+    v2.cpu.max: "11220.026094211"
+    v2.cpu.sum: "11220.026094211"
+    v2.pod: "1"
+    v3.cpu.max: "11279.791407871"
+    v3.cpu.sum: "11279.791407871"
+    v3.pod: "1"
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "1" # Obviously, 3/3=1
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "1" # For each instance, the current limit quota is 3/3=1.
 ```
 ### Uninstall
 1. Delete slime-boot configuration

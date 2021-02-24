@@ -8,6 +8,6 @@ then
   operator-sdk build $HUB:$branch-$commit
   docker push $HUB:$branch-$commit
 else
-  operator-sdk build $HUB:$branch-$tag
-  docker push $HUB:$branch-$tag
+  operator-sdk build $HUB:$tag
+  docker push $HUB:$tag
 fi

@@ -223,11 +223,123 @@ reviews 和 details 被自动加入！
 访问成功, 后端服务是reviews和details.
 
 ## HTTP插件管理
+### 安装和使用
+使用如下配置安装HTTP插件管理模块：
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: example-slimeboot
+  namespace: mesh-operator
+spec:
+  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  module:
+    - plugin:
+        enable: true
+        local:
+          mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
+```
+### 内建插件
+**注意:** envoy的二进制需支持扩展插件
+
+**打开/停用**   
+
+按如下格式配置PluginManager，即可打开内建插件:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # 插件开关
+    name: {plugin-1}
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+其中，{plugin-N}为插件名称，PluginManager中的排序为插件执行顺序。
+将enable字段设置为false即可停用插件。
+
+**全局配置**
+
+全局配置对应LDS中的插件配置，按如下格式设置全局配置:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # 插件开关
+    name: {plugin-1}      # 插件名称
+    inline:
+      settings:
+        {plugin settings} # 插件配置
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+
+**Host/路由级别配置**
+
+按如下格式配置EnvoyPlugin:
+```yaml
+apiVersion: microservice.netease.com/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: project1-abc
+  namespace: gateway-system
+spec:
+  workload_labels:
+    app: my-app
+  host:                          # 插件的生效范围(host级别)              
+  - jmeter.com
+  - istio.com
+  - 989.mock.qa.netease.com
+  - demo.test.com
+  - netease.com
+  route:                         # 插件的生效范围(route级别), route字段须对应VirtualService中的名称
+  - abc
+  plugins:
+  - name: com.netease.supercache # 插件名称
+    settings:                    # 插件配置
+      cache_ttls:
+        LocalHttpCache:
+          default: 60000
+      enable_rpx:
+        headers:
+        - name: :status
+          regex_match: 200|
+      key_maker:
+        exclude_host: false
+        ignore_case: true
+      low_level_fill: true
+```
+### 扩展wasm插件
+
 // TODO
-### 安装
+
+### 示例
 // TODO
+
 ### 卸载
-// TODO
+1. 删除slime-boot配置
+2. 删除servicefence配置
+```shell
+for i in $(kubectl get ns);do kubectl delete pluginmanager -n $i --all;done
+for i in $(kubectl get ns);do kubectl delete envoyplugin -n $i --all;done
+```
 
 ## 自适应限流
 ### 安装和使用
@@ -244,17 +356,58 @@ metadata:
   name: limiter
   namespace: mesh-operator
 spec:
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
   module:
     - limiter:
         enable: true
-        backend: 1
-      name: slime-limiter
-  //...      
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            cpu.sum:
+              query: |
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.max:
+              query: |
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+        k8s:
+          handlers:
+            - pod # inline
+      name: limiter
+```
+在示例中，我们配置了prometheus作为监控源，prometheus.handlers定义了希望从监控中获取的监控指标，这些监控指标可以作为治理规则中的参数，从而达到自适应限流的目的，具体用法可参考[基于监控的自适应限流](#基于监控的自适应限流)。
+用户也可以根据需要定义limiter模块需要获取的监控指标，以下是一些可以常用的监控指标获取语句：
+```
+cpu:
+总和：
+sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+最大值：
+max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+limit:
+container_spec_cpu_quota{pod=~"$pod_name"}
+
+内存：
+总和：
+sum(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+最大值：
+max(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+limit:
+sum(container_spec_memory_limit_bytes{pod=~"$pod_name"})
+
+请求时延：
+90值：
+histogram_quantile(0.90, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+95值：
+histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+99值：
+histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
 ```
 
-根据限流规则为目标服务定义SmartLimite资源，如下所示：
-
+#### 分组限流
+在istio的体系中，用户可以通过DestinationRule为服务定义subset，并为其定制负载均衡，连接池等服务治理规则。限流同样属于此类服务治理规则，通过slime框架，我们不仅可以为服务，也可以为subset定制限流规则，如下所示：
 ```yaml
 apiVersion: microservice.netease.com/v1alpha1
 kind: SmartLimiter
@@ -336,7 +489,7 @@ condition中的算式会根据endPointStatus的条目进行渲染，渲染后的
 apiVersion: microservice.netease.com/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
   descriptors:
