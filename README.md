@@ -1,14 +1,13 @@
 # Slime
+# Smart ServiceMesh Manager
 
 [中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)  
  
 [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
+![slime-logo](logo/slime-logo.png)
 
-![slime-logo](logo/slime-logo.png)  
-
-
-Slime is a CRD controller for istio. Designed to use istio/envoy advanced features more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
+Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
 
 **[Configuration Lazy Loading](#configure-lazy-loading):** No need to configure SidecarScope, automatically load configuration on demand.
 
@@ -16,7 +15,22 @@ Slime is a CRD controller for istio. Designed to use istio/envoy advanced featur
 
 **[Adaptive Ratelimit](#adaptive-ratelimit):** It can be automatically combined with adaptive ratelimit strategy based on metrics.
 
-## Install slime-boot
+## Architecture
+The Slime architecture is mainly divided into three parts:
+
+1. slime-boot，Deploy the operator component of the slime-module, and the slime-module can be deployed quickly and easily through the slime-boot.
+2. slime-controller，The core thread of slime-module senses SlimeCRD and converts to IstioCRD.
+3. slime-metric，The monitoring acquisition thread of slime-module is used to perceive the service status, and the slime-controller will dynamically adjust the service traffic rules according to the service status.
+
+![slime架构图](media/arch.png)
+
+The user defines the service traffic policy in the CRD spec. At the same time, slime-metric obtains information about the service status from prometheus and records it in the metricStatus of the CRD. After the slime-module controller perceives the service status through metricStatus, it renders the corresponding monitoring items in the service governance policy, calculates the formula in the policy, and finally generates traffic rules.
+
+![limiter治理策略](media/policy.png)
+
+## How to Use Slime
+
+### Install slime-boot
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
 ```
 kubectl create ns mesh-operator
@@ -24,8 +38,8 @@ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install
 kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/slime-boot-install.yaml
 ```
 
-## Configure lazy loading
-### Install & Use
+### Configure lazy loading
+#### Install & Use
 
 **make sure [slime-boot](#install-slime-boot) has been installed.**
 
@@ -115,7 +129,7 @@ spec:
 ```
 #### Other installation options
 
-**Disable global-sidecar**
+**Disable global-sidecar**  
 
 In the ServiceMesh with allow_any enabled, the global-sidecar component can be omitted. Use the following configuration:
 ```yaml
@@ -144,7 +158,8 @@ spec:
 ```
 Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
 
-**Use the cluster's only global-sidecar**
+**Use cluster unique global-sidecar**     
+
 ```yaml
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
@@ -182,8 +197,10 @@ spec:
         tag: preview-1.3.7-v0.0.1      
 ```
 
-**Use report-server to report the dependency**
-When prometheus is not configured in the cluster, the dependency can be reported through report-server  
+**Use report-server to report the dependency**   
+
+When prometheus is not configured in the cluster, the dependency can be reported through report-server.  
+
 ```yaml
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
@@ -237,7 +254,7 @@ spec:
 ```
 
 
-### Uninstall
+#### Uninstall
 
 1. Delete corresponding slime-boot configuration.
 2. Delete all servicefence configurations.
@@ -245,7 +262,7 @@ spec:
 for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
 ```
 
-### Example
+#### Example
 
 1. install istio ( > 1.8 )
 2. install slime 
@@ -353,8 +370,8 @@ reviews and details are automatically added！
 ```
 Successful access, the backend services are reviews and details.
 
-## Http Plugin Management
-### Install & Use
+### Http Plugin Management
+#### Install & Use
 Use the following configuration to install the HTTP plugin management module:
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -454,11 +471,9 @@ spec:
         ignore_case: true
       low_level_fill: true
 ```
-### Uninstall
-// TODO
 
-## Adaptive Ratelimit
-### Install & Use
+### Adaptive Ratelimit
+#### Install & Use
 
 **make sure [slime-boot](#install-slime-boot) has been installed.**   
 
@@ -648,13 +663,13 @@ status:
             seconds: 1
           quota: "1" # For each instance, the current limit quota is 3/3=1.
 ```
-### Uninstall
+#### Uninstall
 1. Delete slime-boot configuration
 2. Delete smartlimiter configuration
 ```
 for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
 ```
-### Example
+#### Example
 Take bookinfo as an example.
 
 1. Install istio ( > 1.8 ).

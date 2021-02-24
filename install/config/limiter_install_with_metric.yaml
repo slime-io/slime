@@ -7,7 +7,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/bcxq/slime
-    tag: slime-metric-35a37dd
+    tag: v0.1.0
   module:
     - limiter:
         enable: true

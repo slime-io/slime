@@ -1,10 +1,9 @@
-# Slime
-
+# Slime 
+# 智能网格管理器 
 ![slime-logo](logo/slime-logo.png)
 
 ---
-
-slime是针对istio的CRD控制器。旨在通过简单配置，自动更便捷的使用istio/envoy高阶功能。不同功能对应slime中的不同模块，目前slime包含了三个子模块：
+slime是基于istio的智能网格管理器，通过slime，我们可以定义动态的服务治理策略，从而达到自动便捷使用istio/envoy高阶功能的目的。目前slime包含了三个子模块：
 
 **[配置懒加载](#配置懒加载):** 无须配置SidecarScope，自动按需加载配置/服务发现信息  
 
@@ -14,7 +13,22 @@ slime是针对istio的CRD控制器。旨在通过简单配置，自动更便捷�
 
 后续我们会开放更多的功能模块~
 
-## 安装slime-boot
+## 架构
+Slime架构主要分为三大块：
+
+1. slime-boot，部署slime-module的operator组件，通过slime-boot可以便捷快速的部署slime-module。
+2. slime-controller，slime-module的核心线程，感知SlimeCRD并转换为IstioCRD。
+3. slime-metric，slime-module的监控获取线程，用于感知服务状态，slime-controller会根据服务状态动态调整服务治理规则。
+
+其架构图如下：
+
+![slime架构图](media/arch.png)
+
+使用者将服务治理策略定义在CRD的spec中，同时，slime-metric从prometheus获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
+![limiter治理策略](media/policy_zh.png)
+
+## 如何使用Slime
+### 安装slime-boot
 在使用slime之前，需要安装slime-boot，通过slime-boot，可以方便的安装和卸载slime模块。 执行如下命令：
 ```
 kubectl create ns mesh-operator
@@ -22,8 +36,8 @@ kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/c
 kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/slime-boot-install.yaml
 ```
 
-## 配置懒加载
-### 安装和使用
+### 配置懒加载
+#### 安装和使用
 
 **请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**     
 
@@ -44,22 +58,26 @@ spec:
         - {{port2}}
         - ...
       name: slime-fence
- component:
-   globalSidecar:
-     enable: true
-     namespace:
-       - default # 替换为业务所在的namespace
-       - {{you namespace}}
-   pilot:
-     enable: true
-     image:
-       repository: docker.io/bcxq/pilot
-       tag: preview-1.3.7-v0.0.1
-   reportServer:
-     enable: true
-     image:
-       repository: docker.io/bcxq/mixer
-       tag: preview-1.3.7-v0.0.1  
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
 ```
 2. 确认所有组件已正常运行：
 ```
@@ -67,7 +85,6 @@ $ kubectl get po -n mesh-operator
 NAME                                    READY     STATUS    RESTARTS   AGE
 global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
 lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
-report-server-855c8cf558-wdqjs          2/2       Running   0          27s
 slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
 ```
@@ -109,13 +126,136 @@ spec:
       app: {{your svc}}
 ```
 
-### 卸载
+#### 其他安装选项
+
+**不使用global-sidecar组件**  
+在开启allow_any的网格中，可以不使用global-sidecar组件。使用如下配置：
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+```
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。   
+
+**使用集群唯一的global-sidecar**   
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: cluster
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1      
+```
+
+**使用report-server上报调用关系**   
+集群内未配置prometheus时，可通过report-server上报依赖关系   
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
+    reportServer:
+      enable: true
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
+      mixerImage:
+        repository: docker.io/bcxq/mixer
+        tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/bcxq/report-server
+        tag: preview-v0.0.1-rc    
+```
+
+#### 卸载
 1. 删除slime-boot配置
 2. 删除servicefence配置
 ```shell
 for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
 ```
-### 示例: 为bookinfo开启配置懒加载
+#### 示例: 为bookinfo开启配置懒加载
 1. 安装 istio ( > 1.8 )
 2. 安装 slime 
 ```shell
@@ -222,8 +362,8 @@ reviews 和 details 被自动加入！
 ```
 访问成功, 后端服务是reviews和details.
 
-## HTTP插件管理
-### 安装和使用
+### HTTP插件管理
+#### 安装和使用
 使用如下配置安装HTTP插件管理模块：
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -243,7 +383,7 @@ spec:
     repository: docker.io/bcxq/slime
     tag: v0.1.0
 ```
-### 内建插件
+#### 内建插件
 **注意:** envoy的二进制需支持扩展插件
 
 **打开/停用**   
@@ -341,8 +481,8 @@ for i in $(kubectl get ns);do kubectl delete pluginmanager -n $i --all;done
 for i in $(kubectl get ns);do kubectl delete envoyplugin -n $i --all;done
 ```
 
-## 自适应限流
-### 安装和使用
+### 自适应限流
+#### 安装和使用
 
 **注意:** 自适应限流功能可以对接envoy社区支持的限流插件`envoy.filters.http.local_ratelimit`，也可以对接网易自研插件`com.netease.local_flow_control`。envoy社区的限流插件暂不支持HeaderMatch的配置，使用`com.netease.local_flow_control`插件前需确认envoy二进制中是否包含该插件。      
 
@@ -515,13 +655,13 @@ status:
         seconds: 1
       quota: "1" 显然，3/3=1
 ```
-### 卸载
+#### 卸载
 1. 删除slime-boot配置
 2. 删除smartlimiter配置
 ```
 for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
 ```
-### 示例
+#### 示例
 以bookinfo为例，介绍配置限流如何使用。开始之前，确保已经安装了istio1.8版本以及slime-boot。示例中的bookinfo安装在default namespace。   
 
 **安装bookinfo**
