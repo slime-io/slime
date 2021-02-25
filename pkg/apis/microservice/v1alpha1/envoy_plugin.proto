@@ -86,7 +86,7 @@ message EnvoyPlugin {
     // which user should use this plugin setting
     repeated string user = 6;
 
-    // group setting 用于路由组级别的配置设置，其优先级低于路由级别的配置
+    // Deprecated
     bool isGroupSetting = 7;
 
     message Listener {

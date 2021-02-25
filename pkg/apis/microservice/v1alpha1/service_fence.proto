@@ -80,9 +80,8 @@ message Timestamp {
 }
 
 message ServiceFenceSpec {
-
-    // 访问的服务以及其回收策略
     map<string, RecyclingStrategy> host = 1;
+    // Switch to render servicefence as sidecar
     bool enable = 2;
 }
 message RecyclingStrategy {
@@ -97,13 +96,13 @@ message RecyclingStrategy {
     message Auto {
         Timestamp duration = 1;
     }
-    // 永久存在的配置
+    // Configuration that will not be cleaned up
     Stable stable = 1;
 
-    // 到期失效
+    // Configurations that expire after expiration
     Deadline deadline = 2;
 
-    // 当最近一次访问时间大于duration时，将其状态改变为失效
+    // Deprecated
     Auto auto = 3;
 
     Timestamp RecentlyCalled = 4;
@@ -112,10 +111,9 @@ message RecyclingStrategy {
 
 message Destinations {
 
-    // 记录最近一次调用，当失效策略为auto时，需定期刷新该值
+    // Deprecated
     Timestamp RecentlyCalled = 1;
 
-    // domain对应的上游服务
     repeated string hosts = 2;
 
     enum Status {

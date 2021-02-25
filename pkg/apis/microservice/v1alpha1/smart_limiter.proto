@@ -18,14 +18,18 @@ option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
 //   namespace: powerful
 // spec:
 //   descriptors:
-//   - action:
-//       fill_interval:
-//         seconds: 60
-//       quota: "30/{pod}"
-//     condition: "true"
+//   sets:
+//     v1:
+//     - action:
+//         fill_interval:
+//           seconds: 60
+//         quota: "30/{._base.pod}"
+//       condition: "true"
 
 message SmartLimiterSpec {
     string domain = 1;
+
+    // subset rate-limit,the key is subset name.
     map<string, SmartLimitDescriptors> sets = 2;
 }
 
@@ -33,13 +37,18 @@ message SmartLimiterStatus {
     map<string, SmartLimitDescriptors> ratelimitStatus = 1;
     map<string, string> metricStatus = 2;
     message ServiceStatus {
+        // Deprecated
         map<string, string> selector = 1;
         message Listener {
+            // Deprecated
             string name = 1;
+            // Deprecated
             uint32 port = 2;
         }
+        // Deprecated
         repeated Listener listener = 2;
     }
+    // Deprecated
     ServiceStatus serviceStatus = 3;
 }
 
@@ -56,15 +65,24 @@ message SmartLimitDescriptor {
         bool invert_match = 8;
     }
     message Action {
+        // rate-limit quota, which can be a template expression
         string quota = 1;
         google.protobuf.Duration fill_interval = 2;
     }
+
+    // rate-limit departure conditions, which can be a template expression.
+    // When the expression value is true, the limit will be triggered
     string condition = 2;
+
+    // Limited traffic behavior
     Action action = 3;
+
+    // not support
     repeated HeaderMatcher match = 4;
 }
 
 message SmartLimitDescriptors {
+    // Description of current rate-limit
     repeated SmartLimitDescriptor descriptor = 4;
 }
 

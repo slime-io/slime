@@ -67,6 +67,7 @@ message PluginManager {
 message Plugin {
     bool enable = 1;
     string name = 2;
+    // Deprecated
     google.protobuf.Struct settings = 3;
     enum ListenerType {
         Outbound = 0;
@@ -76,6 +77,7 @@ message Plugin {
     string type_url = 5;
     oneof plugin_settings {
         Wasm wasm = 6;
+        // plugin compiled inside envoy
         Inline inline = 7;
     }
 }
