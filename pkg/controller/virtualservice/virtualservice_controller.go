@@ -19,9 +19,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	networkingv1alpha3 "yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
+	networkingv1alpha3 "slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	controller2 "slime.io/slime/pkg/controller"
 )
 
 var log = logf.Log.WithName("controller_virtualservice")

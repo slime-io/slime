@@ -87,7 +87,7 @@ rules:
   verbs:
   - get
 - apiGroups:
-  - microservice.netease.com
+  - microservice.slime.io
   resources:
   - '*'
   verbs:

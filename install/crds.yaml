@@ -1,9 +1,9 @@
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: servicefences.microservice.netease.com
+  name: servicefences.microservice.slime.io
 spec:
-  group: microservice.netease.com
+  group: microservice.slime.io
   names:
     shortNames:
       - svf
@@ -22,9 +22,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: smartlimiters.microservice.netease.com
+  name: smartlimiters.microservice.slime.io
 spec:
-  group: microservice.netease.com
+  group: microservice.slime.io
   names:
     kind: SmartLimiter
     listKind: SmartLimiterList
@@ -42,9 +42,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: envoyplugins.microservice.netease.com
+  name: envoyplugins.microservice.slime.io
 spec:
-  group: microservice.netease.com
+  group: microservice.slime.io
   names:
     shortNames:
       - evp
@@ -61,9 +61,9 @@ spec:
 apiVersion: apiextensions.k8s.io/v1beta1
 kind: CustomResourceDefinition
 metadata:
-  name: pluginmanagers.microservice.netease.com
+  name: pluginmanagers.microservice.slime.io
 spec:
-  group: microservice.netease.com
+  group: microservice.slime.io
   names:
     shortNames:
       - plm

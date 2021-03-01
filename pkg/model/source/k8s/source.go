@@ -12,11 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 
-	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
-	"yun.netease.com/slime/pkg/bootstrap"
-	"yun.netease.com/slime/pkg/controller/destinationrule"
-	"yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/apis/config/v1alpha1"
+	"slime.io/slime/pkg/bootstrap"
+	"slime.io/slime/pkg/controller/destinationrule"
+	"slime.io/slime/pkg/model/source"
+	"slime.io/slime/pkg/util"
 )
 
 type Source struct {

@@ -7,11 +7,11 @@ syntax = "proto3";
 import "google/protobuf/duration.proto";
 package netease.microservice.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 // SmartLimiter 用于配置自适应限流插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
 // 示例如下：
-// apiVersion: microservice.netease.com/v1alpha1
+// apiVersion: microservice.slime.io/v1alpha1
 // kind: SmartLimiter
 // metadata:
 //   name: a

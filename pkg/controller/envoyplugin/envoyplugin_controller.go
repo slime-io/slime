@@ -3,11 +3,11 @@ package envoyplugin
 import (
 	"context"
 
-	mircroservice "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	"yun.netease.com/slime/pkg/util"
+	mircroservice "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	"slime.io/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -22,7 +22,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
-	controller2 "yun.netease.com/slime/pkg/controller"
+	controller2 "slime.io/slime/pkg/controller"
 )
 
 var log = logf.Log.WithName("controller_envoyplugin")

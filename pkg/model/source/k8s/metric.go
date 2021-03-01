@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	"slime.io/slime/pkg/apis/config/v1alpha1"
 
 	"github.com/prometheus/common/model"
 	"istio.io/api/networking/v1alpha3"
@@ -16,9 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"yun.netease.com/slime/pkg/controller/destinationrule"
-	"yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/controller/destinationrule"
+	"slime.io/slime/pkg/model/source"
+	"slime.io/slime/pkg/util"
 )
 
 var log = logf.Log.WithName("source_k8s_metric_source")

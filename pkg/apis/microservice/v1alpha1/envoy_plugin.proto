@@ -10,7 +10,7 @@ syntax = "proto3";
 // host级别，对应同一host下的路由规则
 
 // 示例如下：
-// apiVersion: microservice.netease.com/v1alpha1
+// apiVersion: microservice.slime.io/v1alpha1
 // kind: EnvoyPlugin
 // metadata:
 //   name: project1-3-458-rewrite
@@ -41,7 +41,7 @@ import "pkg/apis/microservice/v1alpha1/plugin_manager.proto";
 
 package netease.microservice.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 
 // `WorkloadSelector` specifies the criteria used to determine if the

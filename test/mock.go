@@ -13,7 +13,7 @@ import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
 )
 
 type MockClient struct {

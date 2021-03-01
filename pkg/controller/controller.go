@@ -5,7 +5,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"yun.netease.com/slime/pkg/bootstrap"
+	"slime.io/slime/pkg/bootstrap"
 )
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager

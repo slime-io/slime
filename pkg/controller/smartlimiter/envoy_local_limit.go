@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strconv"
 
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/controller/destinationrule"
-	"yun.netease.com/slime/pkg/util"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/controller/destinationrule"
+	"slime.io/slime/pkg/util"
 
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_extensions_filters_http_local_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"

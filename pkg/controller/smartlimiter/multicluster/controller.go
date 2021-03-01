@@ -19,7 +19,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"yun.netease.com/slime/pkg/bootstrap"
+	"slime.io/slime/pkg/bootstrap"
 )
 
 const (

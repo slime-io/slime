@@ -63,7 +63,7 @@ message RateLimitDescriptorConfigSpec {
 例如，想要实现当`cpu`使用率大于`30000ns`时触发限流，限流额为100除以pod数量，可以如下配置：
 
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: a
@@ -83,7 +83,7 @@ spec:
 配置完成后，监控项会显示在`endPointStatus`中，限流信息显示在`ratelimitStatus`中，如下所示：
 
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: a

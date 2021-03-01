@@ -7,7 +7,7 @@ syntax = "proto3";
 
 // PluginManager 用于管理插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
 // 示例如下：
-// apiVersion: microservice.netease.com/v1alpha1
+// apiVersion: microservice.slime.io/v1alpha1
 // kind: PluginManager
 // metadata:
 //   name: gw-cluster-gateway-proxy
@@ -45,7 +45,7 @@ import "google/protobuf/struct.proto";
 
 package netease.microservice.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 message PluginManager {
     // Zero or more labels that indicate a specific set of pods/VMs whose

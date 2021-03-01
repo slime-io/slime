@@ -1,4 +1,4 @@
-module yun.netease.com/slime
+module slime.io/slime
 
 go 1.13
 

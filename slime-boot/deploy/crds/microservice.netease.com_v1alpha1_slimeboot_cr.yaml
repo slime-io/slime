@@ -1,4 +1,4 @@
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SlimeBoot
 metadata:
   name: example-slimeboot

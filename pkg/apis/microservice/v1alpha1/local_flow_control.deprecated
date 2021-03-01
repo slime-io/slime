@@ -6,7 +6,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.local_flow_control
 option java_outer_classname = "LocalFlowControlProto";
 option java_multiple_files = true;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 // 单机限流： 插件名称: com.netease.local_flow_control
 // 功能：支持服务级别、路由级别限流配置，

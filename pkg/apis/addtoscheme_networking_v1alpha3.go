@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
 )
 
 func init() {

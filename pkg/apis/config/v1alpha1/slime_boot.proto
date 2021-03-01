@@ -10,7 +10,7 @@ import "pkg/apis/config/v1alpha1/config.proto";
 
 package netease.config.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/config/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
 message SlimeBootStatus {
 
 }

@@ -110,7 +110,7 @@ metadata:
   name: {{your svc}}
   namespace: {{your ns}}
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -305,7 +305,7 @@ metadata:
   name: productpage
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -336,7 +336,7 @@ metadata:
   name: productpage
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -390,7 +390,7 @@ spec:
 
 按如下格式配置PluginManager，即可打开内建插件:
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: PluginManager
 metadata:
   name: my-plugin
@@ -412,7 +412,7 @@ spec:
 
 全局配置对应LDS中的插件配置，按如下格式设置全局配置:
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: PluginManager
 metadata:
   name: my-plugin
@@ -435,7 +435,7 @@ spec:
 
 按如下格式配置EnvoyPlugin:
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: EnvoyPlugin
 metadata:
   name: project1-abc
@@ -549,7 +549,7 @@ histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kub
 #### 分组限流
 在istio的体系中，用户可以通过DestinationRule为服务定义subset，并为其定制负载均衡，连接池等服务治理规则。限流同样属于此类服务治理规则，通过slime框架，我们不仅可以为服务，也可以为subset定制限流规则，如下所示：
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
@@ -567,7 +567,7 @@ spec:
 上述配置为reviews服务的v1版本限制了每秒10次的请求。将配置提交之后，该服务下实例的状态信息以及限流信息会显示在`status`中，如下：
 
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
@@ -595,7 +595,7 @@ status:
 #### 基于监控的自适应限流
 在示例的slimeboot中，我们获取了服务容器的cpu总和以及最大值作为limiter模块所关心的监控指标，从prometheus获取的监控数据会被显示在metricStatus中，我们可以采用这些指标作为触发限流的条件，如下所示：
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
@@ -636,7 +636,7 @@ condition中的算式会根据metricStatus的条目进行渲染，渲染后的�
 #### 服务限流
 由于缺乏全局配额管理组件，我们无法做到精确的服务限流，但是假定负载均衡理想的情况下，实例限流数=服务限流数/实例个数。reviews的服务限流数为3，那么可以将quota字段配置为3/{{._base.pod}}以实现服务级别的限流。在服务发生扩容时，可以在限流状态栏中看到实例限流数的变化。
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
@@ -703,7 +703,7 @@ $ kubectl apply -f samples/reviews-svc-limiter.yaml
 **确认配置已经创建**
 ```
 $ kubectl get smartlimiter reviews -oyaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
@@ -731,7 +731,7 @@ metadata:
   name: reviews.default.local-ratelimit
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: SmartLimiter

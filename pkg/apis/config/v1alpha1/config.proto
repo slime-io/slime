@@ -6,7 +6,7 @@ import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 
 
-option go_package = "yun.netease.com/slime/pkg/apis/config/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
 
 
 message LocalSource {

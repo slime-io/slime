@@ -3,14 +3,14 @@ package pluginmanager
 import (
 	"context"
 
-	config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
-	microservice "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/controller/pluginmanager/wasm"
-	"yun.netease.com/slime/pkg/util"
+	config "slime.io/slime/pkg/apis/config/v1alpha1"
+	microservice "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	controller2 "slime.io/slime/pkg/controller"
+	"slime.io/slime/pkg/controller/pluginmanager/wasm"
+	"slime.io/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"

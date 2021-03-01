@@ -19,10 +19,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/util"
 )
 
 func HeaderMatchToKey(matchers []*v1alpha1.HeaderMatcher) string {
