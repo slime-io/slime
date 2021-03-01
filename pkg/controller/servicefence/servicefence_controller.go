@@ -313,7 +313,7 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 			} else {
 				k := ss[1]
 				ks := strings.Split(k, ".")
-				var unityHost string
+				unityHost := k
 				if len(ks) == 1 {
 					unityHost = fmt.Sprintf("%s.%s.svc.cluster.local", ks[0], host.Namespace)
 				} else if len(ks) == 2 {
