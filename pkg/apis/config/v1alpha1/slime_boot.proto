@@ -8,7 +8,7 @@ syntax = "proto3";
 import "pkg/apis/config/v1alpha1/config.proto";
 
 
-package netease.config.v1alpha1;
+package slime.config.v1alpha1;
 
 option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
 message SlimeBootStatus {

@@ -5,7 +5,7 @@
 
 syntax = "proto3";
 import "google/protobuf/duration.proto";
-package netease.microservice.v1alpha1;
+package slime.microservice.v1alpha1;
 
 option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 

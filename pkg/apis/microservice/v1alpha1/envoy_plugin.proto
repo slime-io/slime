@@ -39,7 +39,7 @@ syntax = "proto3";
 //           parse_body_behavior: DontParse
 import "pkg/apis/microservice/v1alpha1/plugin_manager.proto";
 
-package netease.microservice.v1alpha1;
+package slime.microservice.v1alpha1;
 
 option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 

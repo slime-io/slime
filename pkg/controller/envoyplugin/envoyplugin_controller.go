@@ -160,7 +160,7 @@ func DoUpdate(i metav1.Object, args ...interface{}) error {
 }
 
 func newEnvoyFilterForEnvoyPlugin(cr *wrapper.EnvoyPlugin) *v1alpha3.EnvoyFilter {
-	pb, err := util.FromJSONMap("netease.microservice.v1alpha1.EnvoyPlugin", cr.Spec)
+	pb, err := util.FromJSONMap("slime.microservice.v1alpha1.EnvoyPlugin", cr.Spec)
 	if err != nil {
 		log.Error(err, "unable to convert envoyPlugin to envoyFilter")
 		return nil

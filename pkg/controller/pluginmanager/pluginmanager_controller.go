@@ -185,7 +185,7 @@ func DoUpdate(i metav1.Object, args ...interface{}) error {
 }
 
 func (r *ReconcilePluginManager) newPluginManagerForEnvoyPlugin(cr *wrapper.PluginManager) *v1alpha3.EnvoyFilter {
-	pb, err := util.FromJSONMap("netease.microservice.v1alpha1.PluginManager", cr.Spec)
+	pb, err := util.FromJSONMap("slime.microservice.v1alpha1.PluginManager", cr.Spec)
 	if err != nil {
 		log.Error(err, "unable to convert pluginManager to envoyFilter")
 		return nil

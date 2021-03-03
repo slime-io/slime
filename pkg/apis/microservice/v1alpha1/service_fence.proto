@@ -4,9 +4,9 @@
 */
 
 syntax = "proto3";
-package netease.microservice.v1alpha1;
+package slime.microservice.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 // ServiceFence是在社区Sidecar资源之上的一层封装，其主要作用与Sidecar资源相同，可以隔绝服务
 // 所不关心的配置，从而提升大规模场景下服务网格的性能。与Sidecar资源不同的是，ServiceFence
