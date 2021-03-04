@@ -1,8 +1,12 @@
 # Slime
 
-[中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)
+[中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)  
+ 
+[![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
-![slime-logo](logo/slime-logo.png)
+
+![slime-logo](logo/slime-logo.png)  
+
 
 Slime is a CRD controller for istio. Designed to use istio/envoy advanced features more automatically and conveniently through simple configuration. Currently slime contains three sub-modules:
 
