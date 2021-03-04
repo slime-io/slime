@@ -1,11 +1,11 @@
 # Slime
-# Smart ServiceMesh Manager
+## Smart ServiceMesh Manager
 
 [中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)  
  
-[![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
-
-![slime-logo](logo/slime-logo.png)
+![slime-logo](logo/slime-logo.png)    
+ 
+ [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
 Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
 
