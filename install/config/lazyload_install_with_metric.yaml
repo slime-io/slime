@@ -25,6 +25,7 @@ spec:
   component:
     globalSidecar:
       enable: true
+      type: namespaced
       namespace:
         - default # 替换为bookinfo安装的ns
       resources:
