@@ -2,10 +2,9 @@
 * @Author: yangdihang
 * @Date: 2021/1/7
  */
-
 package e2e
 
-import (
+/*import (
 	"path/filepath"
 	"strings"
 
@@ -89,3 +88,4 @@ var _ = framework.KubeDescribe("[Slow]", func() {
 		})
 	})
 })
+*/

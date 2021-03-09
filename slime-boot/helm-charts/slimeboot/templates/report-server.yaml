@@ -1,5 +1,5 @@
 {{if .Values.component}}
-  {{if .Values.component.reportServer.enable }}
+  {{if .Values.component.reportServer}}
 ---
 apiVersion: apps/v1
 kind: Deployment

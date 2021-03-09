@@ -1,0 +1,14 @@
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  name: reviews
+  namespace: default
+spec:
+  sets:
+    _base:
+      descriptor:
+        - action:
+            fill_interval:
+              seconds: 60
+            quota: '3/{{._base.pod}}'
+          condition: '{{._base.rt99}}>10'
