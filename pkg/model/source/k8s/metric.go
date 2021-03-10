@@ -174,8 +174,13 @@ func (m *Source) queryValue(q string) string {
 		switch qv.Type() {
 		case model.ValVector:
 			vector := qv.(model.Vector)
+			if vector.Len() == 0 {
+				log.Info("No data")
+				return ""
+			}
 			if vector.Len() != 1 {
 				log.Error(fmt.Errorf("Invaild Query"), "You need to sum up the monitoring data")
+				return ""
 			}
 			return vector[0].Value.String()
 		}
