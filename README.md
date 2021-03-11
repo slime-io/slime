@@ -264,46 +264,101 @@ for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
 
 #### Example
 
-1. install istio ( > 1.8 )
-2. install slime 
-```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/master/install/easy_install_lazyload.sh)"
-```
-3. Make sure all components are running
+##### Step1: install istio ( > 1.8 )
+##### Step2: install slime
+1. Download Slime
+   ```
+   wget https://github.com/slime-io/slime/archive/v0.1.0-alpha.tar.gz
+   tar -xvf v0.1.0-alpha.tar.gz
+   ```
+   
+2. Enter the "install" folder
+   ```
+   cd slime-0.1.0-alpha/install 
+   ```
+3. Modify installation file of slime-lazyload
+   ```shell
+   ➜  install cat config/lazyload_install_with_metric.yaml 
+   apiVersion: config.netease.com/v1alpha1
+   kind: SlimeBoot
+   metadata:
+     name: lazyload
+     namespace: mesh-operator
+   spec:
+     image:
+       pullPolicy: Always
+       repository: docker.io/bcxq/slime
+       tag: v0.1.0
+     module:
+       - name: lazyload
+         fence:
+           enable: true
+           wormholePort: # replace to your application svc ports
+             - "9080"
+         metric:
+           prometheus:
+             address: #http://prometheus_address
+             handlers:
+               destination:
+                 query: |
+                   sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
+                 type: Group
+     component:
+       globalSidecar:
+         enable: true
+         type: namespaced
+         namespace:
+           - default # 替换为bookinfo安装的ns
+         resources:
+           requests:
+             cpu: 200m
+             memory: 200Mi
+           limits:
+             cpu: 200m
+             memory: 200Mi
+       pilot:
+         enable: true
+         resources:
+           requests:
+             cpu: 200m
+             memory: 200Mi
+           limits:
+             cpu: 200m
+             memory: 200Mi
+         image:
+           repository: docker.io/bcxq/pilot
+           tag: preview-1.3.7-v0.0.1%             
+   ```
+   Replace '#http://prometheus_address' with the service address of Istio's prometheus.    
+4. Execute the installation script
+   ```shell
+   cd sample/lazyload
+   ./easy_install_lazyload.sh
+   ```
+5. Make sure all components are running
 ```
 $ kubectl get po -n mesh-operator
 NAME                                    READY     STATUS    RESTARTS   AGE
 global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
 lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
-report-server-855c8cf558-wdqjs          2/2       Running   0          27s
 slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
-
 ```
 $ kubectl get po 
 NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
-4. install bookinfo in default namespace
-5. enable push on demand
+##### Step3: Try it with bookinfo
+1. install bookinfo in default namespace
+2. enable push on demand for productpage
 ```shell
-kubectl label ns default istio-dependency-servicefence=true
+kubectl apply -f sample/lazyload/productpage-servicefence.yaml
 ```
-```shell
-kubectl annotate svc productpage istio.dependency.servicefence/status=true
-kubectl annotate svc reviews istio.dependency.servicefence/status=true
-kubectl annotate svc details istio.dependency.servicefence/status=true
-kubectl annotate svc ratings istio.dependency.servicefence/status=true
-```
-6. make sure SidecarScope is generated
+3. make sure SidecarScope is generated
 ```
 $ kubectl get sidecar
 NAME          AGE
-details       12s
-kubernetes    11s
 productpage   11s
-ratings       11s
-reviews       11s
 ```
 ```
 $ kubectl get sidecar productpage -o yaml
@@ -328,14 +383,14 @@ spec:
     labels:
       app: productpage
 ```
-7. visit productpage & view accesslog
+4. visit productpage & view accesslog
 ```
 [2021-01-04T07:12:24.101Z] "GET /details/0 HTTP/1.1" 200 - "-" 0 178 36 35 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "83793ccf-545c-4cc2-9a48-82bb70d81a2a" "details:9080" "10.244.3.83:9080" outbound|9080||global-sidecar.default.svc.cluster.local 10.244.1.206:42786 10.97.33.96:9080 10.244.1.206:40108 - -
 [2021-01-04T07:12:24.171Z] "GET /reviews/0 HTTP/1.1" 200 - "-" 0 295 33 33 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "010bb2bc-54ab-4809-b3a0-288d60670ded" "reviews:9080" "10.244.3.83:9080" outbound|9080||global-sidecar.default.svc.cluster.local 10.244.1.206:42786 10.99.230.151:9080 10.244.1.206:51512 - -
 ```
 Successful access, the accesslog shows that the backend service is global-sidecar.
 
-8. view productpage's SidecarScope again
+5. view productpage's SidecarScope again (You may need to wait about 30s, because prometheus is not updated in real time)
 ```
 $ kubectl get sidecar productpage -oyaml
 apiVersion: networking.istio.io/v1beta1
@@ -363,7 +418,7 @@ spec:
 ```
 reviews and details are automatically added！
 
-9. visit productpage & view accesslog again
+6. visit productpage & view accesslog again
 ```
 [2021-01-04T07:35:57.622Z] "GET /details/0 HTTP/1.1" 200 - "-" 0 178 2 2 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "73a6de0b-aac9-422b-af7b-2094bd37094c" "details:9080" "10.244.7.30:9080" outbound|9080||details.default.svc.cluster.local 10.244.1.206:52626 10.97.33.96:9080 10.244.1.206:47396 - default
 [2021-01-04T07:35:57.628Z] "GET /reviews/0 HTTP/1.1" 200 - "-" 0 379 134 134 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "edf8c7eb-9558-4d1e-834c-4f238b387fc5" "reviews:9080" "10.244.7.14:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:42204 10.99.230.151:9080 10.244.1.206:58798 - default
@@ -669,20 +724,62 @@ status:
 ```
 for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
 ```
-#### Example
-Take bookinfo as an example.
 
-1. Install istio ( > 1.8 ).
-2. Install slime.
+#### Example
+##### Step1: install istio ( > 1.8 )
+##### Step2: install slime
+1. Download Slime
+   ```
+   wget https://github.com/slime-io/slime/archive/v0.1.0-alpha.tar.gz
+   tar -xvf v0.1.0-alpha.tar.gz
+   ```
+2. Enter the "install" folder
+   ```
+   cd slime-0.1.0-alpha/install 
+   ```
+3. Modify installation file of slime-limiter
+   ```shell
+   apiVersion: config.netease.com/v1alpha1
+   kind: SlimeBoot
+   metadata:
+     name: smartlimiter
+     namespace: mesh-operator
+   spec:
+     image:
+       pullPolicy: Always
+       repository: docker.io/bcxq/slime
+       tag: v0.1.0
+     module:
+       - limiter:
+           enable: true
+           backend: 1
+         metric:
+           prometheus:
+             address: #http://prometheus_address
+             handlers:
+               cpu.sum:
+                 query: |
+                   sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+               cpu.max:
+                 query: |
+                   max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+               rt99:
+                 query: |
+                   histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+           k8s:
+             handlers:
+               - pod # inline
+         name: limiter              
+   ```
+   Replace '#http://prometheus_address' with the service address of Istio's prometheus.    
+##### Step3: Try it with bookinfo 
+
+1. Install bookinfo.
+2. Create smartlimiter resource for reviews service.
 ```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/master/install/easy_install_limiter.sh)"
+kubectl apply -f sample/limiter/reviews.yaml
 ```
-3. Install bookinfo.
-4. Create smartlimiter resource for reviews service.
-```
-$ kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/samples/reviews-svc-limiter.yaml  
-```
-5. make sure resource has been creaded.
+3. make sure resource has been created.
 ```
 $ kubectl get smartlimiter reviews -oyaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -691,16 +788,34 @@ metadata:
   name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3/{._base.pod}"
-      fill_interval:
-        seconds: 10
-    condition: "true"
-```
-This configuration indicates that the review service will be limited to three visits in 10s.
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: 3/{{._base.pod}}
+        condition: '{{._base.rt99}}>10'
+status:
+  metricStatus:
+    _base.cpu.max: "222.692507384"
+    _base.cpu.sum: "590.506922302"
+    _base.pod: "19"
+    v1.cpu.max: "199.51872224"
+    v1.cpu.sum: "199.51872224"
+    v1.pod: "3"
+    v2.cpu.max: "222.692507384"
+    v2.cpu.sum: "222.692507384"
+    v2.pod: "11"
+    v3.cpu.max: "168.295692678"
+    v3.cpu.sum: "168.295692678"
+    v3.pod: "5"
 
-6. Confirm whether the corresponding envoyfilter resource is created.
+```
+This configuration indicates that when 99% of the request time is greater than 10ms, the rate-limit will be triggered. 
+reviews service can get 3 quotas every 60s. 
+
+4. Confirm whether the corresponding envoyfilter resource is created.
 ```
 $ kubectl get envoyfilter  reviews.default.local-ratelimit -oyaml
 apiVersion: networking.istio.io/v1alpha3
@@ -750,15 +865,15 @@ spec:
             stat_prefix: http_local_rate_limiter
             token_bucket:
               fill_interval:
-                seconds: "10"
+                seconds: "60"
               max_tokens: 1
   workloadSelector:
     labels:
       app: reviews
 ```
-Review service can get 3 quotas every 10s, and the service has 3 instances, so each instance can get 1 quota every 10s.
+Review service can get 3 quotas every 60s, and the service has 3 instances, so each instance can get 1 quota every 60s.
 
-7. visit productpage  
+5. visit productpage  
 The fourth visit within 10s will trigger limit. View the accesslog of productpage to see the ratelimit effect more intuitively:
 ```
 [2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default
