@@ -3,14 +3,14 @@ package pluginmanager
 import (
 	"context"
 
-	config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
-	microservice "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/controller/pluginmanager/wasm"
-	"yun.netease.com/slime/pkg/util"
+	config "slime.io/slime/pkg/apis/config/v1alpha1"
+	microservice "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	controller2 "slime.io/slime/pkg/controller"
+	"slime.io/slime/pkg/controller/pluginmanager/wasm"
+	"slime.io/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
@@ -185,7 +185,7 @@ func DoUpdate(i metav1.Object, args ...interface{}) error {
 }
 
 func (r *ReconcilePluginManager) newPluginManagerForEnvoyPlugin(cr *wrapper.PluginManager) *v1alpha3.EnvoyFilter {
-	pb, err := util.FromJSONMap("netease.microservice.v1alpha1.PluginManager", cr.Spec)
+	pb, err := util.FromJSONMap("slime.microservice.v1alpha1.PluginManager", cr.Spec)
 	if err != nil {
 		log.Error(err, "unable to convert pluginManager to envoyFilter")
 		return nil

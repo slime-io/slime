@@ -17,10 +17,10 @@ import (
 
 	istionetworking "istio.io/api/networking/v1alpha3"
 
-	networkingv1alpha3 "yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/util"
+	networkingv1alpha3 "slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	controller2 "slime.io/slime/pkg/controller"
+	"slime.io/slime/pkg/util"
 )
 
 var log = logf.Log.WithName("controller_destinationrule")

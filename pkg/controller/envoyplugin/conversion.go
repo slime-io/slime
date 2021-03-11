@@ -9,8 +9,8 @@ import (
 	"fmt"
 	"strings"
 
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/util"
 
 	"github.com/gogo/protobuf/types"
 	istio "istio.io/api/networking/v1alpha3"

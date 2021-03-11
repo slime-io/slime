@@ -1,4 +1,4 @@
-module yun.netease.com/slime
+module slime.io/slime
 
 go 1.13
 
@@ -8,19 +8,17 @@ require (
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/protobuf v1.4.2
 	github.com/hashicorp/go-multierror v1.0.0
-	github.com/onsi/ginkgo v1.10.1
 	github.com/operator-framework/operator-sdk v0.15.2
 	github.com/orcaman/concurrent-map v0.0.0-20190826125027-8c72a8bb44f6
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.6.0
 	github.com/prometheus/common v0.9.1
 	github.com/spf13/pflag v1.0.5
 	gopkg.in/yaml.v2 v2.2.5
 	istio.io/api v0.0.0-20210104172659-a364d5657c55
-	istio.io/gogo-genproto v0.0.0-20190930162913-45029607206a
 	k8s.io/api v0.18.1
 	k8s.io/apimachinery v0.18.1
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/kubernetes v1.16.2
 	sigs.k8s.io/controller-runtime v0.4.0
 )
 

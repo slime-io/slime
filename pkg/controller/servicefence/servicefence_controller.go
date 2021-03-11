@@ -12,16 +12,16 @@ import (
 	"strings"
 	"time"
 
-	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/bootstrap"
-	controller2 "yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/pkg/controller/virtualservice"
-	event_source "yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/model/source/aggregate"
-	"yun.netease.com/slime/pkg/model/source/k8s"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/apis/config/v1alpha1"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/bootstrap"
+	controller2 "slime.io/slime/pkg/controller"
+	"slime.io/slime/pkg/controller/virtualservice"
+	event_source "slime.io/slime/pkg/model/source"
+	"slime.io/slime/pkg/model/source/aggregate"
+	"slime.io/slime/pkg/model/source/k8s"
+	"slime.io/slime/pkg/util"
 
 	istio "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
@@ -313,7 +313,7 @@ func (r *ReconcileServiceFence) updateVisitedHostStatus(host *microservicev1alph
 			} else {
 				k := ss[1]
 				ks := strings.Split(k, ".")
-				var unityHost string
+				unityHost := k
 				if len(ks) == 1 {
 					unityHost = fmt.Sprintf("%s.%s.svc.cluster.local", ks[0], host.Namespace)
 				} else if len(ks) == 2 {

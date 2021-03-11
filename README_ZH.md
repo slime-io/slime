@@ -1,10 +1,9 @@
-# Slime
-
+# Slime 
+# 智能网格管理器 
 ![slime-logo](logo/slime-logo.png)
 
 ---
-
-slime是针对istio的CRD控制器。旨在通过简单配置，自动更便捷的使用istio/envoy高阶功能。不同功能对应slime中的不同模块，目前slime包含了三个子模块：
+slime是基于istio的智能网格管理器，通过slime，我们可以定义动态的服务治理策略，从而达到自动便捷使用istio/envoy高阶功能的目的。目前slime包含了三个子模块：
 
 **[配置懒加载](#配置懒加载):** 无须配置SidecarScope，自动按需加载配置/服务发现信息  
 
@@ -14,7 +13,22 @@ slime是针对istio的CRD控制器。旨在通过简单配置，自动更便捷�
 
 后续我们会开放更多的功能模块~
 
-## 安装slime-boot
+## 架构
+Slime架构主要分为三大块：
+
+1. slime-boot，部署slime-module的operator组件，通过slime-boot可以便捷快速的部署slime-module。
+2. slime-controller，slime-module的核心线程，感知SlimeCRD并转换为IstioCRD。
+3. slime-metric，slime-module的监控获取线程，用于感知服务状态，slime-controller会根据服务状态动态调整服务治理规则。
+
+其架构图如下：
+
+![slime架构图](media/arch.png)
+
+使用者将服务治理策略定义在CRD的spec中，同时，slime-metric从prometheus获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
+![limiter治理策略](media/policy_zh.png)
+
+## 如何使用Slime
+### 安装slime-boot
 在使用slime之前，需要安装slime-boot，通过slime-boot，可以方便的安装和卸载slime模块。 执行如下命令：
 ```
 kubectl create ns mesh-operator
@@ -22,8 +36,8 @@ kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/c
 kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/slime-boot-install.yaml
 ```
 
-## 配置懒加载
-### 安装和使用
+### 配置懒加载
+#### 安装和使用
 
 **请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**     
 
@@ -44,22 +58,26 @@ spec:
         - {{port2}}
         - ...
       name: slime-fence
- component:
-   globalSidecar:
-     enable: true
-     namespace:
-       - default # 替换为业务所在的namespace
-       - {{you namespace}}
-   pilot:
-     enable: true
-     image:
-       repository: docker.io/bcxq/pilot
-       tag: preview-1.3.7-v0.0.1
-   reportServer:
-     enable: true
-     image:
-       repository: docker.io/bcxq/mixer
-       tag: preview-1.3.7-v0.0.1  
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
 ```
 2. 确认所有组件已正常运行：
 ```
@@ -67,7 +85,6 @@ $ kubectl get po -n mesh-operator
 NAME                                    READY     STATUS    RESTARTS   AGE
 global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
 lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
-report-server-855c8cf558-wdqjs          2/2       Running   0          27s
 slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
 ```
@@ -93,7 +110,7 @@ metadata:
   name: {{your svc}}
   namespace: {{your ns}}
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -109,13 +126,136 @@ spec:
       app: {{your svc}}
 ```
 
-### 卸载
+#### 其他安装选项
+
+**不使用global-sidecar组件**  
+在开启allow_any的网格中，可以不使用global-sidecar组件。使用如下配置：
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+```
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。   
+
+**使用集群唯一的global-sidecar**   
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: cluster
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1      
+```
+
+**使用report-server上报调用关系**   
+集群内未配置prometheus时，可通过report-server上报依赖关系   
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  module:
+    - fence:
+        enable: true
+        wormholePort:
+        - {{port1}} # 业务svc的端口
+        - {{port2}}
+        - ...
+      name: slime-fence
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default # 替换为业务所在的namespace
+        - {{you namespace}}
+    pilot:
+      enable: true
+      image:
+        repository: docker.io/bcxq/pilot
+        tag: preview-1.3.7-v0.0.1
+    reportServer:
+      enable: true
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
+      mixerImage:
+        repository: docker.io/bcxq/mixer
+        tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/bcxq/report-server
+        tag: preview-v0.0.1-rc    
+```
+
+#### 卸载
 1. 删除slime-boot配置
 2. 删除servicefence配置
 ```shell
 for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
 ```
-### 示例: 为bookinfo开启配置懒加载
+#### 示例: 为bookinfo开启配置懒加载
 1. 安装 istio ( > 1.8 )
 2. 安装 slime 
 ```shell
@@ -165,7 +305,7 @@ metadata:
   name: productpage
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -196,7 +336,7 @@ metadata:
   name: productpage
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
@@ -222,15 +362,127 @@ reviews 和 details 被自动加入！
 ```
 访问成功, 后端服务是reviews和details.
 
-## HTTP插件管理
-// TODO
-### 安装
-// TODO
-### 卸载
+### HTTP插件管理
+#### 安装和使用
+使用如下配置安装HTTP插件管理模块：
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: example-slimeboot
+  namespace: mesh-operator
+spec:
+  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  module:
+    - plugin:
+        enable: true
+        local:
+          mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
+```
+#### 内建插件
+**注意:** envoy的二进制需支持扩展插件
+
+**打开/停用**   
+
+按如下格式配置PluginManager，即可打开内建插件:
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # 插件开关
+    name: {plugin-1}
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+其中，{plugin-N}为插件名称，PluginManager中的排序为插件执行顺序。
+将enable字段设置为false即可停用插件。
+
+**全局配置**
+
+全局配置对应LDS中的插件配置，按如下格式设置全局配置:
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: PluginManager
+metadata:
+  name: my-plugin
+  namespace: default
+spec:
+  workload_labels:
+    app: my-app
+  plugins:
+  - enable: true          # 插件开关
+    name: {plugin-1}      # 插件名称
+    inline:
+      settings:
+        {plugin settings} # 插件配置
+  # ...
+  - enable: true
+    name: {plugin-N}
+```
+
+**Host/路由级别配置**
+
+按如下格式配置EnvoyPlugin:
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: project1-abc
+  namespace: gateway-system
+spec:
+  workload_labels:
+    app: my-app
+  host:                          # 插件的生效范围(host级别)              
+  - jmeter.com
+  - istio.com
+  - 989.mock.qa.netease.com
+  - demo.test.com
+  - netease.com
+  route:                         # 插件的生效范围(route级别), route字段须对应VirtualService中的名称
+  - abc
+  plugins:
+  - name: com.netease.supercache # 插件名称
+    settings:                    # 插件配置
+      cache_ttls:
+        LocalHttpCache:
+          default: 60000
+      enable_rpx:
+        headers:
+        - name: :status
+          regex_match: 200|
+      key_maker:
+        exclude_host: false
+        ignore_case: true
+      low_level_fill: true
+```
+### 扩展wasm插件
+
 // TODO
 
-## 自适应限流
-### 安装和使用
+### 示例
+// TODO
+
+### 卸载
+1. 删除slime-boot配置
+2. 删除servicefence配置
+```shell
+for i in $(kubectl get ns);do kubectl delete pluginmanager -n $i --all;done
+for i in $(kubectl get ns);do kubectl delete envoyplugin -n $i --all;done
+```
+
+### 自适应限流
+#### 安装和使用
 
 **注意:** 自适应限流功能可以对接envoy社区支持的限流插件`envoy.filters.http.local_ratelimit`，也可以对接网易自研插件`com.netease.local_flow_control`。envoy社区的限流插件暂不支持HeaderMatch的配置，使用`com.netease.local_flow_control`插件前需确认envoy二进制中是否包含该插件。      
 
@@ -244,131 +496,188 @@ metadata:
   name: limiter
   namespace: mesh-operator
 spec:
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  image:
+    pullPolicy: Always
+    repository: docker.io/bcxq/slime
+    tag: v0.1.0
   module:
     - limiter:
         enable: true
-        backend: 1
-      name: slime-limiter
-  //...      
+      metric:
+        prometheus:
+          address: #http://prometheus_address
+          handlers:
+            cpu.sum:
+              query: |
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.max:
+              query: |
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+        k8s:
+          handlers:
+            - pod # inline
+      name: limiter
+```
+在示例中，我们配置了prometheus作为监控源，prometheus.handlers定义了希望从监控中获取的监控指标，这些监控指标可以作为治理规则中的参数，从而达到自适应限流的目的，具体用法可参考[基于监控的自适应限流](#基于监控的自适应限流)。
+用户也可以根据需要定义limiter模块需要获取的监控指标，以下是一些可以常用的监控指标获取语句：
+```
+cpu:
+总和：
+sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+最大值：
+max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+limit:
+container_spec_cpu_quota{pod=~"$pod_name"}
+
+内存：
+总和：
+sum(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+最大值：
+max(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
+limit:
+sum(container_spec_memory_limit_bytes{pod=~"$pod_name"})
+
+请求时延：
+90值：
+histogram_quantile(0.90, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+95值：
+histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+99值：
+histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
 ```
 
-根据限流规则为目标服务定义SmartLimite资源，如下所示：
-
+#### 分组限流
+在istio的体系中，用户可以通过DestinationRule为服务定义subset，并为其定制负载均衡，连接池等服务治理规则。限流同样属于此类服务治理规则，通过slime框架，我们不仅可以为服务，也可以为subset定制限流规则，如下所示：
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3"     # 配额数
-      fill_interval:
-        seconds: 1   # 统计配额的周期
-    condition: "true"
+  sets:
+    v1: # reviews的v1版本
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
+        condition: "true"
 ```
-上述配置为test-svc服务限制了每秒3次的请求。将配置提交之后，该服务下实例的状态信息以及限流信息会显示在`status`中，如下：
+上述配置为reviews服务的v1版本限制了每秒10次的请求。将配置提交之后，该服务下实例的状态信息以及限流信息会显示在`status`中，如下：
 
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3"
-      fill_interval:
-        seconds: 1
-    condition: "true"
+  sets:
+    v1: # reviews的v1版本
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
+        condition: "true"
 status:
-  endPointStatus:
-    cpu: "398293"        # 业务容器和sidecar容器占用CPU之和 
-    cpu_max: "286793"    # CPU占用最大的容器
-    memory: "68022"      # 业务容器和sidecar容器内存占用之和  
-    memory_max: "55236"  # 内存占用最大的容器
-    pod: "1"
+  metricStatus:
+  # ...
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "3"
+    v1:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
 ```
 #### 基于监控的自适应限流
-
-可以将监控信息条目配置到`condition`中，例如希望cpu超过300m时触发限流，可以进行如下配置：
-
+在示例的slimeboot中，我们获取了服务容器的cpu总和以及最大值作为limiter模块所关心的监控指标，从prometheus获取的监控数据会被显示在metricStatus中，我们可以采用这些指标作为触发限流的条件，如下所示：
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3"
-      fill_interval:
-        seconds: 1
-    condition: {cpu}>300000 # cpu的单位为ns，首先会根据endPointStatus中cpu的值将算式渲染为398293>300000
+  sets:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "5"
+        condition: '{{.v2.cpu.sum}}>10000'
 status:
-  endPointStatus:
-    cpu: "398293"        # 业务容器和sidecar容器占用CPU之和 
-    cpu_max: "286793"    # CPU占用最大的容器
-    memory: "68022"      # 业务容器和sidecar容器内存占用之和  
-    memory_max: "55236"  # 内存占用最大的容器
-    pod: "1"
+  metricStatus:
+    '_base.cpu.max': "11279.791407871"
+    '_base.cpu.sum': "31827.916205633"
+    '_base.pod': "3"
+    v1.cpu.max: "9328.098703551"
+    v1.cpu.sum: "9328.098703551"
+    v1.pod: "1"
+    v2.cpu.max: "11220.026094211"
+    v2.cpu.sum: "11220.026094211"
+    v2.pod: "1"
+    v3.cpu.max: "11279.791407871"
+    v3.cpu.sum: "11279.791407871"
+    v3.pod: "1"
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "3"
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "5"
 ```
-
-condition中的算式会根据endPointStatus的条目进行渲染，渲染后的算式若计算结果为true，则会触发限流。
+condition中的算式会根据metricStatus的条目进行渲染，渲染后的算式若计算结果为true，则会触发限流。
 
 #### 服务限流
-由于缺乏全局配额管理组件，我们无法做到精确的服务限流，但是假定负载均衡理想的情况下，实例限流数=服务限流数/实例个数。test-svc的服务限流数为3，那么可以将quota字段配置为3/{pod}以实现服务级别的限流。在服务发生扩容时，可以在限流状态栏中看到实例限流数的变化。
+由于缺乏全局配额管理组件，我们无法做到精确的服务限流，但是假定负载均衡理想的情况下，实例限流数=服务限流数/实例个数。reviews的服务限流数为3，那么可以将quota字段配置为3/{{._base.pod}}以实现服务级别的限流。在服务发生扩容时，可以在限流状态栏中看到实例限流数的变化。
 ```yaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
-  name: test-svc
+  name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3/{pod}" # 算式会根据endPointStatus中pod值渲染为3/3
-      fill_interval:
-        seconds: 1
-    condition: "{cpu}>300000" 
-    match:
-    - exact_match: user
-      invert_match: false
-      name: Bob
+  sets:
+    "_base":
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "3/{{._base.pod}}"
 status:
-  endPointStatus:
-    cpu: "xxxxx"        
-    cpu_max: "xxxx"    
-    memory: "xxx"       
-    memory_max: "xx" 
-    pod: "3" # test-svc的endpoint扩容成了3
+  metricStatus:
+    '_base.cpu.max': "11279.791407871"
+    '_base.cpu.sum': "31827.916205633"
+    '_base.pod': "3"
+    v1.cpu.max: "9328.098703551"
+    v1.cpu.sum: "9328.098703551"
+    v1.pod: "1"
+    v2.cpu.max: "11220.026094211"
+    v2.cpu.sum: "11220.026094211"
+    v2.pod: "1"
+    v3.cpu.max: "11279.791407871"
+    v3.cpu.sum: "11279.791407871"
+    v3.pod: "1"
   ratelimitStatus:
-  - action:
-      fill_interval:
-        seconds: 1
-      quota: "1" 显然，3/3=1
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "1" # 对于每个实例而言，限流配额为3/3=1
 ```
-### 卸载
+#### 卸载
 1. 删除slime-boot配置
 2. 删除smartlimiter配置
 ```
 for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
 ```
-### 示例
+#### 示例
 以bookinfo为例，介绍配置限流如何使用。开始之前，确保已经安装了istio1.8版本以及slime-boot。示例中的bookinfo安装在default namespace。   
 
 **安装bookinfo**
@@ -394,18 +703,20 @@ $ kubectl apply -f samples/reviews-svc-limiter.yaml
 **确认配置已经创建**
 ```
 $ kubectl get smartlimiter reviews -oyaml
-apiVersion: microservice.netease.com/v1alpha1
+apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
   name: reviews
   namespace: default
 spec:
-  descriptors:
-  - action:
-      quota: "3/{pod}"
-      fill_interval:
-        seconds: 10
-    condition: "true"
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: 3/{{._base.pod}}
+        condition: "true"
 ```
 该配置表明review服务会被限制为10s访问三次
 
@@ -420,7 +731,7 @@ metadata:
   name: reviews.default.local-ratelimit
   namespace: default
   ownerReferences:
-  - apiVersion: microservice.netease.com/v1alpha1
+  - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: SmartLimiter

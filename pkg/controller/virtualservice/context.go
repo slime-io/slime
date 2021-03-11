@@ -6,7 +6,7 @@
 package virtualservice
 
 import (
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/util"
 )
 
 var HostDestinationMapping *util.SubcribeableMap

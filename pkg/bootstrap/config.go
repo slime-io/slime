@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
 
-	netease_config "yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	netease_config "slime.io/slime/pkg/apis/config/v1alpha1"
 )
 
 const (

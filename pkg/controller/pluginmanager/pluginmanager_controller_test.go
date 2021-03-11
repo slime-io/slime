@@ -17,10 +17,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/test"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/controller"
+	"slime.io/slime/test"
 )
 
 func readPluginManager(file string) *wrapper.PluginManager {

@@ -10,9 +10,9 @@ import (
 	"fmt"
 	"strconv"
 
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/controller/destinationrule"
-	"yun.netease.com/slime/pkg/util"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/controller/destinationrule"
+	"slime.io/slime/pkg/util"
 
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_extensions_filters_http_local_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
@@ -43,9 +43,9 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 		svc := &v1.Service{}
 		_ = r.client.Get(context.TODO(), loc, svc)
 		svcSelector := svc.Spec.Selector
-		// 使用@base作为key，可以为基础集合配置限流
-		sets = append(sets, &networking.Subset{Name: "@base"})
-		for _, set := range sets {
+		// 使用base作为key，可以为基础集合配置限流
+		sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
+   		for _, set := range sets {
 			if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
 				descriptor := &microservicev1alpha1.SmartLimitDescriptors{}
 				for _, des := range setDescriptor.Descriptor_ {
@@ -70,6 +70,9 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 					ef := descriptorsToEnvoyFilter(descriptor.Descriptor_, selector)
 					setsEnvoyFilter[set.Name] = ef
 					setsSmartLimitDescriptor[set.Name] = descriptor
+				}else{
+					// Used to delete
+					setsEnvoyFilter[set.Name] = nil
 				}
 			} else {
 				// Used to delete

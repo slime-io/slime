@@ -7,7 +7,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/bcxq/slime
-    tag: preview-v0.0.1
+    tag: v0.1.0
   module:
     - name: lazyload
       fence:
@@ -17,6 +17,7 @@ spec:
   component:
     globalSidecar:
       enable: true
+      type: namespaced
       namespace:
         - default # 替换为bookinfo安装的ns
       resources:

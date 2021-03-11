@@ -11,11 +11,11 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"reflect"
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/model"
-	event_source "yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/util"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/model"
+	event_source "slime.io/slime/pkg/model/source"
+	"slime.io/slime/pkg/util"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -164,7 +164,7 @@ func (r *ReconcileSmartLimiter) refresh(instance *microservicev1alpha1.SmartLimi
 	efs, descriptor = r.GenerateEnvoyLocalLimit(rateLimitConf, material, instance)
 	for k, ef := range efs {
 		var efcr *v1alpha3.EnvoyFilter
-		if k == "@base" {
+		if k == util.Wellkonw_BaseSet {
 			efcr = &v1alpha3.EnvoyFilter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),

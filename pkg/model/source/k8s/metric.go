@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"yun.netease.com/slime/pkg/apis/config/v1alpha1"
+	"slime.io/slime/pkg/apis/config/v1alpha1"
 
 	"github.com/prometheus/common/model"
 	"istio.io/api/networking/v1alpha3"
@@ -16,9 +16,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"yun.netease.com/slime/pkg/controller/destinationrule"
-	"yun.netease.com/slime/pkg/model/source"
-	"yun.netease.com/slime/pkg/util"
+	"slime.io/slime/pkg/controller/destinationrule"
+	"slime.io/slime/pkg/model/source"
+	"slime.io/slime/pkg/util"
 )
 
 var log = logf.Log.WithName("source_k8s_metric_source")
@@ -174,8 +174,13 @@ func (m *Source) queryValue(q string) string {
 		switch qv.Type() {
 		case model.ValVector:
 			vector := qv.(model.Vector)
+			if vector.Len() == 0 {
+				log.Info("No data")
+				return ""
+			}
 			if vector.Len() != 1 {
 				log.Error(fmt.Errorf("Invaild Query"), "You need to sum up the monitoring data")
+				return ""
 			}
 			return vector[0].Value.String()
 		}
@@ -206,9 +211,6 @@ func (m *Source) queryGroup(q string) map[string]string {
 
 func update(m *Source, loc types.NamespacedName) {
 	material := m.Get(loc)
-	/*if material["@base.pod"] == "0" || material["@base.pod"] == "" {
-		return
-	}*/
 	m.EventChan <- source.Event{
 		EventType: source.Add,
 		Loc:       loc,

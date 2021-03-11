@@ -3,8 +3,8 @@ package servicefence
 import (
 	"context"
 	"k8s.io/apimachinery/pkg/api/errors"
-	microservicev1alpha1 "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	event_source "yun.netease.com/slime/pkg/model/source"
+	microservicev1alpha1 "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	event_source "slime.io/slime/pkg/model/source"
 )
 
 func (r *ReconcileServiceFence) WatchSource(stop <-chan struct{}) {

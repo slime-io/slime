@@ -8,7 +8,7 @@ package wrapper
 import (
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1"
 )
 
 type NeteaseType interface {

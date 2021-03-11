@@ -8,8 +8,8 @@ package pluginmanager
 import (
 	"fmt"
 
-	microservice "yun.netease.com/slime/pkg/apis/microservice/v1alpha1"
-	"yun.netease.com/slime/pkg/util"
+	microservice "slime.io/slime/pkg/apis/microservice/v1alpha1"
+	"slime.io/slime/pkg/util"
 
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_extensions_wasm_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"

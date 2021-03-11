@@ -5,7 +5,7 @@
 
 package destinationrule
 
-import "yun.netease.com/slime/pkg/util"
+import "slime.io/slime/pkg/util"
 
 var HostSubsetMapping *util.SubcribeableMap
 

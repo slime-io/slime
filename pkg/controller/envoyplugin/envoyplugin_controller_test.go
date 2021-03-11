@@ -10,10 +10,10 @@ import (
 	"io/ioutil"
 	"testing"
 
-	"yun.netease.com/slime/pkg/apis/microservice/v1alpha1/wrapper"
-	"yun.netease.com/slime/pkg/apis/networking/v1alpha3"
-	"yun.netease.com/slime/pkg/controller"
-	"yun.netease.com/slime/test"
+	"slime.io/slime/pkg/apis/microservice/v1alpha1/wrapper"
+	"slime.io/slime/pkg/apis/networking/v1alpha3"
+	"slime.io/slime/pkg/controller"
+	"slime.io/slime/test"
 
 	"gopkg.in/yaml.v2"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"

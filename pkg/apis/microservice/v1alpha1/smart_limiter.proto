@@ -5,27 +5,31 @@
 
 syntax = "proto3";
 import "google/protobuf/duration.proto";
-package netease.microservice.v1alpha1;
+package slime.microservice.v1alpha1;
 
-option go_package = "yun.netease.com/slime/pkg/apis/microservice/v1alpha1";
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
 
 // SmartLimiter 用于配置自适应限流插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
 // 示例如下：
-// apiVersion: microservice.netease.com/v1alpha1
+// apiVersion: microservice.slime.io/v1alpha1
 // kind: SmartLimiter
 // metadata:
 //   name: a
 //   namespace: powerful
 // spec:
 //   descriptors:
-//   - action:
-//       fill_interval:
-//         seconds: 60
-//       quota: "30/{pod}"
-//     condition: "true"
+//   sets:
+//     v1:
+//     - action:
+//         fill_interval:
+//           seconds: 60
+//         quota: "30/{._base.pod}"
+//       condition: "true"
 
 message SmartLimiterSpec {
     string domain = 1;
+
+    // subset rate-limit,the key is subset name.
     map<string, SmartLimitDescriptors> sets = 2;
 }
 
@@ -33,13 +37,18 @@ message SmartLimiterStatus {
     map<string, SmartLimitDescriptors> ratelimitStatus = 1;
     map<string, string> metricStatus = 2;
     message ServiceStatus {
+        // Deprecated
         map<string, string> selector = 1;
         message Listener {
+            // Deprecated
             string name = 1;
+            // Deprecated
             uint32 port = 2;
         }
+        // Deprecated
         repeated Listener listener = 2;
     }
+    // Deprecated
     ServiceStatus serviceStatus = 3;
 }
 
@@ -56,15 +65,24 @@ message SmartLimitDescriptor {
         bool invert_match = 8;
     }
     message Action {
+        // rate-limit quota, which can be a template expression
         string quota = 1;
         google.protobuf.Duration fill_interval = 2;
     }
+
+    // rate-limit departure conditions, which can be a template expression.
+    // When the expression value is true, the limit will be triggered
     string condition = 2;
+
+    // Limited traffic behavior
     Action action = 3;
+
+    // not support
     repeated HeaderMatcher match = 4;
 }
 
 message SmartLimitDescriptors {
+    // Description of current rate-limit
     repeated SmartLimitDescriptor descriptor = 4;
 }
 

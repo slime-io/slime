@@ -7,7 +7,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/bcxq/slime
-    tag: slime-metric-35a37dd
+    tag: v0.1.0
   module:
     - name: lazyload
       fence:
@@ -20,11 +20,12 @@ spec:
           handlers:
             destination:
               query: |
-                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
               type: Group
   component:
     globalSidecar:
       enable: true
+      type: namespaced
       namespace:
         - default # 替换为bookinfo安装的ns
       resources:
