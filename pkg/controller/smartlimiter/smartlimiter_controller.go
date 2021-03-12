@@ -2,6 +2,7 @@ package smartlimiter
 
 import (
 	"context"
+	"reflect"
 	"sync"
 
 	cmap "github.com/orcaman/concurrent-map"
@@ -44,7 +45,7 @@ func newReconciler(mgr manager.Manager, env *bootstrap.Environment) reconcile.Re
 	src := &aggregate.Source{}
 	ms, err := k8s.NewMetricSource(eventChan, env)
 	if err != nil {
-		log.Error(err,"failed to create slime-metric")
+		log.Error(err, "failed to create slime-metric")
 		return nil
 	}
 	src.AppendSource(ms)
@@ -54,12 +55,13 @@ func newReconciler(mgr manager.Manager, env *bootstrap.Environment) reconcile.Re
 		go mc.Run()
 	}
 	r := &ReconcileSmartLimiter{
-		client:     mgr.GetClient(),
-		scheme:     mgr.GetScheme(),
-		metricInfo: cmap.New(),
-		eventChan:  eventChan,
-		source:     src,
-		env:        env,
+		client:               mgr.GetClient(),
+		scheme:               mgr.GetScheme(),
+		metricInfo:           cmap.New(),
+		eventChan:            eventChan,
+		source:               src,
+		env:                  env,
+		lastUpdatePolicyLock: &sync.RWMutex{},
 	}
 	r.source.Start(env.Stop)
 	r.WatchSource(env.Stop)
@@ -101,12 +103,16 @@ type ReconcileSmartLimiter struct {
 	metricInfoLock sync.RWMutex
 	eventChan      chan event_source.Event
 	source         event_source.Source
+
+	lastUpdatePolicy     microservicev1alpha1.SmartLimiterSpec
+	lastUpdatePolicyLock *sync.RWMutex
 }
 
 func (r *ReconcileSmartLimiter) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	reqLogger := log.WithValues("Request.Namespace", request.Namespace, "Request.Name", request.Name)
 	reqLogger.Info("Reconciling SmartLimiter")
 	instance := &microservicev1alpha1.SmartLimiter{}
+
 	err := r.client.Get(context.TODO(), request.NamespacedName, instance)
 
 	// 异常分支
@@ -156,7 +162,18 @@ func DoUpdate(instance metav1.Object, args ...interface{}) error {
 	if this, ok := args[0].(*ReconcileSmartLimiter); !ok {
 		log.Error(nil, "smartlimiter DoUpdate方法第一参数需为自身")
 	} else {
-		this.source.WatchAdd(r)
+		if m, ok := instance.(*microservicev1alpha1.SmartLimiter); ok {
+			this.lastUpdatePolicyLock.RLock()
+			if reflect.DeepEqual(m.Spec, this.lastUpdatePolicy) {
+				return nil
+			} else {
+				this.lastUpdatePolicyLock.RUnlock()
+				this.lastUpdatePolicyLock.Lock()
+				this.lastUpdatePolicy = m.Spec
+				this.lastUpdatePolicyLock.Unlock()
+				this.source.WatchAdd(r)
+			}
+		}
 	}
 	return nil
 }
