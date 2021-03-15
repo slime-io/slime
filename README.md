@@ -86,7 +86,6 @@ $ kubectl get po -n mesh-operator
 NAME                                    READY     STATUS    RESTARTS   AGE
 global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
 lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
-report-server-855c8cf558-wdqjs          2/2       Running   0          27s
 slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
 ```
@@ -95,14 +94,17 @@ NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
 
-3. enable lazyload
-```shell
-kubectl label ns {{your namespace}} istio-dependency-servicefence=true
+3. enable lazyload    
+Apply servicefence resource to enable lazyload.
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
+metadata:
+  name: {{your svc}}
+  namespace: {{your namespace}}
+spec:
+  enable: true
 ```
-```shell
-kubectl annotate svc {{your svc}} istio.dependency.servicefence/status=true
-```
-
 4. make sure SidecarScope has been generated
 Execute `kubectl get sidecar {{svc name}} -oyaml`，you can see a sidecar is generated for the corresponding service， as follow：
 ```yaml
