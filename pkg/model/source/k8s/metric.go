@@ -3,10 +3,10 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"slime.io/slime/pkg/apis/config/v1alpha1"
 	"strconv"
 	"strings"
 	"time"
-	"slime.io/slime/pkg/apis/config/v1alpha1"
 
 	"github.com/prometheus/common/model"
 	"istio.io/api/networking/v1alpha3"
