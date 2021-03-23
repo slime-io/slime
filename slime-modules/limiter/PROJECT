@@ -1,0 +1,11 @@
+domain: my.domain
+multigroup: true
+repo: slime.io/slime
+resources:
+- group: microservice.slime.io
+  kind: SmartLimiter
+  version: v1alpha1
+- group: networking.istio.io
+  kind: DestinationRule
+  version: v1alpha3
+version: "2"

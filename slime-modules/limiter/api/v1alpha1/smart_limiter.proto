@@ -1,0 +1,103 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+package slime.microservice.v1alpha1;
+
+option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha1";
+
+// SmartLimiter 用于配置自适应限流插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
+// 示例如下：
+// apiVersion: microservice.slime.io/v1alpha1
+// kind: SmartLimiter
+// metadata:
+//   name: a
+//   namespace: powerful
+// spec:
+//   descriptors:
+//   sets:
+//     v1:
+//     - action:
+//         fill_interval:
+//           seconds: 60
+//         quota: "30/{._base.pod}"
+//       condition: "true"
+
+message SmartLimiterSpec {
+    string domain = 1;
+
+    // subset rate-limit,the key is subset name.
+    map<string, SmartLimitDescriptors> sets = 2;
+}
+
+message SmartLimiterStatus {
+    map<string, SmartLimitDescriptors> ratelimitStatus = 1;
+    map<string, string> metricStatus = 2;
+    message ServiceStatus {
+        // Deprecated
+        map<string, string> selector = 1;
+        message Listener {
+            // Deprecated
+            string name = 1;
+            // Deprecated
+            uint32 port = 2;
+        }
+        // Deprecated
+        repeated Listener listener = 2;
+    }
+    // Deprecated
+    ServiceStatus serviceStatus = 3;
+}
+
+message SmartLimitDescriptor {
+    message HeaderMatcher {
+        string name = 1;
+
+        string exact_match = 2;
+        string regex_match = 3;
+        bool present_match = 7;
+        string prefix_match = 9;
+        string suffix_match = 10;
+
+        bool invert_match = 8;
+    }
+    message Action {
+        // rate-limit quota, which can be a template expression
+        string quota = 1;
+        Duration fill_interval = 2;
+    }
+
+    // rate-limit departure conditions, which can be a template expression.
+    // When the expression value is true, the limit will be triggered
+    string condition = 2;
+
+    // Limited traffic behavior
+    Action action = 3;
+
+    // not support
+    repeated HeaderMatcher match = 4;
+}
+
+message SmartLimitDescriptors {
+    // Description of current rate-limit
+    repeated SmartLimitDescriptor descriptor = 4;
+}
+
+message Duration {
+
+    // Signed seconds of the span of time. Must be from -315,576,000,000
+    // to +315,576,000,000 inclusive. Note: these bounds are computed from:
+    // 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
+    int64 seconds = 1;
+
+    // Signed fractions of a second at nanosecond resolution of the span
+    // of time. Durations less than one second are represented with a 0
+    // `seconds` field and a positive or negative `nanos` field. For durations
+    // of one second or more, a non-zero value for the `nanos` field must be
+    // of the same sign as the `seconds` field. Must be from -999,999,999
+    // to +999,999,999 inclusive.
+    int32 nanos = 2;
+}
+

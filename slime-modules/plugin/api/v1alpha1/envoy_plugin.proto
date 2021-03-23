@@ -1,0 +1,99 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+
+// EnvoyPlugin 用于设置网关扩展插件配置，配置生效范围有3个级别
+// route级别，对应同一route name下的路由规则
+// host级别，对应同一host下的路由规则
+
+// 示例如下：
+// apiVersion: microservice.slime.io/v1alpha1
+// kind: EnvoyPlugin
+// metadata:
+//   name: project1-3-458-rewrite
+// spec:
+//   gateway:
+//   - gateway-proxy-1
+//   host:
+//   - 103.196.65.178
+//   plugins:
+//   - name: com.netease.rewrite
+//     settings:
+//       request_transformations:
+//       - conditions:
+//         - headers:
+//           - name: :path
+//             regex_match: /aaaaaaa/(.*)
+//         transformation_template:
+//           extractors:
+//             $1:
+//               header: :path
+//               regex: /aaaaaaa/(.*)
+//               subgroup: 1
+//           headers:
+//             :path:
+//               text: /{{$1}}
+//           parse_body_behavior: DontParse
+import "pkg/apis/microservice/v1alpha1/plugin_manager.proto";
+
+package slime.microservice.v1alpha1;
+
+option go_package = "slime.io/slime/slime-modules/plugin/api/v1alpha1";
+
+
+// `WorkloadSelector` specifies the criteria used to determine if the
+// `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry`
+// configuration can be applied to a proxy. The matching criteria
+// includes the metadata associated with a proxy, workload instance
+// info such as labels attached to the pod/VM, or any other info that
+// the proxy provides to Istio during the initial handshake. If
+// multiple conditions are specified, all conditions need to match in
+// order for the workload instance to be selected. Currently, only
+// label based selection mechanism is supported.
+message WorkloadSelector {
+    // One or more labels that indicate a specific set of pods/VMs
+    // on which the configuration should be applied. The scope of
+    // label search is restricted to the configuration namespace in which the
+    // the resource is present.
+    map<string, string> labels = 1;
+
+    // $hide_from_docs
+    // other forms of identification supplied by the proxy
+    // when connecting to Pilot, such as X509 fields, tenant IDs, JWT,
+    // etc. This has nothing to do with the request level authN etc.
+}
+
+message EnvoyPlugin {
+    WorkloadSelector workload_selector = 9;
+
+    // route level plugin
+    repeated string route = 1;
+
+    // host level plugin
+    repeated string host = 2;
+
+    // service level plugin
+    repeated string service = 3;
+
+    repeated Plugin plugins = 4;
+
+    // which gateway should use this plugin setting
+    repeated string gateway = 5;
+
+    // which user should use this plugin setting
+    repeated string user = 6;
+
+    // Deprecated
+    bool isGroupSetting = 7;
+
+    message Listener {
+        uint32 port = 1;
+        bool outbound = 2;
+    }
+
+    // listener level
+    repeated Listener listener = 8;
+}

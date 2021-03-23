@@ -1,0 +1,20 @@
+# permissions for end users to view destinationrules.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: destinationrule-viewer-role
+rules:
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - destinationrules
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - networking.istio.io
+  resources:
+  - destinationrules/status
+  verbs:
+  - get

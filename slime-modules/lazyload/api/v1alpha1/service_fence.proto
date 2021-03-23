@@ -1,0 +1,130 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+package slime.microservice.v1alpha1;
+
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
+
+// ServiceFence是在社区Sidecar资源之上的一层封装，其主要作用与Sidecar资源相同，可以隔绝服务
+// 所不关心的配置，从而提升大规模场景下服务网格的性能。与Sidecar资源不同的是，ServiceFence
+// 会根据VirtualService资源的变化调整围栏策略。
+// 考虑如下场景：
+// apiVersion: networking.istio.io/v1alpha3
+// kind: VirtualService
+// metadata:
+//   # name和namespace需要和所属服务一一对应
+//   name: a
+//   namespace: test1
+// spec:
+//   host:
+//   - b.test1.svc.cluster.local
+//   http:
+//   - route:
+//     - destination:
+//         host: c.test1.svc.cluster.local
+//
+// 假如此时，Sidecar资源只考虑了a-->b的服务调用，那么如上的路由配置将会出现503,原因是c对于a而言不可达，
+// 对于使用者而言配置路由规则时还要考虑Sidecar资源的配置，这显然不合适。ServiceFence会根据
+// VirtualService对应的修改Sidecar配置
+// 例如：
+// apiVersion: microservice.netease.com/v1alpha1
+// kind: ServiceFence
+// metadata:
+//   # name和namespace需要和所属服务一一对应
+//   name: a
+//   namespace: test1
+// spec:
+//   host:
+//     b.test1.svc.cluster.local:
+//       stable: {}
+//
+// 该配置经过operator计算后，其状态会改变为：
+// apiVersion: microservice.netease.com/v1alpha1
+// kind: ServiceFence
+// metadata:
+//   # name和namespace需要和所属服务一一对应
+//   name: a
+//   namespace: test1
+// spec:
+//   host:
+//     b.test1.svc.cluster.local:
+//       stable: {}
+// status:
+//   domains:
+//     b.test1.svc.cluster.local:
+//       hosts:
+//       - b.test1.svc.cluster.local
+//       - c.test1.svc.cluster.local
+//       status: ACTIVE
+//
+// 也可以利用ServiceFence管理隔离配置的生命周期，ServiceFence有三种记录策略：
+// 1. stable，稳定的配置，用户手动回收配置
+// 2. deadline， 到期回收
+// 3. auto， 根据服务掉用情况自动回收
+
+message Timestamp {
+
+    // Represents seconds of UTC time since Unix epoch
+    // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
+    // 9999-12-31T23:59:59Z inclusive.
+    int64 seconds = 1;
+
+    // Non-negative fractions of a second at nanosecond resolution. Negative
+    // second values with fractions must still have non-negative nanos values
+    // that count forward in time. Must be from 0 to 999,999,999
+    // inclusive.
+    int32 nanos = 2;
+}
+
+message ServiceFenceSpec {
+    map<string, RecyclingStrategy> host = 1;
+    // Switch to render servicefence as sidecar
+    bool enable = 2;
+}
+message RecyclingStrategy {
+
+    message Stable {
+    }
+
+    message Deadline {
+        Timestamp expire = 1;
+    }
+
+    message Auto {
+        Timestamp duration = 1;
+    }
+    // Configuration that will not be cleaned up
+    Stable stable = 1;
+
+    // Configurations that expire after expiration
+    Deadline deadline = 2;
+
+    // Deprecated
+    Auto auto = 3;
+
+    Timestamp RecentlyCalled = 4;
+}
+
+
+message Destinations {
+
+    // Deprecated
+    Timestamp RecentlyCalled = 1;
+
+    repeated string hosts = 2;
+
+    enum Status {
+        ACTIVE = 0;
+        EXPIRE = 1;
+    }
+    Status status = 3;
+}
+
+message ServiceFenceStatus {
+    map<string, Destinations> domains = 1;
+    map<string, string> metricStatus = 3;
+    map<string, bool> visitor = 2;
+}

@@ -1,0 +1,24 @@
+# permissions for end users to edit pluginmanagers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: pluginmanager-editor-role
+rules:
+- apiGroups:
+  - microservice.slime.io.my.domain
+  resources:
+  - pluginmanagers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - microservice.slime.io.my.domain
+  resources:
+  - pluginmanagers/status
+  verbs:
+  - get
