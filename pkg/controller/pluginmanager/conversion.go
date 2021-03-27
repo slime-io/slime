@@ -61,8 +61,6 @@ func (r *ReconcilePluginManager) convertPluginToPatch(in *microservice.Plugin) (
 
 	if in.ListenerType == microservice.Plugin_Inbound {
 		out.Match.Context = istio.EnvoyFilter_SIDECAR_INBOUND
-	} else {
-		out.Match.Context = istio.EnvoyFilter_SIDECAR_OUTBOUND
 	}
 
 	var err error
@@ -197,6 +195,12 @@ func (r *ReconcilePluginManager) convertPluginToPatch(in *microservice.Plugin) (
 					StringValue: in.Name,
 				},
 			}
+		}
+	} else {
+		out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: in.Name,
+			},
 		}
 	}
 	if err != nil {
