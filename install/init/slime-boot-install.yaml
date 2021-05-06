@@ -14,10 +14,12 @@ spec:
         name: slime-boot
     spec:
       serviceAccountName: slime-boot
+      imagePullSecrets:
+        - name: slime-secret
       containers:
         - name: slime-boot
           # Replace this with the built image name
-          image: docker.io/bcxq/slime-boot:v0.1.0-alphal
+          image: docker.pkg.github.com/slime-io/slime/slime-boot:v0.1.0
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE
@@ -61,3 +63,13 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+data:
+  .dockerconfigjson: eyJhdXRocyI6eyJodHRwczovL2RvY2tlci5wa2cuZ2l0aHViLmNvbS92MiI6eyJ1c2VybmFtZSI6InNsaW1lIiwicGFzc3dvcmQiOiJnaHBfRDFkR1RzeUJjMDdIWUNEV3FvVVJRYk1KY0h2TU5kNEF5QVFYIiwiYXV0aCI6ImMyeHBiV1U2WjJod1gwUXhaRWRVYzNsQ1l6QTNTRmxEUkZkeGIxVlNVV0pOU21OSWRrMU9aRFJCZVVGUldBPT0ifX19
+kind: Secret
+metadata:
+  name: slime-secret
+  namespace: mesh-operator
+type: kubernetes.io/dockerconfigjson
+

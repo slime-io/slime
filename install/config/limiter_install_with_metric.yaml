@@ -6,8 +6,10 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
     tag: v0.1.0
+  imagePullSecrets:
+    - name: slime-secret
   module:
     - limiter:
         enable: true

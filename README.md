@@ -289,7 +289,7 @@ for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
    spec:
      image:
        pullPolicy: Always
-       repository: docker.io/bcxq/slime
+       repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
        tag: v0.1.0
      module:
        - name: lazyload
@@ -329,7 +329,7 @@ for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
              memory: 200Mi
          image:
            repository: docker.io/bcxq/pilot
-           tag: preview-1.3.7-v0.0.1%             
+           tag: preview-1.3.7-v0.0.1           
    ```
    Replace '#http://prometheus_address' with the service address of Istio's prometheus.    
 4. Execute the installation script
@@ -444,7 +444,7 @@ spec:
           mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
     tag: v0.1.0
 ```
 #### inline plugin
@@ -544,7 +544,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
     tag: v0.1.0
   module:
     - limiter:
@@ -749,7 +749,7 @@ for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
    spec:
      image:
        pullPolicy: Always
-       repository: docker.io/bcxq/slime
+       repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
        tag: v0.1.0
      module:
        - limiter:
