@@ -380,7 +380,7 @@ spec:
           mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
     tag: v0.1.0
 ```
 #### 内建插件
@@ -498,7 +498,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.pkg.github.com/slime-io/slime/slime:v0.1.0
     tag: v0.1.0
   module:
     - limiter:
