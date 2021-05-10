@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +42,8 @@ func init() {
 
 	_ = microserviceslimeiov1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
+
+	_ = v1alpha3.AddToScheme(scheme)
 }
 
 func main() {
