@@ -1,0 +1,94 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+
+// PluginManager 用于管理插件，以及插件在全局维度上的配置，enable选项可以启用或禁用某插件
+// 示例如下：
+// apiVersion: microservice.slime.io/v1alpha1
+// kind: PluginManager
+// metadata:
+//   name: gw-cluster-gateway-proxy
+//   namespace: gateway-system
+// spec:
+//   plugin:
+//   - enable: true
+//     name: envoy.cors
+//   - enable: true
+//     name: envoy.fault
+//   - enable: true
+//     name: com.netease.iprestriction
+//   - enable: true
+//     name: com.netease.transformation
+//   - enable: false
+//     name: com.netease.resty
+//   - enable: true
+//     name: com.netease.metadatahub
+//   - enable: true
+//     name: com.netease.supercache
+//     inline:
+//       settings:
+//         apis_prefix: testremove
+//         used_caches:
+//           local: {}
+//           redis:
+//             general:
+//               host: 10.107.16.138
+//               port: 6379
+//             timeout: 100
+//   workloadLabels:
+//     gw_cluster: gateway-proxy
+
+import "google/protobuf/struct.proto";
+
+package slime.microservice.v1alpha1;
+
+option go_package = "slime.io/slime/pkg/apis/microservice/v1alpha1";
+
+message PluginManager {
+    // Zero or more labels that indicate a specific set of pods/VMs whose
+    // proxies should be configured to use these additional filters.  The
+    // scope of label search is platform dependent. On Kubernetes, for
+    // example, the scope includes pods running in all reachable
+    // namespaces. Omitting the selector applies the filter to all proxies in
+    // the mesh.
+    map<string, string> workload_labels = 1;
+
+    repeated Plugin plugin = 2;
+
+    // Names of gateways where the rule should be applied to. Gateway names
+    // at the top of the VirtualService (if any) are overridden. The gateway
+    // match is independent of sourceLabels.
+    repeated string gateways = 3;
+}
+
+message Plugin {
+    bool enable = 1;
+    string name = 2;
+    // Deprecated
+    google.protobuf.Struct settings = 3;
+    enum ListenerType {
+        Outbound = 0;
+        Inbound = 1;
+    }
+    ListenerType listenerType = 4;
+    string type_url = 5;
+    oneof plugin_settings {
+        Wasm wasm = 6;
+        // plugin compiled inside envoy
+        Inline inline = 7;
+    }
+}
+
+message Wasm {
+    string rootID = 1;
+    string fileName = 2;
+    google.protobuf.Struct settings = 3;
+}
+
+message Inline {
+    google.protobuf.Struct settings = 1;
+}
+

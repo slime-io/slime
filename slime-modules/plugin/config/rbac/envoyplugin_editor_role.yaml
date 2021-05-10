@@ -1,0 +1,24 @@
+# permissions for end users to edit envoyplugins.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: envoyplugin-editor-role
+rules:
+- apiGroups:
+  - microservice.slime.io.my.domain
+  resources:
+  - envoyplugins
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - microservice.slime.io.my.domain
+  resources:
+  - envoyplugins/status
+  verbs:
+  - get

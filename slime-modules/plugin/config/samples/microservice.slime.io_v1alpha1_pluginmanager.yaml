@@ -1,0 +1,7 @@
+apiVersion: microservice.slime.io.my.domain/v1alpha1
+kind: PluginManager
+metadata:
+  name: pluginmanager-sample
+spec:
+  # Add fields here
+  foo: bar
