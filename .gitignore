@@ -82,3 +82,4 @@ tags
 .kube/*
 /build
 .qz/*
+*manager
