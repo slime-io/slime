@@ -11,8 +11,8 @@ import (
 	envoy_extensions_wasm_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	"strings"
 
-	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-framework/util"
+	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
 
 	"github.com/gogo/protobuf/types"
 	istio "istio.io/api/networking/v1alpha3"
@@ -51,94 +51,143 @@ func translatePluginToPatch(name, typeurl string, setting *types.Struct) *istio.
 	return patch
 }
 
+// translate ServicePlugin
+func translateServicePluginToPatch(name string, setting *types.Struct) *istio.EnvoyFilter_Patch {
+	patch := &istio.EnvoyFilter_Patch{
+		Operation: istio.EnvoyFilter_Patch_MERGE,
+	}
+	patch.Value = &types.Struct{
+		Fields: map[string]*types.Value{util.Struct_Cluster_Metadata: {
+			Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{
+				util.Struct_Cluster_FilterMetaData: {
+					Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{
+						name: {Kind: &types.Value_StructValue{StructValue: setting}},
+					}}},
+				},
+			}}},
+		}},
+	}
+	return patch
+}
+
 func translateRatelimitToPatch(settings *types.Struct) *istio.EnvoyFilter_Patch {
 	patch := &istio.EnvoyFilter_Patch{}
 	patch.Value = settings
 	return patch
 }
 
-func (r *EnvoyPluginReconciler)translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
+func (r *EnvoyPluginReconciler) translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
 	if in.WorkloadSelector != nil {
 		out.WorkloadSelector = &istio.WorkloadSelector{
 			Labels: in.WorkloadSelector.Labels,
 		}
 	}
+
 	out.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 
-	for _, h := range in.Host {
-		for _, p := range in.Plugins {
-			if p.PluginSettings == nil {
-				r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
-			}
-			var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
-			switch m := p.PluginSettings.(type) {
-			case *v1alpha1.Plugin_Wasm:
-				r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
-			case *v1alpha1.Plugin_Inline:
-				cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
-					ApplyTo: istio.EnvoyFilter_VIRTUAL_HOST,
-					Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
-						ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-							RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{
-								Vhost: &istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
-									Name: h,
-								},
-							},
-						},
-					},
+	switch m := in.PluginScope.(type) {
+	case *v1alpha1.EnvoyPlugin_HostScope_:
+		for _, h := range m.HostScope.Host {
+			for _, p := range in.Plugins {
+				if p.PluginSettings == nil {
+					r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
 				}
-				if p.Name == util.Envoy_Ratelimit || p.Name == util.Envoy_Cors {
-					cfp.Patch = translateRatelimitToPatch(m.Inline.Settings)
-				} else {
-					cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, m.Inline.Settings)
-				}
-				cfp.Patch.Operation = istio.EnvoyFilter_Patch_MERGE
-			}
-			out.ConfigPatches = append(out.ConfigPatches, cfp)
-		}
-	}
-
-	for _, route := range in.Route {
-		ss := strings.SplitN(route, "/", 2)
-		if len(ss) != 2 {
-			// patch to all host
-			ss = []string{"", ss[0]}
-		}
-		for _, p := range in.Plugins {
-			if p.PluginSettings == nil {
-				r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
-			}
-			var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
-			switch m := p.PluginSettings.(type) {
-			case *v1alpha1.Plugin_Wasm:
-				r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
-			case *v1alpha1.Plugin_Inline:
-				cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
-					ApplyTo: istio.EnvoyFilter_HTTP_ROUTE,
-					Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
-						ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-							RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{
-								Vhost: &istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
-									Route: &istio.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
-										Name: ss[1],
+				var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
+				switch m := p.PluginSettings.(type) {
+				case *v1alpha1.Plugin_Wasm:
+					r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
+				case *v1alpha1.Plugin_Inline:
+					cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
+						ApplyTo: istio.EnvoyFilter_VIRTUAL_HOST,
+						Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
+							ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+								RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{
+									Vhost: &istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
+										Name: h,
 									},
 								},
 							},
 						},
-					},
+					}
+					if p.Name == util.Envoy_Ratelimit || p.Name == util.Envoy_Cors {
+						cfp.Patch = translateRatelimitToPatch(m.Inline.Settings)
+					} else {
+						cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, m.Inline.Settings)
+					}
+					cfp.Patch.Operation = istio.EnvoyFilter_Patch_MERGE
 				}
-				if ss[0] != "" {
-					cfp.Match.ObjectTypes.(*istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration).RouteConfiguration.Vhost.Name = ss[0]
-				}
-				if p.Name == util.Envoy_Ratelimit || p.Name == util.Envoy_Cors {
-					cfp.Patch = translateRatelimitToPatch(m.Inline.Settings)
-				} else {
-					cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, m.Inline.Settings)
-				}
-				cfp.Patch.Operation = istio.EnvoyFilter_Patch_MERGE
+				out.ConfigPatches = append(out.ConfigPatches, cfp)
 			}
+		}
+	case *v1alpha1.EnvoyPlugin_RouteScope_:
+		for _, route := range m.RouteScope.Route {
+			ss := strings.SplitN(route, "/", 2)
+			if len(ss) != 2 {
+				// patch to all host
+				ss = []string{"", ss[0]}
+			}
+			for _, p := range in.Plugins {
+				if p.PluginSettings == nil {
+					r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
+				}
+				var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
+				switch m := p.PluginSettings.(type) {
+				case *v1alpha1.Plugin_Wasm:
+					r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
+				case *v1alpha1.Plugin_Inline:
+					cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
+						ApplyTo: istio.EnvoyFilter_HTTP_ROUTE,
+						Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
+							ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+								RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{
+									Vhost: &istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
+										Route: &istio.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
+											Name: ss[1],
+										},
+									},
+								},
+							},
+						},
+					}
+					if ss[0] != "" {
+						cfp.Match.ObjectTypes.(*istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration).RouteConfiguration.Vhost.Name = ss[0]
+					}
+					if p.Name == util.Envoy_Ratelimit || p.Name == util.Envoy_Cors {
+						cfp.Patch = translateRatelimitToPatch(m.Inline.Settings)
+					} else {
+						cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, m.Inline.Settings)
+					}
+					cfp.Patch.Operation = istio.EnvoyFilter_Patch_MERGE
+				}
 
-			out.ConfigPatches = append(out.ConfigPatches, cfp)
+				out.ConfigPatches = append(out.ConfigPatches, cfp)
+			}
+		}
+	case *v1alpha1.EnvoyPlugin_ClusterScope_:
+		for _, cluster := range m.ClusterScope.Cluster {
+			for _, p := range in.Plugins {
+				if p.PluginSettings == nil {
+					r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
+				}
+				var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
+				switch m := p.PluginSettings.(type) {
+				case *v1alpha1.Plugin_Wasm:
+					r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
+				case *v1alpha1.Plugin_Inline:
+					cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
+						ApplyTo: istio.EnvoyFilter_CLUSTER,
+						Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
+							ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_Cluster{
+								Cluster: &istio.EnvoyFilter_ClusterMatch{
+									Name: cluster,
+								},
+							},
+						},
+					}
+					cfp.Patch = translateServicePluginToPatch(p.Name, m.Inline.Settings)
+					out.ConfigPatches = append(out.ConfigPatches, cfp)
+				}
+			}
 		}
 	}
 }
@@ -207,64 +256,44 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 			} else if m.Wasm.FileName == "" {
 				err = fmt.Errorf("plugin: %s, wasm 文件缺失", in.Name)
 			} else {
-				if err == nil {
-					filepath := r.wasm.Get(m.Wasm.FileName)
-					pluginConfig := &envoy_extensions_wasm_v3.PluginConfig{
-						Name:   in.Name,
-						RootId: m.Wasm.RootID,
-						Vm: &envoy_extensions_wasm_v3.PluginConfig_VmConfig{
-							VmConfig: &envoy_extensions_wasm_v3.VmConfig{
-								VmId:    in.Name,
-								Runtime: util.Envoy_WasmV8,
-								Code: &envoy_config_core_v3.AsyncDataSource{
-									Specifier: &envoy_config_core_v3.AsyncDataSource_Local{
-										Local: &envoy_config_core_v3.DataSource{
-											Specifier: &envoy_config_core_v3.DataSource_Filename{
-												Filename: filepath,
-											},
+				filepath := r.wasm.Get(m.Wasm.FileName)
+				pluginConfig := &envoy_extensions_wasm_v3.PluginConfig{
+					Name:   in.Name,
+					RootId: m.Wasm.RootID,
+					Vm: &envoy_extensions_wasm_v3.PluginConfig_VmConfig{
+						VmConfig: &envoy_extensions_wasm_v3.VmConfig{
+							VmId:    in.Name,
+							Runtime: util.Envoy_WasmV8,
+							Code: &envoy_config_core_v3.AsyncDataSource{
+								Specifier: &envoy_config_core_v3.AsyncDataSource_Local{
+									Local: &envoy_config_core_v3.DataSource{
+										Specifier: &envoy_config_core_v3.DataSource_Filename{
+											Filename: filepath,
 										},
 									},
 								},
 							},
 						},
-					}
-					settings, err := util.MessageToStruct(pluginConfig)
-					if m.Wasm.Settings != nil {
-						isStringSettings := false
+					},
+				}
+				settings, err := util.MessageToStruct(pluginConfig)
+				if m.Wasm.Settings != nil && settings != nil {
+					isStringSettings := false
 
-						// string类型的配置解析为 google.protobuf.StringValue
-						if len(m.Wasm.Settings.Fields) == 1 && m.Wasm.Settings.Fields["_string"] != nil {
-							parseTostring := m.Wasm.Settings.Fields["_string"]
-							if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
-								isStringSettings = true
-								settings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
-									Kind: &types.Value_StructValue{
-										StructValue: &types.Struct{
-											Fields: map[string]*types.Value{
-												util.Struct_Any_AtType: {
-													Kind: &types.Value_StringValue{StringValue: util.TypeUrl_StringValue},
-												},
-												util.Struct_Any_Value: {
-													Kind: s,
-												},
-											},
-										},
-									},
-								}
-							}
-						}
-
-						// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
-						if !isStringSettings {
+					// string类型的配置解析为 google.protobuf.StringValue
+					if len(m.Wasm.Settings.Fields) == 1 && m.Wasm.Settings.Fields["_string"] != nil {
+						parseTostring := m.Wasm.Settings.Fields["_string"]
+						if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
+							isStringSettings = true
 							settings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
 								Kind: &types.Value_StructValue{
 									StructValue: &types.Struct{
 										Fields: map[string]*types.Value{
 											util.Struct_Any_AtType: {
-												Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+												Kind: &types.Value_StringValue{StringValue: util.TypeUrl_StringValue},
 											},
 											util.Struct_Any_Value: {
-												Kind: &types.Value_StructValue{StructValue: m.Wasm.Settings},
+												Kind: s,
 											},
 										},
 									},
@@ -272,32 +301,50 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 							}
 						}
 					}
-					if err == nil {
-						out.Patch.Value.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+
+					// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
+					if !isStringSettings {
+						settings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
 							Kind: &types.Value_StructValue{
 								StructValue: &types.Struct{
 									Fields: map[string]*types.Value{
-										util.Struct_Any_TypedUrl: {
-											Kind: &types.Value_StringValue{StringValue: util.TypeUrl_EnvoyFilterHttpWasm},
-										},
 										util.Struct_Any_AtType: {
 											Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
 										},
 										util.Struct_Any_Value: {
-											Kind: &types.Value_StructValue{StructValue: &types.Struct{
-												Fields: map[string]*types.Value{
-													util.Struct_Wasm_Config: {
-														Kind: &types.Value_StructValue{
-															StructValue: settings,
-														},
-													},
-												},
-											}},
+											Kind: &types.Value_StructValue{StructValue: m.Wasm.Settings},
 										},
 									},
 								},
 							},
 						}
+					}
+				}
+				if err == nil {
+					out.Patch.Value.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+						Kind: &types.Value_StructValue{
+							StructValue: &types.Struct{
+								Fields: map[string]*types.Value{
+									util.Struct_Any_TypedUrl: {
+										Kind: &types.Value_StringValue{StringValue: util.TypeUrl_EnvoyFilterHttpWasm},
+									},
+									util.Struct_Any_AtType: {
+										Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+									},
+									util.Struct_Any_Value: {
+										Kind: &types.Value_StructValue{StructValue: &types.Struct{
+											Fields: map[string]*types.Value{
+												util.Struct_Wasm_Config: {
+													Kind: &types.Value_StructValue{
+														StructValue: settings,
+													},
+												},
+											},
+										}},
+									},
+								},
+							},
+						},
 					}
 				}
 			}
@@ -325,11 +372,15 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 				},
 			}
 		}
+	} else {
+		out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: in.Name,
+			},
+		}
 	}
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
-
-

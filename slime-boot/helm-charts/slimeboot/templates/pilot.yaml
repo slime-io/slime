@@ -1,5 +1,4 @@
-{{ if .Values.component}}
-{{ if .Values.component.pilot }}
+{{- if .Values.component.pilot.enable }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -324,5 +323,4 @@ spec:
     istio: pilot
   sessionAffinity: None
   type: ClusterIP
-{{ end }}
-{{ end }}  
+{{- end }}

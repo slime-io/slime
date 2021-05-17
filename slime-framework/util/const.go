@@ -22,6 +22,9 @@ const (
 	Struct_HttpFilter_TypedConfig          = "typed_config"
 	Struct_HttpFilter_Name                 = "name"
 	Struct_HttpFilter_TypedPerFilterConfig = "typedPerFilterConfig"
+	Struct_Cluster_Metadata = "metadata"
+	Struct_Cluster_FilterMetaData = "filter_metadata"
+
 
 	Struct_EnvoyLocalRateLimit_Limiter  = "http_local_rate_limiter"
 	Struct_EnvoyLocalRateLimit_Enabled  = "local_rate_limit_enabled"

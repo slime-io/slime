@@ -37,12 +37,11 @@ syntax = "proto3";
 //             :path:
 //               text: /{{$1}}
 //           parse_body_behavior: DontParse
-import "pkg/apis/microservice/v1alpha1/plugin_manager.proto";
+import "api/v1alpha1/plugin_manager.proto";
 
 package slime.microservice.v1alpha1;
 
 option go_package = "slime.io/slime/slime-modules/plugin/api/v1alpha1";
-
 
 // `WorkloadSelector` specifies the criteria used to determine if the
 // `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry`
@@ -66,17 +65,28 @@ message WorkloadSelector {
     // etc. This has nothing to do with the request level authN etc.
 }
 
+
 message EnvoyPlugin {
     WorkloadSelector workload_selector = 9;
 
-    // route level plugin
-    repeated string route = 1;
+    message RouteScope {
+        // route level plugin
+        repeated string route = 1;
+    }
+    message HostScope {
+        // host level plugin
+        repeated string host = 1;
+    }
+    message ClusterScope {
+        // service level plugin
+        repeated string cluster = 1;
+    }
 
-    // host level plugin
-    repeated string host = 2;
-
-    // service level plugin
-    repeated string service = 3;
+    oneof plugin_scope {
+        RouteScope route_scope = 1;
+        HostScope host_scope = 2;
+        ClusterScope cluster_scope = 3;
+    }
 
     repeated Plugin plugins = 4;
 
