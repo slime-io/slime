@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-export HUB=docker.io/yonka/slime
+export HUB=docker.io/yonka/slime-boot
 branch=$(git symbolic-ref --short -q HEAD)
 commit=$(git rev-parse --short HEAD)
 tag=$(git show-ref --tags| grep $commit | awk -F"[/]" '{print $3}')
 if [ -z $tag ]
 then
-  operator-sdk build $HUB:$branch-$commit
-  docker push $HUB:$branch-$commit
+  docker_tag="$HUB:$branch-$commit"
 else
-  operator-sdk build $HUB:$tag
-  docker push $HUB:$tag
+  docker_tag="$HUB:$tag"
 fi
+docker build -f build/Dockerfile -t "$docker_tag" .
+docker push "$docker_tag"
+
