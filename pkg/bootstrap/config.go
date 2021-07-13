@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"github.com/gogo/protobuf/jsonpb"
+	"fmt"
 	"io/ioutil"
 	"k8s.io/client-go/kubernetes"
 
@@ -33,6 +34,7 @@ var (
 
 func GetModuleConfig() *netease_config.Config {
 	if config, err := readModuleConfig(); err != nil {
+		fmt.Printf("readModuleConfig met err %v\n", err)
 		return defaultModuleConfig
 	} else {
 		if config.Fence == nil {
