@@ -34,8 +34,9 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
 ```
 kubectl create ns mesh-operator
-kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/crds.yaml
-kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/slime-boot-install.yaml
+kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/init/crds.yaml
+kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/init/crds_old.yaml
+kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/master/install/init/slime-boot-install.yaml
 ```
 
 ### Configure lazy loading
@@ -55,7 +56,7 @@ spec:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # svc port
+        - {{port1}} # svc port, string(like "8080")
         - {{port2}}
         - ...
       name: slime-fence
