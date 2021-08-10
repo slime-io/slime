@@ -38,8 +38,8 @@ Slime架构主要分为三大块：
 在使用slime之前，需要安装slime-boot，通过slime-boot，可以方便的安装和卸载slime模块。 执行如下命令：
 ```shell
 $ kubectl create ns mesh-operator
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/init/crds.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/easy_install_lazyload.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/init/crds.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/easy_install_lazyload.yaml
 ```
 
 ### 安装Prometheus
@@ -47,7 +47,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdb
 slime的懒加载和自适应等模块配合监控指标使用方便，建议部署Prometheus。这里提供一份istio官网的简化部署文件拷贝。
 
 ```shell
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/prometheus.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/prometheus.yaml
 ```
 
 
@@ -306,7 +306,7 @@ spec:
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 确认所有组件已正常运行
 
@@ -332,7 +332,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 创建完后，状态如下
@@ -358,7 +358,7 @@ reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 创建servicefence，为productpage服务启用懒加载。
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/servicefence_productpage.yaml
 ```
 
 确认生成servicefence和sidecar对象。
@@ -463,13 +463,13 @@ reviews 和 details 被自动加入！
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 
 
@@ -883,7 +883,7 @@ status:
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 确认所有组件已正常运行
@@ -907,7 +907,7 @@ slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
@@ -917,7 +917,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdb
 为reviews创建DestinationRule
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/reviews-destination-rule.yaml
 ```
 
 
@@ -925,7 +925,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdb
 ##### 为reviews设置限流规则
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/smartlimiter_reviews.yaml
 ```
 
 
@@ -1063,14 +1063,14 @@ reviews-v2的sidecar观察日志如下
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/reviews-destination-rule.yaml
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 
 
