@@ -34,8 +34,8 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
 ```sh
 $ kubectl create ns mesh-operator
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/init/crds.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/init/slime-boot-install.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/init/crds.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/init/slime-boot-install.yaml
 ```
 
 
@@ -45,7 +45,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdb
 The lazy load and smart limiter module needs metric data, so we suggest you installing prometheus in your system. Here is a simple prometheus installation file copied from istio.io.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/prometheus.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/prometheus.yaml
 ```
 
 
@@ -302,7 +302,7 @@ spec:
 ##### Install Slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 Confirm all components are running.
@@ -329,7 +329,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 Confirm all pods are running.
@@ -355,7 +355,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create lazyload for productpage.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/servicefence_productpage.yaml
 ```
 
 Confirm servicefence and sidecar already exist.
@@ -461,13 +461,13 @@ The backends are details and reviews now.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 
 
@@ -880,7 +880,7 @@ status:
 ##### Install slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 
@@ -891,7 +891,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
 ```
 
 Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. You can also create gateway and visit productpage from outside, like what shows in  https://istio.io/latest/zh/docs/setup/getting-started/#ip.
@@ -899,7 +899,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create DestinationRule for reviews.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/reviews-destination-rule.yaml
 ```
 
 
@@ -907,7 +907,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdb
 ##### Create Smartlimiter
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/smartlimiter_reviews.yaml
 ```
 
 
@@ -1045,14 +1045,14 @@ Response code is 429. The smartlimiter is working.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/config/reviews-destination-rule.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/75ed452f5fdba82dfde0d3be364bee30b6056072/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/779bbcb6a6ef89b07859f55fc306826f5314ae28/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 
 
