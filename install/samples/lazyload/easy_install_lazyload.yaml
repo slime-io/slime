@@ -1,3 +1,4 @@
+---
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
@@ -6,8 +7,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
-    tag: v0.1.0
+    repository: docker.io/hazard1905/slime
+    tag: v0.1.1
   module:
     - name: lazyload
       fence:
@@ -16,7 +17,7 @@ spec:
           - "9080"
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090
           handlers:
             destination:
               query: |

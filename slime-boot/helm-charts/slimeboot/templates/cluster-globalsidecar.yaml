@@ -1,6 +1,6 @@
-{{ if .Values.component}}
-  {{ if .Values.component.globalSidecar }}
-  {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
+{{ if .Values.component }}
+{{ if .Values.component.globalSidecar.enable }}
+{{ if eq .Values.component.globalSidecar.type "cluster" }}
 ---
 apiVersion: apps/v1
 kind: Deployment

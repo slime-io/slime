@@ -1,3 +1,4 @@
+---
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
@@ -6,15 +7,15 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
-    tag: v0.1.0
+    repository: docker.io/hazard1905/slime
+    tag: v0.1.1
   module:
     - limiter:
         enable: true
         backend: 1
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090
           handlers:
             cpu.sum:
               query: |
