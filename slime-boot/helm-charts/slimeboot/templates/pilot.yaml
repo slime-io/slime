@@ -1,4 +1,4 @@
-{{ if .Values.component}}
+{{ if .Values.component }}
 {{ if .Values.component.pilot }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

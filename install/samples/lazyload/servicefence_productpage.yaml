@@ -1,3 +1,4 @@
+---
 apiVersion: microservice.slime.io/v1alpha1
 kind: ServiceFence
 metadata:
