@@ -5,10 +5,10 @@ metadata:
   namespace: default
 spec:
   sets:
-    _base:
+    v2:
       descriptor:
         - action:
             fill_interval:
               seconds: 60
-            quota: '3/{{._base.pod}}'
-          condition: '{{._base.rt99}}>10'
+            quota: "1"
+          condition: '{{.v2.cpu.sum}}>10'

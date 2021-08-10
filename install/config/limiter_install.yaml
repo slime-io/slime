@@ -6,8 +6,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
-    tag: v0.1.0
+    repository: docker.io/hazard1905/slime
+    tag: v0.1.1
   module:
     - limiter:
         enable: true

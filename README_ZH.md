@@ -1,4 +1,5 @@
 # Slime 
+
 # 智能网格管理器 
 ![slime-logo](logo/slime-logo.png)
 
@@ -27,19 +28,39 @@ Slime架构主要分为三大块：
 使用者将服务治理策略定义在CRD的spec中，同时，slime-metric从prometheus获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
 ![limiter治理策略](media/policy_zh.png)
 
+
+
+
+
 ## 如何使用Slime
+
 ### 安装slime-boot
 在使用slime之前，需要安装slime-boot，通过slime-boot，可以方便的安装和卸载slime模块。 执行如下命令：
+```shell
+$ kubectl create ns mesh-operator
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/init/crds.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/init/slime-boot-install.yaml
 ```
-kubectl create ns mesh-operator
-kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/crds.yaml
-kubectl apply -f https://raw.githubusercontent.com/ydh926/slime/master/install/slime-boot-install.yaml
+
+### 安装Prometheus
+
+slime的懒加载和自适应等模块配合监控指标使用方便，建议部署Prometheus。这里提供一份istio官网的简化部署文件拷贝。
+
+```shell
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/prometheus.yaml
 ```
+
+
+
+
+
+
 
 ### 配置懒加载
+
 #### 安装和使用
 
-**请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**     
+请先按照安装slime-boot小节的指引安装`slime-boot`     
 
 1. 使用Slime的配置懒加载功能需打开Fence模块，同时安装附加组件，如下：
 ```yaml
@@ -49,32 +70,48 @@ metadata:
   name: lazyload
   namespace: mesh-operator
 spec:
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
+  image:
+    pullPolicy: Always
+    repository: docker.io/hazard1905/slime
+    tag: v0.1.1
   module:
-    - fence:
+    - name: lazyload
+      fence:
         enable: true
-        wormholePort:
-        - {{port1}} # 业务svc的端口
-        - {{port2}}
-        - ...
-      name: slime-fence
+        wormholePort: 
+          - "9080" # replace to your application service ports
+          - {{your port}}
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090 # replace to your prometheus address
           handlers:
             destination:
               query: |
-                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
               type: Group
   component:
     globalSidecar:
       enable: true
       type: namespaced
       namespace:
-        - default # 替换为业务所在的namespace
+        - default # replace to or add your deployment's namespace
         - {{you namespace}}
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
     pilot:
       enable: true
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
       image:
         repository: docker.io/bcxq/pilot
         tag: preview-1.3.7-v0.0.1
@@ -93,22 +130,26 @@ NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
 3. 打开配置懒加载：
-在namespace上打上`istio-dependency-servicefence=true`的标签。
-```shell
-kubectl label ns {{your namespace}} istio-dependency-servicefence=true
+  业务namespace已有应用，在业务namespace中创建servicefence，执行`kubectl apply -f servicefence.yaml`
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
+metadata:
+  name: {{your svc}}
+  namespace: {{you namespace}}
+spec:
+  enable: true
 ```
-为需要开启懒加载的服务打上标签`istio.dependency.servicefence/status: "true"`。
-```shell
-kubectl annotate svc {{your svc}} istio.dependency.servicefence/status=true
-```
+
 4. 确认懒加载已开启
-执行`kubectl get sidecar {{svc name}} -oyaml`，可以看到对应服务生成了一个sidecar，如下：
+执行`kubectl get sidecar {{your svc}} -oyaml`，可以看到对应服务生成了一个sidecar，如下：
 ```yaml
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
   name: {{your svc}}
-  namespace: {{your ns}}
+  namespace: {{you namespace}}
   ownerReferences:
   - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
@@ -126,6 +167,8 @@ spec:
       app: {{your svc}}
 ```
 
+
+
 #### 其他安装选项
 
 **不使用global-sidecar组件**  
@@ -141,13 +184,13 @@ spec:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # 业务svc的端口
+        - {{port1}} # replace to your application service ports
         - {{port2}}
         - ...
       name: slime-fence
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090 # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -168,13 +211,13 @@ spec:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # 业务svc的端口
+        - {{port1}} # replace to your application service ports
         - {{port2}}
         - ...
       name: slime-fence
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090 # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -185,7 +228,7 @@ spec:
       enable: true
       type: cluster
       namespace:
-        - default # 替换为业务所在的namespace
+        - default # replace to or add your deployment's namespace
         - {{you namespace}}
     pilot:
       enable: true
@@ -196,6 +239,7 @@ spec:
 
 **使用report-server上报调用关系**   
 集群内未配置prometheus时，可通过report-server上报依赖关系   
+
 ```yaml
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
@@ -208,13 +252,13 @@ spec:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # 业务svc的端口
+        - {{port1}} # replace to your application service ports 
         - {{port2}}
         - ...
       name: slime-fence
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090 # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -225,7 +269,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # 替换为业务所在的namespace
+        - default # replace to your deployment's namespace
         - {{you namespace}}
     pilot:
       enable: true
@@ -249,59 +293,89 @@ spec:
         tag: preview-v0.0.1-rc    
 ```
 
-#### 卸载
-1. 删除slime-boot配置
-2. 删除servicefence配置
+
+
+
+
+#### 示例: 为bookinfo的productpage服务开启懒加载
+
+##### 安装 istio (1.8+)
+
+
+
+##### 安装 slime 
+
 ```shell
-for i in $(kubectl get ns);do kubectl delete servicefence -n $i --all;done
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/lazyload/easy_install_lazyload.sh)"
 ```
-#### 示例: 为bookinfo开启配置懒加载
-1. 安装 istio ( > 1.8 )
-2. 安装 slime 
-```shell
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/ydh926/slime/master/install/easy_install_lazyload.sh)"
-```
-3. 确认所有组件已正常运行：
-```
-$ kubectl get po -n mesh-operator
-NAME                                    READY     STATUS    RESTARTS   AGE
-global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
-lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
-report-server-855c8cf558-wdqjs          2/2       Running   0          27s
-slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
+确认所有组件已正常运行
+
+```sh
+$ kubectl get slimeboot -n mesh-operator
+NAME       AGE
+lazyload   2m20s
+$ kubectl get pod -n mesh-operator
+NAME                                    READY   STATUS             RESTARTS   AGE
+global-sidecar-pilot-7bfcdc55f6-977k2   1/1     Running            0          2m25s
+lazyload-b9646bbc4-ml5dr                1/1     Running            0          2m25s
+slime-boot-7b474c6d47-n4c9k             1/1     Running            0          4m55s
+$ kubectl get po -n default
+NAME                              READY   STATUS    RESTARTS   AGE
+global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 ```
 
+
+
+##### 安装bookinfo
+
+   创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
+
+```sh
+$ kubectl label namespace default istio-injection=enabled
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/bookinfo.yaml
 ```
-$ kubectl get po 
-NAME                              READY     STATUS    RESTARTS   AGE
-global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
+
+创建完后，状态如下
+
+```sh
+$ kubectl get po -n default
+NAME                              READY   STATUS    RESTARTS   AGE
+details-v1-79f774bdb9-6vzj6       2/2     Running   0          60s
+global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          5m12s
+productpage-v1-6b746f74dc-vkfr7   2/2     Running   0          59s
+ratings-v1-b6994bb9-klg48         2/2     Running   0          59s
+reviews-v1-545db77b95-z5ql9       2/2     Running   0          59s
+reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
+reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 ```
-4. 在default namespace下安装bookinfo
-5. 开启配置懒加载
-```shell
-kubectl label ns default istio-dependency-servicefence=true
+
+此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
+
+
+
+##### 开启懒加载
+
+创建servicefence，为productpage服务启用懒加载。
+
+```sh
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/lazyload/servicefence_productpage.yaml
 ```
-```shell
-kubectl annotate svc productpage istio.dependency.servicefence/status=true
-kubectl annotate svc reviews istio.dependency.servicefence/status=true
-kubectl annotate svc details istio.dependency.servicefence/status=true
-kubectl annotate svc ratings istio.dependency.servicefence/status=true
-```
-6. 确认sidecarScope已经生成
-```
-$ kubectl get sidecar
+
+确认生成servicefence和sidecar对象。
+
+```sh
+$ kubectl get servicefence -n default
 NAME          AGE
-details       12s
-kubernetes    11s
-productpage   11s
-ratings       11s
-reviews       11s
-```
-```
-$ kubectl get sidecar productpage -oyaml
+productpage   12s
+$ kubectl get sidecar -n default
+NAME          AGE
+productpage   22s
+$ kubectl get sidecar productpage -n default -oyaml
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
+  creationTimestamp: "2021-08-04T03:54:35Z"
+  generation: 1
   name: productpage
   namespace: default
   ownerReferences:
@@ -310,6 +384,9 @@ metadata:
     controller: true
     kind: ServiceFence
     name: productpage
+    uid: d36e4be7-d66c-4f77-a9ff-14a4bf4641e6
+  resourceVersion: "324118"
+  uid: ec283a14-8746-42d3-87d1-0ee4538f0ac0
 spec:
   egress:
   - hosts:
@@ -320,19 +397,27 @@ spec:
     labels:
       app: productpage
 ```
-7. 访问productpage并查看accesslog
-```
-[2021-01-04T07:12:24.101Z] "GET /details/0 HTTP/1.1" 200 - "-" 0 178 36 35 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "83793ccf-545c-4cc2-9a48-82bb70d81a2a" "details:9080" "10.244.3.83:9080" outbound|9080||global-sidecar.default.svc.cluster.local 10.244.1.206:42786 10.97.33.96:9080 10.244.1.206:40108 - -
-[2021-01-04T07:12:24.171Z] "GET /reviews/0 HTTP/1.1" 200 - "-" 0 295 33 33 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "010bb2bc-54ab-4809-b3a0-288d60670ded" "reviews:9080" "10.244.3.83:9080" outbound|9080||global-sidecar.default.svc.cluster.local 10.244.1.206:42786 10.99.230.151:9080 10.244.1.206:51512 - -
-```
-成功访问, 访问日志显示后端服务是global-sidecar.
 
-8. 查看productpage的sidecarScope
+
+##### 首次访问观察
+
+第一次访问productpage，并使用`kubectl logs -f productpage-xxx -c istio-proxy -n default`观察访问日志。
+
 ```
+[2021-08-06T06:04:36.912Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 43 43 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "48257260-1f5f-92fa-a18f-ff8e2b128487" "details:9080" "172.17.0.17:9080" outbound|9080||global-sidecar.default.svc.cluster.local 172.17.0.11:45422 10.101.207.55:9080 172.17.0.11:56376 - -
+[2021-08-06T06:04:36.992Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 375 1342 1342 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "48257260-1f5f-92fa-a18f-ff8e2b128487" "reviews:9080" "172.17.0.17:9080" outbound|9080||global-sidecar.default.svc.cluster.local 172.17.0.11:45428 10.106.126.147:9080 172.17.0.11:41130 - -
+```
+可以看出，此次outbound后端访问global-sidecar.default.svc.cluster.local。
+
+观察sidecar内容
+
+```sh
 $ kubectl get sidecar productpage -oyaml
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
+  creationTimestamp: "2021-08-06T03:23:05Z"
+  generation: 2
   name: productpage
   namespace: default
   ownerReferences:
@@ -341,6 +426,9 @@ metadata:
     controller: true
     kind: ServiceFence
     name: productpage
+    uid: 27853fe0-01b3-418f-a785-6e49db0d201a
+  resourceVersion: "498810"
+  uid: e923e426-f0f0-429a-a447-c6102f334904
 spec:
   egress:
   - hosts:
@@ -353,14 +441,40 @@ spec:
     labels:
       app: productpage
 ```
+
 reviews 和 details 被自动加入！
 
-9. 再次访问productpage
+
+
+##### 再次访问观察
+
+第二次访问productpage，观察productpage应用日志
+
 ```
-[2021-01-04T07:35:57.622Z] "GET /details/0 HTTP/1.1" 200 - "-" 0 178 2 2 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "73a6de0b-aac9-422b-af7b-2094bd37094c" "details:9080" "10.244.7.30:9080" outbound|9080||details.default.svc.cluster.local 10.244.1.206:52626 10.97.33.96:9080 10.244.1.206:47396 - default
-[2021-01-04T07:35:57.628Z] "GET /reviews/0 HTTP/1.1" 200 - "-" 0 379 134 134 "-" "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0" "edf8c7eb-9558-4d1e-834c-4f238b387fc5" "reviews:9080" "10.244.7.14:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:42204 10.99.230.151:9080 10.244.1.206:58798 - default
+[2021-08-06T06:05:47.068Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 46 46 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "1c1c8e23-24d3-956e-aec0-e4bcff8df251" "details:9080" "172.17.0.6:9080" outbound|9080||details.default.svc.cluster.local 172.17.0.11:58522 10.101.207.55:9080 172.17.0.11:57528 - default
+[2021-08-06T06:05:47.160Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 379 1559 1558 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "1c1c8e23-24d3-956e-aec0-e4bcff8df251" "reviews:9080" "172.17.0.10:9080" outbound|9080||reviews.default.svc.cluster.local 172.17.0.11:60104 10.106.126.147:9080 172.17.0.11:42280 - default
 ```
-访问成功, 后端服务是reviews和details.
+可以看到，outbound日志的后端访问信息变为details.default.svc.cluster.local和reviews.default.svc.cluster.local。
+
+
+
+##### 卸载
+
+卸载bookinfo
+
+```sh
+$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/bookinfo.yaml
+```
+
+卸载slime相关
+
+```sh
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/lazyload/easy_uninstall_lazyload.sh)"
+```
+
+
+
+
 
 ### HTTP插件管理
 #### 安装和使用
@@ -377,7 +491,7 @@ spec:
     - plugin:
         enable: true
         local:
-          mount: /wasm/test # wasm文件夹，需挂载在sidecar中    
+          mount: /wasm/test # wasm directory, mounted in the sidecar    
   image:
     pullPolicy: Always
     repository: docker.io/bcxq/slime
@@ -399,7 +513,7 @@ spec:
   workload_labels:
     app: my-app
   plugins:
-  - enable: true          # 插件开关
+  - enable: true          # switch
     name: {plugin-1}
   # ...
   - enable: true
@@ -421,11 +535,11 @@ spec:
   workload_labels:
     app: my-app
   plugins:
-  - enable: true          # 插件开关
-    name: {plugin-1}      # 插件名称
+  - enable: true          # switch
+    name: {plugin-1}      # plugin name
     inline:
       settings:
-        {plugin settings} # 插件配置
+        {plugin settings} # plugin settings
   # ...
   - enable: true
     name: {plugin-N}
@@ -443,17 +557,17 @@ metadata:
 spec:
   workload_labels:
     app: my-app
-  host:                          # 插件的生效范围(host级别)              
+  host:                          # Effective range(host level)               
   - jmeter.com
   - istio.com
   - 989.mock.qa.netease.com
   - demo.test.com
   - netease.com
-  route:                         # 插件的生效范围(route级别), route字段须对应VirtualService中的名称
+  route:                         # Effective range(route level). The route field must be the same with VirtualService.
   - abc
   plugins:
-  - name: com.netease.supercache # 插件名称
-    settings:                    # 插件配置
+  - name: com.netease.supercache 
+    settings:                   
       cache_ttls:
         LocalHttpCache:
           default: 60000
@@ -466,46 +580,37 @@ spec:
         ignore_case: true
       low_level_fill: true
 ```
-### 扩展wasm插件
 
-// TODO
 
-### 示例
-// TODO
 
-### 卸载
-1. 删除slime-boot配置
-2. 删除servicefence配置
-```shell
-for i in $(kubectl get ns);do kubectl delete pluginmanager -n $i --all;done
-for i in $(kubectl get ns);do kubectl delete envoyplugin -n $i --all;done
-```
+
+
 
 ### 自适应限流
+
 #### 安装和使用
 
-**注意:** 自适应限流功能可以对接envoy社区支持的限流插件`envoy.filters.http.local_ratelimit`，也可以对接网易自研插件`com.netease.local_flow_control`。envoy社区的限流插件暂不支持HeaderMatch的配置，使用`com.netease.local_flow_control`插件前需确认envoy二进制中是否包含该插件。      
-
-**请先按照[安装slime-boot](#安装slime-boot)小节的指引安装`slime-boot`**  
+请先按照安装slime-boot小节的指引安装`slime-boot`  。
 
 使用Slime的自适应限流功能需打开Limiter模块：
 ```yaml
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: limiter
+  name: smartlimiter
   namespace: mesh-operator
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
-    tag: v0.1.0
+    repository: docker.io/hazard1905/slime
+    tag: v0.1.1
   module:
     - limiter:
         enable: true
+        backend: 1
       metric:
         prometheus:
-          address: #http://prometheus_address
+          address: http://prometheus.istio-system:9090 # replace to your prometheus address
           handlers:
             cpu.sum:
               query: |
@@ -513,13 +618,17 @@ spec:
             cpu.max:
               query: |
                 max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            rt99:
+              query: |
+                histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
         k8s:
           handlers:
             - pod # inline
       name: limiter
 ```
-在示例中，我们配置了prometheus作为监控源，prometheus.handlers定义了希望从监控中获取的监控指标，这些监控指标可以作为治理规则中的参数，从而达到自适应限流的目的，具体用法可参考[基于监控的自适应限流](#基于监控的自适应限流)。
+在示例中，我们配置了prometheus作为监控源，prometheus.handlers定义了希望从监控中获取的监控指标，这些监控指标可以作为治理规则中的参数，从而达到自适应限流的目的。
 用户也可以根据需要定义limiter模块需要获取的监控指标，以下是一些可以常用的监控指标获取语句：
+
 ```
 cpu:
 总和：
@@ -546,25 +655,13 @@ histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{kub
 histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
 ```
 
-#### 分组限流
-在istio的体系中，用户可以通过DestinationRule为服务定义subset，并为其定制负载均衡，连接池等服务治理规则。限流同样属于此类服务治理规则，通过slime框架，我们不仅可以为服务，也可以为subset定制限流规则，如下所示：
-```yaml
-apiVersion: microservice.slime.io/v1alpha1
-kind: SmartLimiter
-metadata:
-  name: reviews
-  namespace: default
-spec:
-  sets:
-    v1: # reviews的v1版本
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "10"
-        condition: "true"
-```
-上述配置为reviews服务的v1版本限制了每秒10次的请求。将配置提交之后，该服务下实例的状态信息以及限流信息会显示在`status`中，如下：
+
+
+#### 基于监控的自适应限流
+
+在示例的slimeboot中，我们获取了服务容器的cpu总和以及最大值作为limiter模块所关心的监控指标。从prometheus获取的监控数据会被显示在metricStatus中，我们可以采用这些指标作为触发限流的条件，如下所示：
+
+部署
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -574,135 +671,139 @@ metadata:
   namespace: default
 spec:
   sets:
-    v1: # reviews的v1版本
+    v2:
       descriptor:
       - action:
           fill_interval:
-            seconds: 1
-          quota: "10"
+            seconds: 60
+          quota: "1"
+        condition: '{{.v2.cpu.sum}}>10'
+```
+
+得到
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"microservice.slime.io/v1alpha1","kind":"SmartLimiter","metadata":{"annotations":{},"name":"reviews","namespace":"default"},"spec":{"sets":{"v2":{"descriptor":[{"action":{"fill_interval":{"seconds":60},"quota":"1"},"condition":"{{.v2.cpu.sum}}\u003e100"}]}}}}
+  creationTimestamp: "2021-08-09T07:54:24Z"
+  generation: 1
+  name: reviews
+  namespace: default
+  resourceVersion: "63006"
+  uid: e6bf5121-6126-40db-8f5c-e124894b5d54
+spec:
+  sets:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
+        condition: '{{.v2.cpu.sum}}>100'
+status:
+  metricStatus:
+    _base.cpu.max: "181.591794594"
+    _base.cpu.sum: "536.226646691"
+    _base.pod: "3"
+    v1.cpu.max: "176.285405855"
+    v1.cpu.sum: "176.285405855"
+    v1.pod: "1"
+    v2.cpu.max: "178.349446242"
+    v2.cpu.sum: "178.349446242"
+    v2.pod: "1"
+    v3.cpu.max: "181.591794594"
+    v3.cpu.sum: "181.591794594"
+    v3.pod: "1"
+  ratelimitStatus:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
+```
+
+condition中的算式会根据metricStatus的条目进行渲染，渲染后的算式若计算结果为true，则会触发限流。
+
+
+
+#### 分组限流
+
+在istio的体系中，用户可以通过DestinationRule为服务定义subset，并为其定制负载均衡，连接池等服务治理规则。限流同样属于此类服务治理规则，通过slime框架，我们不仅可以为服务，也可以为subset定制限流规则。如下所示：
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  name: reviews
+  namespace: default
+spec:
+  sets:
+    v1: # reviews v1
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
+        condition: "true"
+```
+上述配置为reviews服务的v1版本限制了每分钟1次的请求。将配置提交之后，该服务下实例的状态信息以及限流信息会显示在`status`中，如下：
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"microservice.slime.io/v1alpha1","kind":"SmartLimiter","metadata":{"annotations":{},"name":"reviews","namespace":"default"},"spec":{"sets":{"v1":{"descriptor":[{"action":{"fill_interval":{"seconds":60},"quota":"1"},"condition":"true"}]}}}}
+  creationTimestamp: "2021-08-09T07:06:42Z"
+  generation: 1
+  name: reviews
+  namespace: default
+  resourceVersion: "59635"
+  uid: ba62ff40-3c9f-427d-959b-6a416d54f24c
+spec:
+  sets:
+    v1:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
         condition: "true"
 status:
   metricStatus:
-  # ...
+    _base.cpu.max: "158.942939832"
+    _base.cpu.sum: "469.688066909"
+    _base.pod: "3"
+    v1.cpu.max: "154.605786157"
+    v1.cpu.sum: "154.605786157"
+    v1.pod: "1"
+    v2.cpu.max: "156.13934092"
+    v2.cpu.sum: "156.13934092"
+    v2.pod: "1"
+    v3.cpu.max: "158.942939832"
+    v3.cpu.sum: "158.942939832"
+    v3.pod: "1"
   ratelimitStatus:
     v1:
       descriptor:
       - action:
           fill_interval:
-            seconds: 1
-          quota: "10"
+            seconds: 60
+          quota: "1"
 ```
-#### 基于监控的自适应限流
-在示例的slimeboot中，我们获取了服务容器的cpu总和以及最大值作为limiter模块所关心的监控指标，从prometheus获取的监控数据会被显示在metricStatus中，我们可以采用这些指标作为触发限流的条件，如下所示：
-```yaml
-apiVersion: microservice.slime.io/v1alpha1
-kind: SmartLimiter
-metadata:
-  name: reviews
-  namespace: default
-spec:
-  sets:
-    v2:
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "5"
-        condition: '{{.v2.cpu.sum}}>10000'
-status:
-  metricStatus:
-    '_base.cpu.max': "11279.791407871"
-    '_base.cpu.sum': "31827.916205633"
-    '_base.pod': "3"
-    v1.cpu.max: "9328.098703551"
-    v1.cpu.sum: "9328.098703551"
-    v1.pod: "1"
-    v2.cpu.max: "11220.026094211"
-    v2.cpu.sum: "11220.026094211"
-    v2.pod: "1"
-    v3.cpu.max: "11279.791407871"
-    v3.cpu.sum: "11279.791407871"
-    v3.pod: "1"
-  ratelimitStatus:
-    v2:
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "5"
-```
-condition中的算式会根据metricStatus的条目进行渲染，渲染后的算式若计算结果为true，则会触发限流。
+
 
 #### 服务限流
 由于缺乏全局配额管理组件，我们无法做到精确的服务限流，但是假定负载均衡理想的情况下，实例限流数=服务限流数/实例个数。reviews的服务限流数为3，那么可以将quota字段配置为3/{{._base.pod}}以实现服务级别的限流。在服务发生扩容时，可以在限流状态栏中看到实例限流数的变化。
+
+部署
+
 ```yaml
-apiVersion: microservice.slime.io/v1alpha1
-kind: SmartLimiter
-metadata:
-  name: reviews
-  namespace: default
-spec:
-  sets:
-    "_base":
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "3/{{._base.pod}}"
-status:
-  metricStatus:
-    '_base.cpu.max': "11279.791407871"
-    '_base.cpu.sum': "31827.916205633"
-    '_base.pod': "3"
-    v1.cpu.max: "9328.098703551"
-    v1.cpu.sum: "9328.098703551"
-    v1.pod: "1"
-    v2.cpu.max: "11220.026094211"
-    v2.cpu.sum: "11220.026094211"
-    v2.pod: "1"
-    v3.cpu.max: "11279.791407871"
-    v3.cpu.sum: "11279.791407871"
-    v3.pod: "1"
-  ratelimitStatus:
-    _base:
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "1" # 对于每个实例而言，限流配额为3/3=1
-```
-#### 卸载
-1. 删除slime-boot配置
-2. 删除smartlimiter配置
-```
-for i in $(kubectl get ns);do kubectl delete smartlimiter -n $i --all;done
-```
-#### 示例
-以bookinfo为例，介绍配置限流如何使用。开始之前，确保已经安装了istio1.8版本以及slime-boot。示例中的bookinfo安装在default namespace。   
-
-**安装bookinfo**
-```
-$ kubectl apply -f samples/bookinfo.yaml 
-```
-
-**清理slime-boot资源**
-```
-$ kubectl delete slimeboot -n mesh-operator --all
-```
-
-**安装限流模块**
-```
-$ kubectl apply -f samples/limiter-install.yaml
-```
-
-**为reviews服务设置限流规则**
-```
-$ kubectl apply -f samples/reviews-svc-limiter.yaml  
-```
-
-**确认配置已经创建**
-```
-$ kubectl get smartlimiter reviews -oyaml
 apiVersion: microservice.slime.io/v1alpha1
 kind: SmartLimiter
 metadata:
@@ -718,17 +819,178 @@ spec:
           quota: 3/{{._base.pod}}
         condition: "true"
 ```
-该配置表明review服务会被限制为10s访问三次
 
-**确认对应的EnvoyFilter是否创建**
+得到SmartLimiter
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"microservice.slime.io/v1alpha1","kind":"SmartLimiter","metadata":{"annotations":{},"name":"reviews","namespace":"default"},"spec":{"sets":{"_base":{"descriptor":[{"action":{"fill_interval":{"seconds":60},"quota":"3/{{._base.pod}}"},"condition":"true"}]}}}}
+  creationTimestamp: "2021-08-09T08:21:11Z"
+  generation: 1
+  name: reviews
+  namespace: default
+  resourceVersion: "65036"
+  uid: 16fc8c81-f71a-45ae-be1f-8f38d9a1fe4b
+spec:
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: 3/{{._base.pod}}
+        condition: "true"
+status:
+  metricStatus:
+    _base.cpu.max: "192.360021503"
+    _base.cpu.sum: "566.4194305139999"
+    _base.pod: "3"
+    v1.cpu.max: "185.760390031"
+    v1.cpu.sum: "185.760390031"
+    v1.pod: "1"
+    v2.cpu.max: "188.29901898"
+    v2.cpu.sum: "188.29901898"
+    v2.pod: "1"
+    v3.cpu.max: "192.360021503"
+    v3.cpu.sum: "192.360021503"
+    v3.pod: "1"
+  ratelimitStatus:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1" # For each instance, the current limit quota is 3/3=1.
 ```
-$ kubectl get envoyfilter  reviews.default.local-ratelimit -oyaml
+
+
+
+
+
+
+
+
+#### 示例：为bookinfo的reviews服务开启自适应限流
+
+##### 安装 istio (1.8+)
+
+
+
+##### 安装 slime 
+
+```shell
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/smartlimiter/easy_install_limiter.sh)"
+```
+
+确认所有组件已正常运行
+
+```sh
+$ kubectl get slimeboot -n mesh-operator
+NAME           AGE
+smartlimiter   6s
+$ kubectl get pod -n mesh-operator
+NAME                                    READY   STATUS    RESTARTS   AGE
+global-sidecar-pilot-7bfcdc55f6-dnqc2   1/1     Running   0          26s
+limiter-6cb886d74-82hxg                 1/1     Running   0          26s
+slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
+```
+
+
+
+##### 安装bookinfo
+
+   创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
+
+```sh
+$ kubectl label namespace default istio-injection=enabled
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/bookinfo.yaml
+```
+
+此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
+
+
+
+为reviews创建DestinationRule
+
+```sh
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/reviews-destination-rule.yaml
+```
+
+
+
+##### 为reviews设置限流规则
+
+```sh
+$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/smartlimiter/smartlimiter_reviews.yaml
+```
+
+
+
+##### 确认smartlimiter已经创建
+
+```sh
+$ kubectl get smartlimiter reviews -oyaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: SmartLimiter
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"microservice.slime.io/v1alpha1","kind":"SmartLimiter","metadata":{"annotations":{},"name":"reviews","namespace":"default"},"spec":{"sets":{"v2":{"descriptor":[{"action":{"fill_interval":{"seconds":60},"quota":"1"},"condition":"{{.v2.cpu.sum}}\u003e100"}]}}}}
+  creationTimestamp: "2021-08-09T07:54:24Z"
+  generation: 1
+  name: reviews
+  namespace: default
+  resourceVersion: "63006"
+  uid: e6bf5121-6126-40db-8f5c-e124894b5d54
+spec:
+  sets:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
+        condition: '{{.v2.cpu.sum}}>100'
+status:
+  metricStatus:
+    _base.cpu.max: "181.591794594"
+    _base.cpu.sum: "536.226646691"
+    _base.pod: "3"
+    v1.cpu.max: "176.285405855"
+    v1.cpu.sum: "176.285405855"
+    v1.pod: "1"
+    v2.cpu.max: "178.349446242"
+    v2.cpu.sum: "178.349446242"
+    v2.pod: "1"
+    v3.cpu.max: "181.591794594"
+    v3.cpu.sum: "181.591794594"
+    v3.pod: "1"
+  ratelimitStatus:
+    v2:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "1"
+```
+该配置表明review-v2服务会被限制为60s访问1次。
+
+
+
+##### 确认EnvoyFilter已创建
+
+```sh
+$ kubectl get envoyfilter reviews.default.v2.ratelimit -oyaml
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  creationTimestamp: "2021-01-05T07:28:01Z"
+  creationTimestamp: "2021-08-09T07:54:25Z"
   generation: 1
-  name: reviews.default.local-ratelimit
+  name: reviews.default.v2.ratelimit
   namespace: default
   ownerReferences:
   - apiVersion: microservice.slime.io/v1alpha1
@@ -736,10 +998,9 @@ metadata:
     controller: true
     kind: SmartLimiter
     name: reviews
-    uid: 5eed7271-e8a9-4eda-b5d8-6cd2dd6b3659
-  resourceVersion: "59145684"
-  selfLink: /apis/networking.istio.io/v1alpha3/namespaces/default/envoyfilters/reviews.default.local-ratelimit
-  uid: 04549089-4bf5-4200-98ae-59dd993cda9d
+    uid: e6bf5121-6126-40db-8f5c-e124894b5d54
+  resourceVersion: "62926"
+  uid: cbea7344-3fda-4a1d-b3d2-93649ce76129
 spec:
   configPatches:
   - applyTo: HTTP_FILTER
@@ -770,18 +1031,58 @@ spec:
             stat_prefix: http_local_rate_limiter
             token_bucket:
               fill_interval:
-                seconds: "10"
+                seconds: "60"
               max_tokens: 1
   workloadSelector:
     labels:
       app: reviews
+      version: v2
 ```
-由于review服务有3个实例，因此每个实例的10s只能获得1个配额
 
-**访问productpage页面**     
-多次访问productpage页面将触发限流，查看productpage的accesslog可以更直观的看出限流效果：
+
+##### **访问观察**
+
+触发限流时，访问productpage，productpage的sidecar观察日志如下
 
 ```
-$ kubectl logs {productpage pod} -c istio-proxy
-[2021-01-05T07:29:03.986Z] "GET /reviews/0 HTTP/1.1" 429 - "-" 0 18 10 10 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.61 Safari/537.36" "d59c781a-f62c-4e98-9efe-5ace68579654" "reviews:9080" "10.244.8.95:9080" outbound|9080||reviews.default.svc.cluster.local 10.244.1.206:35784 10.99.230.151:9080 10.244.1.206:39864 - default                              
+[2021-08-09T08:01:04.872Z] "GET /reviews/0 HTTP/1.1" 429 - via_upstream - "-" 0 18 1 1 "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "19605264-5868-9c90-8b42-424790fad1b2" "reviews:9080" "172.17.0.11:9080" outbound|9080||reviews.default.svc.cluster.local 172.17.0.16:41342 10.100.112.212:9080 172.17.0.16:41378 - default
 ```
+
+reviews-v2的sidecar观察日志如下
+
+```
+[2021-08-09T08:01:04.049Z] "GET /reviews/0 HTTP/1.1" 429 - local_rate_limited - "-" 0 18 0 - "-" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36" "3f0a65c8-1c66-9994-a0cf-1d7ae0446371" "reviews:9080" "-" inbound|9080|| - 172.17.0.11:9080 172.17.0.16:41342 outbound_.9080_._.reviews.default.svc.cluster.local -
+```
+
+触发限流-“local_rate_limited”，返回429。
+
+
+
+##### **卸载**
+
+卸载bookinfo
+
+```sh
+$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime-config/main/config/reviews-destination-rule.yaml
+```
+
+卸载slime相关
+
+```sh
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime-config/main/samples/smartlimiter/easy_uninstall_limiter.sh)"
+```
+
+
+
+
+
+
+
+## 社区
+
+- Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
+- QQ群: 971298863
+
+
+
