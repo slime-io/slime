@@ -34,50 +34,53 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha1.SmartLimitDescriptors)
 
 	host := util.UnityHost(instance.Name, instance.Namespace)
+	var sets []*networking.Subset
 	if destinationrule.HostSubsetMapping.Get(host) != nil {
-		sets := destinationrule.HostSubsetMapping.Get(host).([]*networking.Subset)
-		loc := types.NamespacedName{
-			Namespace: instance.Namespace,
-			Name:      instance.Name,
-		}
-		svc := &v1.Service{}
-		_ = r.client.Get(context.TODO(), loc, svc)
-		svcSelector := svc.Spec.Selector
-		// 使用base作为key，可以为基础集合配置限流
-		sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
-   		for _, set := range sets {
-			if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
-				descriptor := &microservicev1alpha1.SmartLimitDescriptors{}
-				for _, des := range setDescriptor.Descriptor_ {
-					setDes := &microservicev1alpha1.SmartLimitDescriptor{}
-					if shouldUpdate, _ := util.CalculateTemplateBool(des.Condition, materialInterface); shouldUpdate {
-						if des.Action != nil {
-							if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err == nil {
-								setDes.Action = &microservicev1alpha1.SmartLimitDescriptor_Action{
-									Quota:        fmt.Sprintf("%d", rateLimitValue),
-									FillInterval: des.Action.FillInterval,
-								}
+		sets = destinationrule.HostSubsetMapping.Get(host).([]*networking.Subset)
+	} else {
+		sets = make([]*networking.Subset, 0, 1)
+	}
+	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
+	loc := types.NamespacedName{
+		Namespace: instance.Namespace,
+		Name:      instance.Name,
+	}
+	svc := &v1.Service{}
+	_ = r.client.Get(context.TODO(), loc, svc)
+	svcSelector := svc.Spec.Selector
+	// 使用base作为key，可以为基础集合配置限流
+	for _, set := range sets {
+		if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
+			descriptor := &microservicev1alpha1.SmartLimitDescriptors{}
+			for _, des := range setDescriptor.Descriptor_ {
+				setDes := &microservicev1alpha1.SmartLimitDescriptor{}
+				if shouldUpdate, _ := util.CalculateTemplateBool(des.Condition, materialInterface); shouldUpdate {
+					if des.Action != nil {
+						if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err == nil {
+							setDes.Action = &microservicev1alpha1.SmartLimitDescriptor_Action{
+								Quota:        fmt.Sprintf("%d", rateLimitValue),
+								FillInterval: des.Action.FillInterval,
 							}
-							descriptor.Descriptor_ = append(descriptor.Descriptor_, setDes)
 						}
+						descriptor.Descriptor_ = append(descriptor.Descriptor_, setDes)
 					}
 				}
-				selector := util.CopyMap(svcSelector)
-				for k, v := range set.Labels {
-					selector[k] = v
-				}
-				if len(descriptor.Descriptor_) > 0 {
-					ef := descriptorsToEnvoyFilter(descriptor.Descriptor_, selector)
-					setsEnvoyFilter[set.Name] = ef
-					setsSmartLimitDescriptor[set.Name] = descriptor
-				}else{
-					// Used to delete
-					setsEnvoyFilter[set.Name] = nil
-				}
+			}
+			selector := util.CopyMap(svcSelector)
+			for k, v := range set.Labels {
+				selector[k] = v
+			}
+			if len(descriptor.Descriptor_) > 0 {
+				ef := descriptorsToEnvoyFilter(descriptor.Descriptor_, selector)
+				setsEnvoyFilter[set.Name] = ef
+				setsSmartLimitDescriptor[set.Name] = descriptor
 			} else {
 				// Used to delete
 				setsEnvoyFilter[set.Name] = nil
 			}
+		} else {
+			// Used to delete
+			setsEnvoyFilter[set.Name] = nil
 		}
 		return setsEnvoyFilter, setsSmartLimitDescriptor
 	}
