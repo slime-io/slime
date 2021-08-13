@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-export HUB=docker.io/yonka/slime
+export HUB=docker.io/hazard1905/slime
 branch=$(git symbolic-ref --short -q HEAD)
 commit=$(git rev-parse --short HEAD)
 tag=$(git show-ref --tags| grep $commit | awk -F"[/]" '{print $3}')

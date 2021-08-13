@@ -1,6 +1,5 @@
-{{ if .Values.component }}
-{{ if .Values.component.globalSidecar.enable }}
-{{ if eq .Values.component.globalSidecar.type "cluster" }}
+{{- if .Values.component.globalSidecar.enable }}
+  {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -227,7 +226,6 @@ spec:
                         prefix: /
                       route:
                         cluster: outbound|{{.}}||global-sidecar.{{$.Values.namespace}}.svc.cluster.local
-  {{ end }}
   {{ end }}
   {{ end }}
   {{ end }}

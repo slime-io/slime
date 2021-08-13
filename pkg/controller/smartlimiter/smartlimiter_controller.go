@@ -165,6 +165,7 @@ func DoUpdate(instance metav1.Object, args ...interface{}) error {
 		if m, ok := instance.(*microservicev1alpha1.SmartLimiter); ok {
 			this.lastUpdatePolicyLock.RLock()
 			if reflect.DeepEqual(m.Spec, this.lastUpdatePolicy) {
+				this.lastUpdatePolicyLock.RUnlock()
 				return nil
 			} else {
 				this.lastUpdatePolicyLock.RUnlock()
