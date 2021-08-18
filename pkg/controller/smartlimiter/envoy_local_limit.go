@@ -40,7 +40,10 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 	} else {
 		sets = make([]*networking.Subset, 0, 1)
 	}
+
+	// 使用base作为key，可以为基础集合配置限流
 	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
+
 	loc := types.NamespacedName{
 		Namespace: instance.Namespace,
 		Name:      instance.Name,
@@ -48,7 +51,7 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 	svc := &v1.Service{}
 	_ = r.client.Get(context.TODO(), loc, svc)
 	svcSelector := svc.Spec.Selector
-	// 使用base作为key，可以为基础集合配置限流
+
 	for _, set := range sets {
 		if setDescriptor, ok := rateLimitConf.Sets[set.Name]; ok {
 			descriptor := &microservicev1alpha1.SmartLimitDescriptors{}
@@ -82,9 +85,8 @@ func (r *ReconcileSmartLimiter) GenerateEnvoyLocalLimit(rateLimitConf microservi
 			// Used to delete
 			setsEnvoyFilter[set.Name] = nil
 		}
-		return setsEnvoyFilter, setsSmartLimitDescriptor
 	}
-	return nil, nil
+	return setsEnvoyFilter, setsSmartLimitDescriptor
 }
 
 func descriptorsToEnvoyFilter(descriptor []*microservicev1alpha1.SmartLimitDescriptor, labels map[string]string) *networking.EnvoyFilter {
