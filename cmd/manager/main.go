@@ -36,7 +36,6 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
 // Change below variables to serve metrics on different host or port.
@@ -237,7 +236,7 @@ func processConfig(Config *v1alpha1.Config) map[controller.Collection]func(manag
 	f := make(map[controller.Collection]func(manager.Manager, *bootstrap.Environment) error)
 	if Config.Limiter != nil && Config.Limiter.Enable {
 		controller.UpdateHook[controller.SmartLimiter] = []func(object v12.Object, args ...interface{}) error{smartlimiter.DoUpdate}
-		controller.DeleteHook[controller.SmartLimiter] = []func(reconcile.Request, ...interface{}) error{smartlimiter.DoRemove}
+		//controller.DeleteHook[controller.SmartLimiter] = []func(reconcile.Request, ...interface{}) error{smartlimiter.DoRemove}
 		controller.UpdateHook[controller.DestinationRule] = []func(object v12.Object, args ...interface{}) error{destinationrule.DoUpdate}
 		f[controller.SmartLimiter] = smartlimiter.Add
 		f[controller.DestinationRule] = destinationrule.Add
