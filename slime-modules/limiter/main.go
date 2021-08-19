@@ -93,6 +93,9 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
+	// TODO - Add ModuleHealthCheckRegister
+	go bootstrap.HealthCheckStart()
+
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

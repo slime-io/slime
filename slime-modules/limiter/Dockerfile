@@ -2,7 +2,7 @@
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM ubuntu:bionic
 WORKDIR /
-COPY manager .
+COPY manager.exe ./manager
 
 ENTRYPOINT ["/manager"]
 

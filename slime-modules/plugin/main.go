@@ -19,6 +19,8 @@ package main
 import (
 	"flag"
 	"os"
+	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
+	"slime.io/slime/slime-framework/bootstrap"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -41,6 +43,7 @@ func init() {
 
 	_ = microserviceslimeiov1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
+	_ = v1alpha3.AddToScheme(scheme)
 }
 
 func main() {
@@ -83,6 +86,10 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	// TODO - Add ModuleHealthCheckRegister
+	go bootstrap.HealthCheckStart()
+
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
