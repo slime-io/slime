@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"go.uber.org/zap/zapcore"
 	"reflect"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/gogo/protobuf/jsonpb"
@@ -249,4 +251,9 @@ func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{}
 	s.subscriberLock.Lock()
 	s.subscriber = append(s.subscriber, subscribe)
 	s.subscriberLock.Unlock()
+}
+
+
+func TimeEncoder ( t time.Time, enc zapcore.PrimitiveArrayEncoder){
+	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
 }
