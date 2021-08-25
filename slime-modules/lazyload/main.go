@@ -50,6 +50,7 @@ func init() {
 }
 
 func main() {
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -77,17 +78,21 @@ func main() {
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
+		setupLog.Error(err,"create a new clientSet failed")
 		os.Exit(1)
 	}
 	env.K8SClient = client
+
+	setupLog.Info("New ServiceFence Reconciler and SetupWithManager")
+
 	r := controllers.NewReconciler(mgr, &env)
 	if err = r.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Servicefence")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
-
 	// add vs reconcile
+	setupLog.Info("New VirtualService Reconciler and SetupWithManager")
 	if err = (&istiocontroller.VirtualServiceReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),

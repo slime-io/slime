@@ -63,7 +63,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 		eventChan := make(chan event_source.Event)
 		src := &aggregate.Source{}
 		if ms, err := k8s.NewMetricSource(eventChan, env); err != nil {
-			fmt.Printf("failed to create slime-metric, err : %s", err.Error())
+			ctrl.Log.Error(err,"failed to create slime-metric")
 		} else {
 			src.Sources = append(src.Sources, ms)
 
