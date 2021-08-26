@@ -70,7 +70,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 			r := &ServicefenceReconciler{
 				Client:    mgr.GetClient(),
 				Scheme:    mgr.GetScheme(),
-				Log:       ctrl.Log.WithName("controllers").WithName("SmartLimiter"),
+				Log:       ctrl.Log.WithName("controllers").WithName("ServiceFence"),
 				env:       env,
 				eventChan: eventChan,
 				source:    src,

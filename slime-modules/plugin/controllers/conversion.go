@@ -11,8 +11,8 @@ import (
 	envoy_extensions_wasm_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	"strings"
 
-	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-framework/util"
+	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
 
 	"github.com/gogo/protobuf/types"
 	istio "istio.io/api/networking/v1alpha3"
@@ -54,6 +54,20 @@ func translatePluginToPatch(name, typeurl string, setting *types.Struct) *istio.
 func translateRatelimitToPatch(settings *types.Struct) *istio.EnvoyFilter_Patch {
 	patch := &istio.EnvoyFilter_Patch{}
 	patch.Value = settings
+	return patch
+}
+
+func translateRouteRatelimitToPatch(settings *types.Struct) *istio.EnvoyFilter_Patch {
+	patch := &istio.EnvoyFilter_Patch{}
+	patch.Value = &types.Struct{
+		Fields: map[string]*types.Value{
+			"route": {
+				Kind: &types.Value_StructValue{
+					StructValue: settings,
+				},
+			},
+		},
+	}
 	return patch
 }
 
@@ -131,7 +145,7 @@ func (r *EnvoyPluginReconciler)translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, ou
 					cfp.Match.ObjectTypes.(*istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration).RouteConfiguration.Vhost.Name = ss[0]
 				}
 				if p.Name == util.Envoy_Ratelimit || p.Name == util.Envoy_Cors {
-					cfp.Patch = translateRatelimitToPatch(m.Inline.Settings)
+					cfp.Patch = translateRouteRatelimitToPatch(m.Inline.Settings)
 				} else {
 					cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, m.Inline.Settings)
 				}
@@ -324,6 +338,12 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 					StringValue: in.Name,
 				},
 			}
+		}
+	}else{
+		out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
+			Kind: &types.Value_StringValue{
+				StringValue: in.Name,
+			},
 		}
 	}
 	if err != nil {

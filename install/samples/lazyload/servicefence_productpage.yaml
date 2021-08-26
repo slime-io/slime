@@ -1,0 +1,8 @@
+---
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
+metadata:
+  name: productpage
+  namespace: default
+spec:
+  enable: true

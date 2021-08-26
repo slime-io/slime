@@ -77,8 +77,12 @@ func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// 资源删除
 	if err != nil && errors.IsNotFound(err) {
+		r.Log.Info("metricInfo.Pop: ", "name", req.Name, "namespace", req.Namespace)
 		r.metricInfo.Pop(req.Namespace + "/" + req.Name)
 		r.source.WatchRemove(req.NamespacedName)
+		r.lastUpdatePolicyLock.Lock()
+		r.lastUpdatePolicy = microserviceslimeiov1alpha1.SmartLimiterSpec{}
+		r.lastUpdatePolicyLock.Unlock()
 		return reconcile.Result{}, nil
 	}
 
@@ -94,7 +98,6 @@ func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 		r.lastUpdatePolicyLock.Unlock()
 		r.source.WatchAdd(req.NamespacedName)
 	}
-	r.source.WatchAdd(req.NamespacedName)
 
 	return ctrl.Result{}, nil
 }

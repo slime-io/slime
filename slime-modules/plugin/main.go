@@ -18,13 +18,13 @@ package main
 
 import (
 	"flag"
-	"os"
-
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-modules/plugin/controllers"
@@ -41,6 +41,7 @@ func init() {
 
 	_ = microserviceslimeiov1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
+	_ = v1alpha3.AddToScheme(scheme)
 }
 
 func main() {
