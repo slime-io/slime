@@ -70,7 +70,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime
+    repository: docker.io/slimeio/slime
     tag: v0.1.2
   module:
     - name: lazyload
@@ -111,7 +111,7 @@ spec:
           cpu: 200m
           memory: 200Mi
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1
 ```
 2. make sure all components are running
@@ -230,7 +230,7 @@ spec:
     pilot:
       enable: true
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1      
 ```
 
@@ -272,7 +272,7 @@ spec:
     pilot:
       enable: true
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1
     reportServer:
       enable: true
@@ -284,10 +284,10 @@ spec:
           cpu: 200m
           memory: 200Mi
       mixerImage:
-        repository: docker.io/bcxq/mixer
+        repository: docker.io/slimeio/mixer
         tag: preview-1.3.7-v0.0.1
       inspectorImage:
-        repository: docker.io/bcxq/report-server
+        repository: docker.io/slimeio/report-server
         tag: preview-v0.0.1-rc    
 ```
 
@@ -496,7 +496,7 @@ spec:
           mount: /wasm/test # wasm directory, mounted in the sidecar    
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime
+    repository: docker.io/slimeio/slime
     tag: v0.1.2
 ```
 #### inline plugin
@@ -603,7 +603,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime
+    repository: docker.io/slimeio/slime
     tag: v0.1.2
   module:
     - limiter:
