@@ -5,7 +5,7 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/hazard1905/slime
+  repository: docker.io/slimeio/slime
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
   tag: v0.1.2
@@ -97,7 +97,7 @@ component:
         cpu: 200m
         memory: 200Mi
     image:
-      repository: docker.io/bcxq/pilot
+      repository: docker.io/slimeio/pilot
       tag: preview-1.3.7-v0.0.1
   reportServer:
     enable: false
@@ -109,8 +109,8 @@ component:
         cpu: 200m
         memory: 200Mi
     mixerImage:
-      repository: docker.io/bcxq/mixer
+      repository: docker.io/slimeio/mixer
       tag: preview-1.3.7-v0.0.1
     inspectorImage:
-      repository: docker.io/bcxq/report-server
+      repository: docker.io/slimeio/report-server
       tag: preview-v0.0.1-rc
