@@ -1,11 +1,11 @@
 # Slime
 ## Smart ServiceMesh Manager
 
-[中文](https://github.com/cywang1905/slime/blob/master/README_ZH.md)  
+[中文](https://github.com/slime-io/slime/blob/master/README_ZH.md)  
 
 ![slime-logo](logo/slime-logo.png)    
 
- [![Go Report Card](https://goreportcard.com/badge/github.com/cywang1905/slime)](https://goreportcard.com/report/github.com/cywang1905/slime)  
+ [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
 Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
 
@@ -34,8 +34,8 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
 ```sh
 $ kubectl create ns mesh-operator
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/init/crds.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/init/deployment_slime-boot.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/crds.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/deployment_slime-boot.yaml
 ```
 
 
@@ -45,7 +45,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alp
 The lazy load and smart limiter module needs metric data, so we suggest you installing prometheus in your system. Here is a simple prometheus installation file copied from istio.io.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/prometheus.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/prometheus.yaml
 ```
 
 
@@ -70,7 +70,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-lazyload
+    repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.0-alpha
   module:
     - name: lazyload
@@ -111,18 +111,18 @@ spec:
           cpu: 200m
           memory: 200Mi
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1
 ```
 2. make sure all components are running
-```
+```sh
 $ kubectl get po -n mesh-operator
 NAME                                    READY     STATUS    RESTARTS   AGE
 global-sidecar-pilot-796fb554d7-blbml   1/1       Running   0          27s
 lazyload-fbcd5dbd9-jvp2s                1/1       Running   0          27s
 slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
-```
+```sh
 $ kubectl get po -n {{your namespace}}
 NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
@@ -178,7 +178,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-lazyload
+    repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.0-alpha
   module:
     - fence:
@@ -210,7 +210,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-lazyload
+    repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.0-alpha
   module:
     - fence:
@@ -238,7 +238,7 @@ spec:
     pilot:
       enable: true
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1      
 ```
 
@@ -255,7 +255,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-lazyload
+    repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.0-alpha
   # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
@@ -284,7 +284,7 @@ spec:
     pilot:
       enable: true
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1
     reportServer:
       enable: true
@@ -296,10 +296,10 @@ spec:
           cpu: 200m
           memory: 200Mi
       mixerImage:
-        repository: docker.io/bcxq/mixer
+        repository: docker.io/slimeio/mixer
         tag: preview-1.3.7-v0.0.1
       inspectorImage:
-        repository: docker.io/bcxq/report-server
+        repository: docker.io/slimeio/report-server
         tag: preview-v0.0.1-rc    
 ```
 
@@ -315,7 +315,7 @@ spec:
 ##### Install Slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 Confirm all components are running.
@@ -342,7 +342,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
 ```
 
 Confirm all pods are running.
@@ -368,7 +368,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create lazyload for productpage.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
 ```
 
 Confirm servicefence and sidecar already exist.
@@ -474,13 +474,13 @@ The backends are details and reviews now.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 
 
@@ -498,20 +498,22 @@ Use the following configuration to install the HTTP plugin management module:
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: example-slimeboot
+  name: plugin
   namespace: mesh-operator
 spec:
   module:
-    - plugin:
+    - name: plugin
+      plugin:
         enable: true
-        local:
-          mount: /wasm/test # wasm directory, mounted in the sidecar    
   image:
     pullPolicy: Always
-    repository: docker.io/bcxq/slime-plugin
+    repository: docker.io/slimeio/slime-plugin
     tag: v0.2.0-alpha
 ```
-#### inline plugin
+
+
+#### Inline plugin
+
 **Note:** Envoy binary needs to support extension plugins
 **enable/disable**
 Configure PluginManager in the following format to open the built-in plugin:
@@ -519,20 +521,22 @@ Configure PluginManager in the following format to open the built-in plugin:
 apiVersion: microservice.slime.io/v1alpha1
 kind: PluginManager
 metadata:
-  name: my-plugin
+  name: reviews-pm
   namespace: default
 spec:
   workload_labels:
-    app: my-app
+    app: reviews
   plugins:
-  - enable: true          # switch
-    name: {plugin-1}
+  - enable: true
+    name: {plugin-1}     # plugin name
   # ...
   - enable: true
     name: {plugin-N}
 ```
-{plugin-N} is the name of the plug-in, and the sort in PluginManager is the execution order of the plug-in.
-Set the enable field to false to disable the plugin.
+{plugin-N} is the name of the plug-in, and the sort in PluginManager is the execution order of the plug-in. Set the enable field to false to disable the plugin.
+
+
+
 **Global configuration**
 
 The global configuration corresponds to the plug-in configuration in LDS. Set the global configuration in the following format:
@@ -557,41 +561,180 @@ spec:
 ```
 
 
-**Host/route level configuration**
 
-Configure EnvoyPlugin in the following format:
+#### PluginManager Example
+
+Use the yaml file below to create plugin manager, and enable the plugin reviews-ep
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: PluginManager
+metadata:
+  name: reviews-pm
+  namespace: default
+spec:
+  workload_labels:
+    app: reviews
+  plugins:
+  - enable: true
+    name: reviews-ep     # plugin name
+    inline:
+      settings:
+        rate_limits:
+        - actions:
+          - header_value_match:
+              descriptor_value: Service[a.powerful]-User[none]-Gateway[null]-Api[null]-Id[hash:-1414739194]
+              headers:
+              - invert_match: false
+                name: testaaa
+                safe_regex_match:
+                  google_re2: {}
+                  regex: testt
+          stage: 0
+```
+
+And you will get the envoyfilter
+
+```yaml
+$ kubectl -n default get envoyfilter reviews-pm -oyaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  creationTimestamp: "2021-08-26T08:20:56Z"
+  generation: 1
+  name: reviews-pm
+  namespace: default
+  ownerReferences:
+  - apiVersion: microservice.slime.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: PluginManager
+    name: reviews-pm
+    uid: 00a65d02-4025-4d0c-a08a-0a8901cd0fa2
+  resourceVersion: "658741"
+  uid: 2e8c8a96-fc0d-4e92-9f7a-e3336a53a806
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: SIDECAR_OUTBOUND
+      listener:
+        filterChain:
+          filter:
+            name: envoy.http_connection_manager
+            subFilter:
+              name: envoy.router
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: reviews-ep
+        typed_config:
+          '@type': type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: ""
+          value:
+            rate_limits:
+            - actions:
+              - header_value_match:
+                  descriptor_value: Service[a.powerful]-User[none]-Gateway[null]-Api[null]-Id[hash:-1414739194]
+                  headers:
+                  - invert_match: false
+                    name: testaaa
+                    safe_regex_match:
+                      google_re2: {}
+                      regex: testt
+              stage: 0
+  workloadSelector:
+    labels:
+      app: reviews
+```
+
+
+
+#### EnvoyPlugin Example
+
+Use the yaml file below to create envoy plugin
+
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
 kind: EnvoyPlugin
 metadata:
-  name: project1-abc
-  namespace: gateway-system
+  name: reviews-ep
+  namespace: default
 spec:
-  workload_labels:
-    app: my-app
-  host:                          # Effective range(host level)              
-  - jmeter.com
-  - istio.com
-  - 989.mock.qa.netease.com
-  - demo.test.com
-  - netease.com
-  route:                         # Effective range(route level). The route field must be the same with VirtualService.
-  - abc
+  workloadSelector:
+    labels:
+      app: reviews
+  route:
+    - inbound|http|80/default
   plugins:
-  - name: com.netease.supercache 
-    settings:                    
-      cache_ttls:
-        LocalHttpCache:
-          default: 60000
-      enable_rpx:
-        headers:
-        - name: :status
-          regex_match: 200|
-      key_maker:
-        exclude_host: false
-        ignore_case: true
-      low_level_fill: true
+  - name: envoy.ratelimit
+    inline:
+      settings:
+        rate_limits:
+        - actions:
+          - header_value_match:
+              descriptor_value: Service[a.powerful]-User[none]-Gateway[null]-Api[null]-Id[hash:-1414739194]
+              headers:
+              - invert_match: false
+                name: testaaa
+                safe_regex_match:
+                  google_re2: {}
+                  regex: testt
+          stage: 0
 ```
+
+And you will get the envoyfilter
+
+```yaml
+$ kubectl -n default get envoyfilter reviews-ep -oyaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  creationTimestamp: "2021-08-26T08:13:56Z"
+  generation: 1
+  name: reviews-ep
+  namespace: default
+  ownerReferences:
+  - apiVersion: microservice.slime.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: EnvoyPlugin
+    name: reviews-ep
+    uid: fcf9d63b-115f-4a2a-bfc4-40d5ce1bcfee
+  resourceVersion: "658067"
+  uid: 762768a7-48ae-4939-afa3-f687e0cca826
+spec:
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      routeConfiguration:
+        vhost:
+          name: inbound|http|80
+          route:
+            name: default
+    patch:
+      operation: MERGE
+      value:
+        route:
+          rate_limits:
+          - actions:
+            - header_value_match:
+                descriptor_value: Service[a.powerful]-User[none]-Gateway[null]-Api[null]-Id[hash:-1414739194]
+                headers:
+                - invert_match: false
+                  name: testaaa
+                  safe_regex_match:
+                    google_re2: {}
+                    regex: testt
+            stage: 0
+  workloadSelector:
+    labels:
+      app: reviews
+```
+
+
+
+
 
 
 
@@ -615,7 +758,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-limiter
+    repository: docker.io/slimeio/slime-limiter
     tag: v0.2.0-alpha
   module:
     - limiter:
@@ -893,7 +1036,7 @@ status:
 ##### Install slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 
@@ -904,7 +1047,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
 ```
 
 Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. You can also create gateway and visit productpage from outside, like what shows in  https://istio.io/latest/zh/docs/setup/getting-started/#ip.
@@ -912,7 +1055,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create DestinationRule for reviews.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
 ```
 
 
@@ -920,7 +1063,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alp
 ##### Create Smartlimiter
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
 ```
 
 
@@ -1058,14 +1201,14 @@ Response code is 429. The smartlimiter is working.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/cywang1905/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 
 

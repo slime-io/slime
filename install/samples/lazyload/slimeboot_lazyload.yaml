@@ -7,7 +7,7 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/hazard1905/slime-lazyload
+    repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.0-alpha
   module:
     - name: lazyload
@@ -46,5 +46,5 @@ spec:
           cpu: 200m
           memory: 200Mi
       image:
-        repository: docker.io/bcxq/pilot
+        repository: docker.io/slimeio/pilot
         tag: preview-1.3.7-v0.0.1
