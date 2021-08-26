@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -26,6 +27,14 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	networkingistioiov1alpha3 "slime.io/slime/slime-framework/apis/networking/v1alpha3"
+)
+
+const (
+	VSHOSTS = "hosts"
+	VSHOST = "host"
+	VSDESTINATION = "destination"
+	VSHTTP = "http"
+	VSROUTE = "route"
 )
 
 // VirtualServiceReconciler reconciles a VirtualService object
@@ -40,23 +49,29 @@ type VirtualServiceReconciler struct {
 
 func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("virtualservice", req.NamespacedName)
+	_ = r.Log.WithValues("virtualService", req.NamespacedName)
 	// Fetch the VirtualService instance
 	instance := &networkingistioiov1alpha3.VirtualService{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 
 	// 异常分支
 	if err != nil && !errors.IsNotFound(err) {
+		r.Log.Error(err, fmt.Sprintf("get virtualservice %+v abnormal, unknown condition",req.NamespacedName))
 		return reconcile.Result{}, err
 	}
 
 	// 资源删除
 	if err != nil && errors.IsNotFound(err) {
+		r.Log.Error(err, fmt.Sprintf("virtualservice %+v is deleted",req.NamespacedName))
 		return reconcile.Result{}, nil
 	}
 
+	r.Log.Info(fmt.Sprintf("get virtualservice %+v",*instance))
+
 	// 资源更新
 	m := parseDestination(instance)
+	r.Log.Info(fmt.Sprintf("after parse destination get %v",m))
+
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)
 	}
@@ -68,23 +83,23 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 	ret := make(map[string][]string)
 
 	hosts := make([]string, 0)
-	i, ok := instance.Spec["hosts"].([]interface{})
-	for _, iv := range i {
-		hosts = append(hosts, iv.(string))
-	}
+	i, ok := instance.Spec[VSHOSTS].([]interface{})
 	if !ok {
 		return nil
+	}
+	for _, iv := range i {
+		hosts = append(hosts, iv.(string))
 	}
 
 	dhs := make(map[string]struct{}, 0)
 
-	if httpRoutes, ok := instance.Spec["http"].([]interface{}); ok {
+	if httpRoutes, ok := instance.Spec[VSHTTP].([]interface{}); ok {
 		for _, httpRoute := range httpRoutes {
 			if hr, ok := httpRoute.(map[string]interface{}); ok {
-				if ds, ok := hr["route"].([]interface{}); ok {
+				if ds, ok := hr[VSROUTE].([]interface{}); ok {
 					for _, d := range ds {
 						if route, ok := d.(map[string]interface{}); ok {
-							destinationHost := route["destination"].(map[string]interface{})["host"].(string)
+							destinationHost := route[VSDESTINATION].(map[string]interface{})[VSHOST].(string)
 							dhs[destinationHost] = struct{}{}
 						}
 					}

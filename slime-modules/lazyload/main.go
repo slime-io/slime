@@ -83,16 +83,16 @@ func main() {
 	}
 	env.K8SClient = client
 
-	setupLog.Info("New ServiceFence Reconciler and SetupWithManager")
-
+	setupLog.Info("create new serviceFence reconciler and setupWithManager")
 	r := controllers.NewReconciler(mgr, &env)
 	if err = r.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Servicefence")
 		os.Exit(1)
 	}
+
+	setupLog.Info("create new virtualService reconciler and setupWithManager")
 	// +kubebuilder:scaffold:builder
 	// add vs reconcile
-	setupLog.Info("New VirtualService Reconciler and SetupWithManager")
 	if err = (&istiocontroller.VirtualServiceReconciler{
 		Client: mgr.GetClient(),
 		Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),

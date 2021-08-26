@@ -70,7 +70,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 			r := &ServicefenceReconciler{
 				Client:    mgr.GetClient(),
 				Scheme:    mgr.GetScheme(),
-				Log:       ctrl.Log.WithName("controllers").WithName("SmartLimiter"),
+				Log:       ctrl.Log.WithName("controllers").WithName("ServiceFence"),
 				env:       env,
 				eventChan: eventChan,
 				source:    src,
@@ -80,7 +80,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 			return r
 		}
 	}
-	return &ServicefenceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), env: env}
+	return &ServicefenceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), env: env, Log:ctrl.Log.WithName("controllers").WithName("ServiceFence")}
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete
@@ -98,13 +98,17 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// 异常分支
 	if err != nil && !errors.IsNotFound(err) {
+		r.Log.Error(err, fmt.Sprintf("get servicefence  %+v abnormal, unknown condition",req.NamespacedName))
 		return reconcile.Result{}, err
 	}
 
 	// 资源删除
 	if err != nil && errors.IsNotFound(err) {
+		r.Log.Error(err, fmt.Sprintf("servicefence %+v is deleted",req.NamespacedName))
 		return reconcile.Result{}, nil
 	}
+
+	r.Log.Info(fmt.Sprintf("get servicefence %+v",*instance))
 
 	// 资源更新
 	diff := r.updateVisitedHostStatus(instance)
