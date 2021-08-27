@@ -25,6 +25,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
+	"slime.io/slime/slime-framework/bootstrap"
 
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-modules/plugin/controllers"
@@ -84,6 +85,8 @@ func main() {
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
+
+	go bootstrap.HealthCheckStart()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
