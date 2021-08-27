@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slime-boot
+  namespace: mesh-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: slime-boot
+  template:
+    metadata:
+      labels:
+        name: slime-boot
+    spec:
+      serviceAccountName: slime-boot
+      containers:
+        - name: slime-boot
+          # Replace this with the built image name
+          image: docker.io/slimeio/slime-boot:v0.2.0-alpha
+          imagePullPolicy: Always
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "slime-boot"
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: slime-boot
+  namespace: mesh-operator
+subjects:
+  - kind: ServiceAccount
+    name: slime-boot
+    namespace: mesh-operator
+roleRef:
+  kind: Role
+  name: slime-boot
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slime-boot
+  namespace: mesh-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: slime-boot
+subjects:
+  - kind: ServiceAccount
+    name: slime-boot
+    namespace: mesh-operator
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io

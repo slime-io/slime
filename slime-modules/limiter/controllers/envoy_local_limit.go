@@ -82,9 +82,8 @@ func (r *SmartLimiterReconciler) GenerateEnvoyLocalLimit(rateLimitConf microserv
 			// Used to delete
 			setsEnvoyFilter[set.Name] = nil
 		}
-		return setsEnvoyFilter, setsSmartLimitDescriptor
 	}
-	return nil, nil
+	return setsEnvoyFilter, setsSmartLimitDescriptor
 }
 
 func descriptorsToEnvoyFilter(descriptor []*microservicev1alpha1.SmartLimitDescriptor, labels map[string]string) *networking.EnvoyFilter {
