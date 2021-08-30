@@ -18,17 +18,19 @@ package main
 
 import (
 	"flag"
+	uberzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"os"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
 	istiocontroller "slime.io/slime/slime-framework/controllers"
-
-	"k8s.io/apimachinery/pkg/runtime"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"slime.io/slime/slime-framework/util"
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/lazyload/api/v1alpha1"
 	"slime.io/slime/slime-modules/lazyload/controllers"
 	// +kubebuilder:scaffold:imports
@@ -46,10 +48,8 @@ func init() {
 	_ = istioapi.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
-
 func main() {
 	// TODO - add pause/resume logic for module
-
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -57,8 +57,9 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
-
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
+	encoderCfg.EncodeTime = util.TimeEncoder
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true),zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -76,16 +77,20 @@ func main() {
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
+		setupLog.Error(err,"create a new clientSet failed")
 		os.Exit(1)
 	}
 	env.K8SClient = client
+
+	setupLog.Info("create new serviceFence reconciler and setupWithManager")
 	r := controllers.NewReconciler(mgr, &env)
 	if err = r.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Servicefence")
 		os.Exit(1)
 	}
-	// +kubebuilder:scaffold:builder
 
+	setupLog.Info("create new virtualService reconciler and setupWithManager")
+	// +kubebuilder:scaffold:builder
 	// add vs reconcile
 	if err = (&istiocontroller.VirtualServiceReconciler{
 		Client: mgr.GetClient(),

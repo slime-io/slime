@@ -18,17 +18,20 @@ package main
 
 import (
 	"flag"
+	uberzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"os"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
 	istiocontroller "slime.io/slime/slime-framework/controllers"
+	"slime.io/slime/slime-framework/util"
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/limiter/api/v1alpha1"
 	"slime.io/slime/slime-modules/limiter/controllers"
 	// +kubebuilder:scaffold:imports
@@ -58,7 +61,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
+	encoderCfg.EncodeTime = util.TimeEncoder
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true),zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

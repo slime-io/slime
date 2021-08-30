@@ -63,7 +63,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 		eventChan := make(chan event_source.Event)
 		src := &aggregate.Source{}
 		if ms, err := k8s.NewMetricSource(eventChan, env); err != nil {
-			fmt.Printf("failed to create slime-metric, err : %s", err.Error())
+			ctrl.Log.Error(err,"failed to create slime-metric")
 		} else {
 			src.Sources = append(src.Sources, ms)
 
@@ -80,7 +80,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 			return r
 		}
 	}
-	return &ServicefenceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), env: env}
+	return &ServicefenceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), env: env, Log:ctrl.Log.WithName("controllers").WithName("ServiceFence")}
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete
@@ -88,7 +88,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 
 func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("servicefence", req.NamespacedName)
+	_ = r.Log.WithValues("serviceFence", req.NamespacedName)
 
 	// your logic here
 
@@ -96,15 +96,16 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	instance := &microserviceslimeiov1alpha1.ServiceFence{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 
-	// 异常分支
-	if err != nil && !errors.IsNotFound(err) {
-		return reconcile.Result{}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Info("serviceFence is deleted")
+			return reconcile.Result{}, nil
+		} else {
+			r.Log.Error(err,"get serviceFence error")
+			return reconcile.Result{}, err
+		}
 	}
-
-	// 资源删除
-	if err != nil && errors.IsNotFound(err) {
-		return reconcile.Result{}, nil
-	}
+	r.Log.Info("get serviceFence","sf",instance)
 
 	// 资源更新
 	diff := r.updateVisitedHostStatus(instance)

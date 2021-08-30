@@ -28,6 +28,14 @@ import (
 	networkingistioiov1alpha3 "slime.io/slime/slime-framework/apis/networking/v1alpha3"
 )
 
+const (
+	vsHosts = "hosts"
+	vsHost = "host"
+	vsDestination = "destination"
+	vsHttp = "http"
+	vsRoute = "route"
+)
+
 // VirtualServiceReconciler reconciles a VirtualService object
 type VirtualServiceReconciler struct {
 	client.Client
@@ -40,23 +48,25 @@ type VirtualServiceReconciler struct {
 
 func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("virtualservice", req.NamespacedName)
+	_ = r.Log.WithValues("virtualService", req.NamespacedName)
 	// Fetch the VirtualService instance
 	instance := &networkingistioiov1alpha3.VirtualService{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-
-	// 异常分支
-	if err != nil && !errors.IsNotFound(err) {
-		return reconcile.Result{}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Info("virtualService is deleted")
+			return reconcile.Result{}, nil
+		} else {
+			r.Log.Error(err,"get virtualService error")
+			return reconcile.Result{}, err
+		}
 	}
 
-	// 资源删除
-	if err != nil && errors.IsNotFound(err) {
-		return reconcile.Result{}, nil
-	}
-
+	r.Log.Info("get virtualService","vs",instance)
 	// 资源更新
 	m := parseDestination(instance)
+	r.Log.Info("get destination after parse","destination",m)
+
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)
 	}
@@ -68,23 +78,23 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 	ret := make(map[string][]string)
 
 	hosts := make([]string, 0)
-	i, ok := instance.Spec["hosts"].([]interface{})
-	for _, iv := range i {
-		hosts = append(hosts, iv.(string))
-	}
+	i, ok := instance.Spec[vsHosts].([]interface{})
 	if !ok {
 		return nil
+	}
+	for _, iv := range i {
+		hosts = append(hosts, iv.(string))
 	}
 
 	dhs := make(map[string]struct{}, 0)
 
-	if httpRoutes, ok := instance.Spec["http"].([]interface{}); ok {
+	if httpRoutes, ok := instance.Spec[vsHttp].([]interface{}); ok {
 		for _, httpRoute := range httpRoutes {
 			if hr, ok := httpRoute.(map[string]interface{}); ok {
-				if ds, ok := hr["route"].([]interface{}); ok {
+				if ds, ok := hr[vsRoute].([]interface{}); ok {
 					for _, d := range ds {
 						if route, ok := d.(map[string]interface{}); ok {
-							destinationHost := route["destination"].(map[string]interface{})["host"].(string)
+							destinationHost := route[vsDestination].(map[string]interface{})[vsHost].(string)
 							dhs[destinationHost] = struct{}{}
 						}
 					}

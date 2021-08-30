@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	uberzap "go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -25,13 +27,12 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
+	"slime.io/slime/slime-framework/util"
 	"slime.io/slime/slime-framework/bootstrap"
-
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-modules/plugin/controllers"
 	// +kubebuilder:scaffold:imports
 )
-
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
@@ -56,7 +57,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
+	encoderCfg.EncodeTime = util.TimeEncoder
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true),zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
