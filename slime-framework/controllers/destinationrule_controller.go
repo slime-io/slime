@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
 
 	istionetworking "istio.io/api/networking/v1alpha3"
@@ -51,11 +50,10 @@ func (r *DestinationRuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	// 异常分支
 	if err != nil && !errors.IsNotFound(err) {
-		r.Log.Error(err, fmt.Sprintf("get destinationrule %+v abnormal, unknown condition",req.NamespacedName))
+		r.Log.Error(err,"get destinationRule error")
 		return reconcile.Result{}, err
 	}
-
-	r.Log.Info(fmt.Sprintf("get destinationrule %+v",*instance))
+	r.Log.Info("get destinationRule","dr",instance)
 
 	// 资源更新
 	pb, err := util.FromJSONMap("istio.networking.v1alpha3.DestinationRule", instance.Spec)

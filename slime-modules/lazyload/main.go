@@ -49,6 +49,10 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 
+type lll struct {
+	Name string
+	Address string
+}
 func main() {
 
 	var metricsAddr string
