@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-HUB=${HUB:-"docker.io/hazard1905"}
+HUB=${HUB:-"docker.io/slimeio"}
 
 function fatal() {
   echo "$1" >&2
