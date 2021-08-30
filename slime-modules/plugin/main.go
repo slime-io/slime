@@ -46,6 +46,8 @@ func init() {
 }
 
 func main() {
+	// TODO - add pause/resume logic for module
+
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")

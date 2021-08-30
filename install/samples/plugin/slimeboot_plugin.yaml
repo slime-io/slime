@@ -6,8 +6,7 @@ metadata:
 spec:
   module:
     - name: plugin
-      plugin:
-        enable: true
+      enable: true
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin

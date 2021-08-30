@@ -1,4 +1,5 @@
 {{ range .Values.module }}
+{{- if .enable }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -136,4 +137,5 @@ spec:
       name: http
   selector:
     app: {{.name}}
+  {{end}}
   {{end}}

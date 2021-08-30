@@ -11,8 +11,8 @@ spec:
     tag: v0.2.0-alpha
   module:
     - limiter:
-        enable: true
         backend: 1
+      enable: true
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090
