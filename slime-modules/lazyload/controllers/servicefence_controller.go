@@ -98,7 +98,7 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Error(err,"serviceFence is deleted")
+			r.Log.Info("serviceFence is deleted")
 			return reconcile.Result{}, nil
 		} else {
 			r.Log.Error(err,"get serviceFence error")

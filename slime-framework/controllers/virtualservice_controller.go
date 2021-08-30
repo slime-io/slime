@@ -54,7 +54,7 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Error(err,"virtualService is deleted")
+			r.Log.Info("virtualService is deleted")
 			return reconcile.Result{}, nil
 		} else {
 			r.Log.Error(err,"get virtualService error")

@@ -48,11 +48,6 @@ func init() {
 	_ = istioapi.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
-
-type lll struct {
-	Name string
-	Address string
-}
 func main() {
 
 	var metricsAddr string
