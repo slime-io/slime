@@ -11,8 +11,8 @@ spec:
     tag: v0.2.0-alpha
   module:
     - name: lazyload
+      enable: true
       fence:
-        enable: true
         wormholePort: # replace to your application svc ports
           - "9080"
       metric:

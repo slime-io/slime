@@ -14,15 +14,10 @@ const (
 
 var (
 	defaultModuleConfig = &netease_config.Config{
-		Limiter: &netease_config.Limiter{
-			Enable: false,
-		},
-		Plugin: &netease_config.Plugin{
-			Enable: false,
-		},
-		Fence: &netease_config.Fence{
-			Enable: false,
-		},
+		Enable: false,
+		Limiter: &netease_config.Limiter{},
+		Plugin: &netease_config.Plugin{},
+		Fence: &netease_config.Fence{},
 		Global: &netease_config.Global{
 			Service:        "app",
 			IstioNamespace: "istio-system",
