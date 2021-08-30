@@ -88,7 +88,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 
 func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("servicefence", req.NamespacedName)
+	_ = r.Log.WithValues("serviceFence", req.NamespacedName)
 
 	// your logic here
 
@@ -96,19 +96,16 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	instance := &microserviceslimeiov1alpha1.ServiceFence{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 
-	// 异常分支
-	if err != nil && !errors.IsNotFound(err) {
-		r.Log.Error(err, fmt.Sprintf("get servicefence  %+v abnormal, unknown condition",req.NamespacedName))
-		return reconcile.Result{}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Error(err,"serviceFence is deleted")
+			return reconcile.Result{}, nil
+		} else {
+			r.Log.Error(err,"get serviceFence error")
+			return reconcile.Result{}, err
+		}
 	}
-
-	// 资源删除
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Error(err, fmt.Sprintf("servicefence %+v is deleted",req.NamespacedName))
-		return reconcile.Result{}, nil
-	}
-
-	r.Log.Info(fmt.Sprintf("get servicefence %+v",*instance))
+	r.Log.Info("get serviceFence","sf",instance)
 
 	// 资源更新
 	diff := r.updateVisitedHostStatus(instance)

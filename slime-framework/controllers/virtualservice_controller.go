@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"fmt"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,11 +29,11 @@ import (
 )
 
 const (
-	VSHOSTS = "hosts"
-	VSHOST = "host"
-	VSDESTINATION = "destination"
-	VSHTTP = "http"
-	VSROUTE = "route"
+	vsHosts = "hosts"
+	vsHost = "host"
+	vsDestination = "destination"
+	vsHttp = "http"
+	vsRoute = "route"
 )
 
 // VirtualServiceReconciler reconciles a VirtualService object
@@ -53,24 +52,20 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 	// Fetch the VirtualService instance
 	instance := &networkingistioiov1alpha3.VirtualService{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-
-	// 异常分支
-	if err != nil && !errors.IsNotFound(err) {
-		r.Log.Error(err, fmt.Sprintf("get virtualservice %+v abnormal, unknown condition",req.NamespacedName))
-		return reconcile.Result{}, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Log.Error(err,"virtualService is deleted")
+			return reconcile.Result{}, nil
+		} else {
+			r.Log.Error(err,"get virtualService error")
+			return reconcile.Result{}, err
+		}
 	}
 
-	// 资源删除
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Error(err, fmt.Sprintf("virtualservice %+v is deleted",req.NamespacedName))
-		return reconcile.Result{}, nil
-	}
-
-	r.Log.Info(fmt.Sprintf("get virtualservice %+v",*instance))
-
+	r.Log.Info("get virtualService","vs",instance)
 	// 资源更新
 	m := parseDestination(instance)
-	r.Log.Info(fmt.Sprintf("after parse destination get %v",m))
+	r.Log.Info("get destination after parse","destination",m)
 
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)
@@ -83,7 +78,7 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 	ret := make(map[string][]string)
 
 	hosts := make([]string, 0)
-	i, ok := instance.Spec[VSHOSTS].([]interface{})
+	i, ok := instance.Spec[vsHosts].([]interface{})
 	if !ok {
 		return nil
 	}
@@ -93,13 +88,13 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 
 	dhs := make(map[string]struct{}, 0)
 
-	if httpRoutes, ok := instance.Spec[VSHTTP].([]interface{}); ok {
+	if httpRoutes, ok := instance.Spec[vsHttp].([]interface{}); ok {
 		for _, httpRoute := range httpRoutes {
 			if hr, ok := httpRoute.(map[string]interface{}); ok {
-				if ds, ok := hr[VSROUTE].([]interface{}); ok {
+				if ds, ok := hr[vsRoute].([]interface{}); ok {
 					for _, d := range ds {
 						if route, ok := d.(map[string]interface{}); ok {
-							destinationHost := route[VSDESTINATION].(map[string]interface{})[VSHOST].(string)
+							destinationHost := route[vsDestination].(map[string]interface{})[vsHost].(string)
 							dhs[destinationHost] = struct{}{}
 						}
 					}
