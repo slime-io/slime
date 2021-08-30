@@ -1,4 +1,5 @@
 {{ range .Values.module }}
+{{- if .enable }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -58,8 +59,24 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
+            - name: probe-port
+              containerPort: 8081
           resources:
           {{- toYaml $.Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: "/modules/readyz"
+              port: probe-port
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: "/modules/livez"
+              port: probe-port
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            failureThreshold: 2
           volumeMounts:
             - mountPath: /etc/slime/config
               name: config-volume
@@ -120,4 +137,5 @@ spec:
       name: http
   selector:
     app: {{.name}}
+  {{end}}
   {{end}}

@@ -19,7 +19,6 @@ message RemoteSource {
 
 
 message Plugin {
-  bool enable = 1;
   oneof wasm_source {
     LocalSource local = 2;
     RemoteSource remote = 3;
@@ -27,7 +26,6 @@ message Plugin {
 }
 
 message Limiter {
-  bool enable = 1;
   bool Multicluster = 2;
   enum RateLimitBackend {
     netEaseLocalFlowControl = 0;
@@ -45,7 +43,6 @@ message Global {
 }
 
 message Fence {
-  bool enable = 1;
   repeated string wormholePort = 2;
 }
 
@@ -80,4 +77,5 @@ message Config {
   Fence fence = 4;
   Metric metric = 6;
   string name = 5;
+  bool enable = 7;
 }

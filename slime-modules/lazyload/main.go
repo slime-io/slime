@@ -49,7 +49,7 @@ func init() {
 	// +kubebuilder:scaffold:scheme
 }
 func main() {
-
+	// TODO - add pause/resume logic for module
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -100,6 +100,8 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "VirtualService")
 		os.Exit(1)
 	}
+
+	go bootstrap.HealthCheckStart()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
