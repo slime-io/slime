@@ -1,6 +1,8 @@
 {{ if .Values.component}}
   {{ if .Values.component.globalSidecar }}
   {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
+{{- $ns := $.Values.namespace }}
+{{- $istioNamespace := $.Values.namespace }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -197,39 +199,60 @@ apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: to-global-sidecar
-  namespace:  {{ $.Values.istioNamespace }}
+  namespace:  {{ $istioNamespace }}
 spec:
   configPatches:
-      {{range $.Values.module }}
-    {{ if .fence }}
-    {{ range .fence.wormholePort}}
-        - applyTo: VIRTUAL_HOST
-          match:
-            routeConfiguration:
-              name: "{{ . }}"
-              vhost:
-                name: allow_any
-          patch:
-            operation: REMOVE
-        - applyTo: ROUTE_CONFIGURATION
-          match:
-            routeConfiguration:
-              name: "{{ . }}"
-          patch:
-            operation: MERGE
-            value:
-              virtual_hosts:
-                - domains:
-                    - '*'
-                  name: to_global_sidecar
-                  routes:
-                    - match:
-                        prefix: /
-                      route:
-                        cluster: outbound|{{.}}||global-sidecar.{{$.Values.namespace}}.svc.cluster.local
-  {{ end }}
-  {{ end }}
-  {{ end }}
+    {{- range $.Values.module }}
+    {{- if .fence }}
+    {{- $f := .fence }}
+    {{- range $f.wormholePort }}
+  - applyTo: VIRTUAL_HOST
+    match:
+      routeConfiguration:
+        name: "{{ . }}"
+        vhost:
+          name: allow_any
+    patch:
+      operation: REMOVE
+  - applyTo: ROUTE_CONFIGURATION
+    match:
+      routeConfiguration:
+        name: "{{ . }}"
+    patch:
+      operation: MERGE
+      value:
+        virtual_hosts:
+          {{- if gt (len $f.dispatches) 0 }}
+          {{- $svcPort := . }}
+          {{- range $f.dispatches }}
+          - domains: {{ toYaml .domains | nindent 12 }}
+            name: {{ .name }}
+            routes:
+            - match:
+                prefix: /
+              route:
+                {{- if (eq .cluster "_GLOBAL_SIDECAR") }}
+                cluster: outbound|{{$svcPort}}||global-sidecar.{{$ns}}.svc.cluster.local
+                {{- else }}
+                cluster: {{ tpl .cluster $ }}
+                # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
+                {{- end }}
+          {{- end }}
+          {{ else }}
+          - domains:
+            - '*'
+            name: to_global_sidecar
+            routes:
+            - match:
+                prefix: /
+              route:
+                cluster: outbound|{{.}}||global-sidecar.{{$ns}}.svc.cluster.local
+          {{- end }}
+
+    {{- end }}
+    {{- end }}
+    {{- end }}
+
   {{ end }}
   {{ end }}
   {{ end }}
