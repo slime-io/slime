@@ -66,7 +66,7 @@ spec:
           memory: 200Mi
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1
+        tag: global-pilot-v0.0.2-a85b00
 ```
 
 2. 确认所有组件已正常运行：
@@ -202,7 +202,7 @@ spec:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1      
+        tag: global-pilot-v0.0.2-a85b00      
 ```
 
 **使用report-server上报调用关系**   
@@ -247,7 +247,7 @@ spec:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1
+        tag: global-pilot-v0.0.2-a85b00
     reportServer:
       enable: true
       resources:
