@@ -66,7 +66,7 @@ spec:
           memory: 200Mi
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1
+        tag: global-pilot-v0.0.2-a85b00
 ```
 
 2. make sure all components are running
@@ -202,7 +202,7 @@ spec:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1      
+        tag: global-pilot-v0.0.2-a85b00      
 ```
 
 **Use report-server to report the dependency**   
@@ -248,7 +248,7 @@ spec:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: preview-1.3.7-v0.0.1
+        tag: global-pilot-v0.0.2-a85b00
     reportServer:
       enable: true
       resources:
