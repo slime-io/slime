@@ -10,8 +10,8 @@
 
 ```shell
 $ kubectl create ns mesh-operator
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/crds.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/deployment_slime-boot.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/init/crds.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/init/deployment_slime-boot.yaml
 ```
 
 
@@ -21,7 +21,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 slime的懒加载和自适应等模块配合监控指标使用方便，建议部署Prometheus。这里提供一份istio官网的简化部署文件拷贝。
 
 ```shell
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/prometheus.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/prometheus.yaml
 ```
 
 

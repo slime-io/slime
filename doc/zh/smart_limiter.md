@@ -32,7 +32,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - limiter:
         enable: true
@@ -316,7 +316,7 @@ status:
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 确认所有组件已正常运行
@@ -340,7 +340,7 @@ slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
@@ -350,7 +350,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 为reviews创建DestinationRule
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/reviews-destination-rule.yaml
 ```
 
 
@@ -358,7 +358,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 ##### 为reviews设置限流规则
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/smartlimiter_reviews.yaml
 ```
 
 
@@ -497,14 +497,14 @@ reviews-v2的sidecar观察日志如下
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/reviews-destination-rule.yaml
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 
 

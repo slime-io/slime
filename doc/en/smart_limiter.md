@@ -28,7 +28,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - limiter:
         enable: true
@@ -308,7 +308,7 @@ status:
 ##### Install slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 
@@ -319,7 +319,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. You can also create gateway and visit productpage from outside, like what shows in  https://istio.io/latest/zh/docs/setup/getting-started/#ip.
@@ -327,7 +327,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create DestinationRule for reviews.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/reviews-destination-rule.yaml
 ```
 
 
@@ -335,7 +335,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 ##### Create Smartlimiter
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/smartlimiter_reviews.yaml
 ```
 
 
@@ -473,13 +473,13 @@ Response code is 429. The smartlimiter is working.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/reviews-destination-rule.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 

@@ -24,7 +24,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.2.0-alpha
+    tag: v0.2.1
 ```
 
 pluginmanager和envoyplugin是平级关系。每个envoyplugin可以管理一个envoyfilter，而pluginmanager可以管理多个envoyfilter。

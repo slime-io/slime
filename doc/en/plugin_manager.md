@@ -24,7 +24,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.2.0-alpha
+    tag: v0.2.1
 ```
 
 
