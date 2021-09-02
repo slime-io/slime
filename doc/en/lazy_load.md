@@ -25,7 +25,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - name: lazyload
       fence:
@@ -141,7 +141,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - fence:
         enable: true
@@ -174,7 +174,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - fence:
         enable: true
@@ -195,9 +195,6 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
-      namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
     pilot:
       enable: true
       image:
@@ -207,7 +204,9 @@ spec:
 
 **Use report-server to report the dependency**   
 
-When prometheus is not configured in the cluster, the dependency can be reported through report-server.  
+When prometheus is not configured in the cluster, the dependency can be reported through report-server.  Add reportServer in component, and set reportServer.enable = true.
+
+If using prometheus, delete reportServer from component, or set reportServer.enable = false.
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -219,7 +218,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
     - fence:
@@ -278,7 +277,7 @@ spec:
 ##### Install Slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 Confirm all components are running.
@@ -305,7 +304,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 Confirm all pods are running.
@@ -331,7 +330,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create lazyload for productpage.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/servicefence_productpage.yaml
 ```
 
 Confirm servicefence and sidecar already exist.
@@ -437,12 +436,12 @@ The backends are details and reviews now.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 

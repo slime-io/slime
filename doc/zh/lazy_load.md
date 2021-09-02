@@ -25,7 +25,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - name: lazyload
       fence:
@@ -141,7 +141,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - fence:
         enable: true
@@ -160,7 +160,7 @@ spec:
               type: Group
 ```
 
-不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。   
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
 
 **使用集群唯一的global-sidecar**   
 
@@ -174,7 +174,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   module:
     - fence:
         enable: true
@@ -195,9 +195,6 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
-      namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
     pilot:
       enable: true
       image:
@@ -206,7 +203,9 @@ spec:
 ```
 
 **使用report-server上报调用关系**   
-集群内未配置prometheus时，可通过report-server上报依赖关系   
+集群内未配置prometheus时，可通过report-server上报依赖关系，此时需要在component中添加reportServer，并且设置reportServer.enable为true。
+
+对应的，如果使用prometheus，则component中无需添加reportServer，或者设置reportServer.enable为false。
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -218,7 +217,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: v0.2.1
   # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
     - fence:
@@ -278,7 +277,7 @@ spec:
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 确认所有组件已正常运行
@@ -305,7 +304,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 创建完后，状态如下
@@ -331,7 +330,7 @@ reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 创建servicefence，为productpage服务启用懒加载。
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/servicefence_productpage.yaml
 ```
 
 确认生成servicefence和sidecar对象。
@@ -438,13 +437,13 @@ reviews 和 details 被自动加入！
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/config/bookinfo.yaml
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.1/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 
 
