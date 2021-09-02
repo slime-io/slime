@@ -156,7 +156,7 @@ spec:
           handlers:
             destination:
               query: |
-                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
               type: Group
 ```
 
@@ -189,7 +189,7 @@ spec:
           handlers:
             destination:
               query: |
-                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
               type: Group
   component:
     globalSidecar:
@@ -235,7 +235,7 @@ spec:
           handlers:
             destination:
               query: |
-                sum(istio_requests_total{source_app="$source_app",report="destination"})by(destination_service)
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
               type: Group
   component:
     globalSidecar:
