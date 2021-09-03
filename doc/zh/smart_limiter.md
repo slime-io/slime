@@ -5,13 +5,15 @@
   - [服务限流](#服务限流)
   - [示例：为bookinfo的reviews服务开启自适应限流](#示例为bookinfo的reviews服务开启自适应限流)
     - [安装 istio (1.8+)](#安装-istio-18)
+    - [设定tag](#设定tag)
     - [安装 slime](#安装-slime)
     - [安装bookinfo](#安装bookinfo)
     - [为reviews设置限流规则](#为reviews设置限流规则)
     - [确认smartlimiter已经创建](#确认smartlimiter已经创建)
     - [确认EnvoyFilter已创建](#确认envoyfilter已创建)
-    - [**访问观察**](#访问观察)
-    - [**卸载**](#卸载)
+    - [访问观察](#访问观察)
+    - [卸载](#卸载)
+    - [补充说明](#补充说明)
 
 
 ### 自适应限流
@@ -32,14 +34,14 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0-alpha
+    tag: {{your_limiter_tag}}
   module:
     - limiter:
         enable: true
         backend: 1
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             cpu.sum:
               query: |
@@ -55,6 +57,8 @@ spec:
             - pod # inline
       name: limiter
 ```
+
+[完整样例](../../install/samples/smartlimiter/slimeboot_smartlimiter.yaml)
 
 在示例中，我们配置了prometheus作为监控源，prometheus.handlers定义了希望从监控中获取的监控指标，这些监控指标可以作为治理规则中的参数，从而达到自适应限流的目的。
 用户也可以根据需要定义limiter模块需要获取的监控指标，以下是一些可以常用的监控指标获取语句：
@@ -313,10 +317,20 @@ status:
 
 
 
+##### 设定tag
+
+$latest_tag获取最新tag。默认执行的shell脚本和yaml文件均是$latest_tag版本。
+
+```sh
+$ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+```
+
+
+
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
 ```
 
 确认所有组件已正常运行
@@ -327,7 +341,6 @@ NAME           AGE
 smartlimiter   6s
 $ kubectl get pod -n mesh-operator
 NAME                                    READY   STATUS    RESTARTS   AGE
-global-sidecar-pilot-7bfcdc55f6-dnqc2   1/1     Running   0          26s
 limiter-6cb886d74-82hxg                 1/1     Running   0          26s
 slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
 ```
@@ -340,17 +353,19 @@ slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
-此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
+此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。
+
+另外也可参考 [对外开放应用程序](https://istio.io/latest/zh/docs/setup/getting-started/#ip) 给应用暴露外访接口。
 
 
 
 为reviews创建DestinationRule
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/reviews-destination-rule.yaml"
 ```
 
 
@@ -358,7 +373,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 ##### 为reviews设置限流规则
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/smartlimiter_reviews.yaml"
 ```
 
 
@@ -497,15 +512,37 @@ reviews-v2的sidecar观察日志如下
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/reviews-destination-rule.yaml"
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
 ```
 
 
+
+##### 补充说明
+
+如想要使用其他tag或commit_id的shell脚本和yaml文件，请显示指定$custom_tag_or_commit。
+
+```sh
+$ export custom_tag_or_commit=xxx
+```
+
+执行的命令涉及到yaml文件，用$custom_tag_or_commit替换$latest_tag，如下
+
+```sh
+#$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$custom_tag_or_commit/install/config/bookinfo.yaml"
+```
+
+执行的命令涉及到shell文件，将$custom_tag_or_commit作为shell文件的参数，如下
+
+```sh
+#$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)" $custom_tag_or_commit
+```
 

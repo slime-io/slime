@@ -24,8 +24,11 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.2.0-alpha
+    tag: {{your_plugin_tag}}
 ```
+
+[Example](../../install/samples/plugin/slimeboot_plugin.yaml)
+
 
 
 #### Inline plugin
@@ -45,13 +48,13 @@ spec:
     app: reviews
   plugins:
   - enable: true
-    name: {plugin-1}     # plugin name
+    name: {{plugin-1}}     # plugin name
   # ...
   - enable: true
-    name: {plugin-N}
+    name: {{plugin-N}}
 ```
 
-{plugin-N} is the name of the plug-in, and the sort in PluginManager is the execution order of the plug-in. Set the enable field to false to disable the plugin.
+{{plugin-N}} is the name of the plug-in, and the sort in PluginManager is the execution order of the plug-in. Set the enable field to false to disable the plugin.
 
 
 
@@ -70,13 +73,13 @@ spec:
     app: my-app
   plugins:
   - enable: true          # switch
-    name: {plugin-1}      # plugin name
+    name: {{plugin-1}}      # plugin name
     inline:
       settings:
-        {plugin settings} # plugin settings
+        {{plugin settings}} # plugin settings
   # ...
   - enable: true
-    name: {plugin-N}
+    name: {{plugin-N}}
 ```
 
 

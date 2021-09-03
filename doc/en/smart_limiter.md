@@ -4,6 +4,7 @@
 - [Service ratelimit](#service-ratelimit)
 - [Example](#example)
   - [Install istio (1.8+)](#install-istio-18)
+  - [Set Tag](#set-tag)
   - [Install slime](#install-slime)
   - [Install Bookinfo](#install-bookinfo)
   - [Create Smartlimiter](#create-smartlimiter)
@@ -11,6 +12,7 @@
   - [Observ Envoyfilter](#observ-envoyfilter)
   - [Visit and Observ](#visit-and-observ)
   - [Uninstall](#uninstall)
+  - [Remarks](#remarks)
 
 #### Install & Use
 
@@ -28,14 +30,14 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0-alpha
+    tag: {{your_limiter_tag}}
   module:
     - limiter:
         enable: true
         backend: 1
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             cpu.sum:
               query: |
@@ -51,6 +53,8 @@ spec:
             - pod # inline
       name: limiter   
 ```
+
+[Example](../../install/samples/smartlimiter/slimeboot_smartlimiter.yaml)
 
 In the example, we configure prometheus as the monitoring source, and "prometheus handlers" defines the attributes that we want to obtain from monitoring. These attributes can be used as parameters in the traffic rules to achieve the purpose of adaptive ratelimit. 
 Users can also define the monitoring attributes that the limiter module needs to obtain according to their needs. The following are some commonly used statements for obtaining monitoring attributes:
@@ -305,10 +309,33 @@ status:
 ##### Install istio (1.8+)
 
 
+
+##### Set Tag
+
+$latest_tag equals the latest tag. The shell scripts and yaml files uses this version as default.
+
+```sh
+$ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+```
+
+
+
 ##### Install slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
+```
+
+Make sure all component are running.
+
+```sh
+$ kubectl get slimeboot -n mesh-operator
+NAME           AGE
+smartlimiter   6s
+$ kubectl get pod -n mesh-operator
+NAME                                    READY   STATUS    RESTARTS   AGE
+limiter-6cb886d74-82hxg                 1/1     Running   0          26s
+slime-boot-5977685db8-lnltl             1/1     Running   0          6m22s
 ```
 
 
@@ -319,15 +346,17 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
-Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. You can also create gateway and visit productpage from outside, like what shows in  https://istio.io/latest/zh/docs/setup/getting-started/#ip.
+Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. 
+
+You can also create gateway and visit productpage from outside, like what shows in  [Open the application to the outside](https://istio.io/latest/docs/setup/getting-started/#ip).
 
 Create DestinationRule for reviews.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/reviews-destination-rule.yaml"
 ```
 
 
@@ -335,7 +364,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 ##### Create Smartlimiter
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/smartlimiter_reviews.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/smartlimiter_reviews.yaml"
 ```
 
 
@@ -473,13 +502,37 @@ Response code is 429. The smartlimiter is working.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/reviews-destination-rule.yaml
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/reviews-destination-rule.yaml"
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_uninstall_limiter.sh)"
+```
+
+
+
+##### Remarks
+
+If you want to use customize shell scripts or yaml files, please set $custom_tag_or_commit. 
+
+```sh
+$ export custom_tag_or_commit=xxx
+```
+
+If command includes a yaml file,  please use $custom_tag_or_commit instead of $latest_tag.
+
+```sh
+#$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$custom_tag_or_commit/install/config/bookinfo.yaml"
+```
+
+If command includes a shell script,  please add $custom_tag_or_commit as a parameter to the shell script.
+
+```sh
+#$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)" $custom_tag_or_commit
 ```
 
