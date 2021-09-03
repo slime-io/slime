@@ -1,4 +1,5 @@
-{{ if .Values.component}}
+{{ if .Values.component }}
+{{ if .Values.component.globalSidecar }}
 {{ if .Values.component.globalSidecar.enable }}
 {{ with (eq  .Values.component.globalSidecar.type "namespaced") }}
   {{ range $_,$ns :=  $.Values.component.globalSidecar.namespace }}
@@ -251,6 +252,7 @@ spec:
   {{- end }}
   {{- end }}
   {{- end }}
+  {{ end }}
   {{ end }}
   {{ end }}
   {{ end }}

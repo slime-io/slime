@@ -1,13 +1,18 @@
 - [安装和使用](#安装和使用)
 - [其他安装选项](#其他安装选项)
+  - [不使用global-sidecar组件](#不使用global-sidecar组件)
+  - [使用集群唯一的global-sidecar](#使用集群唯一的global-sidecar)
+  - [使用report-server上报调用关系](#使用report-server上报调用关系)
 - [示例: 为bookinfo的productpage服务开启懒加载](#示例-为bookinfo的productpage服务开启懒加载)
   - [安装 istio (1.8+)](#安装-istio-18)
+  - [设定tag](#设定tag)
   - [安装 slime](#安装-slime)
   - [安装bookinfo](#安装bookinfo)
   - [开启懒加载](#开启懒加载)
   - [首次访问观察](#首次访问观察)
   - [再次访问观察](#再次访问观察)
   - [卸载](#卸载)
+  - [补充说明](#补充说明)
 
 #### 安装和使用
 
@@ -25,17 +30,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - name: lazyload
       fence:
         enable: true
         wormholePort: 
-          - "9080" # replace to your application service ports
-          - {{your port}}
+          - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -46,8 +50,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
+        - {{your_namespace}} #replace to your deployment's namespace, and extend the list in case of multi namespaces
       resources:
         requests:
           cpu: 200m
@@ -66,10 +69,14 @@ spec:
           memory: 200Mi
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+        tag: {{your_pilot_tag}}
 ```
 
-2. 确认所有组件已正常运行：
+[完整样例](../../install/samples/lazyload/slimeboot_lazyload.yaml)
+
+
+
+​	2.确认所有组件已正常运行：
 
 ```
 $ kubectl get po -n mesh-operator
@@ -80,7 +87,7 @@ slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
 
 ```
-$ kubectl get po -n {{your namespace}}
+$ kubectl get po -n {{your_namespace}}
 NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
@@ -92,8 +99,8 @@ global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 apiVersion: microservice.slime.io/v1alpha1
 kind: ServiceFence
 metadata:
-  name: {{your svc}}
-  namespace: {{you namespace}}
+  name: {{your_svc}}
+  namespace: {{you_namespace}}
 spec:
   enable: true
 ```
@@ -105,14 +112,14 @@ spec:
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
-  name: {{your svc}}
-  namespace: {{you namespace}}
+  name: {{your_svc}}
+  namespace: {{your_namespace}}
   ownerReferences:
   - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
-    name: {{your svc}}
+    name: {{your_svc}}
 spec:
   egress:
   - hosts:
@@ -121,14 +128,15 @@ spec:
     - '*/global-sidecar.{{your ns}}.svc.cluster.local'
   workloadSelector:
     labels:
-      app: {{your svc}}
+      app: {{your_svc}}
 ```
 
 
 
 #### 其他安装选项
 
-**不使用global-sidecar组件**  
+##### 不使用global-sidecar组件  
+
 在开启allow_any的网格中，可以不使用global-sidecar组件。使用如下配置：
 
 ```yaml
@@ -141,18 +149,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -160,9 +166,13 @@ spec:
               type: Group
 ```
 
-不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。   
+[完整样例](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
 
-**使用集群唯一的global-sidecar**   
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
+
+
+
+##### 使用集群唯一的global-sidecar   
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -174,18 +184,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -195,18 +203,22 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
-      namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
     pilot:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00      
+        tag: {{your_pilot_tag}}
 ```
 
-**使用report-server上报调用关系**   
-集群内未配置prometheus时，可通过report-server上报依赖关系   
+[完整样例](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
+
+
+
+##### 使用report-server上报调用关系   
+
+集群内未配置prometheus时，可通过report-server上报依赖关系，此时需要在component中添加reportServer，并且设置reportServer.enable为true。
+
+对应的，如果使用prometheus，则component中无需添加reportServer，或者设置reportServer.enable为false。
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -218,19 +230,17 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports 
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -241,13 +251,12 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # replace to your deployment's namespace
-        - {{you namespace}}
+        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
     pilot:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+        tag: {{your_pilot_tag}}
     reportServer:
       enable: true
       resources:
@@ -259,13 +268,13 @@ spec:
           memory: 200Mi
       mixerImage:
         repository: docker.io/slimeio/mixer
-        tag: preview-1.3.7-v0.0.1
+        tag: {{your_mixer_image}}
       inspectorImage:
         repository: docker.io/slimeio/report-server
-        tag: preview-v0.0.1-rc    
+        tag: {{your_inspector_image}}    
 ```
 
-
+[完整样例](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
 
 
 
@@ -275,10 +284,20 @@ spec:
 
 
 
+##### 设定tag
+
+$latest_tag获取最新tag。默认执行的shell脚本和yaml文件均是$latest_tag版本。
+
+```sh
+$ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+```
+
+
+
 ##### 安装 slime 
 
 ```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 确认所有组件已正常运行
@@ -305,7 +324,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
 创建完后，状态如下
@@ -322,7 +341,9 @@ reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
 reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 ```
 
-此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。另外也可参考 https://istio.io/latest/zh/docs/setup/getting-started/#ip 给应用暴露外访接口。
+此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。
+
+另外也可参考 [对外开放应用程序](https://istio.io/latest/zh/docs/setup/getting-started/#ip) 给应用暴露外访接口。
 
 
 
@@ -331,7 +352,7 @@ reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 创建servicefence，为productpage服务启用懒加载。
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/servicefence_productpage.yaml"
 ```
 
 确认生成servicefence和sidecar对象。
@@ -438,14 +459,36 @@ reviews 和 details 被自动加入！
 卸载bookinfo
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
 卸载slime相关
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_uninstall_lazyload.sh)"
 ```
 
 
+
+##### 补充说明
+
+如想要使用其他tag或commit_id的shell脚本和yaml文件，请显示指定$custom_tag_or_commit。
+
+```sh
+$ export custom_tag_or_commit=xxx
+```
+
+执行的命令涉及到yaml文件，用$custom_tag_or_commit替换$latest_tag，如下
+
+```sh
+#$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$custom_tag_or_commit/install/config/bookinfo.yaml"
+```
+
+执行的命令涉及到shell文件，将$custom_tag_or_commit作为shell文件的参数，如下
+
+```sh
+#$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)" $custom_tag_or_commit
+```
 

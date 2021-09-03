@@ -1,13 +1,18 @@
 - [Install & Use](#install--use)
 - [Other installation options](#other-installation-options)
+  - [Disable global-sidecar](#disable-global-sidecar)
+  - [Use cluster unique global-sidecar](#use-cluster-unique-global-sidecar)
+  - [Use report-server to report the dependency](#use-report-server-to-report-the-dependency)
 - [Example](#example)
   - [Install Istio (1.8+)](#install-istio-18)
+  - [Set Tag](#set-tag)
   - [Install Slime](#install-slime)
   - [Install Bookinfo](#install-bookinfo)
   - [Enable Lazyload](#enable-lazyload)
   - [First Visit and Observ](#first-visit-and-observ)
   - [Second Visit and Observ](#second-visit-and-observ)
   - [Uninstall](#uninstall)
+  - [Remarks](#remarks)
 
 #### Install & Use
 
@@ -25,17 +30,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - name: lazyload
       fence:
         enable: true
         wormholePort: 
-          - "9080" # replace to your application service ports
-          - {{your port}}
+          - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -46,8 +50,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
+        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
       resources:
         requests:
           cpu: 200m
@@ -66,8 +69,10 @@ spec:
           memory: 200Mi
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+        tag: {{your_pilot_tag}}
 ```
+
+[Example](../../install/samples/lazyload/slimeboot_lazyload.yaml)
 
 2. make sure all components are running
 
@@ -80,7 +85,7 @@ slime-boot-68b6f88b7b-wwqnd             1/1       Running   0          39s
 ```
 
 ```sh
-$ kubectl get po -n {{your namespace}}
+$ kubectl get po -n {{your_namespace}}
 NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
@@ -93,8 +98,8 @@ global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 apiVersion: microservice.slime.io/v1alpha1
 kind: ServiceFence
 metadata:
-  name: {{your svc}}
-  namespace: {{your namespace}}
+  name: {{your_svc}}
+  namespace: {{your_namespace}}
 spec:
   enable: true
 ```
@@ -106,14 +111,14 @@ spec:
 apiVersion: networking.istio.io/v1beta1
 kind: Sidecar
 metadata:
-  name: {{your svc}}
-  namespace: {{your ns}}
+  name: {{your_svc}}
+  namespace: {{your_ns}}
   ownerReferences:
   - apiVersion: microservice.slime.io/v1alpha1
     blockOwnerDeletion: true
     controller: true
     kind: ServiceFence
-    name: {{your svc}}
+    name: {{your_svc}}
 spec:
   egress:
   - hosts:
@@ -122,12 +127,12 @@ spec:
     - '*/global-sidecar.{your ns}.svc.cluster.local'
   workloadSelector:
     labels:
-      app: {{your svc}}
+      app: {{your_svc}}
 ```
 
 #### Other installation options
 
-**Disable global-sidecar**  
+##### Disable global-sidecar  
 
 In the ServiceMesh with allow_any enabled, the global-sidecar component can be omitted. Use the following configuration:
 
@@ -141,18 +146,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -160,9 +163,13 @@ spec:
               type: Group
 ```
 
+[Example](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
+
 Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
 
-**Use cluster unique global-sidecar**     
+
+
+##### Use cluster unique global-sidecar     
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -174,18 +181,16 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -195,19 +200,22 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
-      namespace:
-        - default # replace to or add your deployment's namespace
-        - {{you namespace}}
     pilot:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00      
+        tag: {{your_pilot_tag}}     
 ```
 
-**Use report-server to report the dependency**   
+[Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 
-When prometheus is not configured in the cluster, the dependency can be reported through report-server.  
+
+
+##### Use report-server to report the dependency   
+
+When prometheus is not configured in the cluster, the dependency can be reported through report-server.  Add reportServer in component, and set reportServer.enable = true.
+
+If using prometheus, delete reportServer from component, or set reportServer.enable = false.
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -219,19 +227,17 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.0-alpha
+    tag: {{your_lazyload_tag}}
   # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
   module:
     - fence:
         enable: true
         wormholePort:
-        - {{port1}} # replace to your application service ports 
-        - {{port2}}
-        - ...
+        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
       metric:
         prometheus:
-          address: http://prometheus.istio-system:9090 # replace to your prometheus address
+          address: {{prometheus_address}} # replace to your prometheus address
           handlers:
             destination:
               query: |
@@ -242,13 +248,12 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # replace to your deployment's namespace
-        - {{you namespace}}
+        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
     pilot:
       enable: true
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+        tag: {{your_pilot_tag}}
     reportServer:
       enable: true
       resources:
@@ -260,13 +265,13 @@ spec:
           memory: 200Mi
       mixerImage:
         repository: docker.io/slimeio/mixer
-        tag: preview-1.3.7-v0.0.1
+        tag: {{your_mixer_image}}
       inspectorImage:
         repository: docker.io/slimeio/report-server
-        tag: preview-v0.0.1-rc    
+        tag: {{your_inspector_image}}        
 ```
 
-
+[Example](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
 
 
 
@@ -275,10 +280,21 @@ spec:
 ##### Install Istio (1.8+)
 
 
+
+##### Set Tag
+
+$latest_tag equals the latest tag. The shell scripts and yaml files uses this version as default.
+
+```sh
+$ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+```
+
+
+
 ##### Install Slime
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_install_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
 ```
 
 Confirm all components are running.
@@ -305,7 +321,7 @@ Change the namespace of current-context to which bookinfo will deploy first. Her
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
 Confirm all pods are running.
@@ -322,7 +338,9 @@ reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
 reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 ```
 
-Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. You can also create gateway and visit productpage from outside, like what shows in  https://istio.io/latest/zh/docs/setup/getting-started/#ip.
+Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. 
+
+You can also create gateway and visit productpage from outside, like what shows in  [Open the application to outside traffic](https://istio.io/latest/docs/setup/getting-started/#ip).
 
 
 
@@ -331,7 +349,7 @@ Then we can visit productpage from pod/ratings, executing `curl productpage:9080
 Create lazyload for productpage.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/servicefence_productpage.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/servicefence_productpage.yaml"
 ```
 
 Confirm servicefence and sidecar already exist.
@@ -384,7 +402,7 @@ Visit the productpage website, and use `kubectl logs -f productpage-xxx -c istio
 
 It is clearly that the banckend of productpage is global-sidecar.
 
-Now we get the sidecar yaml. Details and reviews are already added into sidecar! 
+Now we get the sidecar yaml. 
 
 ```YAML
 $ kubectl get sidecar productpage -oyaml
@@ -417,6 +435,8 @@ spec:
       app: productpage
 ```
 
+Details and reviews are already added into sidecar! 
+
 
 
 ##### Second Visit and Observ
@@ -437,12 +457,36 @@ The backends are details and reviews now.
 Uninstall bookinfo.
 
 ```sh
-$ kubectl delete -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/bookinfo.yaml
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
 ```
 
 Uninstall slime.
 
 ```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_uninstall_lazyload.sh)"
+```
+
+
+
+##### Remarks
+
+If you want to use customize shell scripts or yaml files, please set $custom_tag_or_commit. 
+
+```sh
+$ export custom_tag_or_commit=xxx
+```
+
+If command includes a yaml file,  please use $custom_tag_or_commit instead of $latest_tag.
+
+```sh
+#$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/config/bookinfo.yaml"
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$custom_tag_or_commit/install/config/bookinfo.yaml"
+```
+
+If command includes a shell script,  please add $custom_tag_or_commit as a parameter to the shell script.
+
+```sh
+#$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
+$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)" $custom_tag_or_commit
 ```
 

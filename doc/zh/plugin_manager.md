@@ -24,8 +24,10 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.2.0-alpha
+    tag: {{your_plugin_tag}}
 ```
+
+[完整样例](../../install/samples/plugin/slimeboot_plugin.yaml)
 
 pluginmanager和envoyplugin是平级关系。每个envoyplugin可以管理一个envoyfilter，而pluginmanager可以管理多个envoyfilter。
 
@@ -50,13 +52,13 @@ spec:
     app: reviews
   plugins:
   - enable: true
-    name: {plugin-1}     # plugin name
+    name: {{plugin-1}}     # plugin name
   # ...
   - enable: true
-    name: {plugin-N}
+    name: {{plugin-N}}
 ```
 
-其中，{plugin-N}为插件名称，PluginManager中的排序为插件执行顺序。将enable字段设置为false即可停用插件。
+其中，{{plugin-N}}为插件名称，PluginManager中的排序为插件执行顺序。将enable字段设置为false即可停用插件。
 
 
 
@@ -75,13 +77,13 @@ spec:
     app: my-app
   plugins:
   - enable: true          # switch
-    name: {plugin-1}      # plugin name
+    name: {{plugin-1}}      # plugin name
     inline:
       settings:
-        {plugin settings} # plugin settings
+        {{plugin_settings}} # plugin settings
   # ...
   - enable: true
-    name: {plugin-N}
+    name: {{plugin-N}}
 ```
 
 
