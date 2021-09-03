@@ -2,8 +2,8 @@
 name: Suggestions
 about: " Your suggestions for slime"
 title: ''
-labels: ''
-assignees: ydh926
+labels: advice
+assignees: YonkaFang
 
 ---
 
