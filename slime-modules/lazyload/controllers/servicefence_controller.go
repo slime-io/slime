@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 	istio "istio.io/api/networking/v1alpha3"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -182,7 +182,7 @@ func (r *ServicefenceReconciler) prepare(host *microserviceslimeiov1alpha1.Servi
 	if loc == nil {
 		return nil
 	}
-	svc := &v1.Service{}
+	svc := &corev1.Service{}
 	if err := r.Client.Get(context.TODO(), *loc, svc); err != nil {
 		return nil
 	}
