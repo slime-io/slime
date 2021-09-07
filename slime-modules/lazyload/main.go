@@ -22,12 +22,14 @@ import (
 
 	uberzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
@@ -97,6 +99,14 @@ func main() {
 			Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),
 			Scheme: mgr.GetScheme(),
 		},
+	}).Add(basecontroller.ObjectReconcileItem{
+		Name:    "Service",
+		ApiType: &corev1.Service{},
+		R:       reconcile.Func(sfReconciler.ReconcileService),
+	}).Add(basecontroller.ObjectReconcileItem{
+		Name:    "Namespace",
+		ApiType: &corev1.Namespace{},
+		R:       reconcile.Func(sfReconciler.ReconcileNamespace),
 	}).Build(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)

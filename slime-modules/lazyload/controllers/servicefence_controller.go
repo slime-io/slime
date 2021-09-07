@@ -19,15 +19,20 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"strings"
+	"sync"
+	"time"
+
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"reflect"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/controllers"
@@ -35,15 +40,13 @@ import (
 	"slime.io/slime/slime-framework/model/source/aggregate"
 	"slime.io/slime/slime-framework/model/source/k8s"
 	"slime.io/slime/slime-framework/util"
-	"strings"
-	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/lazyload/api/v1alpha1"
+	lazyloadv1alpha1 "slime.io/slime/slime-modules/lazyload/api/v1alpha1"
 )
 
 // ServicefenceReconciler reconciles a Servicefence object
@@ -55,6 +58,10 @@ type ServicefenceReconciler struct {
 	env       *bootstrap.Environment
 	eventChan chan event_source.Event
 	source    event_source.Source
+
+	reconcileLock sync.Mutex
+
+	enabledNamespaces map[string]bool
 }
 
 // NewReconciler returns a new reconcile.Reconciler
@@ -90,11 +97,12 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	_ = context.Background()
 	_ = r.Log.WithValues("serviceFence", req.NamespacedName)
 
-	// your logic here
-
 	// Fetch the ServiceFence instance
-	instance := &microserviceslimeiov1alpha1.ServiceFence{}
+	instance := &lazyloadv1alpha1.ServiceFence{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+
+	r.reconcileLock.Lock()
+	defer r.reconcileLock.Unlock()
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -121,7 +129,7 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	return ctrl.Result{}, err
 }
 
-func (r *ServicefenceReconciler) refreshSidecar(instance *microserviceslimeiov1alpha1.ServiceFence) error {
+func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.ServiceFence) error {
 	sidecar, err := newSidecar(instance, r.env)
 	if err != nil {
 		r.Log.Error(err, "servicefence生产sidecar的过程中发生错误")
@@ -157,7 +165,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *microserviceslimeiov1a
 	return nil
 }
 
-func (r *ServicefenceReconciler) recordVisitor(host *microserviceslimeiov1alpha1.ServiceFence, diff Diff) {
+func (r *ServicefenceReconciler) recordVisitor(host *lazyloadv1alpha1.ServiceFence, diff Diff) {
 	for _, k := range diff.Added {
 		vih := r.prepare(host, k)
 		if vih == nil {
@@ -177,7 +185,7 @@ func (r *ServicefenceReconciler) recordVisitor(host *microserviceslimeiov1alpha1
 	}
 }
 
-func (r *ServicefenceReconciler) prepare(host *microserviceslimeiov1alpha1.ServiceFence, n string) *microserviceslimeiov1alpha1.ServiceFence {
+func (r *ServicefenceReconciler) prepare(host *lazyloadv1alpha1.ServiceFence, n string) *lazyloadv1alpha1.ServiceFence {
 	loc := parseHost(host.Namespace, n)
 	if loc == nil {
 		return nil
@@ -186,7 +194,7 @@ func (r *ServicefenceReconciler) prepare(host *microserviceslimeiov1alpha1.Servi
 	if err := r.Client.Get(context.TODO(), *loc, svc); err != nil {
 		return nil
 	}
-	vih := &microserviceslimeiov1alpha1.ServiceFence{}
+	vih := &lazyloadv1alpha1.ServiceFence{}
 retry:
 	if err := r.Client.Get(context.TODO(), *loc, vih); err != nil {
 		if errors.IsNotFound(err) {
@@ -221,35 +229,35 @@ func parseHost(locNs, h string) *types.NamespacedName {
 	return nil
 }
 
-func (r *ServicefenceReconciler) updateVisitedHostStatus(host *microserviceslimeiov1alpha1.ServiceFence) Diff {
-	domains := make(map[string]*microserviceslimeiov1alpha1.Destinations)
+func (r *ServicefenceReconciler) updateVisitedHostStatus(host *lazyloadv1alpha1.ServiceFence) Diff {
+	domains := make(map[string]*lazyloadv1alpha1.Destinations)
 	now := time.Now().Unix()
 	for k, v := range host.Spec.Host {
 		allHost := []string{k}
 		if hs := getDestination(k); len(hs) > 0 {
 			allHost = append(allHost, hs...)
 		}
-		var status microserviceslimeiov1alpha1.Destinations_Status
+		var status lazyloadv1alpha1.Destinations_Status
 		if v.Stable != nil {
-			status = microserviceslimeiov1alpha1.Destinations_ACTIVE
+			status = lazyloadv1alpha1.Destinations_ACTIVE
 		} else if v.Deadline != nil {
 			if now-v.Deadline.Expire.Seconds > 0 {
-				status = microserviceslimeiov1alpha1.Destinations_EXPIRE
+				status = lazyloadv1alpha1.Destinations_EXPIRE
 			} else {
-				status = microserviceslimeiov1alpha1.Destinations_ACTIVE
+				status = lazyloadv1alpha1.Destinations_ACTIVE
 			}
 		} else if v.Auto != nil {
 			if v.RecentlyCalled == nil {
-				status = microserviceslimeiov1alpha1.Destinations_ACTIVE
+				status = lazyloadv1alpha1.Destinations_ACTIVE
 			} else {
 				if now-v.RecentlyCalled.Seconds > v.Auto.Duration.Seconds {
-					status = microserviceslimeiov1alpha1.Destinations_EXPIRE
+					status = lazyloadv1alpha1.Destinations_EXPIRE
 				} else {
-					status = microserviceslimeiov1alpha1.Destinations_ACTIVE
+					status = lazyloadv1alpha1.Destinations_ACTIVE
 				}
 			}
 		}
-		domains[k] = &microserviceslimeiov1alpha1.Destinations{
+		domains[k] = &lazyloadv1alpha1.Destinations{
 			Hosts:  allHost,
 			Status: status,
 		}
@@ -280,9 +288,9 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(host *microserviceslime
 				if hs := getDestination(unityHost); len(hs) > 0 {
 					allHost = append(allHost, hs...)
 				}
-				domains[k] = &microserviceslimeiov1alpha1.Destinations{
+				domains[k] = &lazyloadv1alpha1.Destinations{
 					Hosts:  allHost,
-					Status: microserviceslimeiov1alpha1.Destinations_ACTIVE,
+					Status: lazyloadv1alpha1.Destinations_ACTIVE,
 				}
 			}
 		}
@@ -306,13 +314,13 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(host *microserviceslime
 	return delta
 }
 
-func newSidecar(vhost *microserviceslimeiov1alpha1.ServiceFence, env *bootstrap.Environment) (*v1alpha3.Sidecar, error) {
+func newSidecar(vhost *lazyloadv1alpha1.ServiceFence, env *bootstrap.Environment) (*v1alpha3.Sidecar, error) {
 	host := make([]string, 0)
 	if !vhost.Spec.Enable {
 		return nil, nil
 	}
 	for _, v := range vhost.Status.Domains {
-		if v.Status == microserviceslimeiov1alpha1.Destinations_ACTIVE {
+		if v.Status == lazyloadv1alpha1.Destinations_ACTIVE {
 			for _, h := range v.Hosts {
 				host = append(host, "*/"+h)
 			}
@@ -349,13 +357,13 @@ func newSidecar(vhost *microserviceslimeiov1alpha1.ServiceFence, env *bootstrap.
 
 func (r *ServicefenceReconciler) Subscribe(host string, destination interface{}) {
 	if svc, namespace, ok := util.IsK8SService(host); ok {
-		vih := &microserviceslimeiov1alpha1.ServiceFence{}
+		vih := &lazyloadv1alpha1.ServiceFence{}
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: svc, Namespace: namespace}, vih); err != nil {
 			return
 		}
 		for k, _ := range vih.Status.Visitor {
 			if i := strings.Index(k, "/"); i != -1 {
-				visitorVih := &microserviceslimeiov1alpha1.ServiceFence{}
+				visitorVih := &lazyloadv1alpha1.ServiceFence{}
 				visitorNamespace := k[:i]
 				visitorName := k[i+1:]
 				err := r.Client.Get(context.TODO(), types.NamespacedName{Name: visitorName, Namespace: visitorNamespace}, visitorVih)
@@ -415,6 +423,6 @@ func isValidHost(h string) bool {
 
 func (r *ServicefenceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&microserviceslimeiov1alpha1.ServiceFence{}).
+		For(&lazyloadv1alpha1.ServiceFence{}).
 		Complete(r)
 }
