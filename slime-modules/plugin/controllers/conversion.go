@@ -7,9 +7,10 @@ package controllers
 
 import (
 	"fmt"
+	"strings"
+
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_extensions_wasm_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
-	"strings"
 
 	"slime.io/slime/slime-framework/util"
 	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
@@ -71,7 +72,7 @@ func translateRouteRatelimitToPatch(settings *types.Struct) *istio.EnvoyFilter_P
 	return patch
 }
 
-func (r *EnvoyPluginReconciler)translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
+func (r *EnvoyPluginReconciler) translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
 	if in.WorkloadSelector != nil {
 		out.WorkloadSelector = &istio.WorkloadSelector{
 			Labels: in.WorkloadSelector.Labels,
@@ -175,7 +176,6 @@ func (r *PluginManagerReconciler) translatePluginManager(in *v1alpha1.PluginMana
 }
 
 func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*istio.EnvoyFilter_EnvoyConfigObjectPatch, error) {
-
 	out := &istio.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: istio.EnvoyFilter_HTTP_FILTER,
 		Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
@@ -339,7 +339,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 				},
 			}
 		}
-	}else{
+	} else {
 		out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
 			Kind: &types.Value_StringValue{
 				StringValue: in.Name,
@@ -351,5 +351,3 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 	}
 	return out, nil
 }
-
-

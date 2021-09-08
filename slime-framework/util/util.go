@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go.uber.org/zap/zapcore"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap/zapcore"
 
 	"github.com/ghodss/yaml"
 	"github.com/gogo/protobuf/jsonpb"
@@ -78,7 +79,6 @@ func findSubNode(ks []string, root map[string]interface{}) (map[string]interface
 		} else {
 			return findSubNode(ks[1:], m)
 		}
-
 	}
 }
 
@@ -106,7 +106,7 @@ func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
 	var buf bytes.Buffer
 	if err := m.Marshal(&buf, pb); err == nil {
 		var mapResult map[string]interface{}
-		//使用 json.Unmarshal(data []byte, v interface{})进行转换,返回 error 信息
+		// 使用 json.Unmarshal(data []byte, v interface{})进行转换,返回 error 信息
 		if err := json.Unmarshal(buf.Bytes(), &mapResult); err == nil {
 			return mapResult, nil
 		} else {
@@ -165,7 +165,7 @@ func ApplyJSON(js string, pb proto.Message) error {
 	reader := strings.NewReader(js)
 	m := jsonpb.Unmarshaler{}
 	if err := m.Unmarshal(reader, pb); err != nil {
-		//log.Debugf("Failed to decode proto: %q. Trying decode with AllowUnknownFields=true", err)
+		// log.Debugf("Failed to decode proto: %q. Trying decode with AllowUnknownFields=true", err)
 		m.AllowUnknownFields = true
 		reader.Reset(js)
 		return m.Unmarshal(reader, pb)
@@ -207,7 +207,7 @@ func UnityHost(host string, namespace string) string {
 	}
 }
 
-//Subscribeable map
+// Subscribeable map
 type SubcribeableMap struct {
 	data           cmap.ConcurrentMap
 	subscriber     []func(key string, value interface{})
@@ -253,7 +253,6 @@ func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{}
 	s.subscriberLock.Unlock()
 }
 
-
-func TimeEncoder ( t time.Time, enc zapcore.PrimitiveArrayEncoder){
+func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
 }

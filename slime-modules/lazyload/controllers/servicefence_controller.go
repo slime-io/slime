@@ -267,7 +267,7 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(host *lazyloadv1alpha1.
 		}
 	}
 
-	for mk, _ := range host.Status.MetricStatus {
+	for mk := range host.Status.MetricStatus {
 		mk = strings.Trim(mk, "{}")
 		if strings.HasPrefix(mk, "destination_service") {
 			ss := strings.Split(mk, "\"")
@@ -340,7 +340,7 @@ func newSidecar(vhost *lazyloadv1alpha1.ServiceFence, env *bootstrap.Environment
 		},
 		Egress: []*istio.IstioEgressListener{
 			{
-				//Bind:  "0.0.0.0",
+				// Bind:  "0.0.0.0",
 				Hosts: host,
 			},
 		},
@@ -365,7 +365,7 @@ func (r *ServicefenceReconciler) Subscribe(host string, destination interface{})
 		if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: svc, Namespace: namespace}, vih); err != nil {
 			return
 		}
-		for k, _ := range vih.Status.Visitor {
+		for k := range vih.Status.Visitor {
 			if i := strings.Index(k, "/"); i != -1 {
 				visitorVih := &lazyloadv1alpha1.ServiceFence{}
 				visitorNamespace := k[:i]

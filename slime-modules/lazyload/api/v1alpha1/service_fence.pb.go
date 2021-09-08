@@ -5,14 +5,17 @@ package v1alpha1
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	math "math"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -66,18 +69,23 @@ func (*Timestamp) ProtoMessage()    {}
 func (*Timestamp) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{0}
 }
+
 func (m *Timestamp) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Timestamp.Unmarshal(m, b)
 }
+
 func (m *Timestamp) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Timestamp.Marshal(b, m, deterministic)
 }
+
 func (m *Timestamp) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Timestamp.Merge(m, src)
 }
+
 func (m *Timestamp) XXX_Size() int {
 	return xxx_messageInfo_Timestamp.Size(m)
 }
+
 func (m *Timestamp) XXX_DiscardUnknown() {
 	xxx_messageInfo_Timestamp.DiscardUnknown(m)
 }
@@ -113,18 +121,23 @@ func (*ServiceFenceSpec) ProtoMessage()    {}
 func (*ServiceFenceSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{1}
 }
+
 func (m *ServiceFenceSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ServiceFenceSpec.Unmarshal(m, b)
 }
+
 func (m *ServiceFenceSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ServiceFenceSpec.Marshal(b, m, deterministic)
 }
+
 func (m *ServiceFenceSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ServiceFenceSpec.Merge(m, src)
 }
+
 func (m *ServiceFenceSpec) XXX_Size() int {
 	return xxx_messageInfo_ServiceFenceSpec.Size(m)
 }
+
 func (m *ServiceFenceSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_ServiceFenceSpec.DiscardUnknown(m)
 }
@@ -164,18 +177,23 @@ func (*RecyclingStrategy) ProtoMessage()    {}
 func (*RecyclingStrategy) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{2}
 }
+
 func (m *RecyclingStrategy) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RecyclingStrategy.Unmarshal(m, b)
 }
+
 func (m *RecyclingStrategy) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RecyclingStrategy.Marshal(b, m, deterministic)
 }
+
 func (m *RecyclingStrategy) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RecyclingStrategy.Merge(m, src)
 }
+
 func (m *RecyclingStrategy) XXX_Size() int {
 	return xxx_messageInfo_RecyclingStrategy.Size(m)
 }
+
 func (m *RecyclingStrategy) XXX_DiscardUnknown() {
 	xxx_messageInfo_RecyclingStrategy.DiscardUnknown(m)
 }
@@ -222,18 +240,23 @@ func (*RecyclingStrategy_Stable) ProtoMessage()    {}
 func (*RecyclingStrategy_Stable) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{2, 0}
 }
+
 func (m *RecyclingStrategy_Stable) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RecyclingStrategy_Stable.Unmarshal(m, b)
 }
+
 func (m *RecyclingStrategy_Stable) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RecyclingStrategy_Stable.Marshal(b, m, deterministic)
 }
+
 func (m *RecyclingStrategy_Stable) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RecyclingStrategy_Stable.Merge(m, src)
 }
+
 func (m *RecyclingStrategy_Stable) XXX_Size() int {
 	return xxx_messageInfo_RecyclingStrategy_Stable.Size(m)
 }
+
 func (m *RecyclingStrategy_Stable) XXX_DiscardUnknown() {
 	xxx_messageInfo_RecyclingStrategy_Stable.DiscardUnknown(m)
 }
@@ -253,18 +276,23 @@ func (*RecyclingStrategy_Deadline) ProtoMessage()    {}
 func (*RecyclingStrategy_Deadline) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{2, 1}
 }
+
 func (m *RecyclingStrategy_Deadline) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RecyclingStrategy_Deadline.Unmarshal(m, b)
 }
+
 func (m *RecyclingStrategy_Deadline) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RecyclingStrategy_Deadline.Marshal(b, m, deterministic)
 }
+
 func (m *RecyclingStrategy_Deadline) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RecyclingStrategy_Deadline.Merge(m, src)
 }
+
 func (m *RecyclingStrategy_Deadline) XXX_Size() int {
 	return xxx_messageInfo_RecyclingStrategy_Deadline.Size(m)
 }
+
 func (m *RecyclingStrategy_Deadline) XXX_DiscardUnknown() {
 	xxx_messageInfo_RecyclingStrategy_Deadline.DiscardUnknown(m)
 }
@@ -291,18 +319,23 @@ func (*RecyclingStrategy_Auto) ProtoMessage()    {}
 func (*RecyclingStrategy_Auto) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{2, 2}
 }
+
 func (m *RecyclingStrategy_Auto) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RecyclingStrategy_Auto.Unmarshal(m, b)
 }
+
 func (m *RecyclingStrategy_Auto) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RecyclingStrategy_Auto.Marshal(b, m, deterministic)
 }
+
 func (m *RecyclingStrategy_Auto) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RecyclingStrategy_Auto.Merge(m, src)
 }
+
 func (m *RecyclingStrategy_Auto) XXX_Size() int {
 	return xxx_messageInfo_RecyclingStrategy_Auto.Size(m)
 }
+
 func (m *RecyclingStrategy_Auto) XXX_DiscardUnknown() {
 	xxx_messageInfo_RecyclingStrategy_Auto.DiscardUnknown(m)
 }
@@ -332,18 +365,23 @@ func (*Destinations) ProtoMessage()    {}
 func (*Destinations) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{3}
 }
+
 func (m *Destinations) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Destinations.Unmarshal(m, b)
 }
+
 func (m *Destinations) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Destinations.Marshal(b, m, deterministic)
 }
+
 func (m *Destinations) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Destinations.Merge(m, src)
 }
+
 func (m *Destinations) XXX_Size() int {
 	return xxx_messageInfo_Destinations.Size(m)
 }
+
 func (m *Destinations) XXX_DiscardUnknown() {
 	xxx_messageInfo_Destinations.DiscardUnknown(m)
 }
@@ -386,18 +424,23 @@ func (*ServiceFenceStatus) ProtoMessage()    {}
 func (*ServiceFenceStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_39c73264bd217447, []int{4}
 }
+
 func (m *ServiceFenceStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ServiceFenceStatus.Unmarshal(m, b)
 }
+
 func (m *ServiceFenceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_ServiceFenceStatus.Marshal(b, m, deterministic)
 }
+
 func (m *ServiceFenceStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_ServiceFenceStatus.Merge(m, src)
 }
+
 func (m *ServiceFenceStatus) XXX_Size() int {
 	return xxx_messageInfo_ServiceFenceStatus.Size(m)
 }
+
 func (m *ServiceFenceStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_ServiceFenceStatus.DiscardUnknown(m)
 }
