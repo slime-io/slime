@@ -18,18 +18,22 @@ package main
 
 import (
 	"flag"
+	"os"
+
 	uberzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
-	istiocontroller "slime.io/slime/slime-framework/controllers"
+	basecontroller "slime.io/slime/slime-framework/controllers"
 	"slime.io/slime/slime-framework/util"
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/lazyload/api/v1alpha1"
 	"slime.io/slime/slime-modules/lazyload/controllers"
@@ -59,7 +63,7 @@ func main() {
 	flag.Parse()
 	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
 	encoderCfg.EncodeTime = util.TimeEncoder
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true),zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -77,27 +81,34 @@ func main() {
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		setupLog.Error(err,"create a new clientSet failed")
+		setupLog.Error(err, "create a new clientSet failed")
 		os.Exit(1)
 	}
 	env.K8SClient = client
 
-	setupLog.Info("create new serviceFence reconciler and setupWithManager")
-	r := controllers.NewReconciler(mgr, &env)
-	if err = r.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "Servicefence")
-		os.Exit(1)
-	}
+	sfReconciler := controllers.NewReconciler(mgr, &env)
 
-	setupLog.Info("create new virtualService reconciler and setupWithManager")
-	// +kubebuilder:scaffold:builder
-	// add vs reconcile
-	if err = (&istiocontroller.VirtualServiceReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "VirtualService")
+	var builder basecontroller.ObjectReconcilerBuilder
+	if err := builder.Add(basecontroller.ObjectReconcileItem{
+		Name: "ServiceFence",
+		R:    sfReconciler,
+	}).Add(basecontroller.ObjectReconcileItem{
+		Name: "VirtualService",
+		R: &basecontroller.VirtualServiceReconciler{
+			Client: mgr.GetClient(),
+			Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),
+			Scheme: mgr.GetScheme(),
+		},
+	}).Add(basecontroller.ObjectReconcileItem{
+		Name:    "Service",
+		ApiType: &corev1.Service{},
+		R:       reconcile.Func(sfReconciler.ReconcileService),
+	}).Add(basecontroller.ObjectReconcileItem{
+		Name:    "Namespace",
+		ApiType: &corev1.Namespace{},
+		R:       reconcile.Func(sfReconciler.ReconcileNamespace),
+	}).Build(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller")
 		os.Exit(1)
 	}
 
