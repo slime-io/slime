@@ -61,11 +61,22 @@ type ServicefenceReconciler struct {
 
 	reconcileLock sync.Mutex
 
+	staleNamespaces   map[string]bool
 	enabledNamespaces map[string]bool
 }
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *ServicefenceReconciler {
+	r := &ServicefenceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("controllers").WithName("ServiceFence"),
+		env:    env,
+
+		staleNamespaces:   map[string]bool{},
+		enabledNamespaces: map[string]bool{},
+	}
+
 	if env.Config.Metric != nil {
 		eventChan := make(chan event_source.Event)
 		src := &aggregate.Source{}
@@ -73,21 +84,14 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 			ctrl.Log.Error(err, "failed to create slime-metric")
 		} else {
 			src.Sources = append(src.Sources, ms)
+			r.eventChan = eventChan
+			r.source = src
 
-			r := &ServicefenceReconciler{
-				Client:    mgr.GetClient(),
-				Scheme:    mgr.GetScheme(),
-				Log:       ctrl.Log.WithName("controllers").WithName("ServiceFence"),
-				env:       env,
-				eventChan: eventChan,
-				source:    src,
-			}
 			r.source.Start(env.Stop)
 			r.WatchSource(env.Stop)
-			return r
 		}
 	}
-	return &ServicefenceReconciler{Client: mgr.GetClient(), Scheme: mgr.GetScheme(), env: env, Log: ctrl.Log.WithName("controllers").WithName("ServiceFence")}
+	return r
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete

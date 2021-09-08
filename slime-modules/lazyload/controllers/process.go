@@ -65,7 +65,7 @@ func (r *ServicefenceReconciler) Refresh(request reconcile.Request, args map[str
 	}
 }
 
-func (r *ServicefenceReconciler) isServiceFenced(svc *corev1.Service) bool {
+func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev1.Service) bool {
 	var svcLabel string
 	if svc.Labels != nil {
 		svcLabel = svc.Labels[LabelServiceFenced]
@@ -77,6 +77,24 @@ func (r *ServicefenceReconciler) isServiceFenced(svc *corev1.Service) bool {
 	case ServiceFencedTrue:
 		return true
 	default:
+		if r.staleNamespaces[svc.Namespace] {
+			ns := &corev1.Namespace{}
+			if err := r.Client.Get(ctx, types.NamespacedName{
+				Namespace: "",
+				Name:      svc.Namespace,
+			}, ns); err != nil {
+				if errors.IsNotFound(err) {
+					ns = nil
+				} else {
+					ns = nil
+					r.Log.Error(err, "fail to get ns", "ns", svc.Namespace)
+				}
+			}
+
+			if ns != nil && ns.Labels != nil {
+				return ns.Labels[LabelServiceFenced] == ServiceFencedTrue
+			}
+		}
 		return r.enabledNamespaces[svc.Namespace]
 	}
 }
@@ -91,7 +109,6 @@ func (r *ServicefenceReconciler) ReconcileService(req ctrl.Request) (ctrl.Result
 }
 
 func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.Result, err error) {
-	// TODO
 	ctx := context.TODO()
 
 	// Fetch the Service instance
@@ -100,6 +117,12 @@ func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.
 
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
+
+	defer func() {
+		if err == nil {
+			delete(r.staleNamespaces, req.Name)
+		}
+	}()
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -125,6 +148,7 @@ func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.
 		defer func() {
 			if err != nil {
 				delete(r.enabledNamespaces, req.Name) // restore, leave to re-process next time
+				r.staleNamespaces[req.Name] = true
 			}
 		}()
 	}
@@ -183,7 +207,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 	defer r.reconcileLock.Unlock()
 
 	if sf == nil {
-		if svc != nil && r.isServiceFenced(svc) {
+		if svc != nil && r.isServiceFenced(ctx, svc) {
 			sf = &lazyloadv1alpha1.ServiceFence{
 				TypeMeta: metav1.TypeMeta{},
 				ObjectMeta: metav1.ObjectMeta{
@@ -196,7 +220,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				return reconcile.Result{}, err
 			}
 		}
-	} else if svc == nil || !r.isServiceFenced(svc) {
+	} else if svc == nil || !r.isServiceFenced(ctx, svc) {
 		if err := r.Client.Delete(ctx, sf); err != nil {
 			r.Log.Error(err, "delete fence failed", "fence", nsName)
 		}
