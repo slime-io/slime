@@ -21,6 +21,9 @@ const (
 	LabelServiceFenced = "slime.io/serviceFenced"
 	ServiceFencedTrue  = "true"
 	ServiceFencedFalse = "false"
+
+	LabelCreatedBy           = "app.kubernetes.io/created-by"
+	CreatedByFenceController = "fence-controller"
 )
 
 func (r *ServicefenceReconciler) WatchSource(stop <-chan struct{}) {
@@ -215,16 +218,31 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 					Namespace: svc.Namespace,
 				},
 			}
+			markFenceCreatedByController(sf)
 			if err := r.Client.Create(ctx, sf); err != nil {
 				r.Log.Error(err, "create fence failed", "fence", nsName)
 				return reconcile.Result{}, err
 			}
 		}
-	} else if svc == nil || !r.isServiceFenced(ctx, svc) {
+	} else if isFenceCreatedByController(sf) && (svc == nil || !r.isServiceFenced(ctx, svc)) {
 		if err := r.Client.Delete(ctx, sf); err != nil {
 			r.Log.Error(err, "delete fence failed", "fence", nsName)
 		}
 	}
 
 	return ctrl.Result{}, nil
+}
+
+func isFenceCreatedByController(sf *lazyloadv1alpha1.ServiceFence) bool {
+	if sf.Labels == nil {
+		return false
+	}
+	return sf.Labels[LabelCreatedBy] == CreatedByFenceController
+}
+
+func markFenceCreatedByController(sf *lazyloadv1alpha1.ServiceFence) {
+	if sf.Labels == nil {
+		sf.Labels = map[string]string{}
+	}
+	sf.Labels = map[string]string{LabelCreatedBy: CreatedByFenceController}
 }
