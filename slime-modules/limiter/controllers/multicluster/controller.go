@@ -97,7 +97,7 @@ func (c *Controller) Run() {
 	// Wait for the caches to be synced before starting workers
 	log.Info("Waiting for informer caches to sync")
 	if !cache.WaitForCacheSync(c.stop, c.informer.HasSynced) {
-		//utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
+		// utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
 	}
 	wait.Until(c.runWorker, 5*time.Second, c.stop)

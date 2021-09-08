@@ -52,6 +52,7 @@ func init() {
 	_ = istioapi.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
+
 func main() {
 	// TODO - add pause/resume logic for module
 	var metricsAddr string

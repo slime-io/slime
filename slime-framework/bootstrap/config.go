@@ -12,19 +12,17 @@ const (
 	DefaultModuleConfigPath = "/etc/slime/config/cfg"
 )
 
-var (
-	defaultModuleConfig = &netease_config.Config{
-		Enable: false,
-		Limiter: &netease_config.Limiter{},
-		Plugin: &netease_config.Plugin{},
-		Fence: &netease_config.Fence{},
-		Global: &netease_config.Global{
-			Service:        "app",
-			IstioNamespace: "istio-system",
-			SlimeNamespace: "mesh-operator",
-		},
-	}
-)
+var defaultModuleConfig = &netease_config.Config{
+	Enable:  false,
+	Limiter: &netease_config.Limiter{},
+	Plugin:  &netease_config.Plugin{},
+	Fence:   &netease_config.Fence{},
+	Global: &netease_config.Global{
+		Service:        "app",
+		IstioNamespace: "istio-system",
+		SlimeNamespace: "mesh-operator",
+	},
+}
 
 func GetModuleConfig() *netease_config.Config {
 	if config, err := readModuleConfig(); err != nil {

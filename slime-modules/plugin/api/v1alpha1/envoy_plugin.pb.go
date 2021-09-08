@@ -5,14 +5,17 @@ package v1alpha1
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	math "math"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -46,18 +49,23 @@ func (*WorkloadSelector) ProtoMessage()    {}
 func (*WorkloadSelector) Descriptor() ([]byte, []int) {
 	return fileDescriptor_35868063e6636962, []int{0}
 }
+
 func (m *WorkloadSelector) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_WorkloadSelector.Unmarshal(m, b)
 }
+
 func (m *WorkloadSelector) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_WorkloadSelector.Marshal(b, m, deterministic)
 }
+
 func (m *WorkloadSelector) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_WorkloadSelector.Merge(m, src)
 }
+
 func (m *WorkloadSelector) XXX_Size() int {
 	return xxx_messageInfo_WorkloadSelector.Size(m)
 }
+
 func (m *WorkloadSelector) XXX_DiscardUnknown() {
 	xxx_messageInfo_WorkloadSelector.DiscardUnknown(m)
 }
@@ -99,18 +107,23 @@ func (*EnvoyPlugin) ProtoMessage()    {}
 func (*EnvoyPlugin) Descriptor() ([]byte, []int) {
 	return fileDescriptor_35868063e6636962, []int{1}
 }
+
 func (m *EnvoyPlugin) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_EnvoyPlugin.Unmarshal(m, b)
 }
+
 func (m *EnvoyPlugin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_EnvoyPlugin.Marshal(b, m, deterministic)
 }
+
 func (m *EnvoyPlugin) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EnvoyPlugin.Merge(m, src)
 }
+
 func (m *EnvoyPlugin) XXX_Size() int {
 	return xxx_messageInfo_EnvoyPlugin.Size(m)
 }
+
 func (m *EnvoyPlugin) XXX_DiscardUnknown() {
 	xxx_messageInfo_EnvoyPlugin.DiscardUnknown(m)
 }
@@ -194,18 +207,23 @@ func (*EnvoyPlugin_Listener) ProtoMessage()    {}
 func (*EnvoyPlugin_Listener) Descriptor() ([]byte, []int) {
 	return fileDescriptor_35868063e6636962, []int{1, 0}
 }
+
 func (m *EnvoyPlugin_Listener) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_EnvoyPlugin_Listener.Unmarshal(m, b)
 }
+
 func (m *EnvoyPlugin_Listener) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_EnvoyPlugin_Listener.Marshal(b, m, deterministic)
 }
+
 func (m *EnvoyPlugin_Listener) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_EnvoyPlugin_Listener.Merge(m, src)
 }
+
 func (m *EnvoyPlugin_Listener) XXX_Size() int {
 	return xxx_messageInfo_EnvoyPlugin_Listener.Size(m)
 }
+
 func (m *EnvoyPlugin_Listener) XXX_DiscardUnknown() {
 	xxx_messageInfo_EnvoyPlugin_Listener.DiscardUnknown(m)
 }
