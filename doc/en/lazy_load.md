@@ -3,6 +3,8 @@
   - [Disable global-sidecar](#disable-global-sidecar)
   - [Use cluster unique global-sidecar](#use-cluster-unique-global-sidecar)
   - [Use report-server to report the dependency](#use-report-server-to-report-the-dependency)
+- [Introduction of features](#introduction-of-features)
+  - [Automatic ServiceFence generation based on namespace/service label](#automatic-servicefence-generation-based-on-namespaceservice-label)
 - [Example](#example)
   - [Install Istio (1.8+)](#install-istio-18)
   - [Set Tag](#set-tag)
@@ -14,11 +16,17 @@
   - [Uninstall](#uninstall)
   - [Remarks](#remarks)
 
-#### Install & Use
+
+[TOC]
+
+
+## Install & Use
 
 Make sure slime-boot has been installed.
 
 1. Install the lazyload module and additional components, through slime-boot configuration:
+
+   > [Example](../../install/samples/lazyload/slimeboot_lazyload.yaml)
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -50,7 +58,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
+        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
       resources:
         requests:
           cpu: 200m
@@ -72,7 +80,7 @@ spec:
         tag: {{your_pilot_tag}}
 ```
 
-[Example](../../install/samples/lazyload/slimeboot_lazyload.yaml)
+
 
 2. make sure all components are running
 
@@ -130,11 +138,15 @@ spec:
       app: {{your_svc}}
 ```
 
-#### Other installation options
+## Other installation options
 
-##### Disable global-sidecar  
+### Disable global-sidecar  
 
 In the ServiceMesh with allow_any enabled, the global-sidecar component can be omitted. Use the following configuration:
+
+> [Example](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
+>
+> Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -163,13 +175,11 @@ spec:
               type: Group
 ```
 
-[Example](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
-
-Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
 
 
+### Use cluster unique global-sidecar   
 
-##### Use cluster unique global-sidecar     
+> [Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)  
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -207,15 +217,16 @@ spec:
         tag: {{your_pilot_tag}}     
 ```
 
-[Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 
 
-
-##### Use report-server to report the dependency   
+### Use report-server to report the dependency   
 
 When prometheus is not configured in the cluster, the dependency can be reported through report-server.  Add reportServer in component, and set reportServer.enable = true.
 
 If using prometheus, delete reportServer from component, or set reportServer.enable = false.
+
+> [Example](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
+>
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -248,7 +259,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
+        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
     pilot:
       enable: true
       image:
@@ -271,17 +282,86 @@ spec:
         tag: {{your_inspector_image}}        
 ```
 
-[Example](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
+
+
+## Introduction of features
+
+### Automatic ServiceFence generation based on namespace/service label
 
 
 
-#### Example
+fence supports automatic generation based on label, i.e. you can define  **the scope of "fence enabled" functionality** by typing label `slime.io/serviceFenced`.
 
-##### Install Istio (1.8+)
+* namespace level
+
+  * `true`: Servicefence cr will be created for all services (without cr) under this namespace 
+  * Other values: No action
+
+* service level
+
+  * `true`: generates servicefence cr for this service
+  * `false`: do not generate servicefence cr for this service
+
+  > All of the above will override the namespace level setting (label)
+
+  * other values: use namespace level configuration
 
 
 
-##### Set Tag
+For automatically generated servicefence cr, it will be recorded by the standard label `app.kubernetes.io/created-by=fence-controller`, which implements the state association change. Servicefence that do not match this label are currently considered manually configured and are not affected by the above labels.
+
+
+
+**Example**
+
+> namespace `testns` has three services under it: `svc1`, `svc2`, `svc3`
+
+* Label `testns` with `slime.io/serviceFenced=true`: Generate cr for the above three services
+* Label `svc2` with `slime.io/serviceFenced=false`: only the cr for `svc1`, `svc3` remain
+* Remove this label from `svc2`: restores three cr
+* Remove `app.kubernetes.io/created-by=fence-controller` from the cr of `svc3`; remove the label on `testns`: only the cr of `svc3` remains
+
+
+
+**Sample configuration**
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: "2021-03-16T09:36:25Z"
+  labels:
+    istio-injection: enabled
+    slime.io/serviceFenced: "true"
+  name: testns
+  resourceVersion: "79604437"
+  uid: 5a34b780-cd95-4e43-b706-94d89473db77
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: {}
+  labels:
+    app: svc2
+    service: svc2
+    slime.io/serviceFenced: "false"
+  name: svc2
+  namespace: testns
+  resourceVersion: "79604741"
+  uid: b36f04fe-18c6-4506-9d17-f91a81479dd2
+```
+
+
+
+
+
+## Example
+
+### Install Istio (1.8+)
+
+
+
+### Set Tag
 
 $latest_tag equals the latest tag. The shell scripts and yaml files uses this version as default.
 
@@ -291,7 +371,7 @@ $ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags |
 
 
 
-##### Install Slime
+### Install Slime
 
 ```sh
 $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
@@ -315,7 +395,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 
 
-##### Install Bookinfo
+### Install Bookinfo
 
 Change the namespace of current-context to which bookinfo will deploy first. Here we use default namespace.
 
@@ -344,7 +424,7 @@ You can also create gateway and visit productpage from outside, like what shows 
 
 
 
-##### Enable Lazyload
+### Enable Lazyload
 
 Create lazyload for productpage.
 
@@ -391,7 +471,7 @@ spec:
 
 
 
-##### First Visit and Observ
+### First Visit and Observ
 
 Visit the productpage website, and use `kubectl logs -f productpage-xxx -c istio-proxy -n default` to observe the access log of productpage.
 
@@ -439,7 +519,7 @@ Details and reviews are already added into sidecar!
 
 
 
-##### Second Visit and Observ
+### Second Visit and Observ
 
 Visit the productpage website again, and use `kubectl logs -f productpage-xxx -c istio-proxy -n default` to observe the access log of productpage.
 
@@ -452,7 +532,7 @@ The backends are details and reviews now.
 
 
 
-##### Uninstall
+### Uninstall
 
 Uninstall bookinfo.
 
@@ -468,7 +548,7 @@ $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$l
 
 
 
-##### Remarks
+### Remarks
 
 If you want to use customize shell scripts or yaml files, please set $custom_tag_or_commit. 
 
