@@ -3,6 +3,8 @@
   - [不使用global-sidecar组件](#不使用global-sidecar组件)
   - [使用集群唯一的global-sidecar](#使用集群唯一的global-sidecar)
   - [使用report-server上报调用关系](#使用report-server上报调用关系)
+- [特性介绍](#特性介绍)
+  - [基于namespace/service label自动生成ServiceFence](#基于namespaceservice-label自动生成servicefence)
 - [示例: 为bookinfo的productpage服务开启懒加载](#示例-为bookinfo的productpage服务开启懒加载)
   - [安装 istio (1.8+)](#安装-istio-18)
   - [设定tag](#设定tag)
@@ -14,11 +16,17 @@
   - [卸载](#卸载)
   - [补充说明](#补充说明)
 
-#### 安装和使用
+[TOC]
+
+
+
+## 安装和使用
 
 请先按照安装slime-boot小节的指引安装slime-boot
 
 1. 使用Slime的配置懒加载功能需打开Fence模块，同时安装global-sidecar, pilot等附加组件，如下：
+
+   > [完整样例](../../install/samples/lazyload/slimeboot_lazyload.yaml)
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -50,7 +58,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - {{your_namespace}} #replace to your deployment's namespace, and extend the list in case of multi namespaces
+        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
       resources:
         requests:
           cpu: 200m
@@ -71,8 +79,6 @@ spec:
         repository: docker.io/slimeio/pilot
         tag: {{your_pilot_tag}}
 ```
-
-[完整样例](../../install/samples/lazyload/slimeboot_lazyload.yaml)
 
 
 
@@ -133,11 +139,15 @@ spec:
 
 
 
-#### 其他安装选项
+## 其他安装选项
 
-##### 不使用global-sidecar组件  
+### 不使用global-sidecar组件  
 
 在开启allow_any的网格中，可以不使用global-sidecar组件。使用如下配置：
+
+> [完整样例](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
+>
+> 不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -166,13 +176,13 @@ spec:
               type: Group
 ```
 
-[完整样例](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
-
-不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
 
 
 
-##### 使用集群唯一的global-sidecar   
+
+### 使用集群唯一的global-sidecar   
+
+> [完整样例](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -210,15 +220,15 @@ spec:
         tag: {{your_pilot_tag}}
 ```
 
-[完整样例](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 
 
-
-##### 使用report-server上报调用关系   
+### 使用report-server上报调用关系   
 
 集群内未配置prometheus时，可通过report-server上报依赖关系，此时需要在component中添加reportServer，并且设置reportServer.enable为true。
 
 对应的，如果使用prometheus，则component中无需添加reportServer，或者设置reportServer.enable为false。
+
+> [完整样例](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml) 
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -251,7 +261,7 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - {{your_namespace}} # replace to your deployment's namespace, and extend the list in case of multi namespaces
+        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
     pilot:
       enable: true
       image:
@@ -274,17 +284,88 @@ spec:
         tag: {{your_inspector_image}}    
 ```
 
-[完整样例](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
+
+
+## 特性介绍
+
+### 基于namespace/service label自动生成ServiceFence
 
 
 
-#### 示例: 为bookinfo的productpage服务开启懒加载
+fence支持基于label的自动生成，也即可以通过打label `slime.io/serviceFenced`的方式来定义**”开启fence“功能的范围**。
 
-##### 安装 istio (1.8+)
+* namespace级别
+
+  * `true`： 会对该namespace下的所有（没有cr的）服务都创建servicefence cr
+  * 其他值： 无操作
+
+* service级别
+
+  * `true`： 对该服务生成servicefence cr
+  * `false`： 不对该服务生成servicefence cr
+
+  > 以上都会覆盖namespace级别设置（label）
+
+  * 其他值： 使用namespace级别配置
 
 
 
-##### 设定tag
+对于自动生成的servicefence cr，会通过标准label `app.kubernetes.io/created-by=fence-controller`来记录，实现了状态关联变更。 而不匹配该label的servicefence，目前视为手动配置，不受以上label影响。
+
+
+
+**举例**
+
+> namespace `testns`下有三个服务： `svc1`, `svc2`, `svc3`
+
+* 给`testns`打上`slime.io/serviceFenced=true` label： 生成以上三个服务的cr
+* 给`svc2`打上 `slime.io/serviceFenced=false` label： 只剩下`svc1`, `svc3`这两个cr
+* 删掉`svc2`的该label：恢复三个cr
+* 去掉`svc3`的cr的`app.kubernetes.io/created-by=fence-controller`； 去掉`testns`上的label： 只剩下`svc3`的cr
+
+
+
+**配置样例**
+
+
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  creationTimestamp: "2021-03-16T09:36:25Z"
+  labels:
+    istio-injection: enabled
+    slime.io/serviceFenced: "true"
+  name: testns
+  resourceVersion: "79604437"
+  uid: 5a34b780-cd95-4e43-b706-94d89473db77
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations: {}
+  labels:
+    app: svc2
+    service: svc2
+    slime.io/serviceFenced: "false"
+  name: svc2
+  namespace: testns
+  resourceVersion: "79604741"
+  uid: b36f04fe-18c6-4506-9d17-f91a81479dd2
+```
+
+
+
+
+
+## 示例: 为bookinfo的productpage服务开启懒加载
+
+### 安装 istio (1.8+)
+
+
+
+### 设定tag
 
 $latest_tag获取最新tag。默认执行的shell脚本和yaml文件均是$latest_tag版本。
 
@@ -294,7 +375,7 @@ $ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags |
 
 
 
-##### 安装 slime 
+### 安装 slime 
 
 ```shell
 $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
@@ -318,7 +399,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 
 
-##### 安装bookinfo
+### 安装bookinfo
 
    创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
 
@@ -347,7 +428,7 @@ reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 
 
 
-##### 开启懒加载
+### 开启懒加载
 
 创建servicefence，为productpage服务启用懒加载。
 
@@ -393,7 +474,7 @@ spec:
 ```
 
 
-##### 首次访问观察
+### 首次访问观察
 
 第一次访问productpage，并使用`kubectl logs -f productpage-xxx -c istio-proxy -n default`观察访问日志。
 
@@ -441,7 +522,7 @@ reviews 和 details 被自动加入！
 
 
 
-##### 再次访问观察
+### 再次访问观察
 
 第二次访问productpage，观察productpage应用日志
 
@@ -454,7 +535,7 @@ reviews 和 details 被自动加入！
 
 
 
-##### 卸载
+### 卸载
 
 卸载bookinfo
 
@@ -470,7 +551,7 @@ $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$l
 
 
 
-##### 补充说明
+### 补充说明
 
 如想要使用其他tag或commit_id的shell脚本和yaml文件，请显示指定$custom_tag_or_commit。
 
