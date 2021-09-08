@@ -146,11 +146,12 @@ func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.
 	nsFenced := nsLabel == ServiceFencedTrue
 	if nsFenced == r.enabledNamespaces[req.Name] {
 		return reconcile.Result{}, nil
-	} else if nsFenced {
-		r.enabledNamespaces[req.Name] = true
+	} else {
+		prev := r.enabledNamespaces[req.Name]
+		r.enabledNamespaces[req.Name] = nsFenced
 		defer func() {
 			if err != nil {
-				delete(r.enabledNamespaces, req.Name) // restore, leave to re-process next time
+				r.enabledNamespaces[req.Name] = prev // restore, leave to re-process next time
 				r.staleNamespaces[req.Name] = true
 			}
 		}()
@@ -205,9 +206,6 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 			return reconcile.Result{}, err
 		}
 	}
-
-	r.reconcileLock.Lock()
-	defer r.reconcileLock.Unlock()
 
 	if sf == nil {
 		if svc != nil && r.isServiceFenced(ctx, svc) {
