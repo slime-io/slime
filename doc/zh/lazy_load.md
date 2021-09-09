@@ -5,6 +5,7 @@
   - [使用report-server上报调用关系](#使用report-server上报调用关系)
 - [特性介绍](#特性介绍)
   - [基于namespace/service label自动生成ServiceFence](#基于namespaceservice-label自动生成servicefence)
+  - [自定义兜底流量分派](#自定义兜底流量分派)
 - [示例: 为bookinfo的productpage服务开启懒加载](#示例-为bookinfo的productpage服务开启懒加载)
   - [安装 istio (1.8+)](#安装-istio-18)
   - [设定tag](#设定tag)
