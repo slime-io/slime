@@ -5,6 +5,7 @@
   - [Use report-server to report the dependency](#use-report-server-to-report-the-dependency)
 - [Introduction of features](#introduction-of-features)
   - [Automatic ServiceFence generation based on namespace/service label](#automatic-servicefence-generation-based-on-namespaceservice-label)
+  - [Custom undefined traffic dispatch](#custom-undefined-traffic-dispatch)
 - [Example](#example)
   - [Install Istio (1.8+)](#install-istio-18)
   - [Set Tag](#set-tag)
@@ -15,7 +16,6 @@
   - [Second Visit and Observ](#second-visit-and-observ)
   - [Uninstall](#uninstall)
   - [Remarks](#remarks)
-
 
 [TOC]
 
