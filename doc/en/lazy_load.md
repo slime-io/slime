@@ -355,6 +355,56 @@ metadata:
 
 
 
+### Custom undefined traffic dispatch
+
+By default, lazyload/fence sends  (default or undefined) traffic that envoy cannot match the route to the global sidecar to deal with the problem of missing service data temprorarily, which is inevitably faced by "lazy loading". This solution is limited by technical details, and cannot handle traffic whose target (e.g. domain name) is outside the cluster, see [[Configuration Lazy Loading]: Failed to access external service #3](https://github.com/slime-io/) slime/issues/3).
+
+Based on this background, this feature was designed to be used in more flexible business scenarios as well. The general idea is to assign different default traffic to different targets for correct processing by means of domain matching.
+
+
+
+Sample configuration.
+
+```yaml
+module:
+  - name: fence
+    fence:
+      wormholePort:
+      - "80"
+      - "8080"
+      dispatches: # new field
+      - name: 163
+        domains:
+        - "www.163.com"
+        cluster: "outbound|80||egress1.testns.svc.cluster.local" # standard istio cluster format: <direction>|<svcPort>|<subset>|<svcFullName>, normally direction is outbound and subset is empty      
+      - name: baidu
+        domains:
+        - "*.baidu.com"
+        - "baidu.*"
+        cluster: "{{ (print .Values.foo \ ". \" .Values.namespace ) }}" # you can use template to construct cluster dynamically
+      - name: sohu
+        domains:
+        - "*.sohu.com"
+        - "sodu.*"
+        cluster: "_GLOBAL_SIDECAR" # a special name which will be replaced with actual global sidecar cluster
+      - name: default
+        domains:
+        - "*"
+        cluster: "PassthroughCluster"  # a special istio cluster which will passthrough the traffic according to orgDest info. It's the default behavior of native istio.
+
+foo: bar
+```
+
+> In this example, we dispatch a portion of the traffic to the specified cluster; let another part go to the global sidecar; and then for the rest of the traffic, let it keep the native istio behavior: passthrough.
+
+
+
+**Note**:
+
+* In custom assignment scenarios, if you want to keep the original logic "all other undefined traffic goes to global sidecar", you need to explicitly configure the last item as above
+
+
+
 ## Example
 
 ### Install Istio (1.8+)

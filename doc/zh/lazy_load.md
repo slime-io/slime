@@ -359,6 +359,60 @@ metadata:
 
 
 
+### 自定义兜底流量分派
+
+lazyload/fence默认会将envoy无法匹配路由（缺省）的流量兜底发送到global sidecar，应对短暂服务数据缺失的问题，这是“懒加载”所必然面对的。 该方案因为技术细节上的局限性，对于目标（如域名）是集群外的流量，无法正常处理，详见 [[Configuration Lazy Loading]: Failed to access external service #3](https://github.com/slime-io/slime/issues/3)。
+
+基于这个背景，设计了本特性，同时也能用于更灵活的业务场景。 大致思路是通过域名匹配的方式讲不同的缺省流量分派到不同的目标做正确处理。
+
+
+
+配置样例：
+
+```yaml
+module:
+  - name: fence
+    fence:
+      wormholePort:
+      - "80"
+      - "8080"
+      dispatches:  # new field
+      - name: 163
+        domains:
+        - "www.163.com"
+        cluster: "outbound|80||egress1.testns.svc.cluster.local"  # standard istio cluster format: <direction>|<svcPort>|<subset>|<svcFullName>, normally direction is outbound and subset is empty      
+      - name: baidu
+        domains:
+        - "*.baidu.com"
+        - "baidu.*"
+        cluster: "{{ (print .Values.foo \".\" .Values.namespace ) }}"  # you can use template to construct cluster dynamically
+      - name: sohu
+        domains:
+        - "*.sohu.com"
+        - "sodu.*"
+        cluster: "_GLOBAL_SIDECAR"  # a special name which will be replaced with actual global sidecar cluster
+      - name: default
+        domains:
+        - "*"
+        cluster: "PassthroughCluster"  # a special istio cluster which will passthrough the traffic according to orgDest info. It's the default behavior of native istio.
+
+foo: bar
+```
+
+> 在本例中，我们把一部分流量分派给了指定的cluster； 另一部分让它走global sidecar； 然后对其余的流量，让它保持原生istio的行为： passthrough
+
+
+
+
+
+**注意**：
+
+* 自定义分派场景，如果希望保持原有逻辑 “其他所有未定义流量走global sidecar” 的话，需要显式配置如上的最后一条
+
+
+
+
+
 ## 示例: 为bookinfo的productpage服务开启懒加载
 
 ### 安装 istio (1.8+)
