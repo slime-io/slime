@@ -54,6 +54,7 @@ func init() {
 }
 
 func main() {
+
 	// TODO - add pause/resume logic for module
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -114,7 +115,6 @@ func main() {
 	}
 
 	go bootstrap.HealthCheckStart()
-
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

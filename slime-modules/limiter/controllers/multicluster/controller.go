@@ -18,7 +18,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	logrus "sigs.k8s.io/controller-runtime"
 	"slime.io/slime/slime-framework/bootstrap"
 )
 
@@ -27,7 +27,7 @@ const (
 	maxRetries    = 3
 )
 
-var log = logf.Log.WithName("controller_multi_cluster")
+var log = logrus.Log.WithName("controller_multi_cluster")
 
 type Controller struct {
 	k8sClient    *kubernetes.Clientset

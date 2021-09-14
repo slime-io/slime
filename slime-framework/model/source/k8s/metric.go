@@ -14,14 +14,14 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"slime.io/slime/slime-framework/apis/config/v1alpha1"
 	"slime.io/slime/slime-framework/controllers"
 	"slime.io/slime/slime-framework/model/source"
 	"slime.io/slime/slime-framework/util"
 )
 
-var log = logf.Log.WithName("source_k8s_metric_source")
+var log = ctrl.Log.WithName("source_k8s_metric_source")
 
 // metric source handlers
 func metricWatcherHandler(m *Source, e watch.Event) {
