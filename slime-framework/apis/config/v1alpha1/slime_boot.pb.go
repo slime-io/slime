@@ -5,14 +5,17 @@ package v1alpha1
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	math "math"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -32,18 +35,23 @@ func (*SlimeBootStatus) ProtoMessage()    {}
 func (*SlimeBootStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0354666a6f23fc96, []int{0}
 }
+
 func (m *SlimeBootStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SlimeBootStatus.Unmarshal(m, b)
 }
+
 func (m *SlimeBootStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SlimeBootStatus.Marshal(b, m, deterministic)
 }
+
 func (m *SlimeBootStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SlimeBootStatus.Merge(m, src)
 }
+
 func (m *SlimeBootStatus) XXX_Size() int {
 	return xxx_messageInfo_SlimeBootStatus.Size(m)
 }
+
 func (m *SlimeBootStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_SlimeBootStatus.DiscardUnknown(m)
 }
@@ -64,18 +72,23 @@ func (*SlimeBootSpec) ProtoMessage()    {}
 func (*SlimeBootSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0354666a6f23fc96, []int{1}
 }
+
 func (m *SlimeBootSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SlimeBootSpec.Unmarshal(m, b)
 }
+
 func (m *SlimeBootSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SlimeBootSpec.Marshal(b, m, deterministic)
 }
+
 func (m *SlimeBootSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SlimeBootSpec.Merge(m, src)
 }
+
 func (m *SlimeBootSpec) XXX_Size() int {
 	return xxx_messageInfo_SlimeBootSpec.Size(m)
 }
+
 func (m *SlimeBootSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_SlimeBootSpec.DiscardUnknown(m)
 }
@@ -110,18 +123,23 @@ func (*Component) ProtoMessage()    {}
 func (*Component) Descriptor() ([]byte, []int) {
 	return fileDescriptor_0354666a6f23fc96, []int{2}
 }
+
 func (m *Component) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Component.Unmarshal(m, b)
 }
+
 func (m *Component) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Component.Marshal(b, m, deterministic)
 }
+
 func (m *Component) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Component.Merge(m, src)
 }
+
 func (m *Component) XXX_Size() int {
 	return xxx_messageInfo_Component.Size(m)
 }
+
 func (m *Component) XXX_DiscardUnknown() {
 	xxx_messageInfo_Component.DiscardUnknown(m)
 }

@@ -5,15 +5,18 @@ package v1alpha1
 
 import (
 	fmt "fmt"
+	math "math"
+
 	proto "github.com/gogo/protobuf/proto"
 	types "github.com/gogo/protobuf/types"
-	math "math"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -70,18 +73,23 @@ func (*PluginManager) ProtoMessage()    {}
 func (*PluginManager) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3b828c45d9f521e4, []int{0}
 }
+
 func (m *PluginManager) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_PluginManager.Unmarshal(m, b)
 }
+
 func (m *PluginManager) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_PluginManager.Marshal(b, m, deterministic)
 }
+
 func (m *PluginManager) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_PluginManager.Merge(m, src)
 }
+
 func (m *PluginManager) XXX_Size() int {
 	return xxx_messageInfo_PluginManager.Size(m)
 }
+
 func (m *PluginManager) XXX_DiscardUnknown() {
 	xxx_messageInfo_PluginManager.DiscardUnknown(m)
 }
@@ -131,18 +139,23 @@ func (*Plugin) ProtoMessage()    {}
 func (*Plugin) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3b828c45d9f521e4, []int{1}
 }
+
 func (m *Plugin) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Plugin.Unmarshal(m, b)
 }
+
 func (m *Plugin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Plugin.Marshal(b, m, deterministic)
 }
+
 func (m *Plugin) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Plugin.Merge(m, src)
 }
+
 func (m *Plugin) XXX_Size() int {
 	return xxx_messageInfo_Plugin.Size(m)
 }
+
 func (m *Plugin) XXX_DiscardUnknown() {
 	xxx_messageInfo_Plugin.DiscardUnknown(m)
 }
@@ -156,6 +169,7 @@ type isPlugin_PluginSettings interface {
 type Plugin_Wasm struct {
 	Wasm *Wasm `protobuf:"bytes,6,opt,name=wasm,proto3,oneof"`
 }
+
 type Plugin_Inline struct {
 	Inline *Inline `protobuf:"bytes,7,opt,name=inline,proto3,oneof"`
 }
@@ -308,18 +322,23 @@ func (*Wasm) ProtoMessage()    {}
 func (*Wasm) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3b828c45d9f521e4, []int{2}
 }
+
 func (m *Wasm) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Wasm.Unmarshal(m, b)
 }
+
 func (m *Wasm) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Wasm.Marshal(b, m, deterministic)
 }
+
 func (m *Wasm) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Wasm.Merge(m, src)
 }
+
 func (m *Wasm) XXX_Size() int {
 	return xxx_messageInfo_Wasm.Size(m)
 }
+
 func (m *Wasm) XXX_DiscardUnknown() {
 	xxx_messageInfo_Wasm.DiscardUnknown(m)
 }
@@ -360,18 +379,23 @@ func (*Inline) ProtoMessage()    {}
 func (*Inline) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3b828c45d9f521e4, []int{3}
 }
+
 func (m *Inline) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Inline.Unmarshal(m, b)
 }
+
 func (m *Inline) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Inline.Marshal(b, m, deterministic)
 }
+
 func (m *Inline) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Inline.Merge(m, src)
 }
+
 func (m *Inline) XXX_Size() int {
 	return xxx_messageInfo_Inline.Size(m)
 }
+
 func (m *Inline) XXX_DiscardUnknown() {
 	xxx_messageInfo_Inline.DiscardUnknown(m)
 }

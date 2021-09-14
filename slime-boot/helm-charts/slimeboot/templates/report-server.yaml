@@ -1,5 +1,6 @@
-{{if .Values.component}}
-  {{if .Values.component.reportServer}}
+{{ if .Values.component }}
+{{ if .Values.component.reportServer }}
+{{- if .Values.component.reportServer.enable }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -574,5 +575,6 @@ data:
         source.project:
           valueType: STRING
 ---
-  {{end}}
-  {{end}}
+  {{ end }}
+  {{ end }}
+  {{ end }}

@@ -7,12 +7,15 @@
 
 ### Install Slime-boot
 
-You can easily install and uninstall the slime sub-module with slime-boot. Using the following commands to install slime-boot:
+You can easily install and uninstall the slime sub-module with slime-boot. 
+
+$tag_or_commit uses latest tag as default now. You can use other tag or commit_id instead as needed. Using the following commands to install slime-boot:
 
 ```sh
+$ export tag_or_commit=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
 $ kubectl create ns mesh-operator
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/crds.yaml
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/init/deployment_slime-boot.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds.yaml"
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
 ```
 
 
@@ -22,7 +25,7 @@ $ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha
 The lazy load and smart limiter module needs metric data, so we suggest you installing prometheus in your system. Here is a simple prometheus installation file copied from istio.io.
 
 ```sh
-$ kubectl apply -f https://raw.githubusercontent.com/slime-io/slime/v0.2.0-alpha/install/config/prometheus.yaml
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/config/prometheus.yaml"
 ```
 
 

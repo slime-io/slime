@@ -18,9 +18,11 @@ package main
 
 import (
 	"flag"
+	"os"
+
 	uberzap "go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"os"
+
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -61,10 +63,10 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	//ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
+	// ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
 	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
 	encoderCfg.EncodeTime = util.TimeEncoder
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true),zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
+	ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

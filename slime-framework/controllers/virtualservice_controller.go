@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,11 +30,11 @@ import (
 )
 
 const (
-	vsHosts = "hosts"
-	vsHost = "host"
+	vsHosts       = "hosts"
+	vsHost        = "host"
 	vsDestination = "destination"
-	vsHttp = "http"
-	vsRoute = "route"
+	vsHttp        = "http"
+	vsRoute       = "route"
 )
 
 // VirtualServiceReconciler reconciles a VirtualService object
@@ -57,15 +58,15 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 			r.Log.Info("virtualService is deleted")
 			return reconcile.Result{}, nil
 		} else {
-			r.Log.Error(err,"get virtualService error")
+			r.Log.Error(err, "get virtualService error")
 			return reconcile.Result{}, err
 		}
 	}
 
-	r.Log.Info("get virtualService","vs",instance)
+	r.Log.Info("get virtualService", "vs", instance)
 	// 资源更新
 	m := parseDestination(instance)
-	r.Log.Info("get destination after parse","destination",m)
+	r.Log.Info("get destination after parse", "destination", m)
 
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)

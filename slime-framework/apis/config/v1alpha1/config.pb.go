@@ -5,18 +5,21 @@ package v1alpha1
 
 import (
 	fmt "fmt"
+	math "math"
+	time "time"
+
 	_ "github.com/gogo/protobuf/gogoproto"
 	proto "github.com/gogo/protobuf/proto"
 	_ "github.com/gogo/protobuf/types"
-	math "math"
-	time "time"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
-var _ = time.Kitchen
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+	_ = time.Kitchen
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -87,18 +90,23 @@ func (*LocalSource) ProtoMessage()    {}
 func (*LocalSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{0}
 }
+
 func (m *LocalSource) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_LocalSource.Unmarshal(m, b)
 }
+
 func (m *LocalSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_LocalSource.Marshal(b, m, deterministic)
 }
+
 func (m *LocalSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_LocalSource.Merge(m, src)
 }
+
 func (m *LocalSource) XXX_Size() int {
 	return xxx_messageInfo_LocalSource.Size(m)
 }
+
 func (m *LocalSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_LocalSource.DiscardUnknown(m)
 }
@@ -125,18 +133,23 @@ func (*RemoteSource) ProtoMessage()    {}
 func (*RemoteSource) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{1}
 }
+
 func (m *RemoteSource) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_RemoteSource.Unmarshal(m, b)
 }
+
 func (m *RemoteSource) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_RemoteSource.Marshal(b, m, deterministic)
 }
+
 func (m *RemoteSource) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_RemoteSource.Merge(m, src)
 }
+
 func (m *RemoteSource) XXX_Size() int {
 	return xxx_messageInfo_RemoteSource.Size(m)
 }
+
 func (m *RemoteSource) XXX_DiscardUnknown() {
 	xxx_messageInfo_RemoteSource.DiscardUnknown(m)
 }
@@ -166,18 +179,23 @@ func (*Plugin) ProtoMessage()    {}
 func (*Plugin) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{2}
 }
+
 func (m *Plugin) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Plugin.Unmarshal(m, b)
 }
+
 func (m *Plugin) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Plugin.Marshal(b, m, deterministic)
 }
+
 func (m *Plugin) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Plugin.Merge(m, src)
 }
+
 func (m *Plugin) XXX_Size() int {
 	return xxx_messageInfo_Plugin.Size(m)
 }
+
 func (m *Plugin) XXX_DiscardUnknown() {
 	xxx_messageInfo_Plugin.DiscardUnknown(m)
 }
@@ -191,6 +209,7 @@ type isPlugin_WasmSource interface {
 type Plugin_Local struct {
 	Local *LocalSource `protobuf:"bytes,2,opt,name=local,proto3,oneof" json:"local,omitempty"`
 }
+
 type Plugin_Remote struct {
 	Remote *RemoteSource `protobuf:"bytes,3,opt,name=remote,proto3,oneof" json:"remote,omitempty"`
 }
@@ -242,18 +261,23 @@ func (*Limiter) ProtoMessage()    {}
 func (*Limiter) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{3}
 }
+
 func (m *Limiter) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Limiter.Unmarshal(m, b)
 }
+
 func (m *Limiter) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Limiter.Marshal(b, m, deterministic)
 }
+
 func (m *Limiter) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Limiter.Merge(m, src)
 }
+
 func (m *Limiter) XXX_Size() int {
 	return xxx_messageInfo_Limiter.Size(m)
 }
+
 func (m *Limiter) XXX_DiscardUnknown() {
 	xxx_messageInfo_Limiter.DiscardUnknown(m)
 }
@@ -297,18 +321,23 @@ func (*Global) ProtoMessage()    {}
 func (*Global) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{4}
 }
+
 func (m *Global) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Global.Unmarshal(m, b)
 }
+
 func (m *Global) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Global.Marshal(b, m, deterministic)
 }
+
 func (m *Global) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Global.Merge(m, src)
 }
+
 func (m *Global) XXX_Size() int {
 	return xxx_messageInfo_Global.Size(m)
 }
+
 func (m *Global) XXX_DiscardUnknown() {
 	xxx_messageInfo_Global.DiscardUnknown(m)
 }
@@ -356,18 +385,23 @@ func (*Fence) ProtoMessage()    {}
 func (*Fence) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{5}
 }
+
 func (m *Fence) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Fence.Unmarshal(m, b)
 }
+
 func (m *Fence) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Fence.Marshal(b, m, deterministic)
 }
+
 func (m *Fence) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Fence.Merge(m, src)
 }
+
 func (m *Fence) XXX_Size() int {
 	return xxx_messageInfo_Fence.Size(m)
 }
+
 func (m *Fence) XXX_DiscardUnknown() {
 	xxx_messageInfo_Fence.DiscardUnknown(m)
 }
@@ -395,18 +429,23 @@ func (*Prometheus_Source) ProtoMessage()    {}
 func (*Prometheus_Source) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{6}
 }
+
 func (m *Prometheus_Source) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Prometheus_Source.Unmarshal(m, b)
 }
+
 func (m *Prometheus_Source) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Prometheus_Source.Marshal(b, m, deterministic)
 }
+
 func (m *Prometheus_Source) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Prometheus_Source.Merge(m, src)
 }
+
 func (m *Prometheus_Source) XXX_Size() int {
 	return xxx_messageInfo_Prometheus_Source.Size(m)
 }
+
 func (m *Prometheus_Source) XXX_DiscardUnknown() {
 	xxx_messageInfo_Prometheus_Source.DiscardUnknown(m)
 }
@@ -441,18 +480,23 @@ func (*Prometheus_Source_Handler) ProtoMessage()    {}
 func (*Prometheus_Source_Handler) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{6, 0}
 }
+
 func (m *Prometheus_Source_Handler) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Prometheus_Source_Handler.Unmarshal(m, b)
 }
+
 func (m *Prometheus_Source_Handler) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Prometheus_Source_Handler.Marshal(b, m, deterministic)
 }
+
 func (m *Prometheus_Source_Handler) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Prometheus_Source_Handler.Merge(m, src)
 }
+
 func (m *Prometheus_Source_Handler) XXX_Size() int {
 	return xxx_messageInfo_Prometheus_Source_Handler.Size(m)
 }
+
 func (m *Prometheus_Source_Handler) XXX_DiscardUnknown() {
 	xxx_messageInfo_Prometheus_Source_Handler.DiscardUnknown(m)
 }
@@ -486,18 +530,23 @@ func (*K8S_Source) ProtoMessage()    {}
 func (*K8S_Source) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{7}
 }
+
 func (m *K8S_Source) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_K8S_Source.Unmarshal(m, b)
 }
+
 func (m *K8S_Source) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_K8S_Source.Marshal(b, m, deterministic)
 }
+
 func (m *K8S_Source) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_K8S_Source.Merge(m, src)
 }
+
 func (m *K8S_Source) XXX_Size() int {
 	return xxx_messageInfo_K8S_Source.Size(m)
 }
+
 func (m *K8S_Source) XXX_DiscardUnknown() {
 	xxx_messageInfo_K8S_Source.DiscardUnknown(m)
 }
@@ -525,18 +574,23 @@ func (*Metric) ProtoMessage()    {}
 func (*Metric) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{8}
 }
+
 func (m *Metric) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Metric.Unmarshal(m, b)
 }
+
 func (m *Metric) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Metric.Marshal(b, m, deterministic)
 }
+
 func (m *Metric) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Metric.Merge(m, src)
 }
+
 func (m *Metric) XXX_Size() int {
 	return xxx_messageInfo_Metric.Size(m)
 }
+
 func (m *Metric) XXX_DiscardUnknown() {
 	xxx_messageInfo_Metric.DiscardUnknown(m)
 }
@@ -576,18 +630,23 @@ func (*Config) ProtoMessage()    {}
 func (*Config) Descriptor() ([]byte, []int) {
 	return fileDescriptor_3eaf2c85e69e9ea4, []int{9}
 }
+
 func (m *Config) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Config.Unmarshal(m, b)
 }
+
 func (m *Config) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Config.Marshal(b, m, deterministic)
 }
+
 func (m *Config) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Config.Merge(m, src)
 }
+
 func (m *Config) XXX_Size() int {
 	return xxx_messageInfo_Config.Size(m)
 }
+
 func (m *Config) XXX_DiscardUnknown() {
 	xxx_messageInfo_Config.DiscardUnknown(m)
 }

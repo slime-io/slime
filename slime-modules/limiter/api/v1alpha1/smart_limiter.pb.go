@@ -5,14 +5,17 @@ package v1alpha1
 
 import (
 	fmt "fmt"
-	proto "github.com/gogo/protobuf/proto"
 	math "math"
+
+	proto "github.com/gogo/protobuf/proto"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
-var _ = proto.Marshal
-var _ = fmt.Errorf
-var _ = math.Inf
+var (
+	_ = proto.Marshal
+	_ = fmt.Errorf
+	_ = math.Inf
+)
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the proto package it is being compiled against.
@@ -35,18 +38,23 @@ func (*SmartLimiterSpec) ProtoMessage()    {}
 func (*SmartLimiterSpec) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{0}
 }
+
 func (m *SmartLimiterSpec) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimiterSpec.Unmarshal(m, b)
 }
+
 func (m *SmartLimiterSpec) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimiterSpec.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimiterSpec) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimiterSpec.Merge(m, src)
 }
+
 func (m *SmartLimiterSpec) XXX_Size() int {
 	return xxx_messageInfo_SmartLimiterSpec.Size(m)
 }
+
 func (m *SmartLimiterSpec) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimiterSpec.DiscardUnknown(m)
 }
@@ -83,18 +91,23 @@ func (*SmartLimiterStatus) ProtoMessage()    {}
 func (*SmartLimiterStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{1}
 }
+
 func (m *SmartLimiterStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimiterStatus.Unmarshal(m, b)
 }
+
 func (m *SmartLimiterStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimiterStatus.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimiterStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimiterStatus.Merge(m, src)
 }
+
 func (m *SmartLimiterStatus) XXX_Size() int {
 	return xxx_messageInfo_SmartLimiterStatus.Size(m)
 }
+
 func (m *SmartLimiterStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimiterStatus.DiscardUnknown(m)
 }
@@ -138,18 +151,23 @@ func (*SmartLimiterStatus_ServiceStatus) ProtoMessage()    {}
 func (*SmartLimiterStatus_ServiceStatus) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{1, 2}
 }
+
 func (m *SmartLimiterStatus_ServiceStatus) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus.Unmarshal(m, b)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimiterStatus_ServiceStatus.Merge(m, src)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus) XXX_Size() int {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus.Size(m)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimiterStatus_ServiceStatus.DiscardUnknown(m)
 }
@@ -183,6 +201,7 @@ type SmartLimiterStatus_ServiceStatus_Listener struct {
 func (m *SmartLimiterStatus_ServiceStatus_Listener) Reset() {
 	*m = SmartLimiterStatus_ServiceStatus_Listener{}
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) String() string {
 	return proto.CompactTextString(m)
 }
@@ -190,18 +209,23 @@ func (*SmartLimiterStatus_ServiceStatus_Listener) ProtoMessage() {}
 func (*SmartLimiterStatus_ServiceStatus_Listener) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{1, 2, 1}
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus_Listener.Unmarshal(m, b)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus_Listener.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimiterStatus_ServiceStatus_Listener.Merge(m, src)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) XXX_Size() int {
 	return xxx_messageInfo_SmartLimiterStatus_ServiceStatus_Listener.Size(m)
 }
+
 func (m *SmartLimiterStatus_ServiceStatus_Listener) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimiterStatus_ServiceStatus_Listener.DiscardUnknown(m)
 }
@@ -241,18 +265,23 @@ func (*SmartLimitDescriptor) ProtoMessage()    {}
 func (*SmartLimitDescriptor) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{2}
 }
+
 func (m *SmartLimitDescriptor) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimitDescriptor.Unmarshal(m, b)
 }
+
 func (m *SmartLimitDescriptor) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimitDescriptor.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimitDescriptor) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimitDescriptor.Merge(m, src)
 }
+
 func (m *SmartLimitDescriptor) XXX_Size() int {
 	return xxx_messageInfo_SmartLimitDescriptor.Size(m)
 }
+
 func (m *SmartLimitDescriptor) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimitDescriptor.DiscardUnknown(m)
 }
@@ -299,18 +328,23 @@ func (*SmartLimitDescriptor_HeaderMatcher) ProtoMessage()    {}
 func (*SmartLimitDescriptor_HeaderMatcher) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{2, 0}
 }
+
 func (m *SmartLimitDescriptor_HeaderMatcher) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimitDescriptor_HeaderMatcher.Unmarshal(m, b)
 }
+
 func (m *SmartLimitDescriptor_HeaderMatcher) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimitDescriptor_HeaderMatcher.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimitDescriptor_HeaderMatcher) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimitDescriptor_HeaderMatcher.Merge(m, src)
 }
+
 func (m *SmartLimitDescriptor_HeaderMatcher) XXX_Size() int {
 	return xxx_messageInfo_SmartLimitDescriptor_HeaderMatcher.Size(m)
 }
+
 func (m *SmartLimitDescriptor_HeaderMatcher) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimitDescriptor_HeaderMatcher.DiscardUnknown(m)
 }
@@ -381,18 +415,23 @@ func (*SmartLimitDescriptor_Action) ProtoMessage()    {}
 func (*SmartLimitDescriptor_Action) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{2, 1}
 }
+
 func (m *SmartLimitDescriptor_Action) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimitDescriptor_Action.Unmarshal(m, b)
 }
+
 func (m *SmartLimitDescriptor_Action) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimitDescriptor_Action.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimitDescriptor_Action) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimitDescriptor_Action.Merge(m, src)
 }
+
 func (m *SmartLimitDescriptor_Action) XXX_Size() int {
 	return xxx_messageInfo_SmartLimitDescriptor_Action.Size(m)
 }
+
 func (m *SmartLimitDescriptor_Action) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimitDescriptor_Action.DiscardUnknown(m)
 }
@@ -427,18 +466,23 @@ func (*SmartLimitDescriptors) ProtoMessage()    {}
 func (*SmartLimitDescriptors) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{3}
 }
+
 func (m *SmartLimitDescriptors) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_SmartLimitDescriptors.Unmarshal(m, b)
 }
+
 func (m *SmartLimitDescriptors) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_SmartLimitDescriptors.Marshal(b, m, deterministic)
 }
+
 func (m *SmartLimitDescriptors) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_SmartLimitDescriptors.Merge(m, src)
 }
+
 func (m *SmartLimitDescriptors) XXX_Size() int {
 	return xxx_messageInfo_SmartLimitDescriptors.Size(m)
 }
+
 func (m *SmartLimitDescriptors) XXX_DiscardUnknown() {
 	xxx_messageInfo_SmartLimitDescriptors.DiscardUnknown(m)
 }
@@ -475,18 +519,23 @@ func (*Duration) ProtoMessage()    {}
 func (*Duration) Descriptor() ([]byte, []int) {
 	return fileDescriptor_83a0b1a1f579dff8, []int{4}
 }
+
 func (m *Duration) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Duration.Unmarshal(m, b)
 }
+
 func (m *Duration) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
 	return xxx_messageInfo_Duration.Marshal(b, m, deterministic)
 }
+
 func (m *Duration) XXX_Merge(src proto.Message) {
 	xxx_messageInfo_Duration.Merge(m, src)
 }
+
 func (m *Duration) XXX_Size() int {
 	return xxx_messageInfo_Duration.Size(m)
 }
+
 func (m *Duration) XXX_DiscardUnknown() {
 	xxx_messageInfo_Duration.DiscardUnknown(m)
 }

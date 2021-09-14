@@ -173,7 +173,7 @@ func parse3(node *Node) int {
 			return 0
 		}
 		l := parse3(node.Left)
-		//向上取整
+		// 向上取整
 		if l%r > 0 {
 			return l/r + 1
 		} else {

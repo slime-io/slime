@@ -1,5 +1,6 @@
-{{ if .Values.component}}
-  {{ if .Values.component.globalSidecar }}
+{{ if .Values.component }}
+{{ if .Values.component.globalSidecar }}
+{{ if .Values.component.globalSidecar.enable }}
   {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
 {{- $ns := $.Values.namespace }}
 {{- $istioNamespace := $.Values.namespace }}
@@ -222,7 +223,7 @@ spec:
       operation: MERGE
       value:
         virtual_hosts:
-          {{- if gt (len $f.dispatches) 0 }}
+          {{- if $f.dispatches }}
           {{- $svcPort := . }}
           {{- range $f.dispatches }}
           - domains: {{ toYaml .domains | nindent 12 }}
@@ -253,6 +254,7 @@ spec:
     {{- end }}
     {{- end }}
 
+  {{ end }}
   {{ end }}
   {{ end }}
   {{ end }}

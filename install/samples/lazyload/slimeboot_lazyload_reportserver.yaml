@@ -1,4 +1,3 @@
----
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
@@ -10,11 +9,11 @@ spec:
     repository: docker.io/slimeio/slime-lazyload
     tag: v0.2.1
   module:
-    - name: lazyload
-      enable: true
-      fence:
-        wormholePort: # replace to your application svc ports
+    - fence:
+        enable: true
+        wormholePort:
           - "9080"
+      name: slime-fence
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090
@@ -28,15 +27,13 @@ spec:
       enable: true
       type: namespaced
       namespace:
-        - default # 替换为bookinfo安装的ns
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 200m
-          memory: 200Mi
+        - default
     pilot:
+      enable: true
+      image:
+        repository: docker.io/slimeio/pilot
+        tag: global-pilot-v0.0.2-a85b00
+    reportServer:
       enable: true
       resources:
         requests:
@@ -45,6 +42,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
-      image:
-        repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+      mixerImage:
+        repository: docker.io/slimeio/mixer
+        tag: preview-1.3.7-v0.0.1
+      inspectorImage:
+        repository: docker.io/slimeio/report-server
+        tag: preview-v0.0.1-rc
