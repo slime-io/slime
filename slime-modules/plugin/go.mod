@@ -8,6 +8,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1
+	github.com/sirupsen/logrus v1.4.2
 	go.uber.org/zap v1.10.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	k8s.io/apimachinery v0.20.2

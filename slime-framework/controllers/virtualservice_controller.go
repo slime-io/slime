@@ -18,8 +18,8 @@ package controllers
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -40,7 +40,7 @@ const (
 // VirtualServiceReconciler reconciles a VirtualService object
 type VirtualServiceReconciler struct {
 	client.Client
-	Log    logr.Logger
+	Log    *logrus.Entry
 	Scheme *runtime.Scheme
 }
 
@@ -49,25 +49,23 @@ type VirtualServiceReconciler struct {
 
 func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("virtualService", req.NamespacedName)
+	log := r.Log.WithField("virtualService", req.NamespacedName)
 	// Fetch the VirtualService instance
 	instance := &networkingistioiov1alpha3.VirtualService{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Info("virtualService is deleted")
+			log.Info("virtualService is deleted")
 			return reconcile.Result{}, nil
 		} else {
-			r.Log.Error(err, "get virtualService error")
+			log.Errorf("get virtualService error,%+v",err)
 			return reconcile.Result{}, err
 		}
 	}
-
-	r.Log.Info("get virtualService", "vs", instance)
+	log.Infof("get virtualService, %+v",instance)
 	// 资源更新
 	m := parseDestination(instance)
-	r.Log.Info("get destination after parse", "destination", m)
-
+	log.Infof("get destination after parse, %+v", m)
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)
 	}

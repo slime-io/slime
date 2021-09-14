@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 	"sync"
@@ -33,6 +34,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"k8s.io/apimachinery/pkg/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/controllers"
@@ -41,18 +45,13 @@ import (
 	"slime.io/slime/slime-framework/model/source/k8s"
 	"slime.io/slime/slime-framework/util"
 
-	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	lazyloadv1alpha1 "slime.io/slime/slime-modules/lazyload/api/v1alpha1"
 )
 
 // ServicefenceReconciler reconciles a Servicefence object
 type ServicefenceReconciler struct {
 	client.Client
-	Log    logr.Logger
+	Log    *logrus.Entry
 	Scheme *runtime.Scheme
 
 	env       *bootstrap.Environment
@@ -67,12 +66,14 @@ type ServicefenceReconciler struct {
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *ServicefenceReconciler {
+
+	log := logrus.WithField("controllers","ServiceFence")
+
 	r := &ServicefenceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("ServiceFence"),
+		Log:    log,
 		env:    env,
-
 		staleNamespaces:   map[string]bool{},
 		enabledNamespaces: map[string]bool{},
 	}
@@ -81,7 +82,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 		eventChan := make(chan event_source.Event)
 		src := &aggregate.Source{}
 		if ms, err := k8s.NewMetricSource(eventChan, env); err != nil {
-			ctrl.Log.Error(err, "failed to create slime-metric")
+			log.Errorf("failed to create slime-metric,%+v",err)
 		} else {
 			src.Sources = append(src.Sources, ms)
 			r.eventChan = eventChan
@@ -99,7 +100,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 
 func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("serviceFence", req.NamespacedName)
+	log := r.Log.WithField("serviceFence", req.NamespacedName)
 
 	// Fetch the ServiceFence instance
 	instance := &lazyloadv1alpha1.ServiceFence{}
@@ -110,15 +111,15 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	if err != nil {
 		if errors.IsNotFound(err) {
-			r.Log.Info("serviceFence is deleted")
+			log.Info("serviceFence is deleted")
 			r.source.WatchRemove(req.NamespacedName)
 			return reconcile.Result{}, nil
 		} else {
-			r.Log.Error(err, "get serviceFence error")
+			log.Errorf("get serviceFence error,%+v",err)
 			return reconcile.Result{}, err
 		}
 	}
-	r.Log.Info("get serviceFence", "sf", instance)
+	log.Infof("get serviceFence, %+v",instance.Name)
 
 	// 资源更新
 	diff := r.updateVisitedHostStatus(instance)
@@ -136,7 +137,7 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.ServiceFence) error {
 	sidecar, err := newSidecar(instance, r.env)
 	if err != nil {
-		r.Log.Error(err, "servicefence生产sidecar的过程中发生错误")
+		r.Log.Errorf("servicefence生产sidecar的过程中发生错误,%+v",err)
 		return err
 	}
 	if sidecar == nil {
@@ -144,21 +145,21 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	}
 	// Set VisitedHost instance as the owner and controller
 	if err := controllerutil.SetControllerReference(instance, sidecar, r.Scheme); err != nil {
-		r.Log.Error(err, "servicefence为sidecar添加ownerReference的过程中发生错误")
+		r.Log.Errorf("servicefence为sidecar添加ownerReference的过程中发生错误,%+v",err)
 		return err
 	}
 	// Check if this Pod already exists
 	found := &v1alpha3.Sidecar{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
+		r.Log.Infof("Creating a new Sidecar in %s:%s",sidecar.Namespace,sidecar.Name)
 		err = r.Client.Create(context.TODO(), sidecar)
 		if err != nil {
 			return err
 		}
 	} else if err == nil {
 		if !reflect.DeepEqual(found.Spec, sidecar.Spec) {
-			r.Log.Info("Update a  Sidecar", "Sidecar.Namespace", sidecar.Namespace, "Sidecar.Name", sidecar.Name)
+			r.Log.Infof("Update a Sidecarin %s:%s",sidecar.Namespace,sidecar.Name)
 			sidecar.ResourceVersion = found.ResourceVersion
 			err = r.Client.Update(context.TODO(), sidecar)
 			if err != nil {

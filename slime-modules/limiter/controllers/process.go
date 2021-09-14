@@ -58,7 +58,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha1.SmartLimiter, r *SmartLim
 
 	// Create
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new EnvoyFilter", "EnvoyFilter.Namespace", namespace, "EnvoyFilter.Name", name)
+		r.Log.Infof("Creating a new EnvoyFilter,%s:%s", namespace,name)
 		err = r.Client.Create(context.TODO(), obj)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -73,7 +73,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha1.SmartLimiter, r *SmartLim
 	// TODO: 判断是否需要更新
 	// Update
 	if !reflect.DeepEqual(found.Spec, obj.Spec) {
-		r.Log.Info("Update a new EnvoyFilter", "EnvoyFilter.Namespace", namespace, "EnvoyFilter.Name", name)
+		r.Log.Infof("Update a new EnvoyFilter,%s:%s",namespace,name)
 		obj.ResourceVersion = found.ResourceVersion
 		err = r.Client.Update(context.TODO(), obj)
 		if err != nil {
@@ -186,7 +186,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha1.SmartLim
 		}
 		_, err := refreshEnvoyFilter(instance, r, efcr)
 		if err != nil {
-			r.Log.Error(err, fmt.Sprintf("generated/deleted EnvoyFilter failed:%s", efcr.Name))
+			r.Log.Errorf("generated/deleted EnvoyFilter %s failed:%+v", efcr.Name,err)
 		}
 	}
 
@@ -207,7 +207,7 @@ func (r *SmartLimiterReconciler) subscribe(host string, subset interface{}) {
 		err := r.Client.Get(context.TODO(), loc, instance)
 		if err != nil {
 			if !errors.IsNotFound(err) {
-				r.Log.Error(err, "failed to get smartlimiter, host: "+host)
+				r.Log.Errorf("failed to get smartlimiter, host:%s,%+v",host,err)
 			}
 		} else {
 			_, _ = r.refresh(instance)

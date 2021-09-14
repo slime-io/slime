@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/sirupsen/logrus"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -255,4 +257,13 @@ func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{}
 
 func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
+}
+
+func SetLog() {
+	logrus.SetOutput(os.Stdout)
+	logrus.SetLevel(logrus.InfoLevel)
+	//logrus.SetReportCaller(true)
+	logrus.SetFormatter(&logrus.TextFormatter{
+		TimestampFormat: time.RFC3339,
+	})
 }

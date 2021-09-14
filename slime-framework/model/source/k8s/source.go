@@ -1,22 +1,21 @@
 package k8s
 
 import (
-	"sync"
-	"time"
-
 	"github.com/orcaman/concurrent-map"
 	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
+	"github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-
 	"slime.io/slime/slime-framework/apis/config/v1alpha1"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/controllers"
 	"slime.io/slime/slime-framework/model/source"
 	"slime.io/slime/slime-framework/util"
+	"sync"
+	"time"
 )
 
 type Source struct {
@@ -115,7 +114,7 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 			RoundTripper: nil,
 		})
 		if err != nil {
-			log.Error(err, "failed create prometheus client")
+			logrus.Errorf( "failed create prometheus client, %+v",err)
 		} else {
 			es.api = prometheus.NewAPI(promClient)
 			es.items = m.Handlers

@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"github.com/sirupsen/logrus"
 	"reflect"
 	"sync"
 
@@ -29,7 +30,6 @@ import (
 	"slime.io/slime/slime-framework/model/source/k8s"
 	"slime.io/slime/slime-modules/limiter/controllers/multicluster"
 
-	"github.com/go-logr/logr"
 	cmap "github.com/orcaman/concurrent-map"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -43,7 +43,7 @@ import (
 // SmartLimiterReconciler reconciles a SmartLimiter object
 type SmartLimiterReconciler struct {
 	client.Client
-	Log    logr.Logger
+	Log    *logrus.Entry
 	Scheme *runtime.Scheme
 
 	env    *bootstrap.Environment
@@ -65,7 +65,6 @@ type SmartLimiterReconciler struct {
 
 func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("smartlimiter", req.NamespacedName)
 
 	// your logic here
 
@@ -79,7 +78,7 @@ func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 
 	// 资源删除
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("metricInfo.Pop: ", "name", req.Name, "namespace", req.Namespace)
+		r.Log.Infof("metricInfo.Pop, name %s, namespace,%s", req.Name, req.Namespace)
 		r.metricInfo.Pop(req.Namespace + "/" + req.Name)
 		r.source.WatchRemove(req.NamespacedName)
 		r.lastUpdatePolicyLock.Lock()
@@ -111,12 +110,13 @@ func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func NewReconciler(mgr ctrl.Manager, env *bootstrap.Environment) *SmartLimiterReconciler {
-	log := ctrl.Log.WithName("controllers").WithName("SmartLimiter")
+
+	log := logrus.WithField("controllers","SmartLimiter")
 	eventChan := make(chan event_source.Event)
 	src := &aggregate.Source{}
 	ms, err := k8s.NewMetricSource(eventChan, env)
 	if err != nil {
-		log.Error(err, "failed to create slime-metric")
+		log.Errorf("failed to create slime-metric,%+v",err)
 		return nil
 	}
 	src.AppendSource(ms)
@@ -128,7 +128,7 @@ func NewReconciler(mgr ctrl.Manager, env *bootstrap.Environment) *SmartLimiterRe
 	r := &SmartLimiterReconciler{
 		Client:               mgr.GetClient(),
 		scheme:               mgr.GetScheme(),
-		Log:                  ctrl.Log.WithName("controllers").WithName("SmartLimiter"),
+		Log:                  log,
 		metricInfo:           cmap.New(),
 		eventChan:            eventChan,
 		source:               src,
