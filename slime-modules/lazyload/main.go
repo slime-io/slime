@@ -18,13 +18,15 @@ package main
 
 import (
 	"flag"
-	"github.com/sirupsen/logrus"
+	"os"
+
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	istioapi "slime.io/slime/slime-framework/apis"
@@ -36,9 +38,7 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -49,7 +49,6 @@ func init() {
 }
 
 func main() {
-
 	util.SetLog()
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -66,7 +65,7 @@ func main() {
 		LeaderElectionID:   "plugin",
 	})
 	if err != nil {
-		logrus.Errorf("unable to start manager,%+v",err)
+		log.Errorf("unable to start manager,%+v", err)
 		os.Exit(1)
 	}
 
@@ -74,7 +73,7 @@ func main() {
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		logrus.Errorf("create a new clientSet failed,%+v",err)
+		log.Errorf("create a new clientSet failed, %+v", err)
 		os.Exit(1)
 	}
 	env.K8SClient = client
@@ -89,7 +88,6 @@ func main() {
 		Name: "VirtualService",
 		R: &basecontroller.VirtualServiceReconciler{
 			Client: mgr.GetClient(),
-			Log:    logrus.WithField("controllers","VirtualService"),
 			Scheme: mgr.GetScheme(),
 		},
 	}).Add(basecontroller.ObjectReconcileItem{
@@ -101,14 +99,14 @@ func main() {
 		ApiType: &corev1.Namespace{},
 		R:       reconcile.Func(sfReconciler.ReconcileNamespace),
 	}).Build(mgr); err != nil {
-		logrus.Errorf("unable to create controller,%+v",err)
+		log.Errorf("unable to create controller,%+v", err)
 		os.Exit(1)
 	}
 
 	go bootstrap.HealthCheckStart()
-	logrus.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		logrus.Errorf("problem running manager,%+v",err)
+		log.Errorf("problem running manager,%+v", err)
 		os.Exit(1)
 	}
 }

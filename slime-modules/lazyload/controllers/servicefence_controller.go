@@ -19,11 +19,12 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"github.com/sirupsen/logrus"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
@@ -51,29 +52,23 @@ import (
 // ServicefenceReconciler reconciles a Servicefence object
 type ServicefenceReconciler struct {
 	client.Client
-	Log    *logrus.Entry
-	Scheme *runtime.Scheme
-
-	env       *bootstrap.Environment
-	eventChan chan event_source.Event
-	source    event_source.Source
-
-	reconcileLock sync.Mutex
-
+	Scheme            *runtime.Scheme
+	env               *bootstrap.Environment
+	eventChan         chan event_source.Event
+	source            event_source.Source
+	reconcileLock     sync.Mutex
 	staleNamespaces   map[string]bool
 	enabledNamespaces map[string]bool
 }
 
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *ServicefenceReconciler {
-
-	log := logrus.WithField("controllers","ServiceFence")
+	log := log.WithField("serviceFence", "newReconciler")
 
 	r := &ServicefenceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Log:    log,
-		env:    env,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		env:               env,
 		staleNamespaces:   map[string]bool{},
 		enabledNamespaces: map[string]bool{},
 	}
@@ -82,7 +77,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 		eventChan := make(chan event_source.Event)
 		src := &aggregate.Source{}
 		if ms, err := k8s.NewMetricSource(eventChan, env); err != nil {
-			log.Errorf("failed to create slime-metric,%+v",err)
+			log.Errorf("failed to create slime-metric, %+v", err)
 		} else {
 			src.Sources = append(src.Sources, ms)
 			r.eventChan = eventChan
@@ -100,7 +95,7 @@ func NewReconciler(mgr manager.Manager, env *bootstrap.Environment) *Servicefenc
 
 func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	log := r.Log.WithField("serviceFence", req.NamespacedName)
+	log := log.WithField("serviceFence", req.NamespacedName)
 
 	// Fetch the ServiceFence instance
 	instance := &lazyloadv1alpha1.ServiceFence{}
@@ -115,11 +110,11 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			r.source.WatchRemove(req.NamespacedName)
 			return reconcile.Result{}, nil
 		} else {
-			log.Errorf("get serviceFence error,%+v",err)
+			log.Errorf("get serviceFence error,%+v", err)
 			return reconcile.Result{}, err
 		}
 	}
-	log.Infof("get serviceFence, %+v",instance.Name)
+	log.Infof("get serviceFence, %+v", instance.Name)
 
 	// 资源更新
 	diff := r.updateVisitedHostStatus(instance)
@@ -137,7 +132,7 @@ func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.ServiceFence) error {
 	sidecar, err := newSidecar(instance, r.env)
 	if err != nil {
-		r.Log.Errorf("servicefence生产sidecar的过程中发生错误,%+v",err)
+		log.Errorf("servicefence generate sidecar failed, %+v", err)
 		return err
 	}
 	if sidecar == nil {
@@ -145,21 +140,21 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	}
 	// Set VisitedHost instance as the owner and controller
 	if err := controllerutil.SetControllerReference(instance, sidecar, r.Scheme); err != nil {
-		r.Log.Errorf("servicefence为sidecar添加ownerReference的过程中发生错误,%+v",err)
+		log.Errorf("attach ownerReference to sidecar failed, %+v", err)
 		return err
 	}
 	// Check if this Pod already exists
 	found := &v1alpha3.Sidecar{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Infof("Creating a new Sidecar in %s:%s",sidecar.Namespace,sidecar.Name)
+		log.Infof("Creating a new Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
 		err = r.Client.Create(context.TODO(), sidecar)
 		if err != nil {
 			return err
 		}
 	} else if err == nil {
 		if !reflect.DeepEqual(found.Spec, sidecar.Spec) {
-			r.Log.Infof("Update a Sidecarin %s:%s",sidecar.Namespace,sidecar.Name)
+			log.Infof("Update a Sidecarin %s:%s", sidecar.Namespace, sidecar.Name)
 			sidecar.ResourceVersion = found.ResourceVersion
 			err = r.Client.Update(context.TODO(), sidecar)
 			if err != nil {

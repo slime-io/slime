@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -48,10 +49,10 @@ func (r *ServicefenceReconciler) Refresh(request reconcile.Request, args map[str
 	svf := &lazyloadv1alpha1.ServiceFence{}
 	err := r.Client.Get(context.TODO(), request.NamespacedName, svf)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("ServiceFence Not Found, skip")
+		log.Info("ServiceFence Not Found, skip")
 		return reconcile.Result{}, nil
 	} else if err != nil {
-		r.Log.Errorf("can not get ServiceFence %s, %+v",request.NamespacedName.Name,err)
+		log.Errorf("can not get ServiceFence %s, %+v", request.NamespacedName.Name, err)
 		return reconcile.Result{}, err
 	} else {
 		if svf.Spec.Enable {
@@ -61,7 +62,7 @@ func (r *ServicefenceReconciler) Refresh(request reconcile.Request, args map[str
 		svf.Status.MetricStatus = args
 		err = r.Client.Status().Update(context.TODO(), svf)
 		if err != nil {
-			r.Log.Errorf( "can not update ServiceFence %s, %+v",request.NamespacedName.Name,err)
+			log.Errorf("can not update ServiceFence %s, %+v", request.NamespacedName.Name, err)
 			return reconcile.Result{}, err
 		}
 		return reconcile.Result{}, nil
@@ -90,7 +91,7 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 					ns = nil
 				} else {
 					ns = nil
-					r.Log.Errorf("fail to get ns: %s", svc.Namespace)
+					log.Errorf("fail to get ns: %s", svc.Namespace)
 				}
 			}
 
@@ -133,7 +134,7 @@ func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.
 			delete(r.enabledNamespaces, req.Name)
 			return reconcile.Result{}, nil // do not process deletion ...
 		} else {
-			r.Log.Errorf("get namespace %s error, %+v", req.NamespacedName,err)
+			log.Errorf("get namespace %s error, %+v", req.NamespacedName, err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -160,13 +161,13 @@ func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.
 	// refresh service fenced status
 	services := &corev1.ServiceList{}
 	if err = r.Client.List(ctx, services, client.InNamespace(req.Name)); err != nil {
-		r.Log.Errorf("list services %s failed, %+v", req.Name,err)
+		log.Errorf("list services %s failed, %+v", req.Name, err)
 		return reconcile.Result{}, err
 	}
 
 	for _, svc := range services.Items {
 		if ret, err = r.refreshFenceStatusOfService(ctx, &svc, types.NamespacedName{}); err != nil {
-			r.Log.Errorf("refreshFenceStatusOfService services %s failed, %+v",svc.Name,err)
+			log.Errorf("refreshFenceStatusOfService services %s failed, %+v", svc.Name, err)
 			return ret, err
 		}
 	}
@@ -184,7 +185,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 			if errors.IsNotFound(err) {
 				svc = nil
 			} else {
-				r.Log.Errorf("get service %s error, %+v",nsName,err)
+				log.Errorf("get service %s error, %+v", nsName, err)
 				return reconcile.Result{}, err
 			}
 		}
@@ -202,7 +203,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 		if errors.IsNotFound(err) {
 			sf = nil
 		} else {
-			r.Log.Errorf("get serviceFence %s error, %+v",nsName,err)
+			log.Errorf("get serviceFence %s error, %+v", nsName, err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -218,13 +219,13 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 			}
 			markFenceCreatedByController(sf)
 			if err := r.Client.Create(ctx, sf); err != nil {
-				r.Log.Errorf("create fence %s failed, %+v",nsName,err)
+				log.Errorf("create fence %s failed, %+v", nsName, err)
 				return reconcile.Result{}, err
 			}
 		}
 	} else if isFenceCreatedByController(sf) && (svc == nil || !r.isServiceFenced(ctx, svc)) {
 		if err := r.Client.Delete(ctx, sf); err != nil {
-			r.Log.Errorf("delete fence %s failed, %+v",nsName,err)
+			log.Errorf("delete fence %s failed, %+v", nsName, err)
 		}
 	}
 

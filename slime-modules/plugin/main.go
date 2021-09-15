@@ -18,11 +18,13 @@ package main
 
 import (
 	"flag"
-	"github.com/sirupsen/logrus"
+	"os"
+
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	"os"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 	"slime.io/slime/slime-framework/bootstrap"
@@ -32,9 +34,7 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -45,7 +45,6 @@ func init() {
 }
 
 func main() {
-
 	util.SetLog()
 
 	var metricsAddr string
@@ -64,33 +63,31 @@ func main() {
 		LeaderElectionID:   "9487b5c0.my.domain",
 	})
 	if err != nil {
-		logrus.Errorf("unable to start manager,%+v",err)
+		log.Errorf("unable to start manager,%+v", err)
 		os.Exit(1)
 	}
 
 	if err = (&controllers.PluginManagerReconciler{
 		Client: mgr.GetClient(),
-		Log:    logrus.WithField("controllers","PluginManager"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		logrus.Errorf("unable to create pluginManager controller, %+v",err)
+		log.Errorf("unable to create pluginManager controller, %+v", err)
 		os.Exit(1)
 	}
 	if err = (&controllers.EnvoyPluginReconciler{
 		Client: mgr.GetClient(),
-		Log:    logrus.WithField("controllers","EnvoyPlugin"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		logrus.Errorf("unable to create EnvoyPlugin controller, %+v",err)
+		log.Errorf("unable to create EnvoyPlugin controller, %+v", err)
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
 	go bootstrap.HealthCheckStart()
 
-	logrus.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		logrus.Errorf("problem running manager,%+v",err)
+		log.Errorf("problem running manager,%+v", err)
 		os.Exit(1)
 	}
 }

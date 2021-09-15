@@ -2,8 +2,12 @@ package k8s
 
 import (
 	"context"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/prometheus/common/model"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,11 +18,7 @@ import (
 	"slime.io/slime/slime-framework/controllers"
 	"slime.io/slime/slime-framework/model/source"
 	"slime.io/slime/slime-framework/util"
-	"strconv"
-	"strings"
-	"time"
 )
-
 
 // metric source handlers
 func metricWatcherHandler(m *Source, e watch.Event) {
@@ -58,8 +58,7 @@ func metricTimerHandler(m *Source) {
 }
 
 func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
-
-	log := logrus.WithField("metricGetHandler",meta)
+	log := log.WithField("metricGetHandler", meta)
 
 	material := make(map[string]string)
 	if _, ok := m.Interest.Get(meta.Namespace + "/" + meta.Name); !ok {
@@ -70,7 +69,7 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 	for _, c := range m.K8sClient {
 		ps, err := c.CoreV1().Pods(meta.Namespace).List(metav1.ListOptions{})
 		if err != nil {
-			log.Errorf("query pod list faild, %+v",err)
+			log.Errorf("query pod list faild, %+v", err)
 			continue
 		}
 		pods = append(pods, ps.Items...)
@@ -82,7 +81,7 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 		}
 		// 若当前集群未找到则查找下一个集群
 		if !errors.IsNotFound(err) {
-			log.Errorf("query service failed, %+v",err)
+			log.Errorf("query service failed, %+v", err)
 		}
 	}
 	if service != nil {
@@ -138,7 +137,7 @@ func (m *Source) processSubsetPod(subsetsPods map[string][]string, svc *v1.Servi
 		switch v.Type {
 		case v1alpha1.Prometheus_Source_Value:
 			if k == "" {
-				logrus.Error("invalid query,value type must have a item")
+				log.Error("invalid query,value type must have a item")
 			}
 			// Could be grouped by subset
 			if strings.Contains(v.Query, "$pod_name") {
@@ -164,21 +163,21 @@ func (m *Source) processSubsetPod(subsetsPods map[string][]string, svc *v1.Servi
 func (m *Source) queryValue(q string) string {
 	qv, w, e := m.api.Query(context.Background(), q, time.Now())
 	if e != nil {
-		logrus.Errorf("failed get metric from prometheus, %+v",e)
+		log.Errorf("failed get metric from prometheus, %+v", e)
 		return ""
 	} else if w != nil {
-		logrus.Errorf("%s, failed get metric from prometheus",strings.Join(w, ";"))
+		log.Errorf("%s, failed get metric from prometheus", strings.Join(w, ";"))
 		return ""
 	} else {
 		switch qv.Type() {
 		case model.ValVector:
 			vector := qv.(model.Vector)
 			if vector.Len() == 0 {
-				logrus.Infof("query: %s, No data", q)
+				log.Infof("query: %s, No data", q)
 				return ""
 			}
 			if vector.Len() != 1 {
-				logrus.Errorf("invalid query, query: %s, You need to sum up the monitoring data", q)
+				log.Errorf("invalid query, query: %s, You need to sum up the monitoring data", q)
 				return ""
 			}
 			return vector[0].Value.String()
@@ -191,10 +190,10 @@ func (m *Source) queryGroup(q string) map[string]string {
 	qv, w, e := m.api.Query(context.Background(), q, time.Now())
 	result := make(map[string]string)
 	if e != nil {
-		logrus.Errorf("failed get metric from prometheus, %+v",e)
+		log.Errorf("failed get metric from prometheus, %+v", e)
 		return nil
 	} else if w != nil {
-		logrus.Errorf("%s,failed get metric from prometheus",strings.Join(w, ";"))
+		log.Errorf("%s,failed get metric from prometheus", strings.Join(w, ";"))
 		return nil
 	} else {
 		switch qv.Type() {

@@ -18,7 +18,8 @@ package controllers
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/sirupsen/logrus"
 	istionetworking "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -33,7 +34,6 @@ import (
 // DestinationRuleReconciler reconciles a DestinationRule object
 type DestinationRuleReconciler struct {
 	client.Client
-	Log    *logrus.Entry
 	Scheme *runtime.Scheme
 }
 
@@ -42,17 +42,17 @@ type DestinationRuleReconciler struct {
 
 func (r *DestinationRuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	log := r.Log.WithField("destinationRule", req.NamespacedName)
+	log := log.WithField("destinationRule", req.NamespacedName)
 
 	// Fetch the DestinationRule instance
 	instance := &networkingistioiov1alpha3.DestinationRule{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	// 异常分支
 	if err != nil && !errors.IsNotFound(err) {
-		log.Errorf("get destinationRule error,%+v",err)
+		log.Errorf("get destinationRule error, %+v", err)
 		return reconcile.Result{}, err
 	}
-	log.Infof("get destinationRule, %+v",instance)
+	log.Infof("get destinationRule, %s", instance.Name)
 
 	// 资源更新
 	pb, err := util.FromJSONMap("istio.networking.v1alpha3.DestinationRule", instance.Spec)

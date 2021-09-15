@@ -18,7 +18,8 @@ package controllers
 
 import (
 	"context"
-	"github.com/sirupsen/logrus"
+
+	log "github.com/sirupsen/logrus"
 	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -37,7 +38,6 @@ import (
 // EnvoyPluginReconciler reconciles a EnvoyPlugin object
 type EnvoyPluginReconciler struct {
 	client.Client
-	Log    *logrus.Entry
 	Scheme *runtime.Scheme
 }
 
@@ -76,7 +76,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	found := &v1alpha3.EnvoyFilter{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Infof("Creating a new EnvoyFilter in %s:%s",ef.Namespace,ef.Name)
+		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		err = r.Client.Create(context.TODO(), ef)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -84,7 +84,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	} else if err != nil {
 		return reconcile.Result{}, err
 	} else {
-		r.Log.Infof("Update a EnvoyFilter in %s:%s",ef.Namespace,ef.Name)
+		log.Infof("Update a EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.Client.Update(context.TODO(), ef)
 		if err != nil {
@@ -98,7 +98,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin) *v1alpha3.EnvoyFilter {
 	pb, err := util.FromJSONMap("slime.microservice.v1alpha1.EnvoyPlugin", cr.Spec)
 	if err != nil {
-		r.Log.Errorf("unable to convert envoyPlugin to envoyFilter,%+v",err)
+		log.Errorf("unable to convert envoyPlugin to envoyFilter,%+v", err)
 		return nil
 	}
 	envoyFilter := &istio.EnvoyFilter{}

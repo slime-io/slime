@@ -10,10 +10,12 @@ import (
 	"fmt"
 	"reflect"
 
+	log "github.com/sirupsen/logrus"
 	networking "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
@@ -58,7 +60,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha1.SmartLimiter, r *SmartLim
 
 	// Create
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Infof("Creating a new EnvoyFilter,%s:%s", namespace,name)
+		log.Infof("Creating a new EnvoyFilter,%s:%s", namespace, name)
 		err = r.Client.Create(context.TODO(), obj)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -73,7 +75,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha1.SmartLimiter, r *SmartLim
 	// TODO: 判断是否需要更新
 	// Update
 	if !reflect.DeepEqual(found.Spec, obj.Spec) {
-		r.Log.Infof("Update a new EnvoyFilter,%s:%s",namespace,name)
+		log.Infof("Update a new EnvoyFilter,%s:%s", namespace, name)
 		obj.ResourceVersion = found.ResourceVersion
 		err = r.Client.Update(context.TODO(), obj)
 		if err != nil {
@@ -186,7 +188,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha1.SmartLim
 		}
 		_, err := refreshEnvoyFilter(instance, r, efcr)
 		if err != nil {
-			r.Log.Errorf("generated/deleted EnvoyFilter %s failed:%+v", efcr.Name,err)
+			log.Errorf("generated/deleted EnvoyFilter %s failed:%+v", efcr.Name, err)
 		}
 	}
 
@@ -207,7 +209,7 @@ func (r *SmartLimiterReconciler) subscribe(host string, subset interface{}) {
 		err := r.Client.Get(context.TODO(), loc, instance)
 		if err != nil {
 			if !errors.IsNotFound(err) {
-				r.Log.Errorf("failed to get smartlimiter, host:%s,%+v",host,err)
+				log.Errorf("failed to get smartlimiter, host:%s, %+v", host, err)
 			}
 		} else {
 			_, _ = r.refresh(instance)

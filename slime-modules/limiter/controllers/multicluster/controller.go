@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	meta_v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -65,18 +65,18 @@ func New(env *bootstrap.Environment, subscriber []func(*kubernetes.Clientset), u
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	c.queue = queue
 
-	logrus.Info("Setting up event handlers")
+	log.Info("Setting up event handlers")
 	secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
-			logrus.Infof("Processing add: %s",key)
+			log.Infof("Processing add: %s", key)
 			if err == nil {
 				queue.Add(key)
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			logrus.Infof("Processing delete: %s" , key)
+			log.Infof("Processing delete: %s", key)
 			if err == nil {
 				queue.Add(key)
 			}
@@ -88,12 +88,12 @@ func New(env *bootstrap.Environment, subscriber []func(*kubernetes.Clientset), u
 func (c *Controller) Run() {
 	defer c.queue.ShutDown()
 
-	logrus.Info("Starting Secrets controller")
+	log.Info("Starting Secrets controller")
 
 	go c.informer.Run(c.stop)
 
 	// Wait for the caches to be synced before starting workers
-	logrus.Info("Waiting for informer caches to sync")
+	log.Info("Waiting for informer caches to sync")
 	if !cache.WaitForCacheSync(c.stop, c.informer.HasSynced) {
 		// utilruntime.HandleError(fmt.Errorf("timed out waiting for caches to sync"))
 		return
@@ -119,10 +119,10 @@ func (c *Controller) processNextItem() bool {
 		// No error, reset the ratelimit counters
 		c.queue.Forget(secretName)
 	} else if c.queue.NumRequeues(secretName) < maxRetries {
-		logrus.Errorf("processing %s err, (will retry): %+v", secretName, err)
+		log.Errorf("processing %s err, (will retry): %+v", secretName, err)
 		c.queue.AddRateLimited(secretName)
 	} else {
-		logrus.Errorf("processing %s err, (giving up): %+v", secretName, err)
+		log.Errorf("processing %s err, (giving up): %+v", secretName, err)
 		c.queue.Forget(secretName)
 	}
 
@@ -149,25 +149,25 @@ func (c *Controller) addMemberCluster(secretName string, s *corev1.Secret) {
 		// clusterID must be unique even across multiple secrets
 		if _, ok := c.cs[clusterID]; !ok {
 			if len(kubeConfig) == 0 {
-				logrus.Infof("Data '%s' in the secret %s in namespace %s is empty, and disregarded ",
+				log.Infof("Data '%s' in the secret %s in namespace %s is empty, and disregarded ",
 					clusterID, secretName, s.Namespace)
 				continue
 			}
 
 			clientConfig, err := clientcmd.Load(kubeConfig)
 			if err != nil {
-				logrus.Infof("Data '%s' in the secret %s in namespace %s is not a kubeconfig: %+v",
+				log.Infof("Data '%s' in the secret %s in namespace %s is not a kubeconfig: %+v",
 					clusterID, secretName, s.Namespace, err)
 				continue
 			}
 
 			if err := clientcmd.Validate(*clientConfig); err != nil {
-				logrus.Errorf("Data '%s' in the secret %s in namespace %s is not a valid kubeconfig: %+v",
+				log.Errorf("Data '%s' in the secret %s in namespace %s is not a valid kubeconfig: %+v",
 					clusterID, secretName, s.Namespace, err)
 				continue
 			}
 
-			logrus.Infof("Adding new cluster member: %s",clusterID)
+			log.Infof("Adding new cluster member: %s", clusterID)
 			c.cs[clusterID] = secretName
 			client := clientcmd.NewDefaultClientConfig(*clientConfig, &clientcmd.ConfigOverrides{})
 			restConfig, err := client.ClientConfig()
@@ -176,29 +176,29 @@ func (c *Controller) addMemberCluster(secretName string, s *corev1.Secret) {
 			}
 			k8sClient, err := kubernetes.NewForConfig(restConfig)
 			if err != nil {
-				logrus.Errorf("error during create of kubernetes client interface for cluster: %s %+v", clusterID, err)
+				log.Errorf("error during create of kubernetes client interface for cluster: %s %+v", clusterID, err)
 				continue
 			}
 			for _, f := range c.subscriber {
 				f(k8sClient)
 			}
 		} else {
-			logrus.Infof("Cluster %s in the secret %s in namespace %s already exists",
+			log.Infof("Cluster %s in the secret %s in namespace %s already exists",
 				clusterID, c.cs[clusterID], s.Namespace)
 		}
 	}
-	logrus.Infof("Number of remote clusters: %d", len(c.cs))
+	log.Infof("Number of remote clusters: %d", len(c.cs))
 }
 
 func (c *Controller) deleteMemberCluster(secretName string) {
 	for clusterID, cluster := range c.cs {
 		if cluster == secretName {
-			logrus.Infof("Deleting cluster member :%s", clusterID)
+			log.Infof("Deleting cluster member :%s", clusterID)
 			for _, f := range c.unSubscriber {
 				f(clusterID)
 			}
 			delete(c.cs, clusterID)
 		}
 	}
-	logrus.Infof("Number of remote clusters: %d", len(c.cs))
+	log.Infof("Number of remote clusters: %d", len(c.cs))
 }
