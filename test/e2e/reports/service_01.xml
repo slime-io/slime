@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <testsuite name="e2e test suite" tests="1" failures="0" errors="0" time="193.531">
+      <testcase name="Slime e2e test slime module lazyload works" classname="e2e test suite" time="193.530755257"></testcase>
+  </testsuite>

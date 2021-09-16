@@ -50,6 +50,7 @@ var _ = ginkgo.Describe("Slime e2e test", func() {
 		createExampleApps(f)
 		createServiceFence(f)
 		updateSidecar(f)
+		verifyAccessLogs(f)
 		deleteTestResource()
 	})
 
@@ -80,7 +81,7 @@ func createSlimeBoot(f *framework.Framework) {
 			continue
 		}
 		for _, pod := range pods.Items {
-			err = e2epod.WaitForPodRunningInNamespace(cs, &pod)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(cs, pod.Name, nsSlime, framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 			if strings.Contains(pod.Name, slimebootName) {
 				slimebootDeploymentInstalled = true
@@ -117,7 +118,7 @@ func createSlimeModuleLazyload(f *framework.Framework) {
 			continue
 		}
 		for _, pod := range pods.Items {
-			err = e2epod.WaitForPodRunningInNamespace(cs, &pod)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(cs, pod.Name, nsSlime, framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 			if strings.Contains(pod.Name, "lazyload") {
 				lazyloadDeploymentInstalled = true
@@ -137,7 +138,7 @@ func createSlimeModuleLazyload(f *framework.Framework) {
 			continue
 		}
 		for _, pod := range pods.Items {
-			err = e2epod.WaitForPodRunningInNamespace(cs, &pod)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(cs, pod.Name, nsApps, framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 			if strings.Contains(pod.Name, "global-sidecar") {
 				globalSidecarInstalled = true
@@ -176,7 +177,7 @@ func createExampleApps(f *framework.Framework) {
 			continue
 		}
 		for _, pod := range pods.Items {
-			err = e2epod.WaitForPodRunningInNamespace(cs, &pod)
+			err = e2epod.WaitTimeoutForPodReadyInNamespace(cs, pod.Name, nsApps, framework.PodStartTimeout)
 			framework.ExpectNoError(err)
 		}
 		break
@@ -254,11 +255,25 @@ func updateSidecar(f *framework.Framework) {
 
 	pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
+ExecLoop:
 	for _, pod := range pods.Items {
 		if strings.Contains(pod.Name, "ratings") {
-			for i := 0; i < 10; i++ {
+			total, success := 0, 0
+			for {
+				total++
 				_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, nsApps, "curl \"productpage:9080/productpage\"")
-				framework.ExpectNoError(err)
+				if err == nil {
+					success++
+					if success >= 20 {
+						break ExecLoop
+					}
+				}
+				if total < 120 {
+					time.Sleep(500 * time.Millisecond)
+					continue
+				}
+				break ExecLoop
+				//framework.ExpectNoError(err)
 			}
 		}
 	}
@@ -269,7 +284,7 @@ func updateSidecar(f *framework.Framework) {
 		Resource: sidecarResource,
 	}
 	sidecarUpdated := false
-Loop:
+VerifyLoop:
 	for i := 0; i < 120; i++ {
 		sidecar, err := f.DynamicClient.Resource(sidecarGvr).Namespace(nsApps).Get(context.TODO(), sidecarName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
@@ -278,10 +293,9 @@ Loop:
 		hosts, _, err := unstructured.NestedStringSlice(egress[0].(map[string]interface{}), "hosts")
 		framework.ExpectNoError(err)
 		for _, host := range hosts {
-			// TODO Remove global-sidecar condition after 503 UH problem is solved
-			if strings.Contains(host, "details") || strings.Contains(host, "reviews") || strings.Contains(host, "global-sidecar") {
+			if strings.Contains(host, "details") || strings.Contains(host, "reviews") {
 				sidecarUpdated = true
-				break Loop
+				break VerifyLoop
 			}
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -290,7 +304,23 @@ Loop:
 		framework.Failf("sidecar updated failed\n")
 	}
 	ginkgo.By("sidecar updated successfully")
+}
 
+func verifyAccessLogs(f *framework.Framework) {
+	cs := f.ClientSet
+	pods, err := cs.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
+	framework.ExpectNoError(err)
+	for _, pod := range pods.Items {
+		if strings.Contains(pod.Name, "productpage") {
+			logs, err := e2epod.GetPodLogs(cs, nsApps, pod.Name, "istio-proxy")
+			framework.ExpectNoError(err)
+			if !(strings.Contains(logs, "outbound|9080||details") || strings.Contains(logs, "outbound|9080||reviews")) {
+				framework.Failf("access log verified failed\n")
+			}
+			break
+		}
+	}
+	ginkgo.By("access log verified successfully")
 }
 
 func readFile(test, file string) string {

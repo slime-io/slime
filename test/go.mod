@@ -10,6 +10,7 @@ require (
 	k8s.io/api v0.19.6
 	k8s.io/apimachinery v0.19.6
 	k8s.io/client-go v0.19.6
+	k8s.io/kubectl v0.0.0-00010101000000-000000000000
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 )
 

@@ -36,7 +36,7 @@ import (
 const (
 	// How often to Poll pods, nodes and claims.
 	Poll = 2 * time.Second
-
+	PodStartTimeout = 5 * time.Minute
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
 	ServiceAccountProvisionTimeout = 2 * time.Minute
