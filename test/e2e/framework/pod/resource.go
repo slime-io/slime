@@ -7,6 +7,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // errPodCompleted is returned by PodRunning or PodContainerRunning to indicate that
@@ -27,4 +30,36 @@ func podRunning(c clientset.Interface, podName, namespace string) wait.Condition
 		}
 		return false, nil
 	}
+}
+
+// GetPodLogs returns the logs of the specified container (namespace/pod/container).
+func GetPodLogs(c clientset.Interface, namespace, podName, containerName string) (string, error) {
+	return getPodLogsInternal(c, namespace, podName, containerName, false, nil)
+}
+
+// GetPodLogsSince returns the logs of the specified container (namespace/pod/container) since a timestamp.
+func GetPodLogsSince(c clientset.Interface, namespace, podName, containerName string, since time.Time) (string, error) {
+	sinceTime := metav1.NewTime(since)
+	return getPodLogsInternal(c, namespace, podName, containerName, false, &sinceTime)
+}
+
+// utility function for gomega Eventually
+func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName string, previous bool, sinceTime *metav1.Time) (string, error) {
+	request := c.CoreV1().RESTClient().Get().
+		Resource("pods").
+		Namespace(namespace).
+		Name(podName).SubResource("log").
+		Param("container", containerName).
+		Param("previous", strconv.FormatBool(previous))
+	if sinceTime != nil {
+		request.Param("sinceTime", sinceTime.Format(time.RFC3339))
+	}
+	logs, err := request.Do(context.TODO()).Raw()
+	if err != nil {
+		return "", err
+	}
+	if strings.Contains(string(logs), "Internal Error") {
+		return "", fmt.Errorf("Fetched log contains \"Internal Error\": %q", string(logs))
+	}
+	return string(logs), err
 }
