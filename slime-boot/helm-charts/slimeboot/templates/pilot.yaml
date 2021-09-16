@@ -250,7 +250,11 @@ spec:
               value: "false"
             - name: PILOT_SIDECAR_USE_REMOTE_ADDRESS
               value: "true"
+          {{- if $.Values.component.pilot.image.tag }}
           image: "{{ $.Values.component.pilot.image.repository }}:{{ $.Values.component.pilot.image.tag}}"
+          {{- else }}
+          image: "{{ $.Values.component.pilot.image.repository }}"
+          {{- end }}
           imagePullPolicy: IfNotPresent
           name: discovery
           ports:
