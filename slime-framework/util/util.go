@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	"go.uber.org/zap/zapcore"
 
@@ -255,4 +258,27 @@ func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{}
 
 func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
+}
+
+func SetLog() {
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.InfoLevel)
+	log.SetFormatter(&log.TextFormatter{
+		TimestampFormat: time.RFC3339,
+	})
+}
+
+func SetLevel(lvl string) error {
+	level, err := log.ParseLevel(lvl)
+	if err != nil {
+		return err
+	}
+	log.SetLevel(level)
+	return nil
+}
+
+// SetReportCaller sets whether the standard logger will include the calling
+// method as a field, default false.
+func SetReportCaller(support bool) {
+	log.SetReportCaller(support)
 }

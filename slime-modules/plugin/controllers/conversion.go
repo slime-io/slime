@@ -11,6 +11,7 @@ import (
 
 	envoy_config_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_extensions_wasm_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
+	log "github.com/sirupsen/logrus"
 
 	"slime.io/slime/slime-framework/util"
 	"slime.io/slime/slime-modules/plugin/api/v1alpha1"
@@ -83,12 +84,12 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, o
 	for _, h := range in.Host {
 		for _, p := range in.Plugins {
 			if p.PluginSettings == nil {
-				r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
+				log.Errorf("empty setting, cause error happend, skip plugin build, plugin: %s", p.Name)
 			}
 			var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
 			switch m := p.PluginSettings.(type) {
 			case *v1alpha1.Plugin_Wasm:
-				r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
+				log.Errorf("implentment, cause wasm not been support in envoyplugin settings, skip plugin build, plugin: %s")
 			case *v1alpha1.Plugin_Inline:
 				cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
 					ApplyTo: istio.EnvoyFilter_VIRTUAL_HOST,
@@ -121,12 +122,12 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(in *v1alpha1.EnvoyPlugin, o
 		}
 		for _, p := range in.Plugins {
 			if p.PluginSettings == nil {
-				r.Log.Error(fmt.Errorf("empty setting"), "cause error happend, skip plugin build, plugin: "+p.Name)
+				log.Errorf("empty setting, cause error happend, skip plugin build, plugin: %s", p.Name)
 			}
 			var cfp *istio.EnvoyFilter_EnvoyConfigObjectPatch
 			switch m := p.PluginSettings.(type) {
 			case *v1alpha1.Plugin_Wasm:
-				r.Log.Error(fmt.Errorf("implentment"), "cause wasm not been support in envoyplugin settings, skip plugin build, plugin: "+p.Name)
+				log.Errorf("implentment, cause wasm not been support in envoyplugin settings, skip plugin build, plugin: %s", p.Name)
 			case *v1alpha1.Plugin_Inline:
 				cfp = &istio.EnvoyFilter_EnvoyConfigObjectPatch{
 					ApplyTo: istio.EnvoyFilter_HTTP_ROUTE,
@@ -168,7 +169,7 @@ func (r *PluginManagerReconciler) translatePluginManager(in *v1alpha1.PluginMana
 		p := in.Plugin[len(in.Plugin)-i-1]
 		patch, err := r.convertPluginToPatch(p)
 		if err != nil {
-			r.Log.Error(err, "cause error happened, skip plugin build, plugin:"+p.Name)
+			log.Errorf("cause error happened, skip plugin build, plugin: %s, %+v", p.Name, err)
 			continue
 		}
 		out.ConfigPatches = append(out.ConfigPatches, patch)

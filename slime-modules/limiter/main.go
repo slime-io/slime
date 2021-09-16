@@ -20,15 +20,12 @@ import (
 	"flag"
 	"os"
 
-	uberzap "go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
-
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
+	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+
 	ctrl "sigs.k8s.io/controller-runtime"
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
@@ -39,10 +36,7 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -53,7 +47,7 @@ func init() {
 }
 
 func main() {
-	// TODO - add pause/resume logic for module
+	util.SetLog()
 
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -63,11 +57,6 @@ func main() {
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
 
-	// ctrl.SetLogger(zap.New(zap.UseDevMode(true)))
-	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
-	encoderCfg.EncodeTime = util.TimeEncoder
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -76,38 +65,38 @@ func main() {
 		LeaderElectionID:   "limiter",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		log.Errorf("unable to start manager, %+v", err)
 		os.Exit(1)
 	}
 	env := bootstrap.Environment{}
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
+		log.Errorf("unable to start manager, %+v", err)
 		os.Exit(1)
 	}
 	env.K8SClient = client
 	rec := controllers.NewReconciler(mgr, &env)
 	if err = rec.SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "SmartLimiter")
+		log.Errorf("unable to create controller SmartLimiter, %+v", err)
 		os.Exit(1)
 	}
 
 	// add dr reconcile
 	if err = (&istiocontroller.DestinationRuleReconciler{
 		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("DestinationRule"),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "DestinationRule")
+		log.Errorf("unable to create controller DestinationRule, %+v", err)
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder
 
 	go bootstrap.HealthCheckStart()
 
-	setupLog.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		log.Errorf("problem running manager, %+v", err)
 		os.Exit(1)
 	}
 }

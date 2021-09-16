@@ -19,10 +19,15 @@ package controllers
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
@@ -32,18 +37,12 @@ import (
 	"slime.io/slime/slime-modules/plugin/api/v1alpha1/wrapper"
 	"slime.io/slime/slime-modules/plugin/controllers/wasm"
 
-	"github.com/go-logr/logr"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/plugin/api/v1alpha1/wrapper"
 )
 
 // PluginManagerReconciler reconciles a PluginManager object
 type PluginManagerReconciler struct {
 	client.Client
-	Log    logr.Logger
 	Scheme *runtime.Scheme
 
 	wasm wasm.Getter
@@ -55,8 +54,6 @@ type PluginManagerReconciler struct {
 
 func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	_ = r.Log.WithValues("pluginmanager", req.NamespacedName)
-
 	// your logic here
 	// Fetch the PluginManager instance
 	instance := &wrapper.PluginManager{}
@@ -88,7 +85,7 @@ func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	found := &v1alpha3.EnvoyFilter{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
 	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new EnvoyFilter", "EnvoyFilter.Namespace", ef.Namespace, "EnvoyFilter.Name", ef.Name)
+		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		err = r.Client.Create(context.TODO(), ef)
 		if err != nil {
 			return reconcile.Result{}, err
@@ -96,7 +93,7 @@ func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	} else if err != nil {
 		return reconcile.Result{}, err
 	} else {
-		r.Log.Info("Update a EnvoyFilter", "EnvoyFilter.Namespace", ef.Namespace, "EnvoyFilter.Name", ef.Name)
+		log.Infof("Update a EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.Client.Update(context.TODO(), ef)
 		if err != nil {
@@ -110,7 +107,7 @@ func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 func (r *PluginManagerReconciler) newPluginManagerForEnvoyPlugin(cr *wrapper.PluginManager) *v1alpha3.EnvoyFilter {
 	pb, err := util.FromJSONMap("slime.microservice.v1alpha1.PluginManager", cr.Spec)
 	if err != nil {
-		r.Log.Error(err, "unable to convert pluginManager to envoyFilter")
+		log.Errorf("unable to convert pluginManager to envoyFilter, %+v", err)
 		return nil
 	}
 

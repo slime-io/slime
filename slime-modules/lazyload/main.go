@@ -20,17 +20,15 @@ import (
 	"flag"
 	"os"
 
-	uberzap "go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	istioapi "slime.io/slime/slime-framework/apis"
 	"slime.io/slime/slime-framework/bootstrap"
 	basecontroller "slime.io/slime/slime-framework/controllers"
@@ -40,10 +38,7 @@ import (
 	// +kubebuilder:scaffold:imports
 )
 
-var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
-)
+var scheme = runtime.NewScheme()
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
@@ -54,7 +49,7 @@ func init() {
 }
 
 func main() {
-	// TODO - add pause/resume logic for module
+	util.SetLog()
 	var metricsAddr string
 	var enableLeaderElection bool
 	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
@@ -62,10 +57,6 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
-	encoderCfg := uberzap.NewDevelopmentEncoderConfig()
-	encoderCfg.EncodeTime = util.TimeEncoder
-	ctrl.SetLogger(zap.New(zap.UseDevMode(true), zap.Encoder(zapcore.NewConsoleEncoder(encoderCfg))))
-
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: metricsAddr,
@@ -74,7 +65,7 @@ func main() {
 		LeaderElectionID:   "plugin",
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		log.Errorf("unable to start manager,%+v", err)
 		os.Exit(1)
 	}
 
@@ -82,7 +73,7 @@ func main() {
 	env.Config = bootstrap.GetModuleConfig()
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
-		setupLog.Error(err, "create a new clientSet failed")
+		log.Errorf("create a new clientSet failed, %+v", err)
 		os.Exit(1)
 	}
 	env.K8SClient = client
@@ -97,7 +88,6 @@ func main() {
 		Name: "VirtualService",
 		R: &basecontroller.VirtualServiceReconciler{
 			Client: mgr.GetClient(),
-			Log:    ctrl.Log.WithName("controllers").WithName("VirtualService"),
 			Scheme: mgr.GetScheme(),
 		},
 	}).Add(basecontroller.ObjectReconcileItem{
@@ -109,15 +99,14 @@ func main() {
 		ApiType: &corev1.Namespace{},
 		R:       reconcile.Func(sfReconciler.ReconcileNamespace),
 	}).Build(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller")
+		log.Errorf("unable to create controller,%+v", err)
 		os.Exit(1)
 	}
 
 	go bootstrap.HealthCheckStart()
-
-	setupLog.Info("starting manager")
+	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		log.Errorf("problem running manager,%+v", err)
 		os.Exit(1)
 	}
 }
