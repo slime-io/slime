@@ -5,10 +5,10 @@
 replicaCount: 1
 
 image:
-  repository: docker.io/slimeio/slime
+  #repository: docker.io/slimeio/slime
   pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: preview-v0.0.1
+  #tag: preview-v0.0.1
 
 nameOverride: ""
 fullnameOverride: "slime"

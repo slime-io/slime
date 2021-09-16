@@ -38,7 +38,11 @@ spec:
         - name: slime
           securityContext:
           {{- toYaml $.Values.securityContext | nindent 12 }}
+          {{- if $.Values.image.tag }}
           image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag}}"
+          {{- else }}
+          image: "{{ $.Values.image.repository }}"
+          {{- end }}
           command:
             - /manager
           args:

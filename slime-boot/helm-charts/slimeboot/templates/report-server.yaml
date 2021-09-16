@@ -76,7 +76,11 @@ spec:
           env:
             - name: GOMAXPROCS
               value: "2"
+          {{- if $.Values.component.reportServer.mixerImage.tag }}
           image: "{{ $.Values.component.reportServer.mixerImage.repository }}:{{ $.Values.component.reportServer.mixerImage.tag}}"
+          {{- else }}
+          image: "{{ $.Values.component.reportServer.mixerImage.repository }}"
+          {{- end }}
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3
@@ -115,7 +119,11 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.name
+          {{- if $.Values.component.reportServer.inspectorImage.tag }}
           image: "{{ $.Values.component.reportServer.inspectorImage.repository }}:{{ $.Values.component.reportServer.inspectorImage.tag}}"
+          {{- else }}
+          image: "{{ $.Values.component.reportServer.inspectorImage.repository }}"
+          {{- end }}
           imagePullPolicy: Always
           livenessProbe:
             failureThreshold: 3
