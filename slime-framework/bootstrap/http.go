@@ -3,9 +3,29 @@ package bootstrap
 import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"net/http/pprof"
 )
 
-func HealthCheckRegister() {
+func AuxiliaryHttpServerStart() {
+	addr := ":8081"
+	mux := http.NewServeMux()
+
+	//register
+	HealthCheckRegister(mux)
+	PprofRegister(mux)
+
+	log.Infof("auxiliary http server is starting to listen %s", addr)
+	if err := http.ListenAndServe(addr, mux); err != nil {
+		log.Errorf("auxiliary http server starts error, %+v", err)
+	}
+}
+
+func HealthCheckRegister(mux *http.ServeMux) {
+	mux.Handle("/modules/livez", livezHandler())
+	mux.Handle("/modules/readyz", readyzHandler())
+}
+
+func HealthCheckPathRegister() {
 	// TODO - handle readyzPaths and livezPaths will be used when many modules in one depoloyment
 }
 
@@ -26,15 +46,10 @@ func readyzHandler() http.Handler {
 	})
 }
 
-func HealthCheckStart() {
-	addr := ":8081"
-	mux := http.NewServeMux()
-
-	mux.Handle("/modules/livez", livezHandler())
-	mux.Handle("/modules/readyz", readyzHandler())
-
-	log.Infof("health check server is starting to listen %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Errorf("health check server starts error, %+v", err)
-	}
+func PprofRegister(mux *http.ServeMux) {
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }

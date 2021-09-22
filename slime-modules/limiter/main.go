@@ -92,7 +92,7 @@ func main() {
 	}
 	// +kubebuilder:scaffold:builder
 
-	go bootstrap.HealthCheckStart()
+	go bootstrap.AuxiliaryHttpServerStart()
 
 	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

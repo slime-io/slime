@@ -103,7 +103,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	go bootstrap.HealthCheckStart()
+	go bootstrap.AuxiliaryHttpServerStart()
 	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Errorf("problem running manager,%+v", err)
