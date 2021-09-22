@@ -8,7 +8,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.2.1
+    tag: v0.2.2
   module:
     - name: lazyload
       enable: true
