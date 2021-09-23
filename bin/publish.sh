@@ -53,5 +53,10 @@ for action in $actions; do
     echo "skip unknown action $action"
     ;;
   esac
+
+  step_exit=$?
+  if [[ "${step_exit}" -ne 0 ]]; then
+    exit ${step_exit}
+  fi
 done
 set +x
