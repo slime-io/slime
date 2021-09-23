@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -8,10 +9,12 @@ import (
 	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	log "github.com/sirupsen/logrus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	watchtools "k8s.io/client-go/tools/watch"
+	"k8s.io/client-go/tools/cache"
 	"slime.io/slime/slime-framework/apis/config/v1alpha1"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/controllers"
@@ -106,10 +109,16 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 	}
 
 	k8sClient := env.K8SClient
-	watcher, err := watchtools.NewRetryWatcher("1", k8sClient.CoreV1().Endpoints(""))
-	if err != nil {
-		return nil, err
+	epsClient := k8sClient.CoreV1().Endpoints("")
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return epsClient.List(options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return epsClient.Watch(options)
+		},
 	}
+	watcher := util.ListWatcher(context.Background(), lw)
 
 	es := &Source{
 		EventChan:  eventChan,
@@ -135,9 +144,6 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 			// TODO: Transformed into a function
 			es.items[v] = &v1alpha1.Prometheus_Source_Handler{}
 		}
-	}
-	if err != nil {
-		return nil, err
 	}
 	es.SetHandler(metricGetHandler, metricWatcherHandler, metricTimerHandler, update)
 	return es, nil
