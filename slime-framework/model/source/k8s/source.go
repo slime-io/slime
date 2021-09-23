@@ -8,10 +8,10 @@ import (
 	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	log "github.com/sirupsen/logrus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
+	watchtools "k8s.io/client-go/tools/watch"
 	"slime.io/slime/slime-framework/apis/config/v1alpha1"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/controllers"
@@ -55,7 +55,11 @@ func (m *Source) Start(stop <-chan struct{}) {
 			select {
 			case <-stop:
 				return
-			case e := <-m.Watcher.ResultChan():
+			case e, closed := <-m.Watcher.ResultChan():
+				if closed {
+					log.Warningf("Source watcher result chan closed, break process loop")
+					return
+				}
 				m.watchHandler(m, e)
 			case <-ticker.C:
 				m.timerHandler(m)
@@ -100,8 +104,13 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 	if env.Config.Metric == nil {
 		return nil, nil
 	}
+
 	k8sClient := env.K8SClient
-	watcher, err := k8sClient.CoreV1().Endpoints("").Watch(metav1.ListOptions{})
+	watcher, err := watchtools.NewRetryWatcher("1", k8sClient.CoreV1().Endpoints(""))
+	if err != nil {
+		return nil, err
+	}
+
 	es := &Source{
 		EventChan:  eventChan,
 		Watcher:    watcher,
