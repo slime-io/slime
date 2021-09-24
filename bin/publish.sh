@@ -36,7 +36,7 @@ fi
 
 image_url="$HUB/slime-$MOD:$image_tag"
 
-ALL_ACTIONS="build image push"
+ALL_ACTIONS=${ALL_ACTIONS:-"build image push"}
 
 actions=
 if [[ "$#" -eq 0 ]]; then

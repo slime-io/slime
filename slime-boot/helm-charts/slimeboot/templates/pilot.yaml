@@ -37,6 +37,7 @@ data:
 
     disablePolicyChecks: true
 
+    # rootNamespace: {{ $.Values.namespace }}
 
     # This is the k8s ingress service name, update if you used a different name
     ingressService: "istio-ingressgateway"
