@@ -216,6 +216,9 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 					Name:      svc.Name,
 					Namespace: svc.Namespace,
 				},
+				Spec: lazyloadv1alpha1.ServiceFenceSpec{
+					Enable: true,
+				},
 			}
 			markFenceCreatedByController(sf)
 			if err := r.Client.Create(ctx, sf); err != nil {
