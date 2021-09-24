@@ -3,7 +3,7 @@
 {{ if .Values.component.globalSidecar.enable }}
   {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
 {{- $ns := $.Values.namespace }}
-{{- $istioNamespace := $.Values.namespace }}
+{{- $istioNamespace := "istio-system" }}  # XXX can be configured
 ---
 apiVersion: apps/v1
 kind: Deployment
