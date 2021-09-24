@@ -58,8 +58,8 @@ func (m *Source) Start(stop <-chan struct{}) {
 			select {
 			case <-stop:
 				return
-			case e, closed := <-m.Watcher.ResultChan():
-				if closed {
+			case e, ok := <-m.Watcher.ResultChan():
+				if !ok {
 					log.Warningf("Source watcher result chan closed, break process loop")
 					return
 				}
@@ -73,7 +73,7 @@ func (m *Source) Start(stop <-chan struct{}) {
 	}()
 }
 
-// 将svc资源加入到监控关心的列表中
+// WatchAdd add resource to watch list
 func (m *Source) WatchAdd(meta types.NamespacedName) {
 	m.Interest.Set(meta.Namespace+"/"+meta.Name, true)
 	m.UpdateChan <- meta
