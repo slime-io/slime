@@ -12,6 +12,10 @@ if test -z "$MOD"; then
 fi
 
 version=$(cat VERSION)  # get version from file
+dirty="-dirty"
+if git diff-files --quiet && git diff-index --quiet --cached HEAD --; then
+  dirty=
+fi
 commit=$(git rev-parse --short HEAD)
 if [[ -z "${version}" ]]; then
   tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}')
@@ -25,9 +29,9 @@ if [[ -z "${version}" ]]; then
   fi
 fi
 if [ -z "$version" ]; then
-  image_tag="$commit"
+  image_tag="${commit}${dirty}"
 else
-  image_tag="$version-$commit"
+  image_tag="$version-${commit}${dirty}"
 fi
 
 image_url="$HUB/slime-$MOD:$image_tag"
