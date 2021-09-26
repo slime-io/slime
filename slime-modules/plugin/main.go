@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"slime.io/slime/slime-framework/util"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -28,7 +29,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"slime.io/slime/slime-framework/apis/networking/v1alpha3"
 	"slime.io/slime/slime-framework/bootstrap"
-	"slime.io/slime/slime-framework/util"
 	microserviceslimeiov1alpha1 "slime.io/slime/slime-modules/plugin/api/v1alpha1"
 	"slime.io/slime/slime-modules/plugin/controllers"
 	// +kubebuilder:scaffold:imports
@@ -45,7 +45,6 @@ func init() {
 }
 
 func main() {
-	util.SetLog()
 
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -54,6 +53,12 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
+
+	config := bootstrap.GetModuleConfig()
+	err := util.SetLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,

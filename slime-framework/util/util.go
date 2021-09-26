@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"reflect"
@@ -12,7 +13,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
+	"k8s.io/klog"
 	"go.uber.org/zap/zapcore"
 
 	"github.com/ghodss/yaml"
@@ -260,16 +261,29 @@ func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
 }
 
-func SetLog() {
+func SetLog(LogLevel string, KlogLevel int32) error {
+
+	if LogLevel == "" {
+		LogLevel = "info"
+	}
+	if KlogLevel == 0 {
+		KlogLevel = 5
+	}
+	level, err := log.ParseLevel(LogLevel)
+	if err != nil {
+		return err
+	}
+	log.SetLevel(level)
 	log.SetOutput(os.Stdout)
-	log.SetLevel(log.InfoLevel)
 	log.SetFormatter(&log.TextFormatter{
 		TimestampFormat: time.RFC3339,
 	})
+
+	return SetKlog(KlogLevel)
 }
 
-func SetLevel(lvl string) error {
-	level, err := log.ParseLevel(lvl)
+func SetLevel(LogLevel string) error {
+	level, err := log.ParseLevel(LogLevel)
 	if err != nil {
 		return err
 	}
@@ -281,4 +295,30 @@ func SetLevel(lvl string) error {
 // method as a field, default false.
 func SetReportCaller(support bool) {
 	log.SetReportCaller(support)
+}
+
+
+func GetLevel() string {
+	level := log.GetLevel()
+	return level.String()
+}
+
+// SetKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
+func SetKlog(KlogLevel int32) error {
+	klog.InitFlags(nil)
+	err := flag.Set("v", fmt.Sprintf("%d", KlogLevel))
+	if err != nil {
+		return err
+	}
+	flag.Parse()
+	return nil
+}
+
+func SetKlogLevel(number int64) {
+	flag.Set("v", fmt.Sprintf("%d", number))
+	flag.Parse()
+}
+
+func GetKlogLevel() string {
+	return flag.Lookup("v").Value.String()
 }
