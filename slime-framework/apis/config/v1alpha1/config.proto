@@ -40,6 +40,12 @@ message Global {
   string multicluster = 2;
   string istioNamespace = 3;
   string slimeNamespace = 4;
+  Log log = 5;
+}
+
+message Log {
+  string logLevel = 1;
+  int32 klogLevel = 2;
 }
 
 message Fence {

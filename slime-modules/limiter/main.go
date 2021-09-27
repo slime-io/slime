@@ -47,7 +47,6 @@ func init() {
 }
 
 func main() {
-	util.SetLog()
 
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -56,6 +55,12 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 	flag.Parse()
+
+	config := bootstrap.GetModuleConfig()
+	err := util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	if err != nil {
+		panic(err.Error())
+	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
@@ -69,7 +74,7 @@ func main() {
 		os.Exit(1)
 	}
 	env := bootstrap.Environment{}
-	env.Config = bootstrap.GetModuleConfig()
+	env.Config = config
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("unable to start manager, %+v", err)
