@@ -55,7 +55,7 @@ func main() {
 	flag.Parse()
 
 	config := bootstrap.GetModuleConfig()
-	err := util.SetLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	err := util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
 	if err != nil {
 		panic(err.Error())
 	}

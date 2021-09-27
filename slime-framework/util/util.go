@@ -25,6 +25,14 @@ import (
 	yaml2 "gopkg.in/yaml.v2"
 )
 
+const  (
+	slimeLogLevel = "info"
+	slimeKLogLevel = 5
+)
+
+
+var fs *flag.FlagSet
+
 // Map operation
 func IsContain(farther, child map[string]string) bool {
 	if len(child) > len(farther) {
@@ -261,25 +269,29 @@ func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
 }
 
-func SetLog(LogLevel string, KlogLevel int32) error {
+func InitLog(LogLevel string, KlogLevel int32) error {
 
 	if LogLevel == "" {
-		LogLevel = "info"
+		LogLevel = slimeLogLevel
 	}
 	if KlogLevel == 0 {
-		KlogLevel = 5
+		KlogLevel = slimeKLogLevel
 	}
 	level, err := log.ParseLevel(LogLevel)
 	if err != nil {
 		return err
+	} else {
+		log.SetLevel(level)
+		log.SetOutput(os.Stdout)
+		log.SetFormatter(&log.TextFormatter{
+			TimestampFormat: time.RFC3339,
+		})
 	}
-	log.SetLevel(level)
-	log.SetOutput(os.Stdout)
-	log.SetFormatter(&log.TextFormatter{
-		TimestampFormat: time.RFC3339,
-	})
 
-	return SetKlog(KlogLevel)
+	if KlogLevel != 0 {
+		SetKlog(KlogLevel)
+	}
+	return nil
 }
 
 func SetLevel(LogLevel string) error {
@@ -304,21 +316,17 @@ func GetLevel() string {
 }
 
 // SetKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
-func SetKlog(KlogLevel int32) error {
-	klog.InitFlags(nil)
-	err := flag.Set("v", fmt.Sprintf("%d", KlogLevel))
-	if err != nil {
-		return err
-	}
-	flag.Parse()
-	return nil
+func SetKlog(KlogLevel int32) {
+	fs = flag.NewFlagSet("klog",flag.ExitOnError)
+	klog.InitFlags(fs)
+	fs.Set("v",fmt.Sprintf("%d", KlogLevel))
 }
 
+// SetKlogLevel Warning: not thread safe
 func SetKlogLevel(number int64) {
-	flag.Set("v", fmt.Sprintf("%d", number))
-	flag.Parse()
+	fs.Set("v", fmt.Sprintf("%d", number))
 }
 
 func GetKlogLevel() string {
-	return flag.Lookup("v").Value.String()
+	return fs.Lookup("v").Value.String()
 }
