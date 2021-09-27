@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 HUB=${HUB:-"docker.io/slimeio"}
+PUSH_HUBS="$HUB"
 
 function fatal() {
   echo "$1" >&2
@@ -34,9 +35,11 @@ else
   image_tag="$version-${commit}${dirty}"
 fi
 
-image_url="$HUB/slime-$MOD:$image_tag"
+image_full_name="slime-$MOD:$image_tag"
 
-ALL_ACTIONS=${ALL_ACTIONS:-"build image push"}
+image_url="$HUB/${image_full_name}"
+
+ALL_ACTIONS=${ALL_ACTIONS:-"build image pushAll"}
 
 actions=
 if [[ "$#" -eq 0 ]]; then
@@ -81,6 +84,15 @@ for action in $actions; do
     ;;
   push)
     docker push "${image_url}"
+    ;;
+  pushAll)
+    for push_hub in ${PUSH_HUBS}; do
+      push_url="${push_hub}/${image_full_name}"
+      if [[ "${push_url}" != "${image_url}" ]]; then
+        docker tag -t "${image_url}" "${push_url}"
+      fi
+      docker push "${push_url}"
+    done
     ;;
   *)
     echo "skip unknown action $action"
