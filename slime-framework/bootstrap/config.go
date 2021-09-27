@@ -21,6 +21,15 @@ var defaultModuleConfig = &netease_config.Config{
 		Service:        "app",
 		IstioNamespace: "istio-system",
 		SlimeNamespace: "mesh-operator",
+		Log: &netease_config.Log{
+			LogLevel:  "",
+			KlogLevel: 0,
+		},
+		Misc: map[string]string{
+			"metrics-addr":           ":8080",
+			"aux-addr":               ":8081",
+			"enable-leader-election": "false",
+		},
 	},
 }
 
