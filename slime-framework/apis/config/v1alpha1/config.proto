@@ -41,6 +41,7 @@ message Global {
   string istioNamespace = 3;
   string slimeNamespace = 4;
   Log log = 5;
+  map<string, string> misc = 6;
 }
 
 message Log {

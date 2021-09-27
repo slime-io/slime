@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"flag"
 	"os"
 
 	log "github.com/sirupsen/logrus"
@@ -49,15 +48,6 @@ func init() {
 }
 
 func main() {
-
-	var metricsAddr string
-	var enableLeaderElection bool
-	flag.StringVar(&metricsAddr, "metrics-addr", ":8080", "The address the metric endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "enable-leader-election", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
-	flag.Parse()
-
 	config := bootstrap.GetModuleConfig()
 	err := util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
 	if err != nil {
@@ -66,9 +56,9 @@ func main() {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		MetricsBindAddress: metricsAddr,
+		MetricsBindAddress: config.Global.Misc["metrics-addr"],
 		Port:               9443,
-		LeaderElection:     enableLeaderElection,
+		LeaderElection:     config.Global.Misc["enable-leader-election"] == "true",
 		LeaderElectionID:   "lazyload",
 	})
 	if err != nil {
@@ -110,7 +100,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	go bootstrap.AuxiliaryHttpServerStart()
+	go bootstrap.AuxiliaryHttpServerStart(config.Global.Misc["aux-addr"])
 	log.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Errorf("problem running manager,%+v", err)
