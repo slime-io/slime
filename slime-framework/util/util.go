@@ -289,7 +289,7 @@ func InitLog(LogLevel string, KlogLevel int32) error {
 	}
 
 	if KlogLevel != 0 {
-		SetKlog(KlogLevel)
+		initKlog(KlogLevel)
 	}
 	return nil
 }
@@ -309,21 +309,20 @@ func SetReportCaller(support bool) {
 	log.SetReportCaller(support)
 }
 
-
 func GetLevel() string {
 	level := log.GetLevel()
 	return level.String()
 }
 
-// SetKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
-func SetKlog(KlogLevel int32) {
-	fs = flag.NewFlagSet("klog",flag.ExitOnError)
+// initKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
+func initKlog(KlogLevel int32) {
+	fs = flag.NewFlagSet("klog",flag.ContinueOnError)
 	klog.InitFlags(fs)
-	fs.Set("v",fmt.Sprintf("%d", KlogLevel))
+	SetKlogLevel(KlogLevel)
 }
 
 // SetKlogLevel Warning: not thread safe
-func SetKlogLevel(number int64) {
+func SetKlogLevel(number int32) {
 	fs.Set("v", fmt.Sprintf("%d", number))
 }
 
