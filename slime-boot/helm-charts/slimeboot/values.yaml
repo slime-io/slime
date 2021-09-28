@@ -10,9 +10,6 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   #tag: preview-v0.0.1
 
-nameOverride: ""
-fullnameOverride: "slime"
-
 serviceAccount:
   # Specifies whether a service account should be created
   create: true
@@ -27,7 +24,7 @@ podAnnotations: { }
 podSecurityContext: { }
 # fsGroup: 2000
 
-securityContext: { }
+containerSecurityContext: { }
   # capabilities:
   #   drop:
   #   - ALL
@@ -45,8 +42,8 @@ resources:
     cpu: 1
     memory: 1Gi
   requests:
-    cpu: 1
-    memory: 1Gi
+    cpu: 200m
+    memory: 200Mi
   # We usually recommend not to specify default resources and to leave this as a conscious
   # choice for the user. This also increases chances charts run on environments with little
   # resources, such as Minikube. If you do want to specify resources, uncomment the following
@@ -74,3 +71,5 @@ affinity: { }
 namespace: mesh-operator
 
 istioNamespace: istio-system
+
+healthProbePort: 8081

@@ -1,12 +1,18 @@
 - [安装slime-boot](#安装slime-boot)
 - [安装Prometheus](#安装prometheus)
 - [验证](#验证)
+- [slimeboot默认值说明与替换方法](#slimeboot默认值说明与替换方法)
+  - [默认值说明](#默认值说明)
+    - [values.yaml](#valuesyaml)
+    - [Config.global](#configglobal)
+  - [替换方法](#替换方法)
+    - [样例](#样例)
 
 
 
 ## 安装slime-boot
 
-在使用slime module之前，需要安装slime-boot，通过slime-boot，可以方便的安装和卸载slime模块。 
+在使用slime module之前，需要安装deployment/slime-boot，实际是一个封装的helm operator。它会监听slimeboot cr资源的创建，可以方便的安装和卸载slime模块。 
 
 此处$tag_or_commit使用最新tag。如有需要，也可以自行替换为老版本tag或commit_id。执行如下命令：
 
@@ -43,5 +49,139 @@ istio-egressgateway-78cb6c4799-6w2cn    1/1     Running   5          14d
 istio-ingressgateway-59644976b5-kmw9s   1/1     Running   5          14d
 istiod-664799f4bc-wvdhv                 1/1     Running   5          14d
 prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
+```
+
+
+
+## slimeboot默认值说明与替换方法
+
+### 默认值说明
+
+默认值来源分为两块
+
+1. slime-boot operator中的values.yaml文件，文件路径slime/slime-boot/helm-charts/slimeboot/values.yaml
+2. slime framework中Config.Global，文件路径slime/slime-framework/apis/config/v1alpha1/config.proto
+
+#### values.yaml
+
+slimeboot operator templates用到的所有默认值介绍，会用来创建slime module和slime component。
+
+| Key                                        | Default Value | Usages                                                      | Remark                                                       |
+| ------------------------------------------ | ------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| replicaCount                               | 1             | module                                                      |                                                              |
+| image.pullPolicy                           | Always        | module                                                      |                                                              |
+| serviceAccount.create                      | true          | module                                                      | switch on serviceAccount creating                            |
+| serviceAccount.annotations                 | { }           | -                                                           |                                                              |
+| serviceAccount.name                        | ""            | -                                                           |                                                              |
+| podAnnotations                             | { }           | -                                                           |                                                              |
+| podSecurityContext                         | { }           | module                                                      |                                                              |
+| containerSecurityContext                   | { }           | module                                                      |                                                              |
+| service.type                               | ClusterIP     | module                                                      |                                                              |
+| service.port                               | 80            | module                                                      |                                                              |
+| resources.limits.cpu                       | 1             | module and component                                        |                                                              |
+| resources.limits.memory                    | 1Gi           | module and component                                        |                                                              |
+| resources.requests.cpu                     | 200m          | module and component                                        |                                                              |
+| resources.requests.memory                  | 200Mi         | module and component                                        |                                                              |
+| autoscaling.enabled                        | false         | -                                                           |                                                              |
+| autoscaling.minReplicas                    | 1             | -                                                           |                                                              |
+| autoscaling.maxReplicas                    | 100           | -                                                           |                                                              |
+| autoscaling.targetCPUUtilizationPercentage | 80            | -                                                           |                                                              |
+| nodeSelector                               | { }           | module                                                      |                                                              |
+| tolerations                                | [ ]           | module                                                      |                                                              |
+| affinity                                   | { }           | module                                                      |                                                              |
+| namespace                                  | mesh-operator | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
+| istioNamespace                             | istio-system  | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
+| healthProbePort                            | 8081          | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
+
+
+
+#### Config.global
+
+主要是slime module会用到的一些配置，与slime component创建无关。
+
+| Key            | Default Value                                                | Usages                                                       | Remark |
+| -------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------ |
+| Service        | app                                                          | servicefence匹配服务的label key，用来生成懒加载中sidecar的默认配置 |        |
+| IstioNamespace | istio-system                                                 | 部署istio组件的namespace，用来生成懒加载中sidecar的默认配置，应等于实际部署istio组件的namespace |        |
+| SlimeNamespace | mesh-operator                                                | 部署slime模块的namespace，用来生成懒加载中sidecar的默认配置，应等于实际创建slimeboot cr资源的namespace |        |
+| Log.LogLevel   | ""                                                           | slime自身日志级别                                            |        |
+| Log.KlogLevel  | 0                                                            | klog日志级别                                                 |        |
+| Misc           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off","global-sidecar-mode": "namespace"}, | 可扩展的配置集合，目前有四个参数：1."metrics-addr"定义slime module manager监控指标暴露地址；2."aux-addr"定义辅助服务器暴露地址；3."enable-leader-election"定义manager是否启用选主功能；4."global-sidecar-mode"定义global-sidecar的使用模式，默认是"namespace"，可选的还有"cluster", "no" |        |
+
+
+
+### 替换方法
+
+对于values.yaml的替换，按照helm的语法规则[Values file](https://helm.sh/zh/docs/chart_template_guide/values_files/)。可以根据slime/slime-boot/helm-charts/slimeboot/templates中的使用方式，添加需要覆盖的字段到slimeboot cr资源的相应位置。
+
+对于Config.global的替换，添加需要覆盖的字段到slimeboot cr资源的spec.module.global中相应位置。
+
+#### 样例
+
+下面的例子自定义了slime部署的namespace、resources资源大小等内容，从而实现slime中module和component的默认值替换。
+
+```yaml
+---
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: slime
+spec:
+  namespace: slime					#自定义slime部署的namespace，和config.global.slimeNamespace一致
+  istioNamespace: istio-operator	#自定义istio部署的namespace，和config.global.istioNamespace一致
+  healthProbePort: 9091				#和config.global.misc["aux-addr"]包含的端口值一致
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-lazyload
+    tag: v0.2.6-db8a720-dirty
+  module:
+    - name: lazyload
+      enable: true
+      fence:
+        wormholePort:
+          - "9080"
+      global:
+        slimeNamespace: slime		#自定义sidecar默认配置中部署slime的namespace，与spec.namespace保持一致
+        istioNamespace: istio-operator	#自定义sidecar默认配置中部署istio的namespace，与spec.istioNamespace保持一致
+        log:						#自定义log级别
+          logLevel: debug
+          klogLevel: 10
+        misc:
+          metrics-addr: ":9090"		#自定义slime module manager监控指标暴露地址
+          aux-addr: ":9091"			#自定义辅助服务器暴露地址，与spec.healthProbePort一致
+      metric:
+        prometheus:
+          address: http://prometheus.istio-system:9090
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
+              type: Group
+  component:
+    globalSidecar:
+      enable: true
+      type: namespaced
+      namespace:
+        - default
+      resources:		#自定义resources
+        requests:	
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
+    pilot:
+      enable: true
+      resources:		#自定义resources
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 200m
+          memory: 200Mi
+      image:
+        repository: docker.io/slimeio/pilot
+        tag: global-pilot-v0.0.2-a85b00
 ```
 

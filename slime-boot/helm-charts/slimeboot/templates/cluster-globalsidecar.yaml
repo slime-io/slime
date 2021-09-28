@@ -3,7 +3,6 @@
 {{ if .Values.component.globalSidecar.enable }}
   {{ with (eq  .Values.component.globalSidecar.type "cluster") }}
 {{- $ns := $.Values.namespace }}
-{{- $istioNamespace := "istio-system" }}  # XXX can be configured
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -86,7 +85,7 @@ spec:
             - --controlPlaneAuthPolicy
             - NONE
             - --discoveryAddress
-            - istio-pilot.mesh-operator:15010
+            - istio-pilot.{{ $.Values.namespace }}:15010
           env:
             - name: POD_NAME
               valueFrom:
@@ -200,7 +199,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: to-global-sidecar
-  namespace:  {{ $istioNamespace }}
+  namespace:  {{ $.Values.istioNamespace }}
 spec:
   configPatches:
     {{- range $.Values.module }}
