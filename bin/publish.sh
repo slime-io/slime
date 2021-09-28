@@ -13,9 +13,9 @@ if test -z "$MOD"; then
 fi
 
 version=$(cat VERSION)  # get version from file
-dirty="-dirty"
-if git diff-files --quiet && git diff-index --quiet --cached HEAD --; then
-  dirty=
+dirty=
+if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
+  dirty="-dirty"
 fi
 commit=$(git rev-parse --short HEAD)
 if [[ -z "${version}" ]]; then
