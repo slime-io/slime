@@ -329,7 +329,11 @@ func newSidecar(vhost *lazyloadv1alpha1.ServiceFence, env *bootstrap.Environment
 	// 需要加入一条根namespace的策略
 	host = append(host, env.Config.Global.IstioNamespace+"/*")
 	host = append(host, env.Config.Global.SlimeNamespace+"/*")
-	host = append(host, fmt.Sprintf("*/global-sidecar.%s.svc.cluster.local", vhost.Namespace))
+	// check whether using namespace global-sidecar
+	// if so, init config of sidecar will adds */global-sidecar.${svf.ns}.svc.cluster.local
+	if env.Config.Global.Misc["global-sidecar-mode"] == "namespace" {
+		host = append(host, fmt.Sprintf("*/global-sidecar.%s.svc.cluster.local", vhost.Namespace))
+	}
 	sidecar := &istio.Sidecar{
 		WorkloadSelector: &istio.WorkloadSelector{
 			Labels: map[string]string{env.Config.Global.Service: vhost.Name},
