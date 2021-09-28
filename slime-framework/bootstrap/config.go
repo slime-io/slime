@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -28,13 +29,15 @@ var defaultModuleConfig = &netease_config.Config{
 		Misc: map[string]string{
 			"metrics-addr":           ":8080",
 			"aux-addr":               ":8081",
-			"enable-leader-election": "false",
+			"enable-leader-election": "off",
+			"global-sidecar-mode":    "namespace",
 		},
 	},
 }
 
 func GetModuleConfig() *netease_config.Config {
 	if config, err := readModuleConfig(); err != nil {
+		log.Errorf("readModuleConfig error: %v", err)
 		return defaultModuleConfig
 	} else {
 		if config.Fence == nil {
@@ -48,6 +51,35 @@ func GetModuleConfig() *netease_config.Config {
 		}
 		if config.Global == nil {
 			config.Global = defaultModuleConfig.Global
+			return config
+		}
+		if config.Global.Service == "" {
+			config.Global.Service = defaultModuleConfig.Global.Service
+		}
+		if config.Global.IstioNamespace == "" {
+			config.Global.IstioNamespace = defaultModuleConfig.Global.IstioNamespace
+		}
+		if config.Global.SlimeNamespace == "" {
+			config.Global.SlimeNamespace = defaultModuleConfig.Global.SlimeNamespace
+		}
+		if len(config.Global.Misc) == 0 {
+			config.Global.Misc = defaultModuleConfig.Global.Misc
+		} else {
+			for k, v := range defaultModuleConfig.Global.Misc {
+				if _, ok := config.Global.Misc[k]; !ok {
+					config.Global.Misc[k] = v
+				}
+			}
+		}
+		if config.Global.Log == nil {
+			config.Global.Log = defaultModuleConfig.Global.Log
+			return config
+		}
+		if config.Global.Log.LogLevel == "" {
+			config.Global.Log.LogLevel = defaultModuleConfig.Global.Log.LogLevel
+		}
+		if config.Global.Log.KlogLevel == 0 {
+			config.Global.Log.KlogLevel = defaultModuleConfig.Global.Log.KlogLevel
 		}
 		return config
 	}
