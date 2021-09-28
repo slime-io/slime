@@ -56,7 +56,7 @@ func main() {
 		Scheme:             scheme,
 		MetricsBindAddress: config.Global.Misc["metrics-addr"],
 		Port:               9443,
-		LeaderElection:     config.Global.Misc["enable-leader-election"] == "true",
+		LeaderElection:     config.Global.Misc["enable-leader-election"] == "on",
 		LeaderElectionID:   "limiter",
 	})
 	if err != nil {

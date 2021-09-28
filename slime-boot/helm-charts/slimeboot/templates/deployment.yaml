@@ -18,7 +18,7 @@ metadata:
   labels:
     app: {{.name }}
 spec:
-  replicas: 1
+  replicas: {{ $.Values.replicaCount }}
   selector:
     matchLabels:
       app: {{.name }}
@@ -37,7 +37,7 @@ spec:
       containers:
         - name: slime
           securityContext:
-          {{- toYaml $.Values.securityContext | nindent 12 }}
+          {{- toYaml $.Values.containerSecurityContext | nindent 12 }}
           {{- if $.Values.image.tag }}
           image: "{{ $.Values.image.repository }}:{{ $.Values.image.tag}}"
           {{- else }}
@@ -64,7 +64,7 @@ spec:
               containerPort: 80
               protocol: TCP
             - name: probe-port
-              containerPort: 8081
+              containerPort: {{ $.Values.healthProbePort }}
           resources:
           {{- toYaml $.Values.resources | nindent 12 }}
           readinessProbe:

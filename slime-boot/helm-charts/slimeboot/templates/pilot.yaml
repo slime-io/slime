@@ -8,7 +8,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: istio-pilot-service-account
-    namespace: mesh-operator
+    namespace: {{ $.Values.namespace }}
 roleRef:
   kind: ClusterRole
   name: cluster-admin
@@ -18,7 +18,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: istio
-  namespace: mesh-operator
+  namespace: {{ $.Values.namespace }}
 data:
   mesh: |-
     # Set enableTracing to false to disable request tracing.
@@ -32,8 +32,8 @@ data:
     reportBatchMaxEntries: 100
     # reportBatchMaxTime is the max waiting time before the telemetry data of a request is sent to the mixer server
     reportBatchMaxTime: 1s
-    mixerReportServer: istio-telemetry.mesh-operator.svc.cluster.local:9091
-    mixerCheckServer: istio-policy.mesh-operator.svc.cluster.local:9091
+    mixerReportServer: istio-telemetry.{{ $.Values.namespace }}.svc.cluster.local:9091
+    mixerCheckServer: istio-policy.{{ $.Values.namespace }}.svc.cluster.local:9091
 
     disablePolicyChecks: true
 
@@ -160,7 +160,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: global-sidecar-pilot
-  namespace: mesh-operator
+  namespace: {{ $.Values.namespace }}
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
@@ -297,7 +297,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: istio-pilot-service-account
-  namespace: mesh-operator
+  namespace: {{ $.Values.namespace }}
 ---
 apiVersion: v1
 kind: Service
@@ -307,7 +307,7 @@ metadata:
     istio: pilot
     release: istio-v13-pilot
   name: istio-pilot
-  namespace: mesh-operator
+  namespace: {{ $.Values.namespace }}
 spec:
   ports:
     - name: grpc-xds

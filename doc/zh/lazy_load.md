@@ -2,7 +2,6 @@
 - [其他安装选项](#其他安装选项)
   - [不使用global-sidecar组件](#不使用global-sidecar组件)
   - [使用集群唯一的global-sidecar](#使用集群唯一的global-sidecar)
-  - [使用report-server上报调用关系](#使用report-server上报调用关系)
 - [特性介绍](#特性介绍)
   - [基于namespace/service label自动生成ServiceFence](#基于namespaceservice-label自动生成servicefence)
   - [自定义兜底流量分派](#自定义兜底流量分派)
@@ -148,7 +147,13 @@ spec:
 
 > [完整样例](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
 >
-> 不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
+> 使用说明：
+>
+> 不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行，可能走到istio的默认兜底逻辑（一般是passthrough），从而倒回到原来的clusterIP访问服务，配置的virtualservice路由会暂时失效。
+>
+> 场景：
+>
+> 服务A访问服务B，但服务B的virtualservice会将访问服务B的请求转到服务C。由于没有global sidecar兜底，第一次请求会被istio透传，经PassthroughCluster到服务B。本来应该由服务C响应，变成服务B响应，出错。后面A的servicefence会添加上B，随即感知B的virtualservice将请求导向C，所以第一次之后的请求都会成功由C响应。
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -167,6 +172,9 @@ spec:
         wormholePort:
         - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
+      global:
+        misc:
+          global-sidecar-mode: no
       metric:
         prometheus:
           address: {{prometheus_address}} # replace to your prometheus address
@@ -177,13 +185,19 @@ spec:
               type: Group
 ```
 
-
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
 
 
 
 ### 使用集群唯一的global-sidecar   
 
 > [完整样例](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
+>
+> 使用说明：
+>
+> k8s体系里，短域名访问的流量只会来自于同namespace，跨namespace访问必须带有namespace信息。cluster级别的global-sidecar和业务应用往往不在同namespace下，缺少短域名的配置，其拥有的配置必然带有namespace信息，因此global-sidecar无法成功转发同namespace内的访问请求，导致超时 "HTTP/1.1 0 DC downstream_remote_disconnect"错误。
+>
+> 所以，使用集群级global-sidecar时，应用间访问要携带namespace信息。
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -202,6 +216,9 @@ spec:
         wormholePort:
         - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
+      global:
+        misc:
+          global-sidecar-mode: cluster
       metric:
         prometheus:
           address: {{prometheus_address}} # replace to your prometheus address
@@ -222,68 +239,6 @@ spec:
 ```
 
 
-
-### 使用report-server上报调用关系   
-
-集群内未配置prometheus时，可通过report-server上报依赖关系，此时需要在component中添加reportServer，并且设置reportServer.enable为true。
-
-对应的，如果使用prometheus，则component中无需添加reportServer，或者设置reportServer.enable为false。
-
-> [完整样例](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml) 
-
-```yaml
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: lazyload
-  namespace: mesh-operator
-spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
-  module:
-    - fence:
-        enable: true
-        wormholePort:
-        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
-      name: slime-fence
-      metric:
-        prometheus:
-          address: {{prometheus_address}} # replace to your prometheus address
-          handlers:
-            destination:
-              query: |
-                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
-              type: Group
-  component:
-    globalSidecar:
-      enable: true
-      type: namespaced
-      namespace:
-        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
-    pilot:
-      enable: true
-      image:
-        repository: docker.io/slimeio/pilot
-        tag: {{your_pilot_tag}}
-    reportServer:
-      enable: true
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 200m
-          memory: 200Mi
-      mixerImage:
-        repository: docker.io/slimeio/mixer
-        tag: {{your_mixer_image}}
-      inspectorImage:
-        repository: docker.io/slimeio/report-server
-        tag: {{your_inspector_image}}    
-```
 
 
 

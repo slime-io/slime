@@ -86,7 +86,7 @@ spec:
             - --controlPlaneAuthPolicy
             - NONE
             - --discoveryAddress
-            - istio-pilot.mesh-operator:15010
+            - istio-pilot.{{ $.Values.namespace }}:15010
           env:
             - name: POD_NAME
               valueFrom:

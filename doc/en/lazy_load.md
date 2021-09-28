@@ -2,7 +2,6 @@
 - [Other installation options](#other-installation-options)
   - [Disable global-sidecar](#disable-global-sidecar)
   - [Use cluster unique global-sidecar](#use-cluster-unique-global-sidecar)
-  - [Use report-server to report the dependency](#use-report-server-to-report-the-dependency)
 - [Introduction of features](#introduction-of-features)
   - [Automatic ServiceFence generation based on namespace/service label](#automatic-servicefence-generation-based-on-namespaceservice-label)
   - [Custom undefined traffic dispatch](#custom-undefined-traffic-dispatch)
@@ -146,7 +145,14 @@ In the ServiceMesh with allow_any enabled, the global-sidecar component can be o
 
 > [Example](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
 >
-> Not using the global-sidecar component may cause the first call to fail to follow the preset traffic rules.
+> Instructions: 
+>
+> Not using the global-sidecar component may result in the first call not following the pre-defined routing rules. It may result in the underlying logic of istio (typically passthrough), then it come back to send request using clusterIP. VirtualService temporarily disabled.
+>
+> Scenario: 
+>
+> Service A accesses service B, but service B's virtualservice directs the request for access to service B to service C. Since there is no global sidecar to handle this, the first request is transmitted by istio to service B via PassthroughCluster. What should have been a response from service C becomes a response from service B with an error. After first request, B adds to A's servicefence, then A senses that the request is directed to C by watching B's virtualservice. Later C adds to A's servicefence., and all requests after the first time will be successfully responded by C.
+>
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -165,6 +171,9 @@ spec:
         wormholePort:
         - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
+      global:
+        misc:
+          global-sidecar-mode: no      
       metric:
         prometheus:
           address: {{prometheus_address}} # replace to your prometheus address
@@ -180,6 +189,12 @@ spec:
 ### Use cluster unique global-sidecar   
 
 > [Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)  
+>
+> Instructions: 
+>
+> In k8s, the traffic of short domain access will only come from the same namespace, and cross-namespace access must carry namespace information. Cluster unique global-sidecar is often not under the same namespace with business service, so its envoy config lacks the configuration of short domain. Therefore, cluster unique global-sidecar cannot successfully forward access requests within the same namespace, resulting in timeout "HTTP/1.1 0 DC downstream_remote_disconnect" error. 
+>
+> So in this case, inter-application access should carry namespace information.
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -198,6 +213,9 @@ spec:
         wormholePort:
         - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
       name: slime-fence
+      global:
+        misc:
+          global-sidecar-mode: cluster      
       metric:
         prometheus:
           address: {{prometheus_address}} # replace to your prometheus address
@@ -218,69 +236,6 @@ spec:
 ```
 
 
-
-### Use report-server to report the dependency   
-
-When prometheus is not configured in the cluster, the dependency can be reported through report-server.  Add reportServer in component, and set reportServer.enable = true.
-
-If using prometheus, delete reportServer from component, or set reportServer.enable = false.
-
-> [Example](../../install/samples/lazyload/slimeboot_lazyload_reportserver.yaml)
->
-
-```yaml
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: lazyload
-  namespace: mesh-operator
-spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
-  # Default values copied from <project_dir>/helm-charts/slimeboot/values.yaml\
-  module:
-    - fence:
-        enable: true
-        wormholePort:
-        - "{{your_port}}" # replace to your application service ports, and extend the list in case of multi ports
-      name: slime-fence
-      metric:
-        prometheus:
-          address: {{prometheus_address}} # replace to your prometheus address
-          handlers:
-            destination:
-              query: |
-                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
-              type: Group
-  component:
-    globalSidecar:
-      enable: true
-      type: namespaced
-      namespace:
-        - {{your_namespace}} # replace to your service's namespace, and extend the list in case of multi namespaces
-    pilot:
-      enable: true
-      image:
-        repository: docker.io/slimeio/pilot
-        tag: {{your_pilot_tag}}
-    reportServer:
-      enable: true
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 200m
-          memory: 200Mi
-      mixerImage:
-        repository: docker.io/slimeio/mixer
-        tag: {{your_mixer_image}}
-      inspectorImage:
-        repository: docker.io/slimeio/report-server
-        tag: {{your_inspector_image}}        
-```
 
 
 

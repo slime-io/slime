@@ -46,7 +46,7 @@ metadata:
 spec:
   workload_labels:
     app: reviews
-  plugins:
+  plugin:
   - enable: true
     name: {{plugin-1}}     # plugin name
   # ...
@@ -71,7 +71,7 @@ metadata:
 spec:
   workload_labels:
     app: my-app
-  plugins:
+  plugin:
   - enable: true          # switch
     name: {{plugin-1}}      # plugin name
     inline:
@@ -97,7 +97,7 @@ metadata:
 spec:
   workload_labels:
     app: reviews
-  plugins:
+  plugin:
   - enable: true
     name: reviews-ep     # plugin name
     inline:
