@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"net/url"
 	"reflect"
-	e2ekubectl "slime.io/slime/test/e2e/framework/kubectl"
+	e2ekubectl "slime.io/slime/slime-framework/test/e2e/framework/kubectl"
 	"strings"
 	"syscall"
 	"time"
@@ -64,7 +64,7 @@ func CreateTestingNS(baseName string, c clientset.Interface, lables map[string]s
 
 	if err := wait.PollImmediate(Poll, 30*time.Second, func() (bool, error) {
 		var err error
-		got, err = c.CoreV1().Namespaces().Create(context.TODO(), namespaceObj, metav1.CreateOptions{})
+		got, err = c.CoreV1().Namespaces().Create(namespaceObj)
 		if err != nil {
 			glog.Warningf("unexpected error when creating namespace: %v\n", err)
 			return false, nil
@@ -83,12 +83,12 @@ func CreateTestingNS(baseName string, c clientset.Interface, lables map[string]s
 
 func deleteNS(c clientset.Interface, config *restclient.Config, namespace string, timeout time.Duration) error {
 	startTime := time.Now()
-	if err := c.CoreV1().Namespaces().Delete(context.TODO(), namespace, metav1.DeleteOptions{}); err != nil {
+	if err := c.CoreV1().Namespaces().Delete(namespace, &metav1.DeleteOptions{}); err != nil {
 		return err
 	}
 
 	err := wait.PollImmediate(2*time.Second, timeout, func() (bool, error) {
-		if _, err := c.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{}); err != nil {
+		if _, err := c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{}); err != nil {
 			if apierrs.IsNotFound(err) {
 				return true, nil
 			}
@@ -174,7 +174,7 @@ func hasRemainingContent(c clientset.Interface, config *restclient.Config, names
 			continue
 		}
 
-		obj, err := gvrClient.List(context.TODO(), metav1.ListOptions{})
+		obj, err := gvrClient.List(metav1.ListOptions{})
 		if err != nil {
 			// not all resources support list, so we ignore those
 			if apierrs.IsMethodNotSupported(err) || apierrs.IsNotFound(err) || apierrs.IsForbidden(err) {
@@ -198,7 +198,7 @@ func hasRemainingContent(c clientset.Interface, config *restclient.Config, names
 // countRemainingPods queries the server to count number of remaining pods, and number of pods that had a missing deletion timestamp.
 func countRemainingPods(c clientset.Interface, namespace string) (int, int, error) {
 	// check for remaining pods
-	pods, err := c.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{})
+	pods, err := c.CoreV1().Pods(namespace).List(metav1.ListOptions{})
 	if err != nil {
 		return 0, 0, err
 	}
@@ -261,7 +261,7 @@ func logPodStates(pods []v1.Pod) {
 // logNamespaces logs the number of namespaces by phase
 // namespace is the namespace the test was operating against that failed to delete so it can be grepped in logs
 func logNamespaces(c clientset.Interface, namespace string) {
-	namespaceList, err := c.CoreV1().Namespaces().List(context.TODO(), metav1.ListOptions{})
+	namespaceList, err := c.CoreV1().Namespaces().List(metav1.ListOptions{})
 	if err != nil {
 		Logf("namespace: %v, unable to list namespaces: %v", namespace, err)
 		return
@@ -281,7 +281,7 @@ func logNamespaces(c clientset.Interface, namespace string) {
 
 // logNamespace logs detail about a namespace
 func logNamespace(c clientset.Interface, namespace string) {
-	ns, err := c.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
+	ns, err := c.CoreV1().Namespaces().Get(namespace, metav1.GetOptions{})
 	if err != nil {
 		if apierrs.IsNotFound(err) {
 			Logf("namespace: %v no longer exists", namespace)
@@ -302,11 +302,11 @@ func waitForServiceAccountInNamespace(c clientset.Interface, ns, serviceAccountN
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (object runtime.Object, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ServiceAccounts(ns).List(context.TODO(), options)
+			return c.CoreV1().ServiceAccounts(ns).List(options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (i watch.Interface, e error) {
 			options.FieldSelector = fieldSelector
-			return c.CoreV1().ServiceAccounts(ns).Watch(context.TODO(), options)
+			return c.CoreV1().ServiceAccounts(ns).Watch(options)
 		},
 	}
 	ctx, cancel := watchtools.ContextWithOptionalTimeout(context.Background(), timeout)

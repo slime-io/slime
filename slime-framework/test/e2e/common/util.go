@@ -6,7 +6,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
-	"slime.io/slime/test/e2e/framework"
+	"slime.io/slime/slime-framework/test/e2e/framework"
 	"text/template"
 )
 
