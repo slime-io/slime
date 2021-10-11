@@ -1,7 +1,6 @@
 package pod
 
 import (
-	"context"
 	"fmt"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -18,7 +17,7 @@ var errPodCompleted = fmt.Errorf("pod ran to completion")
 
 func podRunning(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}
@@ -54,7 +53,7 @@ func getPodLogsInternal(c clientset.Interface, namespace, podName, containerName
 	if sinceTime != nil {
 		request.Param("sinceTime", sinceTime.Format(time.RFC3339))
 	}
-	logs, err := request.Do(context.TODO()).Raw()
+	logs, err := request.Do().Raw()
 	if err != nil {
 		return "", err
 	}

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	framework2 "slime.io/slime/test/e2e/framework"
-	"slime.io/slime/test/e2e/framework/testfiles"
+	framework2 "slime.io/slime/slime-framework/test/e2e/framework"
+	"slime.io/slime/slime-framework/test/e2e/framework/testfiles"
 	"testing"
 
 	"github.com/golang/glog"

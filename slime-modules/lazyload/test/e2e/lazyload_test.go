@@ -1,16 +1,15 @@
 package e2e
 
 import (
-	"context"
 	"github.com/onsi/ginkgo"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"path/filepath"
-	commonutils "slime.io/slime/test/e2e/common"
-	"slime.io/slime/test/e2e/framework"
-	e2epod "slime.io/slime/test/e2e/framework/pod"
-	"slime.io/slime/test/e2e/framework/testfiles"
+	commonutils "slime.io/slime/slime-framework/test/e2e/common"
+	"slime.io/slime/slime-framework/test/e2e/framework"
+	e2epod "slime.io/slime/slime-framework/test/e2e/framework/pod"
+	"slime.io/slime/slime-framework/test/e2e/framework/testfiles"
 	"strings"
 	"time"
 )
@@ -74,7 +73,7 @@ func createSlimeBoot(f *framework.Framework) {
 	slimebootDeploymentInstalled := false
 
 	for i := 0; i < 10; i++ {
-		pods, err := cs.CoreV1().Pods(nsSlime).List(context.TODO(), metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsSlime).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) == 0 {
 			time.Sleep(500 * time.Millisecond)
@@ -111,7 +110,7 @@ func createSlimeModuleLazyload(f *framework.Framework) {
 	globalSidecarInstalled := false
 
 	for i := 0; i < 60; i++ {
-		pods, err := cs.CoreV1().Pods(nsSlime).List(context.TODO(), metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsSlime).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) != 3 {
 			time.Sleep(500 * time.Millisecond)
@@ -131,7 +130,7 @@ func createSlimeModuleLazyload(f *framework.Framework) {
 	}
 
 	for i := 0; i < 60; i++ {
-		pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
+		pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) == 0 {
 			time.Sleep(500 * time.Millisecond)
@@ -170,7 +169,7 @@ func createExampleApps(f *framework.Framework) {
 
 	// check
 	for i := 0; i < 60; i++ {
-		pods, err := cs.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) != 6 {
 			time.Sleep(500 * time.Millisecond)
@@ -212,7 +211,7 @@ func createServiceFence(f *framework.Framework) {
 
 	svfCreated := false
 	for i := 0; i < 60; i++ {
-		_, err := f.DynamicClient.Resource(svfGvr).Namespace(nsApps).Get(context.TODO(), svfName, metav1.GetOptions{})
+		_, err := f.DynamicClient.Resource(svfGvr).Namespace(nsApps).Get(svfName, metav1.GetOptions{})
 		if err != nil {
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -232,7 +231,7 @@ func createServiceFence(f *framework.Framework) {
 
 	sidecarCreated := false
 	for i := 0; i < 60; i++ {
-		_, err := f.DynamicClient.Resource(sidecarGvr).Namespace(nsApps).Get(context.TODO(), sidecarName, metav1.GetOptions{})
+		_, err := f.DynamicClient.Resource(sidecarGvr).Namespace(nsApps).Get(sidecarName, metav1.GetOptions{})
 		if err != nil {
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -253,7 +252,7 @@ func updateSidecar(f *framework.Framework) {
 	sidecarResource := "sidecars"
 	sidecarName := "productpage"
 
-	pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
+	pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 ExecLoop:
 	for _, pod := range pods.Items {
@@ -264,7 +263,7 @@ ExecLoop:
 				_, _, err = f.ExecShellInPodWithFullOutput(pod.Name, nsApps, "curl \"productpage:9080/productpage\"")
 				if err == nil {
 					success++
-					if success >= 20 {
+					if success >= 30 {
 						break ExecLoop
 					}
 				}
@@ -286,7 +285,7 @@ ExecLoop:
 	sidecarUpdated := false
 VerifyLoop:
 	for i := 0; i < 120; i++ {
-		sidecar, err := f.DynamicClient.Resource(sidecarGvr).Namespace(nsApps).Get(context.TODO(), sidecarName, metav1.GetOptions{})
+		sidecar, err := f.DynamicClient.Resource(sidecarGvr).Namespace(nsApps).Get(sidecarName, metav1.GetOptions{})
 		framework.ExpectNoError(err)
 		egress, _, err := unstructured.NestedSlice(sidecar.Object, "spec", "egress")
 		framework.ExpectNoError(err)
@@ -308,14 +307,24 @@ VerifyLoop:
 
 func verifyAccessLogs(f *framework.Framework) {
 	cs := f.ClientSet
-	pods, err := cs.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
+	pods, err := cs.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
 		if strings.Contains(pod.Name, "productpage") {
-			logs, err := e2epod.GetPodLogs(cs, nsApps, pod.Name, "istio-proxy")
-			framework.ExpectNoError(err)
-			if !(strings.Contains(logs, "outbound|9080||details") || strings.Contains(logs, "outbound|9080||reviews")) {
-				framework.Failf("access log verified failed\n")
+			times := 0
+			for {
+				logs, err := e2epod.GetPodLogs(cs, nsApps, pod.Name, "istio-proxy")
+				framework.ExpectNoError(err)
+				if strings.Contains(logs, "outbound|9080||details") || strings.Contains(logs, "outbound|9080||reviews") {
+					break
+				} else {
+					times++
+				}
+				if times > 60 {
+					framework.Failf("access log verified failed\n")
+				} else {
+					time.Sleep(500 * time.Millisecond)
+				}
 			}
 			break
 		}
