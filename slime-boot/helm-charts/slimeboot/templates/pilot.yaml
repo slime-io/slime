@@ -27,6 +27,7 @@ data:
     # Set accessLogFile to empty string to disable access log.
     accessLogFile: "/dev/stdout"
 
+    enableAutoMtls: false
     enableEnvoyAccessLogService: false
     # reportBatchMaxEntries is the number of requests that are batched before telemetry data is sent to the mixer server
     reportBatchMaxEntries: 100
@@ -224,11 +225,8 @@ spec:
             - --log_output_level=default:info
             - --domain
             - cluster.local
-            - --secureGrpcAddr
-            - ""
             - --keepaliveMaxServerConnectionAge
             - 30m
-            - --identifyLabel=nsf.skiff.netease.com/app
             - --ext-header=x-nsf-app:{nsf.skiff.netease.com/app}.{namespace}
           env:
             - name: POD_NAME
@@ -280,6 +278,8 @@ spec:
           volumeMounts:
             - mountPath: /etc/istio/config
               name: config-volume
+            - mountPath: /var/run/secrets/istio-dns
+              name: local-certs
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -288,6 +288,9 @@ spec:
       serviceAccountName: istio-pilot-service-account
       terminationGracePeriodSeconds: 30
       volumes:
+        - emptyDir:
+            medium: Memory
+          name: local-certs
         - configMap:
             defaultMode: 420
             name: istio
