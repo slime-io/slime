@@ -182,6 +182,6 @@ spec:
           memory: 200Mi
       image:
         repository: docker.io/slimeio/pilot
-        tag: global-pilot-v0.0.2-a85b00
+        tag: globalPilot-7.0-v0.0.3-833f1bd5c1
 ```
 
