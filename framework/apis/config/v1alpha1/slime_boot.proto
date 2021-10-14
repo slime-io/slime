@@ -5,7 +5,7 @@
 
 syntax = "proto3";
 
-import "pkg/apis/config/v1alpha1/config.proto";
+import "apis/config/v1alpha1/config.proto";
 
 
 package slime.config.v1alpha1;

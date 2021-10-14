@@ -5,9 +5,7 @@ package slime.config.v1alpha1;
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 
-
 option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
-
 
 message LocalSource {
   string mount = 1;
@@ -16,7 +14,6 @@ message LocalSource {
 message RemoteSource {
   string address = 1;
 }
-
 
 message Plugin {
   oneof wasm_source {
@@ -70,12 +67,20 @@ message K8S_Source{
   repeated string handlers = 1;
 }
 
-
 message Metric{
   Prometheus_Source prometheus = 1;
   K8S_Source k8s = 2;
 }
 
+message General {// general module
+}
+
+message Bundle {
+  message Item {
+    string name = 1;
+  }
+  repeated Item modules = 1;
+}
 
 message Config {
   Plugin plugin = 1;
@@ -85,4 +90,11 @@ message Config {
   Metric metric = 6;
   string name = 5;
   bool enable = 7;
+  General general = 8;  // general module config
+  Bundle bundle = 9;
+  enum Mode {
+    Module = 0;
+    BundleItem = 1;
+  }
+  Mode mode = 10;
 }

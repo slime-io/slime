@@ -1,0 +1,57 @@
+---
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: bundle-example-all
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-example-all
+    tag: v0.2.6-d808438
+  module:
+    - name: bundle-example-all
+      enable: true
+      bundle:
+        modules:
+        - name: lazyload
+        - name: limiter
+        - name: plugin
+    - name: lazyload
+      enable: true
+      mode: BundleItem
+      fence:
+        wormholePort: # replace to your application svc ports
+          - "9080"
+      metric:
+        prometheus:
+          address: http://prometheus.istio-system:9090
+          handlers:
+            destination:
+              query: |
+                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
+              type: Group
+    - name: plugin
+      enable: true
+      mode: BundleItem
+    - name: limiter
+      limiter:
+        backend: 1
+      enable: true
+      mode: BundleItem
+      metric:
+        prometheus:
+          address: http://prometheus.istio-system:9090
+          handlers:
+            cpu.sum:
+              query: |
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.max:
+              query: |
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            rt99:
+              query: |
+                histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+        k8s:
+          handlers:
+            - pod # inline

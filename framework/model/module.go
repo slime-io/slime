@@ -1,14 +1,18 @@
 package model
 
 import (
+	"bytes"
 	"context"
 	"os"
 
+	"github.com/gogo/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	bootconfig "slime.io/slime/slime-framework/apis/config/v1alpha1"
 	"slime.io/slime/slime-framework/bootstrap"
 	"slime.io/slime/slime-framework/util"
 )
@@ -19,6 +23,7 @@ type ModuleInitCallbacks struct {
 
 type Module interface {
 	Name() string
+	Config() proto.Message
 	InitScheme(scheme *runtime.Scheme) error
 	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs ModuleInitCallbacks) error
 }
@@ -28,10 +33,29 @@ func Main(bundle string, modules []Module) {
 		os.Exit(1)
 	}
 
-	config := bootstrap.GetModuleConfig()
-	err := util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	type configH struct {
+		config      *bootconfig.Config
+		generalJson []byte
+	}
+
+	config, generalJson, err := bootstrap.GetModuleConfig("")
 	if err != nil {
-		panic(err.Error())
+		panic(err)
+	}
+	modConfigs := map[string]configH{}
+	isBundle := config.Bundle != nil
+	if isBundle {
+		for _, mod := range config.Bundle.Modules {
+			modConfig, modGeneralJson, err := bootstrap.GetModuleConfig(mod.Name)
+			if err != nil {
+				panic(err)
+			}
+			modConfigs[mod.Name] = configH{modConfig, modGeneralJson}
+		}
+	}
+	err = util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	if err != nil {
+		panic(err)
 	}
 
 	var (
@@ -58,14 +82,11 @@ func Main(bundle string, modules []Module) {
 		fatal()
 	}
 
-	env := bootstrap.Environment{}
-	env.Config = config
 	client, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("create a new clientSet failed, %+v", err)
 		os.Exit(1)
 	}
-	env.K8SClient = client
 
 	var startups []func(ctx context.Context)
 	cbs := ModuleInitCallbacks{
@@ -73,7 +94,43 @@ func Main(bundle string, modules []Module) {
 			startups = append(startups, f)
 		},
 	}
+
+	ctx := context.Background()
+
 	for _, mod := range modules {
+		var modCfg *bootconfig.Config
+		var modGeneralJson []byte
+		if isBundle {
+			if h, ok := modConfigs[mod.Name()]; ok {
+				modCfg, modGeneralJson = h.config, h.generalJson
+			}
+		} else {
+			modCfg, modGeneralJson = config, generalJson
+		}
+
+		if modCfg != nil && modCfg.General != nil {
+			modSelfCfg := mod.Config()
+			if modSelfCfg != nil {
+				if len(modCfg.General.XXX_unrecognized) > 0 {
+					if err := proto.Unmarshal(modCfg.General.XXX_unrecognized, modSelfCfg); err != nil {
+						log.Errorf("unmarshal for mod %s XXX_unrecognized (%v) met err %v", mod.Name(), modCfg.General.XXX_unrecognized, err)
+						fatal()
+					}
+				} else if len(modGeneralJson) > 0 {
+					if err := jsonpb.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
+						log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", mod.Name(), modGeneralJson, err)
+						fatal()
+					}
+				}
+			}
+		}
+
+		env := bootstrap.Environment{
+			Config:    modCfg,
+			K8SClient: client,
+			Stop:      ctx.Done(),
+		}
+
 		if err := mod.InitManager(mgr, env, cbs); err != nil {
 			log.Errorf("mod %s InitManager met err %v", mod.Name(), err)
 			fatal()
@@ -82,7 +139,6 @@ func Main(bundle string, modules []Module) {
 
 	go bootstrap.AuxiliaryHttpServerStart(config.Global.Misc["aux-addr"])
 
-	ctx := context.Background()
 	for _, startup := range startups {
 		startup(ctx)
 	}
