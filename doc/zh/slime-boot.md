@@ -129,7 +129,7 @@ metadata:
   namespace: slime
 spec:
   namespace: slime					#自定义slime部署的namespace，和config.global.slimeNamespace一致
-  istioNamespace: istio-operator	#自定义istio部署的namespace，和config.global.istioNamespace一致
+  istioNamespace: istio-system		#自定义istio部署的namespace，和config.global.istioNamespace一致
   healthProbePort: 9091				#和config.global.misc["aux-addr"]包含的端口值一致
   image:
     pullPolicy: Always
@@ -143,7 +143,7 @@ spec:
           - "9080"
       global:
         slimeNamespace: slime		#自定义sidecar默认配置中部署slime的namespace，与spec.namespace保持一致
-        istioNamespace: istio-operator	#自定义sidecar默认配置中部署istio的namespace，与spec.istioNamespace保持一致
+        istioNamespace: istio-system	#自定义sidecar默认配置中部署istio的namespace，与spec.istioNamespace保持一致
         log:						#自定义log级别
           logLevel: debug
           klogLevel: 10
@@ -171,6 +171,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
+      image:
+        repository: istio/proxyv2
+        tag: 1.7.0
     pilot:
       enable: true
       resources:		#自定义resources

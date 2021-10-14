@@ -185,6 +185,10 @@ spec:
         app: pilot
         istio: pilot
     spec:
+      {{- with $.Values.component.pilot.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

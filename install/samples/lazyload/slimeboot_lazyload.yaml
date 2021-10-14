@@ -36,6 +36,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
+      image:
+        repository: istio/proxyv2
+        tag: 1.7.0
     pilot:
       enable: true
       resources:

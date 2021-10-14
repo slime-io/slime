@@ -65,6 +65,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
+      image:
+        repository: {{your_sidecar_repo}}
+        tag: {{your_sidecar_tag}}           
     pilot:
       enable: true
       resources:
@@ -75,7 +78,7 @@ spec:
           cpu: 200m
           memory: 200Mi
       image:
-        repository: docker.io/slimeio/pilot
+        repository: {{your_pilot_repo}}
         tag: {{your_pilot_tag}}
 ```
 
@@ -228,10 +231,13 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
+      image:
+        repository: {{your_sidecar_repo}}
+        tag: {{your_sidecar_tag}}      
     pilot:
       enable: true
       image:
-        repository: docker.io/slimeio/pilot
+        repository: {{your_pilot_repo}}
         tag: {{your_pilot_tag}}     
 ```
 
