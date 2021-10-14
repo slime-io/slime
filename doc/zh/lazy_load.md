@@ -66,6 +66,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
+      image:
+        repository: {{your_sidecar_repo}}
+        tag: {{your_sidecar_tag}}          
     pilot:
       enable: true
       resources:
@@ -76,7 +79,7 @@ spec:
           cpu: 200m
           memory: 200Mi
       image:
-        repository: docker.io/slimeio/pilot
+        repository: {{your_pilot_repo}}
         tag: {{your_pilot_tag}}
 ```
 
@@ -231,10 +234,13 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
+      image:
+        repository: {{your_sidecar_repo}}
+        tag: {{your_sidecar_tag}}
     pilot:
       enable: true
       image:
-        repository: docker.io/slimeio/pilot
+        repository: {{your_pilot_repo}}
         tag: {{your_pilot_tag}}
 ```
 
@@ -319,7 +325,7 @@ metadata:
 
 lazyload/fence默认会将envoy无法匹配路由（缺省）的流量兜底发送到global sidecar，应对短暂服务数据缺失的问题，这是“懒加载”所必然面对的。 该方案因为技术细节上的局限性，对于目标（如域名）是集群外的流量，无法正常处理，详见 [[Configuration Lazy Loading]: Failed to access external service #3](https://github.com/slime-io/slime/issues/3)。
 
-基于这个背景，设计了本特性，同时也能用于更灵活的业务场景。 大致思路是通过域名匹配的方式讲不同的缺省流量分派到不同的目标做正确处理。
+基于这个背景，设计了本特性，同时也能用于更灵活的业务场景。 大致思路是通过域名匹配的方式将不同的缺省流量分派到不同的目标做正确处理。
 
 
 

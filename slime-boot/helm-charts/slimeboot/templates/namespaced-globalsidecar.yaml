@@ -30,6 +30,10 @@ spec:
         nsf.skiff.netease.com/app: qz-ingress
         nsf.skiff.netease.com/isIngress: "true"
     spec:
+      {{- with $.Values.component.globalSidecar.imagePullSecrets }}
+      imagePullSecrets:
+      {{- toYaml . | nindent 8 }}
+      {{- end }}
       affinity:
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
@@ -127,7 +131,11 @@ spec:
               value: NONE
             - name: ISTIO_METAJSON_ANNOTATIONS
               value: '{"sidecar.istio.io/statsInclusionPrefixes": "listener,cluster.outbound,cluster_manager,listener_manager,http_mixer_filter,tcp_mixer_filter,server,cluster.xds-grpc"}'
-          image: istio/proxyv2:1.7.0
+          {{- if $.Values.component.globalSidecar.image.tag }}
+          image: "{{ $.Values.component.globalSidecar.image.repository }}:{{ $.Values.component.globalSidecar.image.tag}}"
+          {{- else }}
+          image: "{{ $.Values.component.globalSidecar.image.repository }}"
+          {{- end }}
           imagePullPolicy: IfNotPresent
           livenessProbe:
             failureThreshold: 3

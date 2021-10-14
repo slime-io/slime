@@ -5,8 +5,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"os"
 	"path/filepath"
-	commonutils "slime.io/slime/slime-framework/test/e2e/common"
 	"slime.io/slime/slime-framework/test/e2e/framework"
 	e2epod "slime.io/slime/slime-framework/test/e2e/framework/pod"
 	"slime.io/slime/slime-framework/test/e2e/framework/testfiles"
@@ -15,13 +15,17 @@ import (
 )
 
 var (
-	testResourceToDelete []*TestResource
-	nsSlime              = "mesh-operator"
-	nsApps               = "example-apps"
-	test                 = "test/e2e/testdata/install"
-	slimebootName        = "slime-boot"
-	istiodLabelKey       = "istio.io/rev"
-	istiodLabelV         = "1-10-2"
+	testResourceToDelete  []*TestResource
+	nsSlime               = "mesh-operator"
+	nsApps                = "example-apps"
+	test                  = "test/e2e/testdata/install"
+	slimebootName         = "slime-boot"
+	istiodLabelKey        = "istio.io/rev"
+	istiodLabelV          = "1-10-2"
+	slimebootTag          = "v0.2.3-a3f72fe"
+	lazyloadTag           = "v0.2.6-d808438"
+	globalSidecarTag      = "1.7.0"
+	globalSidecarPilotTag = "globalPilot-7.0-v0.0.3-833f1bd5c1"
 )
 
 type TestResource struct {
@@ -65,6 +69,7 @@ func createSlimeBoot(f *framework.Framework) {
 		testResourceToDelete = append(testResourceToDelete, &TestResource{Namespace: "", Contents: crdYaml})
 	}()
 	deploySlimeBootYaml := readFile(test, "init/deployment_slime-boot.yaml")
+	deploySlimeBootYaml = strings.ReplaceAll(deploySlimeBootYaml, "{{slimebootTag}}", substituteValue("slimeBootTag", slimebootTag))
 	framework.RunKubectlOrDieInput(nsSlime, deploySlimeBootYaml, "create", "-f", "-")
 	defer func() {
 		testResourceToDelete = append(testResourceToDelete, &TestResource{Namespace: nsSlime, Contents: deploySlimeBootYaml})
@@ -99,6 +104,9 @@ func createSlimeModuleLazyload(f *framework.Framework) {
 
 	// create slimeboot/lazyload
 	slimebootLazyloadYaml := readFile(test, "samples/lazyload/slimeboot_lazyload.yaml")
+	slimebootLazyloadYaml = strings.ReplaceAll(slimebootLazyloadYaml, "{{lazyloadTag}}", substituteValue("lazyloadTag", lazyloadTag))
+	slimebootLazyloadYaml = strings.ReplaceAll(slimebootLazyloadYaml, "{{globalSidecarTag}}", substituteValue("globalSidecarTag", globalSidecarTag))
+	slimebootLazyloadYaml = strings.ReplaceAll(slimebootLazyloadYaml, "{{globalSidecarPilotTag}}", substituteValue("globalSidecarPilotTag", globalSidecarPilotTag))
 	framework.RunKubectlOrDieInput(nsSlime, slimebootLazyloadYaml, "create", "-f", "-")
 	defer func() {
 		testResourceToDelete = append(testResourceToDelete, &TestResource{Namespace: nsSlime, Contents: slimebootLazyloadYaml})
@@ -332,13 +340,20 @@ func verifyAccessLogs(f *framework.Framework) {
 	ginkgo.By("access log verified successfully")
 }
 
+func substituteValue(value, defaultValue string) string {
+	if os.Getenv(value) != "" {
+		return os.Getenv(value)
+	}
+	return defaultValue
+}
+
 func readFile(test, file string) string {
 	from := filepath.Join(test, file)
 	data, err := testfiles.Read(from)
 	if err != nil {
 		framework.ExpectNoError(err, "failed to read file %s/%s", test, file)
 	}
-	return commonutils.SubstituteImageName(string(data))
+	return string(data)
 }
 
 func deleteTestResource() {

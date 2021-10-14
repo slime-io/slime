@@ -127,10 +127,10 @@ apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
   name: lazyload
-  namespace: slime				#customize the namespace deployed slime
+  namespace: slime					#customize the namespace deployed slime
 spec:
   namespace: slime					#customize the namespace deployed slime, same with config.global.slimeNamespace
-  istioNamespace: istio-operator	#customize the namespace deployed istio, same with config.global.istioNamespace
+  istioNamespace: istio-system		#customize the namespace deployed istio, same with config.global.istioNamespace
   healthProbePort: 9091				#same with the port contained by config.global.misc["aux-addr"]
   image:
     pullPolicy: Always
@@ -143,8 +143,8 @@ spec:
         wormholePort:
           - "9080"
       global:
-        slimeNamespace: slime	#customize the slime deployed namespace filled in sidecar, same with spec.namespace
-        istioNamespace: istio-operator #customize the istio deployed namespace filled in sidecar, same with spec.istioNamespace
+        slimeNamespace: slime		#customize the slime deployed namespace filled in sidecar, same with spec.namespace
+        istioNamespace: istio-system 	#customize the istio deployed namespace filled in sidecar, same with spec.istioNamespace
         log:						#customize log level
           logLevel: debug
           klogLevel: 10        
@@ -172,6 +172,9 @@ spec:
         limits:
           cpu: 200m
           memory: 200Mi
+      image:
+        repository: istio/proxyv2
+        tag: 1.7.0          
     pilot:
       enable: true
       resources:		#customize resources

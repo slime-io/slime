@@ -17,7 +17,7 @@ spec:
       containers:
         - name: slime-boot
           # Replace this with the built image name
-          image: docker.io/slimeio/slime-boot:v0.2.2
+          image: docker.io/slimeio/slime-boot:{{slimebootTag}}
           imagePullPolicy: Always
           env:
             - name: WATCH_NAMESPACE

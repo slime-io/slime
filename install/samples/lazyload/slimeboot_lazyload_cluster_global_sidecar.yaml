@@ -29,6 +29,9 @@ spec:
     globalSidecar:
       enable: true
       type: cluster
+      image:
+        repository: istio/proxyv2
+        tag: 1.7.0
     pilot:
       enable: true
       image:
