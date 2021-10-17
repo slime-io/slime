@@ -5,7 +5,7 @@
 
 package controllers
 
-import "slime.io/slime/slime-framework/util"
+import "slime.io/slime/framework/util"
 
 // You can query which subsets the Host contains, which is defined in the DestinationRule
 var HostSubsetMapping *util.SubcribeableMap

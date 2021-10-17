@@ -7,8 +7,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/slimeio/slime-example-all
-    tag: v0.2.6-d808438
+    repository: yonka-ubuntu-180413-1:5000/yonka/slime-bundle-example-all
+    tag: feature-bundle-577de48-dirty
   module:
     - name: bundle-example-all
       enable: true

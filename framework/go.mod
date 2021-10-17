@@ -1,4 +1,4 @@
-module slime.io/slime/slime-framework
+module slime.io/slime/framework
 
 go 1.13
 
@@ -30,5 +30,4 @@ require (
 replace (
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.17.2
-	slime.io/slime/slime-framework => ../../slime-framework
 )

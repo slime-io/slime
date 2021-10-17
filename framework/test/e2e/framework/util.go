@@ -11,7 +11,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"net/url"
 	"reflect"
-	e2ekubectl "slime.io/slime/slime-framework/test/e2e/framework/kubectl"
+	e2ekubectl "slime.io/slime/framework/test/e2e/framework/kubectl"
 	"strings"
 	"syscall"
 	"time"

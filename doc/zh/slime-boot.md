@@ -60,7 +60,7 @@ prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
 默认值来源分为两块
 
 1. slime-boot operator中的values.yaml文件，文件路径slime/slime-boot/helm-charts/slimeboot/values.yaml
-2. slime framework中Config.Global，文件路径slime/slime-framework/apis/config/v1alpha1/config.proto
+2. slime framework中Config.Global，文件路径slime/framework/apis/config/v1alpha1/config.proto
 
 #### values.yaml
 

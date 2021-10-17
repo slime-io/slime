@@ -27,8 +27,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	networkingistioiov1alpha3 "slime.io/slime/slime-framework/apis/networking/v1alpha3"
-	"slime.io/slime/slime-framework/util"
+	networkingistioiov1alpha3 "slime.io/slime/framework/apis/networking/v1alpha3"
+	"slime.io/slime/framework/util"
 )
 
 // DestinationRuleReconciler reconciles a DestinationRule object

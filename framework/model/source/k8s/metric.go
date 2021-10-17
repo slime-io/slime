@@ -14,10 +14,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
-	"slime.io/slime/slime-framework/apis/config/v1alpha1"
-	"slime.io/slime/slime-framework/controllers"
-	"slime.io/slime/slime-framework/model/source"
-	"slime.io/slime/slime-framework/util"
+	"slime.io/slime/framework/apis/config/v1alpha1"
+	"slime.io/slime/framework/controllers"
+	"slime.io/slime/framework/model/source"
+	"slime.io/slime/framework/util"
 )
 
 // metric source handlers

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"runtime/debug"
-	e2eginkgowrapper "slime.io/slime/slime-framework/test/e2e/framework/ginkgowrapper"
+	e2eginkgowrapper "slime.io/slime/framework/test/e2e/framework/ginkgowrapper"
 )
 
 var codeFilterRE = regexp.MustCompile(`/github.com/onsi/ginkgo/`)

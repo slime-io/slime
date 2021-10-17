@@ -5,7 +5,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"net/http"
 	"net/http/pprof"
-	"slime.io/slime/slime-framework/util"
+	"slime.io/slime/framework/util"
 	"strconv"
 )
 

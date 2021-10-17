@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/golang/protobuf/proto"
-	config "slime.io/slime/slime-framework/apis/config/v1alpha1"
-	configtest "slime.io/slime/slime-framework/apis/testdata/configv1alpha1"
+	config "slime.io/slime/framework/apis/config/v1alpha1"
+	configtest "slime.io/slime/framework/apis/testdata/configv1alpha1"
 )
 
 func TestGeneral(t *testing.T) {

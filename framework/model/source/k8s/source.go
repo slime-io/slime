@@ -15,11 +15,11 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"slime.io/slime/slime-framework/apis/config/v1alpha1"
-	"slime.io/slime/slime-framework/bootstrap"
-	"slime.io/slime/slime-framework/controllers"
-	"slime.io/slime/slime-framework/model/source"
-	"slime.io/slime/slime-framework/util"
+	"slime.io/slime/framework/apis/config/v1alpha1"
+	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/controllers"
+	"slime.io/slime/framework/model/source"
+	"slime.io/slime/framework/util"
 )
 
 type Source struct {

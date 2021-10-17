@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"slime.io/slime/slime-framework/apis/config/v1alpha1"
+	"slime.io/slime/framework/apis/config/v1alpha1"
 )
 
 func init() {

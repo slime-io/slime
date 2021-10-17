@@ -2,7 +2,7 @@ package aggregate
 
 import (
 	"k8s.io/apimachinery/pkg/types"
-	"slime.io/slime/slime-framework/model/source"
+	"slime.io/slime/framework/model/source"
 )
 
 type Source struct {

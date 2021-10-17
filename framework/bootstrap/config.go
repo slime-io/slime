@@ -1,13 +1,14 @@
 package bootstrap
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"os"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"k8s.io/client-go/kubernetes"
-	bootconfig "slime.io/slime/slime-framework/apis/config/v1alpha1"
+	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 )
 
 const (
@@ -116,7 +117,8 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, error) {
 	}
 
 	c := &bootconfig.Config{}
-	err = jsonpb.UnmarshalString(string(y), c)
+	um := jsonpb.Unmarshaler{AllowUnknownFields: true}
+	err = um.Unmarshal(bytes.NewBuffer(y), c)
 	if err != nil {
 		return nil, nil, err
 	}

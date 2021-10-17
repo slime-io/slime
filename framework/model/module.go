@@ -12,9 +12,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-	bootconfig "slime.io/slime/slime-framework/apis/config/v1alpha1"
-	"slime.io/slime/slime-framework/bootstrap"
-	"slime.io/slime/slime-framework/util"
+	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
+	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/util"
 )
 
 type ModuleInitCallbacks struct {

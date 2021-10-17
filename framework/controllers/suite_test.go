@@ -27,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
-	networkingistioiov1alpha3 "slime.io/slime/slime-framework/apis"
+	networkingistioiov1alpha3 "slime.io/slime/framework/apis"
 	// +kubebuilder:scaffold:imports
 )
 

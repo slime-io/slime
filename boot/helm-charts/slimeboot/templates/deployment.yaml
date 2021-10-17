@@ -18,7 +18,7 @@ data:
   {{ end }}
   {{ end }}
 ---
-{{- if not (eq .mode "BundleItem") }}
+{{- if not (eq (default "" .mode) "BundleItem") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
