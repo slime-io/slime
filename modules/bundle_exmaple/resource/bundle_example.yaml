@@ -7,16 +7,16 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: yonka-ubuntu-180413-1:5000/yonka/slime-bundle-example-all
-    tag: feature-bundle-577de48-dirty
+    repository: slimeio/slime-bundle-example-all
+    tag: feature-bundle-577de48-dirty  # should be replaced with actual repo/tag
   module:
     - name: bundle-example-all
       enable: true
       bundle:
         modules:
-        - name: lazyload
-        - name: limiter
-        - name: plugin
+          - name: lazyload
+          - name: limiter
+          - name: plugin
     - name: lazyload
       enable: true
       mode: BundleItem

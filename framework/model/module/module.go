@@ -1,4 +1,4 @@
-package model
+package module
 
 import (
 	"bytes"
@@ -143,7 +143,7 @@ func Main(bundle string, modules []Module) {
 		startup(ctx)
 	}
 
-	log.Info("starting manager bundle %s with modules %v", bundle, modNames)
+	log.Infof("starting manager bundle %s with modules %v", bundle, modNames)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Errorf("problem running manager, %+v", err)
 		os.Exit(1)
