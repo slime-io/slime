@@ -17,7 +17,7 @@ import (
 	"slime.io/slime/framework/util"
 )
 
-type ModuleInitCallbacks struct {
+type InitCallbacks struct {
 	AddStartup func(func(ctx context.Context))
 }
 
@@ -25,7 +25,7 @@ type Module interface {
 	Name() string
 	Config() proto.Message
 	InitScheme(scheme *runtime.Scheme) error
-	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs ModuleInitCallbacks) error
+	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs InitCallbacks) error
 }
 
 func Main(bundle string, modules []Module) {
@@ -38,24 +38,27 @@ func Main(bundle string, modules []Module) {
 		generalJson []byte
 	}
 
-	config, generalJson, err := bootstrap.GetModuleConfig("")
+	config, rawCfg, generalJson, err := bootstrap.GetModuleConfig("")
 	if err != nil {
 		panic(err)
-	}
-	modConfigs := map[string]configH{}
-	isBundle := config.Bundle != nil
-	if isBundle {
-		for _, mod := range config.Bundle.Modules {
-			modConfig, modGeneralJson, err := bootstrap.GetModuleConfig(mod.Name)
-			if err != nil {
-				panic(err)
-			}
-			modConfigs[mod.Name] = configH{modConfig, modGeneralJson}
-		}
 	}
 	err = util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
 	if err != nil {
 		panic(err)
+	}
+
+	log.Infof("load module config of %s: %s", bundle, string(rawCfg))
+	modConfigs := map[string]configH{}
+	isBundle := config.Bundle != nil
+	if isBundle {
+		for _, mod := range config.Bundle.Modules {
+			modConfig, modRawCfg, modGeneralJson, err := bootstrap.GetModuleConfig(mod.Name)
+			if err != nil {
+				panic(err)
+			}
+			log.Infof("load module config of bundle item %s: %s", mod.Name, string(modRawCfg))
+			modConfigs[mod.Name] = configH{modConfig, modGeneralJson}
+		}
 	}
 
 	var (
@@ -89,7 +92,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	var startups []func(ctx context.Context)
-	cbs := ModuleInitCallbacks{
+	cbs := InitCallbacks{
 		AddStartup: func(f func(ctx context.Context)) {
 			startups = append(startups, f)
 		},

@@ -79,50 +79,50 @@ func patchGlobal(global, patch *bootconfig.Global) {
 	}
 }
 
-func GetModuleConfig(name string) (*bootconfig.Config, []byte, error) {
+func GetModuleConfig(name string) (*bootconfig.Config, []byte, []byte, error) {
 	filePath := DefaultModuleConfigPath
 	if name != "" {
 		filePath += "_" + name
 	}
-	cfg, generalJson, err := readModuleConfig(filePath)
+	cfg, raw, generalJson, err := readModuleConfig(filePath)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	patchModuleConfig(cfg, defaultModuleConfig)
-	return cfg, generalJson, nil
+	return cfg, raw, generalJson, nil
 }
 
-func readModuleConfig(filePath string) (*bootconfig.Config, []byte, error) {
-	y, err := ioutil.ReadFile(filePath)
+func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, error) {
+	raw, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil
 		}
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	// as jsonpb does not support XXX_unrecognized
 	var m map[string]interface{}
 	var generalJson []byte
-	if err = json.Unmarshal(y, &m); err != nil {
-		return nil, nil, err
+	if err = json.Unmarshal(raw, &m); err != nil {
+		return nil, nil, nil, err
 	} else if m != nil {
 		gen := m["general"]
 		if gen != nil {
 			if generalJson, err = json.Marshal(gen); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
 	}
 
 	c := &bootconfig.Config{}
 	um := jsonpb.Unmarshaler{AllowUnknownFields: true}
-	err = um.Unmarshal(bytes.NewBuffer(y), c)
+	err = um.Unmarshal(bytes.NewBuffer(raw), c)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	return c, generalJson, nil
+	return c, raw, generalJson, nil
 }
 
 type Environment struct {
