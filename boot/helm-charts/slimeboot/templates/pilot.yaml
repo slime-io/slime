@@ -253,6 +253,8 @@ spec:
               value: "false"
             - name: PILOT_SIDECAR_USE_REMOTE_ADDRESS
               value: "true"
+            - name: DISABLE_CA_CERT_NAMESPACE_CONFIG_UPDATE
+              value: "true"
           {{- if $.Values.component.pilot.image.tag }}
           image: "{{ $.Values.component.pilot.image.repository }}:{{ $.Values.component.pilot.image.tag}}"
           {{- else }}
