@@ -63,7 +63,7 @@ prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
 The default value source consists of two parts
 
 1. values.yaml of slime-boot operator. The file path is "slime/slime-boot/helm-charts/slimeboot/values.yaml"
-2. struct Config.Global of slime framework. The code path is "slime/slime-framework/apis/config/v1alpha1/config.proto"
+2. struct Config.Global of slime framework. The code path is "slime/framework/apis/config/v1alpha1/config.proto"
 
 #### values.yaml
 
