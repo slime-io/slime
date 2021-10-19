@@ -114,6 +114,11 @@ spec:
   enable: true
 ```
 
+**注意**
+因为servicefence依赖global sidecar来临时处理发往“暂时未知的依赖服务”的流量，所以需要保证以下二者其一：
+* 如globalSidecar为namespaced模式： 要启用的ns或者启用的svc所在的ns在globalSidecar的`namespace`处已配置
+* 如globalSidecar为cluster模式： ok
+
 4. 确认懒加载已开启
    执行`kubectl get sidecar {{your svc}} -oyaml`，可以看到对应服务生成了一个sidecar，如下：
 
@@ -144,7 +149,7 @@ spec:
 
 ## 其他安装选项
 
-### 不使用global-sidecar组件  
+### 不使用global-sidecar组件
 
 在开启allow_any的网格中，可以不使用global-sidecar组件。使用如下配置：
 
@@ -188,11 +193,11 @@ spec:
               type: Group
 ```
 
-不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。 
+不使用global-sidecar组件可能会导致首次调用无法按照预先设定的路由规则进行。
 
 
 
-### 使用集群唯一的global-sidecar   
+### 使用集群唯一的global-sidecar
 
 > [完整样例](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 >
@@ -275,6 +280,7 @@ fence支持基于label的自动生成，也即可以通过打label `slime.io/ser
 对于自动生成的servicefence cr，会通过标准label `app.kubernetes.io/created-by=fence-controller`来记录，实现了状态关联变更。 而不匹配该label的servicefence，目前视为手动配置，不受以上label影响。
 
 
+**注意** 同样的，也需要保证ns对应的globalSidecar是可用的，详见前文
 
 **举例**
 
@@ -391,7 +397,7 @@ $ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/slime/tags |
 
 
 
-### 安装 slime 
+### 安装 slime
 
 ```shell
 $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
@@ -417,7 +423,7 @@ global-sidecar-59f4c5f989-ccjjg   1/1     Running   0          3m9s
 
 ### 安装bookinfo
 
-   创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
+创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
 
 ```sh
 $ kubectl label namespace default istio-injection=enabled

@@ -100,9 +100,9 @@ NAME                              READY     STATUS    RESTARTS   AGE
 global-sidecar-785b58d4b4-fl8j4   1/1       Running   0          68s
 ```
 
-3. enable lazyload    
+3. enable lazyload
 
-  Apply servicefence resource to enable lazyload.
+Apply servicefence resource to enable lazyload.
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -113,6 +113,11 @@ metadata:
 spec:
   enable: true
 ```
+
+**Note**
+Because servicefence relies on global sidecar to temporarily handle traffic to "temporarily unknown dependent services", it is necessary to ensure that one of the following is in place.
+* If globalSidecar is in namespaced mode: the ns to be enabled or the ns where the svc is enabled is configured in the `namespace` of globalSidecar
+* If globalSidecar is in cluster mode: ok
 
 4. make sure sidecar has been generated
    Execute `kubectl get sidecar {{svc name}} -oyaml`，you can see a sidecar is generated for the corresponding service， as follow：
@@ -142,17 +147,17 @@ spec:
 
 ## Other installation options
 
-### Disable global-sidecar  
+### Disable global-sidecar
 
 In the ServiceMesh with allow_any enabled, the global-sidecar component can be omitted. Use the following configuration:
 
 > [Example](../../install/samples/lazyload/slimeboot_lazyload_no_global_sidecar.yaml)
 >
-> Instructions: 
+> Instructions:
 >
 > Not using the global-sidecar component may result in the first call not following the pre-defined routing rules. It may result in the underlying logic of istio (typically passthrough), then it come back to send request using clusterIP. VirtualService temporarily disabled.
 >
-> Scenario: 
+> Scenario:
 >
 > Service A accesses service B, but service B's virtualservice directs the request for access to service B to service C. Since there is no global sidecar to handle this, the first request is transmitted by istio to service B via PassthroughCluster. What should have been a response from service C becomes a response from service B with an error. After first request, B adds to A's servicefence, then A senses that the request is directed to C by watching B's virtualservice. Later C adds to A's servicefence., and all requests after the first time will be successfully responded by C.
 >
@@ -189,13 +194,13 @@ spec:
 
 
 
-### Use cluster unique global-sidecar   
+### Use cluster unique global-sidecar
 
-> [Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)  
+> [Example](../../install/samples/lazyload/slimeboot_lazyload_cluster_global_sidecar.yaml)
 >
-> Instructions: 
+> Instructions:
 >
-> In k8s, the traffic of short domain access will only come from the same namespace, and cross-namespace access must carry namespace information. Cluster unique global-sidecar is often not under the same namespace with business service, so its envoy config lacks the configuration of short domain. Therefore, cluster unique global-sidecar cannot successfully forward access requests within the same namespace, resulting in timeout "HTTP/1.1 0 DC downstream_remote_disconnect" error. 
+> In k8s, the traffic of short domain access will only come from the same namespace, and cross-namespace access must carry namespace information. Cluster unique global-sidecar is often not under the same namespace with business service, so its envoy config lacks the configuration of short domain. Therefore, cluster unique global-sidecar cannot successfully forward access requests within the same namespace, resulting in timeout "HTTP/1.1 0 DC downstream_remote_disconnect" error.
 >
 > So in this case, inter-application access should carry namespace information.
 
@@ -255,7 +260,7 @@ fence supports automatic generation based on label, i.e. you can define  **the s
 
 * namespace level
 
-  * `true`: Servicefence cr will be created for all services (without cr) under this namespace 
+  * `true`: Servicefence cr will be created for all services (without cr) under this namespace
   * Other values: No action
 
 * service level
@@ -271,6 +276,8 @@ fence supports automatic generation based on label, i.e. you can define  **the s
 
 For automatically generated servicefence cr, it will be recorded by the standard label `app.kubernetes.io/created-by=fence-controller`, which implements the state association change. Servicefence that do not match this label are currently considered manually configured and are not affected by the above labels.
 
+
+**Note** Similarly, it is necessary to ensure that the globalSidecar corresponding to the ns is available, see the previous article for details
 
 
 **Example**
@@ -429,7 +436,7 @@ reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
 reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
 ```
 
-Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`. 
+Then we can visit productpage from pod/ratings, executing `curl productpage:9080/productpage`.
 
 You can also create gateway and visit productpage from outside, like what shows in  [Open the application to outside traffic](https://istio.io/latest/docs/setup/getting-started/#ip).
 
@@ -493,7 +500,7 @@ Visit the productpage website, and use `kubectl logs -f productpage-xxx -c istio
 
 It is clearly that the banckend of productpage is global-sidecar.
 
-Now we get the sidecar yaml. 
+Now we get the sidecar yaml.
 
 ```YAML
 $ kubectl get sidecar productpage -oyaml
@@ -526,7 +533,7 @@ spec:
       app: productpage
 ```
 
-Details and reviews are already added into sidecar! 
+Details and reviews are already added into sidecar!
 
 
 
@@ -561,7 +568,7 @@ $ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/slime/$l
 
 ### Remarks
 
-If you want to use customize shell scripts or yaml files, please set $custom_tag_or_commit. 
+If you want to use customize shell scripts or yaml files, please set $custom_tag_or_commit.
 
 ```sh
 $ export custom_tag_or_commit=xxx
