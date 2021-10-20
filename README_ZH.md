@@ -30,11 +30,11 @@ Istio 可以实现版本分流、灰度发布、负载均衡等功能，但是�
 
 Slime 内部采用了模块化的架构。目前包含了三个非常实用的子模块。
 
-**配置懒加载**：无须配置SidecarScope，自动按需加载配置和服务发现信息 ，解决了全量推送的问题。
+[配置懒加载](https://github.com/slime-io/lazyload)：无须配置SidecarScope，自动按需加载配置和服务发现信息 ，解决了全量推送的问题。
 
-**Http插件管理**：使用新的的CRD pluginmanager/envoyplugin包装了可读性及可维护性差的envoyfilter，使得插件扩展更为便捷。
+[Http插件管理](https://github.com/slime-io/plugin)：使用新的的CRD pluginmanager/envoyplugin包装了可读性及可维护性差的envoyfilter，使得插件扩展更为便捷。
 
-**自适应限流**：实现了本地限流，同时可以结合监控信息自动调整限流策略，填补了 Istio 限流功能的短板。
+[自适应限流](https://github.com/slime-io/limiter)：实现了本地限流，同时可以结合监控信息自动调整限流策略，填补了 Istio 限流功能的短板。
 
 后续我们会开源更多的功能模块。
 
@@ -61,6 +61,8 @@ Slime架构主要分为三大块：
 
 
 ## 教程
+
+[Slime镜像信息](https://github.com/slime-io/slime/wiki/Slime-Project-Tag-and-Image-Tag-Mapping-Table)
 
 [Slime-boot安装](./doc/zh/slime-boot.md)
 
