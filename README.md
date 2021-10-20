@@ -31,11 +31,11 @@ In order to solving the current shortcomings of Istio, we make Slime project. It
 
 Slime adopts a modular architecture inside. It contains three useful modules now.
 
-**Configuration Lazy Loading**: No need to configure SidecarScope, automatically load configuration on demand, solving full push problem.
+[Configuration Lazy Loading](https://github.com/slime-io/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem.
 
-**Http Plugin Management**: Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
+[Http Plugin Management](https://github.com/slime-io/plugin): Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
 
-**Adaptive Ratelimit**: It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
+[Adaptive Ratelimit](https://github.com/slime-io/limiter): It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
 
 
 
@@ -60,6 +60,8 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 
 
 ## Tutorials
+
+[Slime Image Info](https://github.com/slime-io/slime/wiki/Slime-Project-Tag-and-Image-Tag-Mapping-Table)
 
 [Slime-boot Install](./doc/en/slime-boot.md)
 
