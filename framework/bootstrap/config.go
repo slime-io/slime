@@ -130,3 +130,10 @@ type Environment struct {
 	K8SClient *kubernetes.Clientset
 	Stop      <-chan struct{}
 }
+
+func (env *Environment) IstioRev() string {
+	if env == nil || env.Config == nil || env.Config.Global == nil {
+		return ""
+	}
+	return env.Config.Global.IstioRev
+}
