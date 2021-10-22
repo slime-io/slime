@@ -68,7 +68,7 @@ Slime架构主要分为三大块：
 
 Slime-module
 
-- [懒加载使用](./doc/zh/lazy_load.md)
+- [懒加载使用](https://github.com/slime-io/lazyload/blob/master/README_zh.md)
 - [插件管理使用](doc/zh/plugin_manager.md)
 - [自适应限流使用](doc/zh/smart_limiter.md)
 

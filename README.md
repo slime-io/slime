@@ -67,7 +67,7 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 
 Slime-module
 
-- [Lazyload Usage](./doc/en/lazy_load.md)
+- [Lazyload Usage](https://github.com/slime-io/lazyload/blob/master/README.md)
 - [PluginManager Usage](./doc/en/plugin_manager.md)
 - [SmartLimiter Usage](./doc/en/smart_limiter.md)
 
