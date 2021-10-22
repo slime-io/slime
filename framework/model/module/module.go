@@ -56,6 +56,13 @@ func Main(bundle string, modules []Module) {
 			if err != nil {
 				panic(err)
 			}
+
+			if config.Global != nil {
+				if modConfig.Global == nil {
+					modConfig.Global = &bootconfig.Global{}
+				}
+				proto.Merge(config.Global, modConfig.Global)
+			}
 			log.Infof("load module config of bundle item %s: %s", mod.Name, string(modRawCfg))
 			modConfigs[mod.Name] = configH{modConfig, modGeneralJson}
 		}

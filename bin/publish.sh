@@ -12,7 +12,7 @@ if test -z "$MOD"; then
   fatal "empty MOD"
 fi
 
-version=$(cat VERSION)  # get version from file
+version=$(test -f VERSION && cat VERSION || echo "")  # get version from file
 dirty=
 if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
   dirty="-dirty"

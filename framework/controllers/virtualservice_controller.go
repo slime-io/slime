@@ -20,6 +20,8 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
+	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -42,6 +44,7 @@ const (
 type VirtualServiceReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
+	Env    *bootstrap.Environment
 }
 
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;create;update;patch;delete
@@ -55,14 +58,18 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("virtualService is deleted")
+			// TODO del event not handled. should re-calc the data accordingly
+			log.Infof("virtualService is deleted")
 			return reconcile.Result{}, nil
 		} else {
 			log.Errorf("get virtualService error, %+v", err)
 			return reconcile.Result{}, err
 		}
 	}
-	log.Infof("get virtualService, %s", instance.Name)
+	if !model.LabelMatchIstioRev(instance.Labels, r.Env.IstioRev()) {
+		return ctrl.Result{}, nil
+	}
+
 	// 资源更新
 	m := parseDestination(instance)
 	log.Infof("get destination after parse, %+v", m)
