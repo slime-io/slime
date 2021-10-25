@@ -40,6 +40,7 @@ message Global {
   Log log = 5;
   map<string, string> misc = 6;
   string istioRev = 7;
+  bool strictRev = 8;
 }
 
 message Log {
