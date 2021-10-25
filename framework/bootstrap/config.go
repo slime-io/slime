@@ -137,3 +137,10 @@ func (env *Environment) IstioRev() string {
 	}
 	return env.Config.Global.IstioRev
 }
+
+func (env *Environment) RevInScope(rev string) bool {
+	if env == nil || env.Config == nil || env.Config.Global == nil {
+		return rev == ""
+	}
+	return env.Config.Global.IstioRev == rev || (rev == "" && !env.Config.Global.StrictRev)
+}
