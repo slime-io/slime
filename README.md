@@ -71,7 +71,7 @@ Slime-module
 - [PluginManager Usage](./doc/en/plugin_manager.md)
 - [SmartLimiter Usage](./doc/en/smart_limiter.md)
 
-
+[E2E Test Tutorials](./doc/en/slime_e2e_test.md)
 
 
 
