@@ -72,7 +72,7 @@ Slime-module
 - [插件管理使用](doc/zh/plugin_manager.md)
 - [自适应限流使用](doc/zh/smart_limiter.md)
 
-
+[E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 
 
 
