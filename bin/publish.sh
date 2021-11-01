@@ -2,6 +2,7 @@
 
 HUB=${HUB:-"docker.io/slimeio"}
 PUSH_HUBS="$HUB"
+VERBOSE=${V:-1}
 
 function fatal() {
   echo "$1" >&2
@@ -12,10 +13,19 @@ if test -z "$MOD"; then
   fatal "empty MOD"
 fi
 
+function calc_unstaged_hash() {
+    local tmp_f
+    tmp_f=`mktemp`
+    cp .git/index "$tmp_f"
+    GIT_INDEX_FILE="$tmp_f" git add -u
+    GIT_INDEX_FILE="$tmp_f" git write-tree
+}
+
 version=$(test -f VERSION && cat VERSION || echo "")  # get version from file
 dirty=
 if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
-  dirty="-dirty"
+  unstaged_hash=$(calc_unstaged_hash)
+  dirty="-dirty_${unstaged_hash::7}"
 fi
 commit=$(git rev-parse --short HEAD)
 if [[ -z "${version}" ]]; then
@@ -66,7 +76,9 @@ function print_info() {
   done
 }
 
-set -x
+if [[ "$V" -gt 0 ]]; then
+  set -x
+fi
 for action in $actions; do
   case "$action" in
   build)
