@@ -3,7 +3,10 @@ package module
 import (
 	"bytes"
 	"context"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/rest"
 	"os"
+	"slime.io/slime/framework/model"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -23,9 +26,14 @@ type InitCallbacks struct {
 
 type Module interface {
 	Name() string
-	Config() proto.Message
+	//Config() proto.Message
+	Env() *bootstrap.Environment
 	InitScheme(scheme *runtime.Scheme) error
 	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs InitCallbacks) error
+	GVKs() []schema.GroupVersionKind                                                                                                // related gvk
+	MetricUpdateCheckHandler() func (event model.WatcherEvent) map[string]*bootconfig.Prometheus_Source_Handler // watcher event -> metric handler need to update
+	ModuleEventChan() chan model.ModuleEvent                                                                                        // module event channel
+	RestConfig() rest.Config                                                                                                       // k8s cluster config
 }
 
 func Main(bundle string, modules []Module) {
@@ -119,7 +127,7 @@ func Main(bundle string, modules []Module) {
 		}
 
 		if modCfg != nil && modCfg.General != nil {
-			modSelfCfg := mod.Config()
+			modSelfCfg := mod.Env().Config
 			if modSelfCfg != nil {
 				if len(modCfg.General.XXX_unrecognized) > 0 {
 					if err := proto.Unmarshal(modCfg.General.XXX_unrecognized, modSelfCfg); err != nil {
