@@ -3,6 +3,7 @@ package module
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -42,6 +43,9 @@ func Main(bundle string, modules []Module) {
 	if err != nil {
 		panic(err)
 	}
+	if config == nil {
+		panic(fmt.Errorf("module config nil for %s", bundle))
+	}
 	err = util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
 	if err != nil {
 		panic(err)
@@ -55,6 +59,9 @@ func Main(bundle string, modules []Module) {
 			modConfig, modRawCfg, modGeneralJson, err := bootstrap.GetModuleConfig(mod.Name)
 			if err != nil {
 				panic(err)
+			}
+			if config == nil {
+				panic(fmt.Errorf("module config nil for %s", mod.Name))
 			}
 
 			if config.Global != nil {
