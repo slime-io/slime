@@ -4,9 +4,9 @@ go 1.13
 
 require (
 	github.com/ghodss/yaml v1.0.0
-	github.com/golang/protobuf v1.4.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/golang/protobuf v1.4.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.8.1

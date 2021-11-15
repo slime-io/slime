@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
-
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
@@ -99,9 +99,15 @@ func Main(bundle string, modules []Module) {
 		fatal()
 	}
 
-	client, err := kubernetes.NewForConfig(mgr.GetConfig())
+	clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("create a new clientSet failed, %+v", err)
+		os.Exit(1)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		log.Errorf("create a new dynamic client failed, %+v", err)
 		os.Exit(1)
 	}
 
@@ -143,9 +149,10 @@ func Main(bundle string, modules []Module) {
 		}
 
 		env := bootstrap.Environment{
-			Config:    modCfg,
-			K8SClient: client,
-			Stop:      ctx.Done(),
+			Config:        modCfg,
+			K8SClient:     clientSet,
+			DynamicClient: dynamicClient,
+			Stop:          ctx.Done(),
 		}
 
 		if err := mod.InitManager(mgr, env, cbs); err != nil {

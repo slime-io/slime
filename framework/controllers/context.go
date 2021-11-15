@@ -7,10 +7,10 @@ package controllers
 
 import "slime.io/slime/framework/util"
 
-// You can query which subsets the Host contains, which is defined in the DestinationRule
+// HostSubsetMapping You can query which subsets the Host contains, which is defined in the DestinationRule
 var HostSubsetMapping *util.SubcribeableMap
 
-// You can query the back-end service of the host, which is defined in the VirtualService
+// HostDestinationMapping You can query the back-end service of the host, which is defined in the VirtualService
 var HostDestinationMapping *util.SubcribeableMap
 
 func init() {
