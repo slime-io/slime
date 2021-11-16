@@ -89,6 +89,9 @@ func GetModuleConfig(name string) (*bootconfig.Config, []byte, []byte, error) {
 	if err != nil {
 		return nil, nil, nil, err
 	}
+	if cfg == nil {
+		cfg = &bootconfig.Config{}
+	}
 
 	if cfg != nil {
 		patchModuleConfig(cfg, defaultModuleConfig)
