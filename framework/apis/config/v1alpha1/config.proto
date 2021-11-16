@@ -15,6 +15,13 @@ message RemoteSource {
   string address = 1;
 }
 
+message TrafficMark {
+  bool enable = 1;
+  repeated string includeNamespaces = 2;
+  repeated string excludeNamespaces = 3;
+  string podLabelName = 4;
+}
+
 message Plugin {
   oneof wasm_source {
     LocalSource local = 2;
@@ -99,4 +106,5 @@ message Config {
     BundleItem = 1;
   }
   Mode mode = 10;
+  TrafficMark trafficMark = 11;
 }
