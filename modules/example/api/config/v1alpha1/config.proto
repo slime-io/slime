@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package slime.microservice.v1alpha1;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
 option go_package = "slime.io/slime/modules/example/api/config/v1alpha1";
 
 message Bar {
