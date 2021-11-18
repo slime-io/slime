@@ -6,17 +6,25 @@ import (
 
 func NewProducer(config *ProducerConfig) {
 
+	var source Source
 	var wp *WatcherProducer
 	var tp *TickerProducer
 
+	// init source
+	if config.EnablePrometheusSource {
+		source = NewPrometheusSource(config.PrometheusSourceConfig)
+	} else {
+		source = NewAccessLogSource(config.AccessLogSourceConfig)
+	}
+
 	if config.EnableWatcherProducer {
-		wp = NewWatcherProducer(config.WatcherProducerConfig)
+		wp = NewWatcherProducer(config.WatcherProducerConfig, source)
 		wp.Start()
 		go wp.HandleWatcherEvent()
 	}
 
 	if config.EnableTickerProducer {
-		tp = NewTickerProducer(config.TickerProducerConfig)
+		tp = NewTickerProducer(config.TickerProducerConfig, source)
 		tp.Start()
 		go tp.HandleTickerEvent()
 	}

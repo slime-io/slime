@@ -9,20 +9,22 @@ type TickerProducer struct {
 	name                    string
 	needUpdateMetricHandler func(event trigger.TickerEvent) QueryMap
 	tickerTrigger           *trigger.TickerTrigger
-	prometheusSource        *PrometheusSource
+	source                  Source
 	MetricChan              chan Metric
 	StopChan                chan struct{}
 }
 
-func NewTickerProducer(config TickerProducerConfig) *TickerProducer {
-	return &TickerProducer{
+func NewTickerProducer(config TickerProducerConfig, source Source) *TickerProducer {
+	tp := &TickerProducer{
 		name:                    config.Name,
 		needUpdateMetricHandler: config.NeedUpdateMetricHandler,
 		tickerTrigger:           trigger.NewTickerTrigger(config.TickerTriggerConfig),
-		prometheusSource:        NewPrometheusSource(config.PrometheusSourceConfig),
+		source:                  source,
 		MetricChan:              config.MetricChan,
 		StopChan:                make(chan struct{}),
 	}
+
+	return tp
 }
 
 func (p *TickerProducer) HandleTickerEvent() {
@@ -45,21 +47,23 @@ func (p *TickerProducer) HandleTickerEvent() {
 				continue
 			}
 
-			// get metric material
-			metric, err := p.prometheusSource.QueryMetric(queryMap)
+			// get metric
+			metric, err := p.source.QueryMetric(queryMap)
 			if err != nil {
 				log.Errorf("%v", err)
 				continue
 			}
 
-			// produce material event
+			// produce metric event
 			p.MetricChan <- metric
+
 		}
 	}
 }
 
 func (p *TickerProducer) Start() {
 	p.tickerTrigger.Start()
+	p.source.Start()
 }
 
 func (p *TickerProducer) Stop() {

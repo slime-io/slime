@@ -1,17 +1,22 @@
 package metric
 
 import (
+	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	prometheusModel "github.com/prometheus/common/model"
+	"k8s.io/client-go/kubernetes"
 	"slime.io/slime/framework/model/trigger"
 )
 
 type ProducerConfig struct {
-	EnableWatcherProducer bool
-	WatcherProducerConfig WatcherProducerConfig
-	EnableTickerProducer  bool
-	TickerProducerConfig  TickerProducerConfig
-	StopChan              <-chan struct{}
+	EnablePrometheusSource bool
+	PrometheusSourceConfig PrometheusSourceConfig
+	AccessLogSourceConfig  AccessLogSourceConfig
+	EnableWatcherProducer  bool
+	WatcherProducerConfig  WatcherProducerConfig
+	EnableTickerProducer   bool
+	TickerProducerConfig   TickerProducerConfig
+	StopChan               <-chan struct{}
 }
 
 type WatcherProducerConfig struct {
@@ -19,7 +24,6 @@ type WatcherProducerConfig struct {
 	NeedUpdateMetricHandler func(event trigger.WatcherEvent) QueryMap
 	MetricChan              chan Metric
 	WatcherTriggerConfig    trigger.WatcherTriggerConfig
-	PrometheusSourceConfig  PrometheusSourceConfig
 }
 
 type TickerProducerConfig struct {
@@ -27,7 +31,6 @@ type TickerProducerConfig struct {
 	NeedUpdateMetricHandler func(event trigger.TickerEvent) QueryMap
 	MetricChan              chan Metric
 	TickerTriggerConfig     trigger.TickerTriggerConfig
-	PrometheusSourceConfig  PrometheusSourceConfig
 }
 
 type PrometheusSourceConfig struct {
@@ -36,4 +39,12 @@ type PrometheusSourceConfig struct {
 }
 
 type AccessLogSourceConfig struct {
+	ServePort                 string
+	AccessLogConvertorConfigs []AccessLogConvertorConfig
+}
+
+type AccessLogConvertorConfig struct {
+	Name      string // handler name
+	ClientSet *kubernetes.Clientset
+	Handler   func(logEntry []*data_accesslog.HTTPAccessLogEntry, clientSet *kubernetes.Clientset) (map[string]map[string]string, error)
 }

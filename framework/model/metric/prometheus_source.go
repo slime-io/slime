@@ -27,6 +27,10 @@ func NewPrometheusSource(config PrometheusSourceConfig) *PrometheusSource {
 	return ps
 }
 
+func (ps *PrometheusSource) Start() error {
+	return nil
+}
+
 func (ps *PrometheusSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 	log := log.WithField("reporter", "PrometheusSource").WithField("function", "QueryMetric")
 

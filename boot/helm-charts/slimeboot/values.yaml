@@ -32,11 +32,6 @@ containerSecurityContext: { }
 # runAsNonRoot: true
 # runAsUser: 1000
 
-service:
-  type: ClusterIP
-  port: 80
-
-
 resources:
   limits:
     cpu: 1
@@ -72,4 +67,12 @@ namespace: mesh-operator
 
 istioNamespace: istio-system
 
+service:
+  type: ClusterIP
+  port: 80
+  logSourcePort: 8082
+
 healthProbePort: 8081
+logSourcePort: 8082
+metricSourceTypeDefault: prometheus
+metricSourceTypeAccesslog: accesslog

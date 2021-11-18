@@ -34,6 +34,8 @@ var defaultModuleConfig = &bootconfig.Config{
 			"aux-addr":               ":8081",
 			"enable-leader-election": "off",
 			"global-sidecar-mode":    "namespace",
+			"metric_source_type":     "prometheus", // can be prometheus or accesslog
+			"log_source_port":        ":8082",
 		},
 	},
 }
@@ -132,10 +134,10 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 }
 
 type Environment struct {
-	Config    *bootconfig.Config
-	K8SClient *kubernetes.Clientset
+	Config        *bootconfig.Config
+	K8SClient     *kubernetes.Clientset
 	DynamicClient dynamic.Interface
-	Stop      <-chan struct{}
+	Stop          <-chan struct{}
 }
 
 func (env *Environment) IstioRev() string {

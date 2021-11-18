@@ -9,24 +9,26 @@ type WatcherProducer struct {
 	name                    string
 	needUpdateMetricHandler func(event trigger.WatcherEvent) QueryMap
 	watcherTrigger          *trigger.WatcherTrigger
-	prometheusSource        *PrometheusSource
+	source                  Source
 	MetricChan              chan Metric
 	StopChan                chan struct{}
 }
 
-func NewWatcherProducer(config WatcherProducerConfig) *WatcherProducer {
-	return &WatcherProducer{
+func NewWatcherProducer(config WatcherProducerConfig, source Source) *WatcherProducer {
+	wp := &WatcherProducer{
 		name:                    config.Name,
 		needUpdateMetricHandler: config.NeedUpdateMetricHandler,
 		watcherTrigger:          trigger.NewWatcherTrigger(config.WatcherTriggerConfig),
-		prometheusSource:        NewPrometheusSource(config.PrometheusSourceConfig),
+		source:                  source,
 		MetricChan:              config.MetricChan,
 		StopChan:                make(chan struct{}),
 	}
+
+	return wp
 }
 
 func (p *WatcherProducer) HandleWatcherEvent() {
-	log := log.WithField("reporter", "WatcherProvider").WithField("function", "HandleTriggerEvent")
+	log := log.WithField("reporter", "WatcherProducer").WithField("function", "HandleTriggerEvent")
 	for {
 		select {
 		case <-p.StopChan:
@@ -46,21 +48,23 @@ func (p *WatcherProducer) HandleWatcherEvent() {
 				continue
 			}
 
-			// get metric material
-			metric, err := p.prometheusSource.QueryMetric(queryMap)
+			// get metric
+			metric, err := p.source.QueryMetric(queryMap)
 			if err != nil {
 				log.Errorf("%v", err)
 				continue
 			}
 
-			// produce material event
+			// produce metric event
 			p.MetricChan <- metric
+
 		}
 	}
 }
 
 func (p *WatcherProducer) Start() {
 	p.watcherTrigger.Start()
+	p.source.Start()
 }
 
 func (p *WatcherProducer) Stop() {

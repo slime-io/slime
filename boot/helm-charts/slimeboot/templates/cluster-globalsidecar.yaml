@@ -91,6 +91,20 @@ spec:
             - --discoveryAddress
             - istio-pilot.{{ $.Values.namespace }}:15010
           env:
+            {{- range $.Values.module }}
+              {{- if .fence }}
+              {{- if .global }}
+              {{- if .global.misc }}
+              {{- if .global.misc.metric_source_type }}
+              {{- if (eq .global.misc.metric_source_type "accesslog") }}
+              - name: ISTIO_BOOTSTRAP_OVERRIDE
+                value: /etc/istio/custom-bootstrap/custom_bootstrap.json
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
+              {{- end }}
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -165,6 +179,20 @@ spec:
             - mountPath: /etc/certs
               name: istio-certs
               readOnly: true
+            {{- range $.Values.module }}
+            {{- if .fence }}
+            {{- if .global }}
+            {{- if .global.misc }}
+            {{- if .global.misc.metric_source_type }}
+            {{- if (eq .global.misc.metric_source_type "accesslog") }}
+            - mountPath: /etc/istio/custom-bootstrap
+              name: custom-bootstrap-volume
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -177,6 +205,22 @@ spec:
             defaultMode: 420
             optional: true
             secretName: istio.global-sidecar
+        {{- range $.Values.module }}
+        {{- if .fence }}
+        {{- if .global }}
+        {{- if .global.misc }}
+        {{- if .global.misc.metric_source_type }}
+        {{- if (eq .global.misc.metric_source_type "accesslog") }}
+        - name: custom-bootstrap-volume
+          configMap:
+            defaultMode: 420
+            name: lazyload-accesslog-source
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -263,7 +307,99 @@ spec:
     {{- end }}
     {{- end }}
     {{- end }}
-
+---
+{{- range $.Values.module }}
+  {{- if .fence }}
+  {{- if .global }}
+  {{- if .global.misc }}
+  {{- if .global.misc.metric_source_type }}
+  {{- if (eq .global.misc.metric_source_type "accesslog") }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: global-sidecar-accesslog
+  namespace: {{ $.Values.istioNamespace }}
+spec:
+  workloadSelector:
+    labels:
+      app: qz-ingress
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        #context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+            access_log:
+              - name: envoy.access_loggers.http_grpc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+                  common_config:
+                    log_name: http_envoy_accesslog
+                    transport_api_version: "V3"
+                    grpc_service:
+                      envoy_grpc:
+                        #cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
+                        cluster_name: lazyload-accesslog-source
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+---
+{{- range $.Values.module }}
+  {{- if .fence }}
+  {{- if .global }}
+  {{- if .global.misc }}
+  {{- if .global.misc.metric_source_type }}
+  {{- if (eq .global.misc.metric_source_type "accesslog") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lazyload-accesslog-source
+  namespace: {{ $.Values.istioNamespace }}
+data:
+  custom_bootstrap.json: |
+    {
+      "static_resources": {
+        "clusters": [{
+          "name": "lazyload-accesslog-source",
+          "type": "STRICT_DNS",
+          "connect_timeout": "5s",
+          "http2_protocol_options": {},
+          "dns_lookup_family": "V4_ONLY",
+          "load_assignment": {
+            "cluster_name": "lazyload-accesslog-source",
+            "endpoints": [{
+              "lb_endpoints": [{
+                "endpoint": {
+                  "address": {
+                    "socket_address": {
+                      "address": "{{.name}}.{{$.Values.namespace}}",
+                      "port_value": {{$.Values.service.logSourcePort}}
+                    }
+                  }
+                }
+              }]
+            }]
+          },
+          "respect_dns_ttl": true
+        }]
+      }
+    }
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
   {{ end }}
   {{ end }}
   {{ end }}
