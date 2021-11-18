@@ -13,3 +13,8 @@ type Result struct {
 	Name  string
 	Value map[string]string
 }
+
+type Source interface {
+	QueryMetric(queryMap QueryMap) (Metric, error)
+	Start() error
+}

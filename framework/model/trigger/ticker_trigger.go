@@ -22,15 +22,14 @@ type TickerTriggerConfig struct {
 
 func NewTickerTrigger(config TickerTriggerConfig) *TickerTrigger {
 	return &TickerTrigger{
-		durations: config.Durations,
-		eventChan: config.EventChan,
+		durations:    config.Durations,
+		eventChan:    config.EventChan,
+		durationsMap: make(map[time.Duration]chan struct{}),
 	}
 }
 
 func (t *TickerTrigger) Start() {
 	log := log.WithField("reporter", "TickerTrigger").WithField("function", "Start")
-
-	t.durationsMap = make(map[time.Duration]chan struct{})
 
 	for _, duration := range t.durations {
 		t.durationsMap[duration] = make(chan struct{})

@@ -74,6 +74,10 @@ spec:
               protocol: TCP
             - name: probe-port
               containerPort: {{ $.Values.healthProbePort }}
+              protocol: TCP
+            - name: log-source-port
+              containerPort: {{ $.Values.logSourcePort }}
+              protocol: TCP
           resources:
           {{- toYaml $.Values.resources | nindent 12 }}
           readinessProbe:
@@ -149,6 +153,10 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ $.Values.service.logSourcePort }}
+      targetPort: log-source-port
+      protocol: TCP
+      name: log-source-port
   selector:
     app: {{.name}}
   {{end}}

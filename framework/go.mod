@@ -3,6 +3,7 @@ module slime.io/slime/framework
 go 1.13
 
 require (
+	github.com/envoyproxy/go-control-plane v0.9.9-0.20201210154907-fd9021fe5dad
 	github.com/ghodss/yaml v1.0.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -16,6 +17,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	go.uber.org/zap v1.10.0
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974
+	google.golang.org/grpc v1.35.0
 	gopkg.in/yaml.v2 v2.2.8
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	k8s.io/api v0.20.2
