@@ -4,7 +4,6 @@ import (
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	prometheusModel "github.com/prometheus/common/model"
-	"k8s.io/client-go/kubernetes"
 	"slime.io/slime/framework/model/trigger"
 )
 
@@ -44,7 +43,6 @@ type AccessLogSourceConfig struct {
 }
 
 type AccessLogConvertorConfig struct {
-	Name      string // handler name
-	ClientSet *kubernetes.Clientset
-	Handler   func(logEntry []*data_accesslog.HTTPAccessLogEntry, clientSet *kubernetes.Clientset) (map[string]map[string]string, error)
+	Name          string // handler name
+	Handler       func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
 }
