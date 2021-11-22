@@ -4,7 +4,6 @@ import (
 	"errors"
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	log "github.com/sirupsen/logrus"
-	"k8s.io/client-go/kubernetes"
 	"sync"
 )
 
@@ -12,15 +11,13 @@ type AccessLogConvertor struct {
 	name            string                       // handler name
 	cacheResult     map[string]map[string]string // meta -> value
 	cacheResultCopy map[string]map[string]string
-	handler         func(logEntry []*data_accesslog.HTTPAccessLogEntry, clientSet *kubernetes.Clientset) (map[string]map[string]string, error)
+	handler         func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
 	convertorLock   sync.RWMutex
-	clientSet       *kubernetes.Clientset
 }
 
 func NewAccessLogConvertor(config AccessLogConvertorConfig) *AccessLogConvertor {
 	return &AccessLogConvertor{
 		name:            config.Name,
-		clientSet:       config.ClientSet,
 		handler:         config.Handler,
 		cacheResult:     make(map[string]map[string]string),
 		cacheResultCopy: make(map[string]map[string]string),
@@ -40,7 +37,7 @@ func (alc *AccessLogConvertor) CacheResultCopy() map[string]map[string]string {
 
 func (alc *AccessLogConvertor) Convert(logEntry []*data_accesslog.HTTPAccessLogEntry) error {
 	log := log.WithField("reporter", "AccessLogConvertor").WithField("function", "Convert")
-	tmpResult, err := alc.handler(logEntry, alc.clientSet)
+	tmpResult, err := alc.handler(logEntry)
 	if err != nil {
 		return err
 	}
