@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
-HUB=${HUB:-"docker.io/slimeio"}
+HUB=${HUB:-"docker.io/slimeio registry.cn-hangzhou.aliyuncs.com/slimeio"}
 PUSH_HUBS="$HUB"
+first_hub=`echo $HUB|awk -F " " '{print $1}'`
 VERBOSE=${V:-1}
 
 function fatal() {
@@ -47,7 +48,7 @@ fi
 
 image_full_name="slime-$MOD:$image_tag"
 
-image_url="$HUB/${image_full_name}"
+image_url="$first_hub/${image_full_name}"
 
 ALL_ACTIONS=${ALL_ACTIONS:-"build image pushAll"}
 
@@ -101,7 +102,7 @@ for action in $actions; do
     for push_hub in ${PUSH_HUBS}; do
       push_url="${push_hub}/${image_full_name}"
       if [[ "${push_url}" != "${image_url}" ]]; then
-        docker tag -t "${image_url}" "${push_url}"
+        docker tag "${image_url}" "${push_url}"
       fi
       docker push "${push_url}"
     done
