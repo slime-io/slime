@@ -3,7 +3,10 @@ package util
 import (
 	"flag"
 	"fmt"
+	"gopkg.in/natefinch/lumberjack.v2"
+	"io"
 	"os"
+	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -15,28 +18,39 @@ func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 	enc.AppendString(t.Format("2006-01-02T15:04:05.000"))
 }
 
-func InitLog(LogLevel string, KlogLevel int32) error {
+func InitLog(logConfig *bootconfig.Log) error {
 
-	if LogLevel == "" {
-		LogLevel = slimeLogLevel
+	// set log level
+	if logConfig.LogLevel == "" {
+		logConfig.LogLevel = slimeLogLevel
 	}
-	if KlogLevel == 0 {
-		KlogLevel = slimeKLogLevel
+	if logConfig.KlogLevel == 0 {
+		logConfig.KlogLevel = slimeKLogLevel
 	}
-	level, err := log.ParseLevel(LogLevel)
+	level, err := log.ParseLevel(logConfig.LogLevel)
 	if err != nil {
 		return err
-	} else {
-		log.SetLevel(level)
-		log.SetOutput(os.Stdout)
-		log.SetFormatter(&log.TextFormatter{
-			TimestampFormat: time.RFC3339,
-		})
+	}
+	log.SetLevel(level)
+	log.SetFormatter(&log.TextFormatter{
+		TimestampFormat: time.RFC3339,
+	})
+
+	var output io.Writer
+	output = os.Stdout
+	if logConfig.LogRotate {
+		output = &lumberjack.Logger{
+			Filename:   logConfig.LogRotateConfig.FilePath,
+			MaxSize:    int(logConfig.LogRotateConfig.MaxSizeMB), // megabytes
+			MaxBackups: int(logConfig.LogRotateConfig.MaxBackups),
+			MaxAge:     int(logConfig.LogRotateConfig.MaxAgeDay), //days
+			Compress:   logConfig.LogRotateConfig.Compress,       // disabled by default
+		}
 	}
 
-	if KlogLevel != 0 {
-		initKlog(KlogLevel)
-	}
+	log.SetOutput(output)
+	initKlog(logConfig.KlogLevel, output)
+
 	return nil
 }
 
@@ -61,9 +75,16 @@ func GetLevel() string {
 }
 
 // initKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
-func initKlog(KlogLevel int32) {
+func initKlog(KlogLevel int32, output io.Writer) {
 	fs = flag.NewFlagSet("klog", flag.ContinueOnError)
 	klog.InitFlags(fs)
+
+	// set log output
+	if output != nil {
+		fs.Set("logtostderr", "false")
+		klog.SetOutput(output)
+	}
+
 	SetKlogLevel(KlogLevel)
 }
 
