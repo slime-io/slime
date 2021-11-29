@@ -5,12 +5,11 @@
 
 syntax = "proto3";
 
-import "apis/config/v1alpha1/config.proto";
-
+import "config.proto";
 
 package slime.config.v1alpha1;
 
-option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
+option go_package = "slime.io/slime/framework/apis/config/v1alpha1";
 message SlimeBootStatus {
 
 }

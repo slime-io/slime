@@ -5,7 +5,7 @@ package slime.config.v1alpha1;
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 
-option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
+option go_package = "slime.io/slime/framework/apis/config/v1alpha1";
 
 message LocalSource {
   string mount = 1;
@@ -46,6 +46,16 @@ message Global {
 message Log {
   string logLevel = 1;
   int32 klogLevel = 2;
+  bool logRotate = 3;
+  LogRotateConfig logRotateConfig = 4;
+}
+
+message LogRotateConfig {
+  string filePath = 1;
+  int32 maxSizeMB = 2;
+  int32 maxBackups = 3;
+  int32 maxAgeDay = 4;
+  bool compress = 5;
 }
 
 message Fence {
