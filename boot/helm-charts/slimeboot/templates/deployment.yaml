@@ -97,11 +97,17 @@ spec:
           volumeMounts:
             - mountPath: /etc/slime/config
               name: config-volume
+            {{- with $.Values.containers.slime.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
       volumes:
         - configMap:
             defaultMode: 420
             name: {{ .name }}
           name: config-volume
+        {{- with $.Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
       {{- with $.Values.nodeSelector }}
       nodeSelector:
       {{- toYaml . | nindent 8 }}
