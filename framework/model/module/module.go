@@ -46,7 +46,7 @@ func Main(bundle string, modules []Module) {
 	if config == nil {
 		panic(fmt.Errorf("module config nil for %s", bundle))
 	}
-	err = util.InitLog(config.Global.Log.LogLevel, config.Global.Log.KlogLevel)
+	err = util.InitLog(config.Global.Log)
 	if err != nil {
 		panic(err)
 	}

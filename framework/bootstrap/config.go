@@ -28,6 +28,14 @@ var defaultModuleConfig = &bootconfig.Config{
 		Log: &bootconfig.Log{
 			LogLevel:  "",
 			KlogLevel: 0,
+			LogRotate: false,
+			LogRotateConfig: &bootconfig.LogRotateConfig{
+				FilePath:             "/tmp/log/slime.log",
+				MaxSizeMB:            100,
+				MaxBackups:           10,
+				MaxAgeDay:            10,
+				Compress:             false,
+			},
 		},
 		Misc: map[string]string{
 			"metrics-addr":           ":8080",
@@ -78,6 +86,24 @@ func patchGlobal(global, patch *bootconfig.Global) {
 		}
 		if global.Log.KlogLevel == 0 {
 			global.Log.KlogLevel = patch.Log.KlogLevel
+		}
+		if global.Log.LogRotate {
+			if global.Log.LogRotateConfig == nil {
+				global.Log.LogRotateConfig = patch.Log.LogRotateConfig
+			} else {
+				if global.Log.LogRotateConfig.FilePath == "" {
+					global.Log.LogRotateConfig.FilePath = patch.Log.LogRotateConfig.FilePath
+				}
+				if global.Log.LogRotateConfig.MaxSizeMB == 0 {
+					global.Log.LogRotateConfig.MaxSizeMB = patch.Log.LogRotateConfig.MaxSizeMB
+				}
+				if global.Log.LogRotateConfig.MaxBackups == 0 {
+					global.Log.LogRotateConfig.MaxBackups = patch.Log.LogRotateConfig.MaxBackups
+				}
+				if global.Log.LogRotateConfig.MaxAgeDay == 0 {
+					global.Log.LogRotateConfig.MaxAgeDay = patch.Log.LogRotateConfig.MaxAgeDay
+				}
+			}
 		}
 	}
 }
