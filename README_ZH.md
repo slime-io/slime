@@ -30,7 +30,7 @@ Istio 可以实现版本分流、灰度发布、负载均衡等功能，但是�
 
 Slime 内部采用了模块化的架构。目前包含了三个非常实用的子模块。
 
-[配置懒加载](https://github.com/slime-io/lazyload)：无须配置SidecarScope，自动按需加载配置和服务发现信息 ，解决了全量推送的问题。
+[配置懒加载](https://github.com/slime-io/lazyload)：无须配置SidecarScope，自动按需加载配置和服务发现信息 ，解决了全量推送的问题。服务调用关系的来源支持Prometheus或者Accesslog。
 
 [Http插件管理](https://github.com/slime-io/plugin)：使用新的的CRD pluginmanager/envoyplugin包装了可读性及可维护性差的envoyfilter，使得插件扩展更为便捷。
 
@@ -46,14 +46,14 @@ Slime 内部采用了模块化的架构。目前包含了三个非常实用的�
 Slime架构主要分为三大块：
 
 1. slime-boot，部署slime-module的operator组件，通过slime-boot可以便捷快速的部署slime-module。
-2. slime-controller，slime-module的核心线程，感知SlimeCRD并转换为IstioCRD。
-3. slime-metric，slime-module的监控获取线程，用于感知服务状态，slime-controller会根据服务状态动态调整服务治理规则。
+2. slime-controller，slime-module的核心线程，感知SlimeCRD并转换为IstioCRD。目前slime-controller已经细化为各个模块的controller，slime作为framework提供通用的基础能力。
+3. slime-metric，slime-module的监控获取线程，用于感知服务状态，slime-controller会根据服务状态动态调整服务治理规则。指标来源支持Prometheus或者Accesslog。
 
 其架构图如下：
 
 ![slime架构图](media/arch.png)
 
-使用者将服务治理策略定义在CRD的spec中，同时，slime-metric从prometheus获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
+使用者将服务治理策略定义在CRD的spec中，同时，slime-metric获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
 ![limiter治理策略](media/policy_zh.png)
 
 
@@ -69,8 +69,8 @@ Slime架构主要分为三大块：
 Slime-module
 
 - [懒加载使用](https://github.com/slime-io/lazyload/blob/master/README_zh.md)
-- [插件管理使用](doc/zh/plugin_manager.md)
-- [自适应限流使用](doc/zh/smart_limiter.md)
+- [插件管理使用](https://github.com/slime-io/plugin/blob/master/README_zh.md)
+- [自适应限流使用](https://github.com/slime-io/limiter/blob/master/README_ZH.md)
 
 [E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 

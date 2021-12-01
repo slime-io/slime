@@ -26,9 +26,13 @@ $ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_com
 
 
 
-### Install Prometheus
+### Prepare Metric Source
 
-The lazy load and smart limiter module needs metric data, so we suggest you installing prometheus in your system. Here is a simple prometheus installation file copied from istio.io.
+Support Prometheus or Accesslog.
+
+The lazy load and smart limiter module needs metric data. Lazyload can use prometheus or accesslog, limiter can use prometheus.
+
+If you need install prometheus in your system, here is a simple prometheus installation file copied from istio.io.
 
 ```sh
 $ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/config/prometheus.yaml"
@@ -38,7 +42,7 @@ $ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_com
 
 ### Verify
 
-After installation of slime-boot, check whether slime-boot pod in mesh-operator and prometheus pod in istio-system are running. 
+After installation of slime-boot, check whether slime-boot pod in mesh-operator and prometheus pod in istio-system are running. If using accesslog, there will be no other components.
 
 ```sh
 $ kubectl get po -n mesh-operator
@@ -54,16 +58,20 @@ prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
 
 
 
-
-
 ## slimeboot Default Value Instruction and Replacement Method
 
 ### Default Value Instruction
 
 The default value source consists of two parts
 
-1. values.yaml of slime-boot operator. The file path is "slime/slime-boot/helm-charts/slimeboot/values.yaml"
-2. struct Config.Global of slime framework. The code path is "slime/framework/apis/config/v1alpha1/config.proto"
+1. Deploying parameters: values.yaml of slime-boot operator. The file path is "slime/slime-boot/helm-charts/slimeboot/values.yaml". The values in this section are directly related to "k8s deployment", such as replicaCount, serviceAccount, imagePullPolicy, etc.
+2. Runtime parameters: struct Config.Global of slime framework. The code path is "slime/framework/apis/config/v1alpha1/config.proto". This part of the value is used to run the Go program.
+
+Deployment parameters and runtime parameters are crossed. 
+
+For example, for health checks, the port `healthProbePort` specified at deployment time should be equal to the port `aux-addr` exposed by the runtime application; and another example, when enabling log output to local files, the storage volume mount path `volumeMounts.mountPath` should match the file path of the runtime logger output parameter ` Config.Global.Log.LogRotateConfig.FilePath`.
+
+
 
 #### values.yaml
 
@@ -95,19 +103,29 @@ Used by slimeboot operator templates to create slime module and slime component.
 | namespace                                  | mesh-operator | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
 | istioNamespace                             | istio-system  | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
 | healthProbePort                            | 8081          | module                                                      | If change, need to be the same with the port contained by config.global.misc["aux-addr"] |
+| logSourcePort                              | 8082          | module                                                      | grpc port of module deployment to receive accesslog          |
+| service.logSourcePort                      | 8082          | module                                                      | grpc port of module serviceto receive accesslog, equals to logSourcePort above |
+| containers.slime.volumeMounts              | ""            | module                                                      | The local path corresponding to the storage volume when log rotation is enabled |
+| volumes                                    | ""            | module                                                      | Information about the storage volume used when log rotation is enabled |
 
 #### Config.global
 
 Only used by slime module.
 
-| Key            | Default Value                                                | Usages                                                       | Remark |
-| -------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | ------ |
-| Service        | app                                                          | label key selected by servicefence, for generating sidecar default configuration in lazyload |        |
-| IstioNamespace | istio-system                                                 | namespace deployed istio, for generating sidecar default configuration in lazyload, should equal the real namespace deployed istio |        |
-| SlimeNamespace | mesh-operator                                                | namespace deployed slime, for generating sidecar default configuration in lazyload, should equal the real namespace deployed slimeboot custom resource |        |
-| Log.LogLevel   | ""                                                           | slime log level                                              |        |
-| Log.KlogLevel  | 0                                                            | klog log level                                               |        |
-| Misc           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off", "global-sidecar-mode": "namespace"}, | Scalable collection map. It contains 3 params now: 1. "metrics-addr", metrics address of slime module manager; 2."aux-addr", address of auxiliary web server; 3."enable-leader-election", switch of enabling leader election of slime module controller; 4."namespace-global-sidecar", global-sidecar using mode, default is "namespace", others are "cluster", "no" |        |
+| Key                            | Default Value                                                | Usages                                                       | Remark |
+| ------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------ | ------ |
+| Service                        | app                                                          | label key selected by servicefence, for generating sidecar default configuration in lazyload |        |
+| IstioNamespace                 | istio-system                                                 | namespace deployed istio, for generating sidecar default configuration in lazyload, should equal the real namespace deployed istio |        |
+| SlimeNamespace                 | mesh-operator                                                | namespace deployed slime, for generating sidecar default configuration in lazyload, should equal the real namespace deployed slimeboot custom resource |        |
+| Log.LogLevel                   | ""                                                           | slime log level                                              |        |
+| Log.KlogLevel                  | 0                                                            | klog log level                                               |        |
+| Log.LogRotate                  | false                                                        | Whether to enable log rotation, i.e. log output to local files |        |
+| Log.LogRotateConfig.FilePath   | "/tmp/log/slime.log"                                         | Local log file path                                          |        |
+| Log.LogRotateConfig.MaxSizeMB  | 100                                                          | Maximum local log file size in MB                            |        |
+| Log.LogRotateConfig.MaxBackups | 10                                                           | Maximum number of local log files                            |        |
+| Log.LogRotateConfig.MaxAgeDay  | 10                                                           | Local log file retention time, in days                       |        |
+| Log.LogRotateConfig.Compress   | false                                                        | Whether to compress local log files after rotation           |        |
+| Misc                           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off", "global-sidecar-mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | Scalable collection map. It contains 3 params now: 1. "metrics-addr", metrics address of slime module manager; 2."aux-addr", address of auxiliary web server; 3."enable-leader-election", switch of enabling leader election of slime module controller; 4."namespace-global-sidecar", global-sidecar using mode, default is "namespace", others are "cluster", "no"；5."metric_source_type", default is "prometheus", others are "accesslog"; 6."log_source_port", grpc port of module to receive accesslog, default is 8082. If you want to modify it, note that you should also modify the logSourcePort in the helm template |        |
 
 
 
