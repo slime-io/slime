@@ -31,7 +31,7 @@ In order to solving the current shortcomings of Istio, we make Slime project. It
 
 Slime adopts a modular architecture inside. It contains three useful modules now.
 
-[Configuration Lazy Loading](https://github.com/slime-io/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem.
+[Configuration Lazy Loading](https://github.com/slime-io/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem. The source of the service relationship supports Prometheus or Accesslog.
 
 [Http Plugin Management](https://github.com/slime-io/plugin): Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
 
@@ -46,12 +46,12 @@ Slime adopts a modular architecture inside. It contains three useful modules now
 The Slime architecture is mainly divided into three parts:
 
 1. slime-boot，Deploy the operator component of the slime-module, and the slime-module can be deployed quickly and easily through the slime-boot.
-2. slime-controller，The core thread of slime-module senses SlimeCRD and converts to IstioCRD.
-3. slime-metric，The monitoring acquisition thread of slime-module is used to perceive the service status, and the slime-controller will dynamically adjust the service traffic rules according to the service status.
+2. slime-controller，The core thread of slime-module senses SlimeCRD and converts to IstioCRD. The slime-controller has been refined into individual module controllers, and slime provides common base capabilities as a framework.
+3. slime-metric，The monitoring acquisition thread of slime-module is used to perceive the service status, and the slime-controller will dynamically adjust the service traffic rules according to the service status. The source of the metric supports Prometheus or Accesslog.
 
 ![slime架构图](media/arch.png)
 
-The user defines the service traffic policy in the CRD spec. At the same time, slime-metric obtains information about the service status from prometheus and records it in the metricStatus of the CRD. After the slime-module controller perceives the service status through metricStatus, it renders the corresponding monitoring items in the service governance policy, calculates the formula in the policy, and finally generates traffic rules.
+The user defines the service traffic policy in the CRD spec. At the same time, slime-metric obtains information about the service status and records it in the metricStatus of the CRD. After the slime-module controller perceives the service status through metricStatus, it renders the corresponding monitoring items in the service governance policy, calculates the formula in the policy, and finally generates traffic rules.
 
 ![limiter治理策略](media/policy.png)
 
@@ -68,8 +68,8 @@ The user defines the service traffic policy in the CRD spec. At the same time, s
 Slime-module
 
 - [Lazyload Usage](https://github.com/slime-io/lazyload/blob/master/README.md)
-- [PluginManager Usage](./doc/en/plugin_manager.md)
-- [SmartLimiter Usage](./doc/en/smart_limiter.md)
+- [PluginManager Usage](https://github.com/slime-io/plugin/blob/master/README.md)
+- [SmartLimiter Usage](https://github.com/slime-io/limiter/blob/master/README.md)
 
 [E2E Test Tutorials](./doc/en/slime_e2e_test.md)
 

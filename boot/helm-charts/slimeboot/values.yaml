@@ -74,8 +74,6 @@ service:
 
 healthProbePort: 8081
 logSourcePort: 8082
-metricSourceTypeDefault: prometheus
-metricSourceTypeAccesslog: accesslog
 
 containers:
   slime:
