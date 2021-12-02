@@ -18,6 +18,14 @@ func CalculateTemplate(expression string, material map[string]interface{}) (int,
 	}
 }
 
+func CalculateTemplateString(expression string, strMaterial map[string]string) (int, error) {
+	material := make(map[string]interface{}, len(strMaterial))
+	for k, v := range strMaterial {
+		material[k] = v
+	}
+	return CalculateTemplate(expression, material)
+}
+
 func CalculateTemplateBool(expression string, material map[string]interface{}) (bool, error) {
 	if expression == "true" {
 		return true, nil
