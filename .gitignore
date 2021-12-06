@@ -82,3 +82,6 @@ tags
 .kube/*
 /build
 .qz/*
+
+### module helm chats ###
+boot/helm-charts/slimeboot/templates/modules/*

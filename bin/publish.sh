@@ -30,7 +30,7 @@ if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
 fi
 commit=$(git rev-parse --short HEAD)
 if [[ -z "${version}" ]]; then
-  tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}')
+  tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}'|tail -1)
   if [[ -z "${tag}" ]]; then
     branch=$(git symbolic-ref --short -q HEAD)
     if [[ -n "${branch}" ]]; then
