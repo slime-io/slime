@@ -5,7 +5,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"slime.io/slime/framework/bootstrap"
-	modapi "slime.io/slime/modules/example/api/config/v1alpha1"
+	modapi "slime.io/slime/modules/example/api/v1alpha1"
 )
 
 // ExampleReconciler reconciles a ... object
