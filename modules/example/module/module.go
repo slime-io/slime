@@ -2,6 +2,7 @@ package module
 
 import (
 	"os"
+	"slime.io/slime/modules/example/api/v1alpha1"
 
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/modules/example/model"
@@ -12,14 +13,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
-	modapi "slime.io/slime/modules/example/api/config/v1alpha1"
 	"slime.io/slime/modules/example/controllers"
 )
 
 var log = model.ModuleLog
 
 type Module struct {
-	config modapi.General
+	config v1alpha1.General
 }
 
 func (m *Module) Name() string {
@@ -33,7 +33,7 @@ func (m *Module) Config() proto.Message {
 func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
-		modapi.AddToScheme,
+		v1alpha1.AddToScheme,
 		istionetworkingapi.AddToScheme,
 	} {
 		if err := f(scheme); err != nil {
