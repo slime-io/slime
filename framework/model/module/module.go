@@ -89,9 +89,9 @@ func Main(bundle string, modules []Module) {
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:             scheme,
-		MetricsBindAddress: config.Global.Misc["metrics-addr"],
+		MetricsBindAddress: config.Global.Misc["metrics_addr"],
 		Port:               9443,
-		LeaderElection:     config.Global.Misc["enable-leader-election"] == "on",
+		LeaderElection:     config.Global.Misc["enable_leader_election"] == "on",
 		LeaderElectionID:   bundle,
 	})
 	if err != nil {
@@ -161,7 +161,7 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
-	go bootstrap.AuxiliaryHttpServerStart(config.Global.Misc["aux-addr"])
+	go bootstrap.AuxiliaryHttpServerStart(config.Global.Misc["aux_addr"])
 
 	for _, startup := range startups {
 		startup(ctx)

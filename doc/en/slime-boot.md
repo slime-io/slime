@@ -69,7 +69,7 @@ The default value source consists of two parts
 
 Deployment parameters and runtime parameters are crossed. 
 
-For example, for health checks, the port `healthProbePort` specified at deployment time should be equal to the port `aux-addr` exposed by the runtime application; and another example, when enabling log output to local files, the storage volume mount path `volumeMounts.mountPath` should match the file path of the runtime logger output parameter ` Config.Global.Log.LogRotateConfig.FilePath`.
+For example, for health checks, the port `healthProbePort` specified at deployment time should be equal to the port `aux_addr` exposed by the runtime application; and another example, when enabling log output to local files, the storage volume mount path `volumeMounts.mountPath` should match the file path of the runtime logger output parameter ` Config.Global.Log.LogRotateConfig.FilePath`.
 
 
 
@@ -102,7 +102,7 @@ Used by slimeboot operator templates to create slime module and slime component.
 | affinity                                   | { }           | module                                                      |                                                              |
 | namespace                                  | mesh-operator | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
 | istioNamespace                             | istio-system  | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
-| healthProbePort                            | 8081          | module                                                      | If change, need to be the same with the port contained by config.global.misc["aux-addr"] |
+| healthProbePort                            | 8081          | module                                                      | If change, need to be the same with the port contained by config.global.misc["aux_addr"] |
 | logSourcePort                              | 8082          | module                                                      | grpc port of module deployment to receive accesslog          |
 | service.logSourcePort                      | 8082          | module                                                      | grpc port of module serviceto receive accesslog, equals to logSourcePort above |
 | containers.slime.volumeMounts              | ""            | module                                                      | The local path corresponding to the storage volume when log rotation is enabled |
@@ -125,7 +125,7 @@ Only used by slime module.
 | Log.LogRotateConfig.MaxBackups | 10                                                           | Maximum number of local log files                            |        |
 | Log.LogRotateConfig.MaxAgeDay  | 10                                                           | Local log file retention time, in days                       |        |
 | Log.LogRotateConfig.Compress   | false                                                        | Whether to compress local log files after rotation           |        |
-| Misc                           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off", "global-sidecar-mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | Scalable collection map. It contains 3 params now: 1. "metrics-addr", metrics address of slime module manager; 2."aux-addr", address of auxiliary web server; 3."enable-leader-election", switch of enabling leader election of slime module controller; 4."namespace-global-sidecar", global-sidecar using mode, default is "namespace", others are "cluster", "no"；5."metric_source_type", default is "prometheus", others are "accesslog"; 6."log_source_port", grpc port of module to receive accesslog, default is 8082. If you want to modify it, note that you should also modify the logSourcePort in the helm template |        |
+| Misc                           | {"metrics_addr": ":8080", "aux_addr": ":8081", "enable_leader_election": "off", "global_sidecar_mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | Scalable collection map. It contains 3 params now: 1. "metrics_addr", metrics address of slime module manager; 2."aux_addr", address of auxiliary web server; 3."enable_leader_election", switch of enabling leader election of slime module controller; 4."global_sidecar_mode", global-sidecar using mode, default is "namespace", others are "cluster", "no"；5."metric_source_type", default is "prometheus", others are "accesslog"; 6."log_source_port", grpc port of module to receive accesslog, default is 8082. If you want to modify it, note that you should also modify the logSourcePort in the helm template |        |
 
 
 
@@ -149,7 +149,7 @@ metadata:
 spec:
   namespace: slime					#customize the namespace deployed slime, same with config.global.slimeNamespace
   istioNamespace: istio-system		#customize the namespace deployed istio, same with config.global.istioNamespace
-  healthProbePort: 9091				#same with the port contained by config.global.misc["aux-addr"]
+  healthProbePort: 9091				#same with the port contained by config.global.misc["aux_addr"]
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
@@ -167,8 +167,8 @@ spec:
           logLevel: debug
           klogLevel: 10        
         misc:
-          metrics-addr: ":9090"		#customize the address of slime module manager
-          aux-addr: ":9091"			#customize auxiliary http server address, same with spec.healthProbePort
+          metrics_addr: ":9090"		#customize the address of slime module manager
+          aux_addr: ":9091"			#customize auxiliary http server address, same with spec.healthProbePort
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090

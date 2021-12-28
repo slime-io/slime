@@ -55,7 +55,7 @@ spec:
           command:
             - /manager
           args:
-            - --enable-leader-election
+            - --enable_leader_election
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           env:
             - name: WATCH_NAMESPACE

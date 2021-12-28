@@ -16,7 +16,7 @@ spec:
       name: slime-fence
       global:
         misc:
-          global-sidecar-mode: cluster
+          global_sidecar_mode: cluster
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090

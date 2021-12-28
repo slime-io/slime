@@ -64,7 +64,7 @@ prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
 1. 部署参数：slime-boot operator中的values.yaml文件，文件路径slime/slime-boot/helm-charts/slimeboot/values.yaml。这部分值都是和“k8s部署”直接相关的，比如replicaCount，serviceAccount，imagePullPolicy等
 2. 运行时参数：slime framework中defaultModuleConfig变量的Global部分，文件路径slime/framework/bootstrap/config.go。这部分值都用于Go程序运行。
 
-部署参数和运行时参数是有交集的，比如对于健康检查来说，部署时指定的端口`healthProbePort`，要等于运行时程序暴露的端口`aux-addr`；再比如，启用日志输出到本地文件时，存储卷挂载路径`volumeMounts.mountPath`要与运行时logger输出的文件路径`Config.Global.Log.LogRotateConfig.FilePath`匹配。
+部署参数和运行时参数是有交集的，比如对于健康检查来说，部署时指定的端口`healthProbePort`，要等于运行时程序暴露的端口`aux_addr`；再比如，启用日志输出到本地文件时，存储卷挂载路径`volumeMounts.mountPath`要与运行时logger输出的文件路径`Config.Global.Log.LogRotateConfig.FilePath`匹配。
 
 
 
@@ -97,7 +97,7 @@ slimeboot operator templates用到的所有默认值介绍，会用来创建slim
 | affinity                                   | { }           | module                                                      |                                                              |
 | namespace                                  | mesh-operator | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
 | istioNamespace                             | istio-system  | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
-| healthProbePort                            | 8081          | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
+| healthProbePort                            | 8081          | module                                                      | 如果修改，要和config.global.misc["aux_addr"]包含的端口值一致 |
 | logSourcePort                              | 8082          | module                                                      | module deployment接收accesslog的grpc端口                     |
 | service.logSourcePort                      | 8082          | module                                                      | module service接收accesslog的grpc端口，要与logSourcePort保持一致 |
 | containers.slime.volumeMounts              | ""            | module                                                      | 启用日志轮转时，存储卷对应的本地路径                         |
@@ -122,7 +122,7 @@ slimeboot operator templates用到的所有默认值介绍，会用来创建slim
 | Log.LogRotateConfig.MaxBackups | 10                                                           | 本地日志文件个数上限                                         |        |
 | Log.LogRotateConfig.MaxAgeDay  | 10                                                           | 本地日志文件保留时间，单位天                                 |        |
 | Log.LogRotateConfig.Compress   | false                                                        | 本地日志文件轮转后是否压缩                                   |        |
-| Misc                           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off","global-sidecar-mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | 可扩展的配置集合，目前有六个参数：1."metrics-addr"定义slime module manager监控指标暴露地址；2."aux-addr"定义辅助服务器暴露地址；3."enable-leader-election"定义manager是否启用选主功能；4."global-sidecar-mode"定义global-sidecar的使用模式，默认是"namespace"，可选的还有"cluster", "no"；5."metric_source_type"定义监控指标来源，默认是"prometheus"，可选"accesslog"；6."log_source_port"定义使用accesslog做指标源时，接收accesslog的端口，默认是8082，如果要修改，注意也要修改helm模板中的logSourcePort |        |
+| Misc                           | {"metrics_addr": ":8080", "aux_addr": ":8081", "enable_leader_election": "off","global_sidecar_mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | 可扩展的配置集合，目前有六个参数：1."metrics_addr"定义slime module manager监控指标暴露地址；2."aux_addr"定义辅助服务器暴露地址；3."enable_leader_election"定义manager是否启用选主功能；4."global_sidecar_mode"定义global-sidecar的使用模式，默认是"namespace"，可选的还有"cluster", "no"；5."metric_source_type"定义监控指标来源，默认是"prometheus"，可选"accesslog"；6."log_source_port"定义使用accesslog做指标源时，接收accesslog的端口，默认是8082，如果要修改，注意也要修改helm模板中的logSourcePort |        |
 
 
 
@@ -146,7 +146,7 @@ metadata:
 spec:
   namespace: slime					#自定义slime部署的namespace，和config.global.slimeNamespace一致
   istioNamespace: istio-system		#自定义istio部署的namespace，和config.global.istioNamespace一致
-  healthProbePort: 9091				#和config.global.misc["aux-addr"]包含的端口值一致
+  healthProbePort: 9091				#和config.global.misc["aux_addr"]包含的端口值一致
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
@@ -164,8 +164,8 @@ spec:
           logLevel: debug
           klogLevel: 10
         misc:
-          metrics-addr: ":9090"		#自定义slime module manager监控指标暴露地址
-          aux-addr: ":9091"			#自定义辅助服务器暴露地址，与spec.healthProbePort一致
+          metrics_addr: ":9090"		#自定义slime module manager监控指标暴露地址
+          aux_addr: ":9091"			#自定义辅助服务器暴露地址，与spec.healthProbePort一致
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090

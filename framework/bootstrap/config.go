@@ -38,10 +38,10 @@ var defaultModuleConfig = &bootconfig.Config{
 			},
 		},
 		Misc: map[string]string{
-			"metrics-addr":           ":8080",
-			"aux-addr":               ":8081",
-			"enable-leader-election": "off",
-			"global-sidecar-mode":    "namespace",
+			"metrics_addr":           ":8080",
+			"aux_addr":               ":8081",
+			"enable_leader_election": "off",
+			"global_sidecar_mode":    "namespace",
 			"metric_source_type":     "prometheus", // can be prometheus or accesslog
 			"log_source_port":        ":8082",
 		},
