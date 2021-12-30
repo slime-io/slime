@@ -122,7 +122,7 @@ slimeboot operator templates用到的所有默认值介绍，会用来创建slim
 | Log.LogRotateConfig.MaxBackups | 10                                                           | 本地日志文件个数上限                                         |        |
 | Log.LogRotateConfig.MaxAgeDay  | 10                                                           | 本地日志文件保留时间，单位天                                 |        |
 | Log.LogRotateConfig.Compress   | false                                                        | 本地日志文件轮转后是否压缩                                   |        |
-| Misc                           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off","global-sidecar-mode": "namespace","metric_source_type": "prometheus","log_source_port": ":8082"}, | 可扩展的配置集合，目前有六个参数：1."metrics-addr"定义slime module manager监控指标暴露地址；2."aux-addr"定义辅助服务器暴露地址；3."enable-leader-election"定义manager是否启用选主功能；4."global-sidecar-mode"定义global-sidecar的使用模式，默认是"namespace"，可选的还有"cluster", "no"；5."metric_source_type"定义监控指标来源，默认是"prometheus"，可选"accesslog"；6."log_source_port"定义使用accesslog做指标源时，接收accesslog的端口，默认是8082，如果要修改，注意也要修改helm模板中的logSourcePort |        |
+| Misc                           | {"metrics-addr": ":8080", "aux-addr": ":8081", "enable-leader-election": "off","globalSidecarMode": "namespace","metricSourceType": "prometheus","logSourcePort": ":8082"}, | 可扩展的配置集合，目前有六个参数：1."metrics-addr"定义slime module manager监控指标暴露地址；2."aux-addr"定义辅助服务器暴露地址；3."enable-leader-election"定义manager是否启用选主功能；4."globalSidecarMode"定义global-sidecar的使用模式，默认是"namespace"，可选的还有"cluster", "no"；5."metricSourceType"定义监控指标来源，默认是"prometheus"，可选"accesslog"；6."logSourcePort"定义使用accesslog做指标源时，接收accesslog的端口，默认是8082，如果要修改，注意也要修改helm模板中的logSourcePort |        |
 
 
 

@@ -30,20 +30,20 @@ var defaultModuleConfig = &bootconfig.Config{
 			KlogLevel: 0,
 			LogRotate: false,
 			LogRotateConfig: &bootconfig.LogRotateConfig{
-				FilePath:             "/tmp/log/slime.log",
-				MaxSizeMB:            100,
-				MaxBackups:           10,
-				MaxAgeDay:            10,
-				Compress:             false,
+				FilePath:   "/tmp/log/slime.log",
+				MaxSizeMB:  100,
+				MaxBackups: 10,
+				MaxAgeDay:  10,
+				Compress:   false,
 			},
 		},
 		Misc: map[string]string{
 			"metrics-addr":           ":8080",
 			"aux-addr":               ":8081",
 			"enable-leader-election": "off",
-			"global-sidecar-mode":    "namespace",
-			"metric_source_type":     "prometheus", // can be prometheus or accesslog
-			"log_source_port":        ":8082",
+			"globalSidecarMode":      "namespace",
+			"metricSourceType":       "prometheus", // can be prometheus or accesslog
+			"logSourcePort":          ":8082",
 		},
 	},
 }
