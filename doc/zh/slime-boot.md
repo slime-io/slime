@@ -72,36 +72,38 @@ prometheus-69f7f4d689-hrtg5             2/2     Running   2          4d4h
 
 slimeboot operator templates用到的所有默认值介绍，会用来创建slime module和slime component。
 
-| Key                                        | Default Value | Usages                                                      | Remark                                                       |
-| ------------------------------------------ | ------------- | ----------------------------------------------------------- | ------------------------------------------------------------ |
-| replicaCount                               | 1             | module                                                      |                                                              |
-| image.pullPolicy                           | Always        | module                                                      |                                                              |
-| serviceAccount.create                      | true          | module                                                      | switch on serviceAccount creating                            |
-| serviceAccount.annotations                 | { }           | -                                                           |                                                              |
-| serviceAccount.name                        | ""            | -                                                           |                                                              |
-| podAnnotations                             | { }           | -                                                           |                                                              |
-| podSecurityContext                         | { }           | module                                                      |                                                              |
-| containerSecurityContext                   | { }           | module                                                      |                                                              |
-| service.type                               | ClusterIP     | module                                                      |                                                              |
-| service.port                               | 80            | module                                                      |                                                              |
-| resources.limits.cpu                       | 1             | module and component                                        |                                                              |
-| resources.limits.memory                    | 1Gi           | module and component                                        |                                                              |
-| resources.requests.cpu                     | 200m          | module and component                                        |                                                              |
-| resources.requests.memory                  | 200Mi         | module and component                                        |                                                              |
-| autoscaling.enabled                        | false         | -                                                           |                                                              |
-| autoscaling.minReplicas                    | 1             | -                                                           |                                                              |
-| autoscaling.maxReplicas                    | 100           | -                                                           |                                                              |
-| autoscaling.targetCPUUtilizationPercentage | 80            | -                                                           |                                                              |
-| nodeSelector                               | { }           | module                                                      |                                                              |
-| tolerations                                | [ ]           | module                                                      |                                                              |
-| affinity                                   | { }           | module                                                      |                                                              |
-| namespace                                  | mesh-operator | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
-| istioNamespace                             | istio-system  | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
-| healthProbePort                            | 8081          | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
-| logSourcePort                              | 8082          | module                                                      | module deployment接收accesslog的grpc端口                     |
-| service.logSourcePort                      | 8082          | module                                                      | module service接收accesslog的grpc端口，要与logSourcePort保持一致 |
-| containers.slime.volumeMounts              | ""            | module                                                      | 启用日志轮转时，存储卷对应的本地路径                         |
-| volumes                                    | ""            | module                                                      | 启用日志轮转时，使用的存储卷信息                             |
+| Key                                        | Default Value                                                | Usages                                                      | Remark                                                       |
+| ------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------ |
+| args                                       | - --enable-leader-election                                   | 自定义启动命令参数                                          |                                                              |
+| env                                        | - name: WATCH_NAMESPACE   valueFrom:     fieldRef:       fieldPath: metadata.namespace - name: POD_NAME   valueFrom:     fieldRef:       fieldPath: metadata.name - name: OPERATOR_NAME   value: "slime" | 自定义环境变量                                              |                                                              |
+| replicaCount                               | 1                                                            | module                                                      |                                                              |
+| image.pullPolicy                           | Always                                                       | module                                                      |                                                              |
+| serviceAccount.create                      | true                                                         | module                                                      | switch on serviceAccount creating                            |
+| serviceAccount.annotations                 | { }                                                          | -                                                           |                                                              |
+| serviceAccount.name                        | ""                                                           | -                                                           |                                                              |
+| podAnnotations                             | { }                                                          | -                                                           |                                                              |
+| podSecurityContext                         | { }                                                          | module                                                      |                                                              |
+| containerSecurityContext                   | { }                                                          | module                                                      |                                                              |
+| service.type                               | ClusterIP                                                    | module                                                      |                                                              |
+| service.port                               | 80                                                           | module                                                      |                                                              |
+| resources.limits.cpu                       | 1                                                            | module and component                                        |                                                              |
+| resources.limits.memory                    | 1Gi                                                          | module and component                                        |                                                              |
+| resources.requests.cpu                     | 200m                                                         | module and component                                        |                                                              |
+| resources.requests.memory                  | 200Mi                                                        | module and component                                        |                                                              |
+| autoscaling.enabled                        | false                                                        | -                                                           |                                                              |
+| autoscaling.minReplicas                    | 1                                                            | -                                                           |                                                              |
+| autoscaling.maxReplicas                    | 100                                                          | -                                                           |                                                              |
+| autoscaling.targetCPUUtilizationPercentage | 80                                                           | -                                                           |                                                              |
+| nodeSelector                               | { }                                                          | module                                                      |                                                              |
+| tolerations                                | [ ]                                                          | module                                                      |                                                              |
+| affinity                                   | { }                                                          | module                                                      |                                                              |
+| namespace                                  | mesh-operator                                                | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
+| istioNamespace                             | istio-system                                                 | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
+| healthProbePort                            | 8081                                                         | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
+| logSourcePort                              | 8082                                                         | module                                                      | module deployment接收accesslog的grpc端口                     |
+| service.logSourcePort                      | 8082                                                         | module                                                      | module service接收accesslog的grpc端口，要与logSourcePort保持一致 |
+| containers.slime.volumeMounts              | ""                                                           | module                                                      | 启用日志轮转时，存储卷对应的本地路径                         |
+| volumes                                    | ""                                                           | module                                                      | 启用日志轮转时，使用的存储卷信息                             |
 
 
 
