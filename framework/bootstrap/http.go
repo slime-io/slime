@@ -3,29 +3,54 @@ package bootstrap
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/kube-openapi/pkg/common"
 	"net/http"
 	"net/http/pprof"
 	"slime.io/slime/framework/util"
 	"strconv"
 )
 
-func AuxiliaryHttpServerStart(addr string) {
-	mux := http.NewServeMux()
+// PathHandler for module using
+type PathHandler struct {
+	mux *http.ServeMux
+}
+
+func NewPathHandler() *PathHandler {
+	return &PathHandler{
+		mux: http.NewServeMux(),
+	}
+}
+
+func (ph PathHandler) Handle(path string, handler http.Handler) {
+	ph.mux.Handle(path, handler)
+}
+
+// PrefixPathHandlerManager for module env init
+type PrefixPathHandlerManager struct {
+	Prefix string // module name
+	common.PathHandler
+}
+
+func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
+	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
+}
+
+func AuxiliaryHttpServerStart(ph *PathHandler, addr string) {
 
 	//register
-	HealthCheckRegister(mux)
-	PprofRegister(mux)
-	LogLevelRegister(mux)
+	HealthCheckRegister(ph)
+	PprofRegister(ph)
+	LogLevelRegister(ph)
 
 	log.Infof("auxiliary http server is starting to listen %s", addr)
-	if err := http.ListenAndServe(addr, mux); err != nil {
+	if err := http.ListenAndServe(addr, ph.mux); err != nil {
 		log.Errorf("auxiliary http server starts error, %+v", err)
 	}
 }
 
-func HealthCheckRegister(mux *http.ServeMux) {
-	mux.Handle("/modules/livez", livezHandler())
-	mux.Handle("/modules/readyz", readyzHandler())
+func HealthCheckRegister(ph *PathHandler) {
+	ph.Handle("/modules/livez", livezHandler())
+	ph.Handle("/modules/readyz", readyzHandler())
 }
 
 func HealthCheckPathRegister() {
@@ -49,17 +74,17 @@ func readyzHandler() http.Handler {
 	})
 }
 
-func PprofRegister(mux *http.ServeMux) {
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+func PprofRegister(ph *PathHandler) {
+	ph.mux.HandleFunc("/debug/pprof/", pprof.Index)
+	ph.mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	ph.mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	ph.mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	ph.mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 }
 
-func LogLevelRegister(mux *http.ServeMux) {
-	mux.Handle("/log/slime", slimeLogLevelHandler())
-	mux.Handle("/log/k", kLogLevelHandler())
+func LogLevelRegister(ph *PathHandler) {
+	ph.Handle("/log/slime", slimeLogLevelHandler())
+	ph.Handle("/log/k", kLogLevelHandler())
 }
 
 func slimeLogLevelHandler() http.Handler {

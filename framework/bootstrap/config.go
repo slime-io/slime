@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/kube-openapi/pkg/common"
 	"os"
 
 	"github.com/gogo/protobuf/jsonpb"
@@ -160,10 +161,11 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 }
 
 type Environment struct {
-	Config        *bootconfig.Config
-	K8SClient     *kubernetes.Clientset
-	DynamicClient dynamic.Interface
-	Stop          <-chan struct{}
+	Config          *bootconfig.Config
+	K8SClient       *kubernetes.Clientset
+	DynamicClient   dynamic.Interface
+	HttpPathHandler common.PathHandler
+	Stop            <-chan struct{}
 }
 
 func (env *Environment) IstioRev() string {
