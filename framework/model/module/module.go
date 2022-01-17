@@ -120,6 +120,8 @@ func Main(bundle string, modules []Module) {
 
 	ctx := context.Background()
 
+	ph := bootstrap.NewPathHandler()
+
 	for _, mod := range modules {
 		var modCfg *bootconfig.Config
 		var modGeneralJson []byte
@@ -152,7 +154,11 @@ func Main(bundle string, modules []Module) {
 			Config:        modCfg,
 			K8SClient:     clientSet,
 			DynamicClient: dynamicClient,
-			Stop:          ctx.Done(),
+			HttpPathHandler: bootstrap.PrefixPathHandlerManager{
+				Prefix:      mod.Name(),
+				PathHandler: ph,
+			},
+			Stop: ctx.Done(),
 		}
 
 		if err := mod.InitManager(mgr, env, cbs); err != nil {
@@ -161,7 +167,7 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
-	go bootstrap.AuxiliaryHttpServerStart(config.Global.Misc["aux-addr"])
+	go bootstrap.AuxiliaryHttpServerStart(ph, config.Global.Misc["aux-addr"])
 
 	for _, startup := range startups {
 		startup(ctx)
