@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"os"
+
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kube-openapi/pkg/common"
-	"os"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"k8s.io/client-go/kubernetes"

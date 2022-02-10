@@ -2,6 +2,7 @@ package trigger
 
 import (
 	"context"
+
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,12 +91,11 @@ func (t *WatcherTrigger) Start() {
 						},
 					}
 					t.eventChan <- event
-					//log.Debugf("sent watcher event to controller: type %s, kind %s", e.Type, e.Object.GetObjectKind().GroupVersionKind().String())
+					// log.Debugf("sent watcher event to controller: type %s, kind %s", e.Type, e.Object.GetObjectKind().GroupVersionKind().String())
 				}
 			}
 		}(wat, channel)
 	}
-
 }
 
 func (t *WatcherTrigger) Stop() {

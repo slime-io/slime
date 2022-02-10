@@ -3,11 +3,13 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"os"
-	"slime.io/slime/framework/test/e2e/framework"
 	"text/template"
+
+	"gopkg.in/yaml.v2"
+
+	"slime.io/slime/framework/test/e2e/framework"
 )
 
 var testImages testImagesStruct
@@ -72,6 +74,7 @@ func initReg() RegistryList {
 	}
 	return registry
 }
+
 // RegistryList holds public and private image registries
 type RegistryList struct {
 	GcAuthenticatedRegistry string `yaml:"gcAuthenticatedRegistry"`
@@ -88,6 +91,7 @@ type RegistryList struct {
 	PrivateRegistry         string `yaml:"privateRegistry"`
 	SampleRegistry          string `yaml:"sampleRegistry"`
 }
+
 // SubstituteImageName replaces image name in content.
 func SubstituteImageName(content string) string {
 	contentWithImageName := new(bytes.Buffer)

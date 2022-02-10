@@ -2,12 +2,14 @@ package bootstrap
 
 import (
 	"fmt"
-	log "github.com/sirupsen/logrus"
-	"k8s.io/kube-openapi/pkg/common"
 	"net/http"
 	"net/http/pprof"
-	"slime.io/slime/framework/util"
 	"strconv"
+
+	log "github.com/sirupsen/logrus"
+	"k8s.io/kube-openapi/pkg/common"
+
+	"slime.io/slime/framework/util"
 )
 
 // PathHandler for module using
@@ -36,8 +38,7 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 }
 
 func AuxiliaryHttpServerStart(ph *PathHandler, addr string) {
-
-	//register
+	// register
 	HealthCheckRegister(ph)
 	PprofRegister(ph)
 	LogLevelRegister(ph)

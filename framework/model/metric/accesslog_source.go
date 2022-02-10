@@ -2,10 +2,11 @@ package metric
 
 import (
 	"fmt"
+	"net"
+
 	service_accesslog "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
-	"net"
 )
 
 type AccessLogSource struct {
@@ -95,5 +96,4 @@ func (s *AccessLogSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 
 	log.Debugf("successfully get metric from accesslog")
 	return metric, nil
-
 }

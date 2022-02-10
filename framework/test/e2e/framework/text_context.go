@@ -3,22 +3,23 @@ package framework
 import (
 	"flag"
 	"fmt"
+
 	"k8s.io/client-go/tools/clientcmd"
 )
 
 const defaultHost = "http://127.0.0.1:8080"
 
 type TestContextType struct {
-	CertDir 					string
-	DeleteNamespace          	bool
-	DeleteNamespaceOnFailure 	bool
-	Host                     	string
-	IstioRevison 				string
-	KubectlPath              	string
-	KubeContext             	string
-	KubeConfig               	string
-	ReportDir                	string
-	RepoRoot                	string
+	CertDir                  string
+	DeleteNamespace          bool
+	DeleteNamespaceOnFailure bool
+	Host                     string
+	IstioRevison             string
+	KubectlPath              string
+	KubeContext              string
+	KubeConfig               string
+	ReportDir                string
+	RepoRoot                 string
 }
 
 var TestContext TestContextType

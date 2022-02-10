@@ -5,16 +5,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
+	"net/url"
+	"os/exec"
+	"reflect"
+	"strings"
+	"syscall"
+	"time"
+
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"net/url"
-	"reflect"
+
 	e2ekubectl "slime.io/slime/framework/test/e2e/framework/kubectl"
-	"strings"
-	"syscall"
-	"time"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -29,13 +33,11 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	watchtools "k8s.io/client-go/tools/watch"
 	uexec "k8s.io/utils/exec"
-	"net"
-	"os/exec"
 )
 
 const (
 	// How often to Poll pods, nodes and claims.
-	Poll = 2 * time.Second
+	Poll            = 2 * time.Second
 	PodStartTimeout = 5 * time.Minute
 	// service accounts are provisioned after namespace creation
 	// a service account is required to support pod creation in a namespace as part of admission control
@@ -53,9 +55,9 @@ func CreateTestingNS(baseName string, c clientset.Interface, lables map[string]s
 
 	namespaceObj := &v1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: baseName,
-			Namespace:    "",
-			Labels:       lables,
+			Name:      baseName,
+			Namespace: "",
+			Labels:    lables,
 		},
 		Status: v1.NamespaceStatus{},
 	}
@@ -137,7 +139,6 @@ func deleteNS(c clientset.Interface, config *restclient.Config, namespace string
 	}
 	Logf("namespace %v deletion completed in %s", namespace, time.Now().Sub(startTime))
 	return nil
-
 }
 
 func hasRemainingContent(c clientset.Interface, config *restclient.Config, namespace string) (bool, error) {
@@ -413,7 +414,7 @@ func (b KubectlBuilder) ExecWithFullOutput() (string, string, error) {
 	select {
 	case err := <-errCh:
 		if err != nil {
-			var rc = 127
+			rc := 127
 			if ee, ok := err.(*exec.ExitError); ok {
 				rc = int(ee.Sys().(syscall.WaitStatus).ExitStatus())
 				Logf("rc: %d", rc)

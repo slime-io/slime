@@ -11,6 +11,7 @@ type ProducerConfig struct {
 	EnablePrometheusSource bool
 	PrometheusSourceConfig PrometheusSourceConfig
 	AccessLogSourceConfig  AccessLogSourceConfig
+	EnableMockSource       bool
 	EnableWatcherProducer  bool
 	WatcherProducerConfig  WatcherProducerConfig
 	EnableTickerProducer   bool
@@ -43,6 +44,6 @@ type AccessLogSourceConfig struct {
 }
 
 type AccessLogConvertorConfig struct {
-	Name          string // handler name
-	Handler       func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
+	Name    string // handler name
+	Handler func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
 }
