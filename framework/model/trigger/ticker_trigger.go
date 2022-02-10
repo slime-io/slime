@@ -1,8 +1,9 @@
 package trigger
 
 import (
-	log "github.com/sirupsen/logrus"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 type TickerTrigger struct {
@@ -52,7 +53,7 @@ func (t *TickerTrigger) Start() {
 						Duration: du,
 					}
 					t.eventChan <- event
-					//log.Debugf("sent timer event to controller: duration %s", timer.String())
+					// log.Debugf("sent timer event to controller: duration %s", timer.String())
 				}
 			}
 		}(duration, channel)

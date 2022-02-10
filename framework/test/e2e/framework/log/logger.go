@@ -2,8 +2,9 @@ package log
 
 import (
 	"fmt"
-	"github.com/onsi/ginkgo"
 	"time"
+
+	"github.com/onsi/ginkgo"
 )
 
 func nowStamp() string {

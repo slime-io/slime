@@ -5,7 +5,6 @@ import (
 )
 
 func NewProducer(config *ProducerConfig) {
-
 	var source Source
 	var wp *WatcherProducer
 	var tp *TickerProducer
@@ -13,6 +12,8 @@ func NewProducer(config *ProducerConfig) {
 	// init source
 	if config.EnablePrometheusSource {
 		source = NewPrometheusSource(config.PrometheusSourceConfig)
+	} else if config.EnableMockSource {
+		source = NewMockSource()
 	} else {
 		source = NewAccessLogSource(config.AccessLogSourceConfig)
 	}
@@ -41,5 +42,4 @@ func NewProducer(config *ProducerConfig) {
 		log.Infof("all producers stopped")
 		return
 	}()
-
 }

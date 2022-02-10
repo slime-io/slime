@@ -1,13 +1,14 @@
 package pod
 
 import (
+	"time"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubectl/pkg/util/podutils"
 	e2elog "slime.io/slime/framework/test/e2e/framework/log"
-	"time"
 )
 
 const (

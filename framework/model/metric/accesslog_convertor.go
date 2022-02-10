@@ -2,9 +2,10 @@ package metric
 
 import (
 	"errors"
+	"sync"
+
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	log "github.com/sirupsen/logrus"
-	"sync"
 )
 
 type AccessLogConvertor struct {

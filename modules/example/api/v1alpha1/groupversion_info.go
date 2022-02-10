@@ -36,6 +36,6 @@ var (
 )
 
 func init() {
-	//SchemeBuilder.Register(&Xxx{}, &XxxList{},
+	// SchemeBuilder.Register(&Xxx{}, &XxxList{},
 	//	&Yyy{}, &YyyList{})
 }

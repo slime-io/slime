@@ -2,9 +2,10 @@ package framework
 
 import (
 	"fmt"
-	"k8s.io/client-go/dynamic"
 	"strings"
 	"time"
+
+	"k8s.io/client-go/dynamic"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -29,8 +30,7 @@ type Framework struct {
 	SkipNamespaceCreation bool // Whether to skip creating a namespace
 }
 
-type FrameworkOptions struct {
-}
+type FrameworkOptions struct{}
 
 func NewDefaultFramework(baseName string) *Framework {
 	return NewFramework(baseName, FrameworkOptions{}, nil)

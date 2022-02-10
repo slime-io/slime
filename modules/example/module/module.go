@@ -2,6 +2,7 @@ package module
 
 import (
 	"os"
+
 	"slime.io/slime/modules/example/api/v1alpha1"
 
 	"slime.io/slime/framework/model/module"

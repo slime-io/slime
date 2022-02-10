@@ -2,9 +2,10 @@ package kubectl
 
 import (
 	"fmt"
-	"k8s.io/client-go/tools/clientcmd"
 	"os/exec"
 	"path/filepath"
+
+	"k8s.io/client-go/tools/clientcmd"
 )
 
 // TestKubeconfig is a struct containing the needed attributes from TestContext and Framework(Namespace).
@@ -58,10 +59,10 @@ func (tk *TestKubeconfig) KubectlCmd(args ...string) *exec.Cmd {
 	}
 	kubectlArgs := append(defaultArgs, args...)
 
-	//We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
-	//and so on.
+	// We allow users to specify path to kubectl, so you can test either "kubectl" or "cluster/kubectl.sh"
+	// and so on.
 	cmd := exec.Command(tk.KubectlPath, kubectlArgs...)
 
-	//caller will invoke this and wait on it.
+	// caller will invoke this and wait on it.
 	return cmd
 }

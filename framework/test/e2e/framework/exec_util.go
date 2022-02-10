@@ -2,15 +2,17 @@ package framework
 
 import (
 	"bytes"
-	"github.com/onsi/gomega"
 	"io"
+	"net/url"
+	"strings"
+
+	"github.com/onsi/gomega"
+
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/remotecommand"
-	"net/url"
-	"strings"
 )
 
 // ExecOptions passed to ExecWithOptions
@@ -29,13 +31,13 @@ type ExecOptions struct {
 // ExecShellInPod executes the specified command on the pod.
 func (f *Framework) ExecShellInPod(podName string, ns string, cmd string) string {
 	return f.execCommandInPod(podName, ns, "/bin/sh", "-c", cmd)
-	//return f.execCommandInPod(podName, ns, cmd)
+	// return f.execCommandInPod(podName, ns, cmd)
 }
 
 // ExecShellInPodWithFullOutput executes the specified command on the Pod and returns stdout, stderr and error.
 func (f *Framework) ExecShellInPodWithFullOutput(podName, ns string, cmd string) (string, string, error) {
 	return f.execCommandInPodWithFullOutput(podName, ns, "/bin/sh", "-c", cmd)
-	//return f.execCommandInPodWithFullOutput(podName, ns, cmd)
+	// return f.execCommandInPodWithFullOutput(podName, ns, cmd)
 }
 
 func (f *Framework) execCommandInPod(podName, ns string, cmd ...string) string {

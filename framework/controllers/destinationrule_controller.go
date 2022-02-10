@@ -50,7 +50,6 @@ func (r *DestinationRuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 	// Fetch the DestinationRule instance
 	instance := &networkingistioiov1alpha3.DestinationRule{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// TODO del event not handled. should re-calc the data accordingly

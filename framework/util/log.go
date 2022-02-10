@@ -3,11 +3,13 @@ package util
 import (
 	"flag"
 	"fmt"
-	"gopkg.in/natefinch/lumberjack.v2"
 	"io"
 	"os"
-	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"time"
+
+	"gopkg.in/natefinch/lumberjack.v2"
+
+	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
@@ -19,7 +21,6 @@ func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
 }
 
 func InitLog(logConfig *bootconfig.Log) error {
-
 	// set log level
 	if logConfig.LogLevel == "" {
 		logConfig.LogLevel = slimeLogLevel
@@ -43,7 +44,7 @@ func InitLog(logConfig *bootconfig.Log) error {
 			Filename:   logConfig.LogRotateConfig.FilePath,
 			MaxSize:    int(logConfig.LogRotateConfig.MaxSizeMB), // megabytes
 			MaxBackups: int(logConfig.LogRotateConfig.MaxBackups),
-			MaxAge:     int(logConfig.LogRotateConfig.MaxAgeDay), //days
+			MaxAge:     int(logConfig.LogRotateConfig.MaxAgeDay), // days
 			Compress:   logConfig.LogRotateConfig.Compress,       // disabled by default
 		}
 	}

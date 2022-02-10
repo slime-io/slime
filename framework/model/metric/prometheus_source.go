@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
+
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	prometheusModel "github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"strings"
-	"time"
 )
 
 type PrometheusSource struct {
