@@ -135,21 +135,47 @@ func Main(bundle string, modules []Module) {
 			modCfg, modGeneralJson = config, generalJson
 		}
 
-		if modCfg != nil && modCfg.General != nil {
-			modSelfCfg := mod.Config()
-			if modSelfCfg != nil {
-				if len(modCfg.General.XXX_unrecognized) > 0 {
-					if err := proto.Unmarshal(modCfg.General.XXX_unrecognized, modSelfCfg); err != nil {
-						log.Errorf("unmarshal for mod %s XXX_unrecognized (%v) met err %v", mod.Name(), modCfg.General.XXX_unrecognized, err)
-						fatal()
-					}
-				} else if len(modGeneralJson) > 0 {
-					if err := jsonpb.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
-						log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", mod.Name(), modGeneralJson, err)
-						fatal()
+		modSelfCfg := mod.Config()
+		if modCfg != nil && modSelfCfg != nil {
+
+			var toCopy proto.Message
+			switch {
+			case modCfg.Fence != nil:
+				toCopy = modCfg.Fence
+			case modCfg.Limiter != nil:
+				toCopy = modCfg.Limiter
+			case modCfg.Plugin != nil:
+				toCopy = modCfg.Plugin
+			}
+
+			if toCopy != nil {
+				// old version: get mod.Config() value from config.Fence/Limiter/Plugin
+				bs, err := proto.Marshal(toCopy)
+				if err != nil {
+					log.Errorf("marshal for mod %s config (%v) met err %v", mod.Name(), toCopy, err)
+					fatal()
+				}
+				if err = proto.Unmarshal(bs, modSelfCfg); err != nil {
+					log.Errorf("unmarshal for mod %s modSelfCfg (%v) met err %v", mod.Name(), bs, err)
+					fatal()
+				}
+			} else {
+				// new version: get mod.Config() value from config.general
+				if modCfg.General != nil {
+					if len(modCfg.General.XXX_unrecognized) > 0 {
+						if err := proto.Unmarshal(modCfg.General.XXX_unrecognized, modSelfCfg); err != nil {
+							log.Errorf("unmarshal for mod %s XXX_unrecognized (%v) met err %v", mod.Name(), modCfg.General.XXX_unrecognized, err)
+							fatal()
+						}
+					} else if len(modGeneralJson) > 0 {
+						if err := jsonpb.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
+							log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", mod.Name(), modGeneralJson, err)
+							fatal()
+						}
 					}
 				}
 			}
+
 		}
 
 		env := bootstrap.Environment{
