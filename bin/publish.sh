@@ -1,56 +1,56 @@
 #!/usr/bin/env bash
 
-HUB=${HUB:-"docker.io/slimeio registry.cn-hangzhou.aliyuncs.com/slimeio"}
-PUSH_HUBS="$HUB"
-first_hub=`echo $HUB|awk -F " " '{print $1}'`
-VERBOSE=${V:-1}
+# usage
+# `sh ./publish.sh ALL` in each submodules
 
-function fatal() {
-  echo "$1" >&2
-  exit 1
-}
+HUB=${HUB:-"docker.io/liuliluo"}
+TARGET_GOARCH=${TARGET_GOARCH:-${GOARCH:-amd64}}
+TARGET_GOOS=${TARGET_GOOS:-${GOOS:-linux}}
+CGO_ENABLED=${CGO_ENABLED:-0}
+export GO111MODULE=on
+
+if [[ -z "$TARGET_GOOS" ]]; then
+  if uname | grep -q Darwin; then
+    TARGET_GOOS=darwin
+  else
+    TARGET_GOOS=linux
+  fi
+fi
 
 if test -z "$MOD"; then
   fatal "empty MOD"
 fi
 
-function calc_unstaged_hash() {
-    local tmp_f
-    tmp_f=`mktemp`
-    cp .git/index "$tmp_f"
-    GIT_INDEX_FILE="$tmp_f" git add -u
-    GIT_INDEX_FILE="$tmp_f" git write-tree
-}
-
-version=$(test -f VERSION && cat VERSION || echo "")  # get version from file
-dirty=
-if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
-  unstaged_hash=$(calc_unstaged_hash)
-  dirty="-dirty_${unstaged_hash::7}"
-fi
-commit=$(git rev-parse --short HEAD)
-if [[ -z "${version}" ]]; then
-  tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}'|tail -1)
-  if [[ -z "${tag}" ]]; then
-    branch=$(git symbolic-ref --short -q HEAD)
-    if [[ -n "${branch}" ]]; then
-      version=$branch
+if [[ -z "$TAG" ]]; then
+  branch=$(git symbolic-ref --short -q HEAD)
+  tag=$(git tag --points-at HEAD)
+  if [ -z "$tag" ]
+  then
+    commit=$(git rev-parse --short HEAD)
+    if [ -z "$branch" ]; then
+      export TAG="$commit"  # detach case
+    else
+      export TAG="$branch-$commit"
     fi
   else
-    version=$tag  # use HEAD tag as version
+     export TAG=$tag
   fi
-fi
-if [ -z "$version" ]; then
-  image_tag="${commit}${dirty}"
+
+  TAG_NO_ARCH=$TAG
+  TAG=${TAG}_${TARGET_GOOS}_${TARGET_GOARCH}
+
+  if test -z "${IGNORE_DIRTY}" && test -n "$(git status -s --porcelain)"; then
+    TAG=$TAG-dirty
+    TAG_NO_ARCH=$TAG_NO_ARCH-dirty
+  fi
 else
-  image_tag="$version-${commit}${dirty}"
+  TAG_NO_ARCH=$TAG
 fi
 
-image_full_name="slime-$MOD:$image_tag"
+image="${HUB}/$MOD:${TAG}"
+image_no_arch="${HUB}/$MOD:${TAG_NO_ARCH}"
 
-image_url="$first_hub/${image_full_name}"
-
-ALL_ACTIONS=${ALL_ACTIONS:-"build image pushAll"}
+ALL_ACTIONS=${ALL_ACTIONS:-"build image image-push"}
 
 actions=
 if [[ "$#" -eq 0 ]]; then
@@ -62,50 +62,29 @@ else
   actions="$*"
 fi
 
-export GOOS=linux
-export GOARCH=amd64
-
-function print_info() {
-  for info in "$@"; do
-    case "$info" in
-    image)
-      echo -e "image:\n  image_url: ${image_url}"
-      ;;
-    *)
-      echo "unknown info: ${info}" >&2
-    esac
-  done
-}
-
-if [[ "$V" -gt 0 ]]; then
-  set -x
-fi
 for action in $actions; do
   case "$action" in
   build)
-    go build -o manager.exe
+    echo "go build submodules ${MOD}"
+    CGO_ENABLED="${CGO_ENABLED}" GOOS="${TARGET_GOOS}" GOARCH=${TARGET_GOARCH}  go build -o manager.exe
     ;;
   image)
-    docker build -t "${image_url}" .
+    echo "build docker image: ${image}" >&2
+    if [[ "$TARGET_GOOS" == "linux" && "$TARGET_GOARCH" == "amd64" && ("$(uname -p)" == "x86_64" || "$(uname -p)" == "i386") ]]; then
+      docker build --platform ${TARGET_GOOS}/${TARGET_GOARCH} -t ${image} .
+    else
+      docker buildx build --platform ${TARGET_GOOS}/${TARGET_GOARCH} --load -t ${image} .
+    fi
     ;;
-  print)  # should be the only action
-    # rest param will be consider as info to print, like: *.sh print image
-    set +x
-    shift
-    print_info "$@"
-    break
+  image-push)
+    echo "push image $image"
+    docker push $image
     ;;
-  push)
-    docker push "${image_url}"
+  print-image)  # should be the only action
+    echo "$image"
     ;;
-  pushAll)
-    for push_hub in ${PUSH_HUBS}; do
-      push_url="${push_hub}/${image_full_name}"
-      if [[ "${push_url}" != "${image_url}" ]]; then
-        docker tag "${image_url}" "${push_url}"
-      fi
-      docker push "${push_url}"
-    done
+  print-image-noarch)
+    echo "$image_no_arch"
     ;;
   *)
     echo "skip unknown action $action"
@@ -117,4 +96,3 @@ for action in $actions; do
     exit ${step_exit}
   fi
 done
-set +x
