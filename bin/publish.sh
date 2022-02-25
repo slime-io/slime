@@ -46,13 +46,13 @@ if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
   dirty="-dirty_${unstaged_hash::7}"
 fi
 
-
+commit=$(git rev-parse --short HEAD)
 if [[ -z "$TAG" ]]; then
   branch=$(git symbolic-ref --short -q HEAD)
-  tag=$(git tag --points-at HEAD)
+  tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}'|tail -1)
   if [ -z "$tag" ]
   then
-    commit=$(git rev-parse --short HEAD)
+
     if [ -z "$branch" ]; then
       export TAG="$commit"  # detach case
     else
@@ -96,11 +96,7 @@ for action in $actions; do
     ;;
   image)
     echo "build docker image: ${image}" >&2
-    if [[ "$TARGET_GOOS" == "linux" && "$TARGET_GOARCH" == "amd64" && ("$(uname -p)" == "x86_64" || "$(uname -p)" == "i386") ]]; then
-      docker build --platform ${TARGET_GOOS}/${TARGET_GOARCH} -t ${image} .
-    else
-      docker buildx build --platform ${TARGET_GOOS}/${TARGET_GOARCH} --load -t ${image} .
-    fi
+    docker buildx build --platform ${TARGET_GOOS}/${TARGET_GOARCH} --load -t ${image} .
     ;;
   image-push)
     for push_hub in ${PUSH_HUBS}; do
