@@ -28,7 +28,7 @@ func NewWatcherProducer(config WatcherProducerConfig, source Source) *WatcherPro
 }
 
 func (p *WatcherProducer) HandleWatcherEvent() {
-	log := log.WithField("reporter", "WatcherProducer").WithField("function", "HandleTriggerEvent")
+	log := log.WithField("reporter", "WatcherProducer").WithField("function", "HandleWatcherEvent")
 	for {
 		select {
 		case <-p.StopChan:
