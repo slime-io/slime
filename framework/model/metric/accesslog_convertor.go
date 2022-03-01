@@ -17,11 +17,21 @@ type AccessLogConvertor struct {
 }
 
 func NewAccessLogConvertor(config AccessLogConvertorConfig) *AccessLogConvertor {
+
+	newCacheResultCopy := make(map[string]map[string]string)
+	for meta, value := range config.InitCache {
+		tmpValue := make(map[string]string)
+		for k, v := range value {
+			tmpValue[k] = v
+		}
+		newCacheResultCopy[meta] = tmpValue
+	}
+
 	return &AccessLogConvertor{
 		name:            config.Name,
 		handler:         config.Handler,
-		cacheResult:     make(map[string]map[string]string),
-		cacheResultCopy: make(map[string]map[string]string),
+		cacheResult:     config.InitCache,
+		cacheResultCopy: newCacheResultCopy,
 	}
 }
 
