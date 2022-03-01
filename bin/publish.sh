@@ -5,7 +5,7 @@
 
 HUB=${HUB:-"docker.io/slimeio registry.cn-hangzhou.aliyuncs.com/slimeio"}
 PUSH_HUBS="$HUB"
-first_hub=`echo $HUB|awk -F " " '{print $1}'`
+first_hub=$(echo $HUB | awk -F " " '{print $1}')
 TARGET_GOARCH=${TARGET_GOARCH:-${GOARCH:-amd64}}
 TARGET_GOOS=${TARGET_GOOS:-${GOOS:-linux}}
 CGO_ENABLED=${CGO_ENABLED:-0}
@@ -17,11 +17,11 @@ function fatal() {
 }
 
 function calc_unstaged_hash() {
-    local tmp_f
-    tmp_f=`mktemp`
-    cp .git/index "$tmp_f"
-    GIT_INDEX_FILE="$tmp_f" git add -u
-    GIT_INDEX_FILE="$tmp_f" git write-tree
+  local tmp_f
+  tmp_f=$(mktemp)
+  cp .git/index "$tmp_f"
+  GIT_INDEX_FILE="$tmp_f" git add -u
+  GIT_INDEX_FILE="$tmp_f" git write-tree
 }
 
 if test -z "$MOD"; then
@@ -40,6 +40,8 @@ if test -z "$MOD"; then
   fatal "empty MOD"
 fi
 
+MOD="slime-$MOD"
+
 dirty=
 if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
   unstaged_hash=$(calc_unstaged_hash)
@@ -49,17 +51,16 @@ fi
 commit=$(git rev-parse --short HEAD)
 if [[ -z "$TAG" ]]; then
   branch=$(git symbolic-ref --short -q HEAD)
-  tag=$(git show-ref --tags| grep "$commit" | awk -F"[/]" '{print $3}'|tail -1)
-  if [ -z "$tag" ]
-  then
+  tag=$(git show-ref --tags | grep "$commit" | awk -F"[/]" '{print $3}' | tail -1)
+  if [ -z "$tag" ]; then
 
     if [ -z "$branch" ]; then
-      export TAG="$commit"  # detach case
+      export TAG="$commit" # detach case
     else
       export TAG="$branch-$commit"
     fi
   else
-     export TAG=$tag
+    export TAG=$tag
   fi
 
   TAG_NO_ARCH=$TAG
@@ -92,7 +93,7 @@ for action in $actions; do
   case "$action" in
   build)
     echo "go build submodules ${MOD}"
-    CGO_ENABLED="${CGO_ENABLED}" GOOS="${TARGET_GOOS}" GOARCH=${TARGET_GOARCH}  go build -o manager.exe
+    CGO_ENABLED="${CGO_ENABLED}" GOOS="${TARGET_GOOS}" GOARCH=${TARGET_GOARCH} go build -o manager.exe
     ;;
   image)
     echo "build docker image: ${image}" >&2
@@ -108,7 +109,7 @@ for action in $actions; do
       docker push "${push_url}"
     done
     ;;
-  print-image)  # should be the only action
+  print-image) # should be the only action
     echo "$image"
     ;;
   print-image-noarch)
