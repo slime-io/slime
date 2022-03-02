@@ -168,7 +168,8 @@ func Main(bundle string, modules []Module) {
 							fatal()
 						}
 					} else if len(modGeneralJson) > 0 {
-						if err := jsonpb.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
+						u := jsonpb.Unmarshaler{AllowUnknownFields: true}
+						if err := u.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
 							log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", mod.Name(), modGeneralJson, err)
 							fatal()
 						}
