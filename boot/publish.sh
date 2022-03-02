@@ -7,5 +7,5 @@ for m in $MODS; do
 done
 
 export MOD=boot
-export ALL_ACTIONS="image pushAll"
+export ALL_ACTIONS="image image-push"
 ../bin/publish.sh "$@"
