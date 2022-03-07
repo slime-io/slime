@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	module.Main("bundle", []module.Module{
+	module.Main("bundle_example", []module.Module{
 		&lazyloadmod.Module{},
 		&limitermod.Module{},
 		&pluginmod.Module{},
