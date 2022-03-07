@@ -123,7 +123,7 @@ func GetModuleConfig(name string) (*bootconfig.Config, []byte, []byte, error) {
 		cfg = &bootconfig.Config{}
 	}
 
-	if cfg != nil {
+	if cfg != nil && name == "" {
 		patchModuleConfig(cfg, defaultModuleConfig)
 	}
 	return cfg, raw, generalJson, nil

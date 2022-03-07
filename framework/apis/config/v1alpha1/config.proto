@@ -91,7 +91,10 @@ message General {// general module
 
 message Bundle {
   message Item {
+    // submodule name, custom value, necessary
     string name = 1;
+    // submodule kind, can only be one of real module kinds, like limiter, necessary
+    string kind = 2;
   }
   repeated Item modules = 1;
 }
@@ -111,4 +114,6 @@ message Config {
     BundleItem = 1;
   }
   Mode mode = 10;
+  // like bundle item kind, necessary if not bundle
+  string kind = 11;
 }
