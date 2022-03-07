@@ -2,56 +2,70 @@
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: bundle-example-all
+  name: lazyload-bundle
   namespace: mesh-operator
 spec:
   image:
     pullPolicy: Always
-    repository: slimeio/slime-bundle-example-all
-    tag: feature-bundle-577de48-dirty  # should be replaced with actual repo/tag
+    repository: registry.cn-hangzhou.aliyuncs.com/slimeio/slime-bundle-example-all
+    tag: v0.3.11_linux_amd64-dirty_  # should be replaced with actual repo/tag
   module:
-    - name: bundle-example-all
+    - name: lazyload-bundle
       enable: true
       bundle:
         modules:
-          - name: lazyload
-          - name: limiter
-          - name: plugin
-    - name: lazyload
+          - name: lazyload-v1
+            kind: lazyload
+          - name: lazyload-v2
+            kind: lazyload
+      global:
+        log:
+          logLevel: debug
+    - name: lazyload-v1
+      kind: lazyload
       enable: true
       mode: BundleItem
-      fence:
+      general:
         wormholePort: # replace to your application svc ports
           - "9080"
-      metric:
-        prometheus:
-          address: http://prometheus.istio-system:9090
-          handlers:
-            destination:
-              query: |
-                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
-              type: Group
-    - name: plugin
+        namespace:
+          - default
+      global:
+        istioRev: v1
+        misc:
+          globalSidecarMode: namespace
+          metricSourceType: accesslog
+    - name: lazyload-v2
+      kind: lazyload
       enable: true
       mode: BundleItem
-    - name: limiter
-      limiter:
-        backend: 1
+      general:
+        wormholePort: # replace to your application svc ports
+          - "80"
+        namespace:
+          - test
+      global:
+        istioRev: v2
+        strictRev: true
+        misc:
+          globalSidecarMode: namespace
+          metricSourceType: accesslog
+  component:  # for lazyload
+    globalSidecar:
       enable: true
-      mode: BundleItem
-      metric:
-        prometheus:
-          address: http://prometheus.istio-system:9090
-          handlers:
-            cpu.sum:
-              query: |
-                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            cpu.max:
-              query: |
-                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            rt99:
-              query: |
-                histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-        k8s:
-          handlers:
-            - pod # inline
+      sidecarInject:
+        enable: true
+        mode: pod
+        labels: # optional, used for sidecarInject.mode = pod
+          sidecar.istio.io/inject: "true"
+          # istio.io/rev: canary # use control plane revisions
+      resources:
+        requests:
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 400m
+          memory: 400Mi
+      image:
+        repository: registry.cn-hangzhou.aliyuncs.com/slimeio/slime-global-sidecar
+        tag: v0.2.0-1b93bf7
