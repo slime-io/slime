@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"bytes"
 	"encoding/json"
+	ghYaml "github.com/ghodss/yaml"
 	"io/ioutil"
 	"os"
 
@@ -138,10 +139,18 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 		return nil, nil, nil, err
 	}
 
-	// as jsonpb does not support XXX_unrecognized
+	c := &bootconfig.Config{}
+	var rawJson, generalJson []byte
 	var m map[string]interface{}
-	var generalJson []byte
-	if err = json.Unmarshal(raw, &m); err != nil {
+
+	// convert yaml/json to json
+	rawJson, err = ghYaml.YAMLToJSON(raw)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	// as jsonpb does not support XXX_unrecognized
+	if err = json.Unmarshal(rawJson, &m); err != nil {
 		return nil, nil, nil, err
 	} else if m != nil {
 		gen := m["general"]
@@ -152,13 +161,12 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 		}
 	}
 
-	c := &bootconfig.Config{}
 	um := jsonpb.Unmarshaler{AllowUnknownFields: true}
-	err = um.Unmarshal(bytes.NewBuffer(raw), c)
+	err = um.Unmarshal(bytes.NewBuffer(rawJson), c)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	return c, raw, generalJson, nil
+	return c, rawJson, generalJson, nil
 }
 
 type Environment struct {

@@ -232,7 +232,6 @@ func Main(bundle string, modules []Module) {
 							fatal()
 						}
 					}
-					log.Warningf("222222 modSelfCfg: %+v", modSelfCfg)
 				}
 			}
 
