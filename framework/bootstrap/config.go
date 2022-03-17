@@ -184,9 +184,19 @@ func (env *Environment) IstioRev() string {
 	return env.Config.Global.IstioRev
 }
 
+// RevInScope check revision
+// when StrictRev is true, return true if revision equals global.IstioRev
+// when StrictRev is false, return true if revision equals global.IstioRev or revision is empty or global.IstioRev is empty
 func (env *Environment) RevInScope(rev string) bool {
+
 	if env == nil || env.Config == nil || env.Config.Global == nil {
-		return rev == ""
+		return true
 	}
-	return env.Config.Global.IstioRev == rev || (rev == "" && !env.Config.Global.StrictRev)
+
+	if env.Config.Global.StrictRev {
+		return env.Config.Global.IstioRev == rev
+	} else {
+		return env.Config.Global.IstioRev == rev || rev == "" || env.Config.Global.IstioRev == ""
+	}
+
 }
