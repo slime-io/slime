@@ -66,7 +66,11 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 			return reconcile.Result{}, err
 		}
 	}
-	if !model.LabelMatchIstioRev(instance.Labels, r.Env.IstioRev()) {
+
+	istioRev := model.IstioRevFromLabel(instance.Labels)
+	if !r.Env.RevInScope(istioRev) {
+		log.Debugf("existing virtualService %v istiorev %s but out %s, skip ...",
+			req.NamespacedName, istioRev, r.Env.IstioRev())
 		return ctrl.Result{}, nil
 	}
 

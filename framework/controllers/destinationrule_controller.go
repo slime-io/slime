@@ -61,7 +61,10 @@ func (r *DestinationRuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, er
 		}
 	}
 
-	if !model.LabelMatchIstioRev(instance.Labels, r.Env.IstioRev()) {
+	istioRev := model.IstioRevFromLabel(instance.Labels)
+	if !r.Env.RevInScope(istioRev) {
+		log.Debugf("existing destinationRule %v istiorev %s but out %s, skip ...",
+			req.NamespacedName, istioRev, r.Env.IstioRev())
 		return ctrl.Result{}, nil
 	}
 	log.Infof("get destinationRule, %s", instance.Name)
