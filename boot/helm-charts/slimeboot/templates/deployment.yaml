@@ -58,7 +58,19 @@ spec:
           {{- toYaml $.Values.args | nindent 12 }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: "slime"
+          {{- if $.Values.env }}
           {{- toYaml $.Values.env | nindent 12 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: 80
