@@ -78,12 +78,10 @@ Slime-module
 ## Community
 
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
-
 - email: slimedotio@gmail.com
-
-- QQ Group: 971298863 
-
-  <img src="media/slime-qq.png" alt="slime qq group" style="zoom: 50%;" /> 
+- QQ Group: 971298863
+- Wechat Group: Please contact Wechat ID: `yonka_hust` to join the group
+- You'll find many other useful documents on our [Blog](https://slime-io.github.io/)
 
 
 

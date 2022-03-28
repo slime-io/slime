@@ -81,8 +81,8 @@ Slime-module
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - 邮件：slimedotio@gmail.com
 - QQ群: 971298863
-
-<img src="media/slime-qq.png" alt="slime qq group" style="zoom: 50%;" /> 
+- 微信群： 请添加微信号 `yonka_hust` 进群
+- 其他有用的信息可以查阅我们的[博客](https://slime-io.github.io/)
 
 
 
