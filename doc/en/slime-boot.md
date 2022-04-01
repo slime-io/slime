@@ -104,7 +104,8 @@ Used by slimeboot operator templates to create slime module and slime component.
 | affinity                                   | { }                                                          | module                                                      |                                                              |
 | namespace                                  | mesh-operator                                                | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
 | istioNamespace                             | istio-system                                                 | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
-| healthProbePort                            | 8081                                                         | module                                                      | If change, need to be the same with the port contained by config.global.misc["aux-addr"] |
+| auxiliaryPort                              | 8081                                                         | module                                                      | If change, need to be the same with the port contained by config.global.misc["aux-addr"] |
+| service.auxiliaryPort                      | 8081                                                         | module                                                      | port of module serviceto provide auxiliary service, equals to auxiliaryPort above |
 | logSourcePort                              | 8082                                                         | module                                                      | grpc port of module deployment to receive accesslog          |
 | service.logSourcePort                      | 8082                                                         | module                                                      | grpc port of module serviceto receive accesslog, equals to logSourcePort above |
 | containers.slime.volumeMounts              | ""                                                           | module                                                      | The local path corresponding to the storage volume when log rotation is enabled |
@@ -151,7 +152,7 @@ metadata:
 spec:
   namespace: slime					#customize the namespace deployed slime, same with config.global.slimeNamespace
   istioNamespace: istio-system		#customize the namespace deployed istio, same with config.global.istioNamespace
-  healthProbePort: 9091				#same with the port contained by config.global.misc["aux-addr"]
+  auxiliaryPort: 9091				#same with the port contained by config.global.misc["aux-addr"]
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
@@ -170,7 +171,7 @@ spec:
           klogLevel: 10        
         misc:
           metrics-addr: ":9090"		#customize the address of slime module manager
-          aux-addr: ":9091"			#customize auxiliary http server address, same with spec.healthProbePort
+          aux-addr: ":9091"			#customize auxiliary http server address, same with spec.auxiliaryPort
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090

@@ -73,9 +73,10 @@ istioNamespace: istio-system
 service:
   type: ClusterIP
   port: 80
+  auxiliaryPort: 8081
   logSourcePort: 8082
 
-healthProbePort: 8081
+auxiliaryPort: 8081
 logSourcePort: 8082
 
 containers:
