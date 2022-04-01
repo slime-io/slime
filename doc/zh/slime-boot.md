@@ -99,7 +99,8 @@ slimeboot operator templates用到的所有默认值介绍，会用来创建slim
 | affinity                                   | { }                                                          | module                                                      |                                                              |
 | namespace                                  | mesh-operator                                                | module and component(cluster global-sidecar, pilot)         | namespace deployed slime                                     |
 | istioNamespace                             | istio-system                                                 | component(cluster global-sidecar, namespace global-sidecar) | namespace deployed istio                                     |
-| healthProbePort                            | 8081                                                         | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
+| auxiliaryPort                              | 8081                                                         | module                                                      | 如果修改，要和config.global.misc["aux-addr"]包含的端口值一致 |
+| serivce.auxiliaryPort                      | 8081                                                         | module                                                      | module service提供辅助web服务的端口，要与auxiliaryPort保持一致 |
 | logSourcePort                              | 8082                                                         | module                                                      | module deployment接收accesslog的grpc端口                     |
 | service.logSourcePort                      | 8082                                                         | module                                                      | module service接收accesslog的grpc端口，要与logSourcePort保持一致 |
 | containers.slime.volumeMounts              | ""                                                           | module                                                      | 启用日志轮转时，存储卷对应的本地路径                         |
@@ -148,7 +149,7 @@ metadata:
 spec:
   namespace: slime					#自定义slime部署的namespace，和config.global.slimeNamespace一致
   istioNamespace: istio-system		#自定义istio部署的namespace，和config.global.istioNamespace一致
-  healthProbePort: 9091				#和config.global.misc["aux-addr"]包含的端口值一致
+  auxiliaryPort: 9091				#和config.global.misc["aux-addr"]包含的端口值一致
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
@@ -167,7 +168,7 @@ spec:
           klogLevel: 10
         misc:
           metrics-addr: ":9090"		#自定义slime module manager监控指标暴露地址
-          aux-addr: ":9091"			#自定义辅助服务器暴露地址，与spec.healthProbePort一致
+          aux-addr: ":9091"			#自定义辅助服务器暴露地址，与spec.auxiliaryPort
       metric:
         prometheus:
           address: http://prometheus.istio-system:9090

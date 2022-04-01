@@ -75,8 +75,8 @@ spec:
             - name: http
               containerPort: 80
               protocol: TCP
-            - name: probe-port
-              containerPort: {{ $.Values.healthProbePort }}
+            - name: aux-port
+              containerPort: {{ $.Values.auxiliaryPort }}
               protocol: TCP
             - name: log-source-port
               containerPort: {{ $.Values.logSourcePort }}
@@ -86,14 +86,14 @@ spec:
           readinessProbe:
             httpGet:
               path: "/modules/readyz"
-              port: probe-port
+              port: aux-port
             initialDelaySeconds: 3
             periodSeconds: 5
             failureThreshold: 1
           livenessProbe:
             httpGet:
               path: "/modules/livez"
-              port: probe-port
+              port: aux-port
             initialDelaySeconds: 3
             periodSeconds: 5
             failureThreshold: 2
@@ -162,6 +162,10 @@ spec:
       targetPort: http
       protocol: TCP
       name: http
+    - port: {{ $.Values.service.auxiliaryPort }}
+      targetPort: aux-port
+      protocol: TCP
+      name: aux-port
     - port: {{ $.Values.service.logSourcePort }}
       targetPort: log-source-port
       protocol: TCP
