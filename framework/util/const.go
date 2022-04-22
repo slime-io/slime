@@ -8,6 +8,7 @@ var (
 	Envoy_Ratelimit             string
 	Envoy_Route                 string
 	Envoy_HttpConnectionManager string
+	Envoy_Cors                  string
 )
 
 func init() {
@@ -15,10 +16,12 @@ func init() {
 		Envoy_Ratelimit = Envoy_Ratelimit_v1
 		Envoy_Route = Envoy_Route_v1
 		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v1
+		Envoy_Cors = Envoy_Cors_v1
 	} else {
 		Envoy_Ratelimit = Envoy_Ratelimit_v2
 		Envoy_Route = Envoy_Route_v2
 		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v2
+		Envoy_Cors = Envoy_Cors_v2
 	}
 }
 
@@ -28,6 +31,7 @@ const (
 	Envoy_Ratelimit_v1             = "envoy.ratelimit"
 	Envoy_Route_v1                 = "envoy.router"
 	Envoy_HttpConnectionManager_v1 = "envoy.http_connection_manager"
+	Envoy_Cors_v1                  = "envoy.cors"
 )
 
 // v2
@@ -36,10 +40,10 @@ const (
 	Envoy_Ratelimit_v2             = "envoy.filters.network.ratelimit"
 	Envoy_Route_v2                 = "envoy.filters.http.router"
 	Envoy_HttpConnectionManager_v2 = "envoy.filters.network.http_connection_manager"
+	Envoy_Cors_v2                  = "envoy.filters.http.cors"
 )
 
 const (
-	Envoy_Cors               = "envoy.cors"
 	Envoy_FilterHttpWasm     = "envoy.filters.http.wasm"
 	Envoy_WasmV8             = "envoy.wasm.runtime.v8"
 	Envoy_LocalRateLimit     = "envoy.filters.http.local_ratelimit"
