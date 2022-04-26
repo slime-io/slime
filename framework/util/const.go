@@ -5,7 +5,7 @@ import (
 )
 
 var (
-	Envoy_Ratelimit             string
+	Envoy_HttpRatelimit         string
 	Envoy_Route                 string
 	Envoy_HttpConnectionManager string
 	Envoy_Cors                  string
@@ -13,12 +13,12 @@ var (
 
 func init() {
 	if os.Getenv("ENVOY_FILTER_NAME_LEGACY") != "" {
-		Envoy_Ratelimit = Envoy_Ratelimit_v1
+		Envoy_HttpRatelimit = Envoy_HttpRatelimit_v1
 		Envoy_Route = Envoy_Route_v1
 		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v1
 		Envoy_Cors = Envoy_Cors_v1
 	} else {
-		Envoy_Ratelimit = Envoy_Ratelimit_v2
+		Envoy_HttpRatelimit = Envoy_HttpRatelimit_v2
 		Envoy_Route = Envoy_Route_v2
 		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v2
 		Envoy_Cors = Envoy_Cors_v2
@@ -29,6 +29,7 @@ func init() {
 const (
 	// Plugins
 	Envoy_Ratelimit_v1             = "envoy.ratelimit"
+	Envoy_HttpRatelimit_v1         = "envoy.rate_limit"
 	Envoy_Route_v1                 = "envoy.router"
 	Envoy_HttpConnectionManager_v1 = "envoy.http_connection_manager"
 	Envoy_Cors_v1                  = "envoy.cors"
@@ -37,7 +38,7 @@ const (
 // v2
 const (
 	// Plugins
-	Envoy_Ratelimit_v2             = "envoy.filters.network.ratelimit"
+	Envoy_HttpRatelimit_v2         = "envoy.filters.http.ratelimit"
 	Envoy_Route_v2                 = "envoy.filters.http.router"
 	Envoy_HttpConnectionManager_v2 = "envoy.filters.network.http_connection_manager"
 	Envoy_Cors_v2                  = "envoy.filters.http.cors"
