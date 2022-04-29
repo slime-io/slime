@@ -9,7 +9,9 @@
 
 [English](./README.md) 
 
-![slime-logo](logo/slime-logo.png)
+![slime-logo](media/slime_logo.png)
+
+ [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
 ---
 Slime是基于Istio的智能网格管理器。通过Slime，我们可以定义动态的服务治理策略，从而达到自动便捷使用Istio和Envoy高阶功能的目的。
@@ -45,18 +47,15 @@ Slime 内部采用了模块化的架构。目前包含了三个非常实用的�
 ## 架构
 Slime架构主要分为三大块：
 
-1. slime-boot，部署slime-module的operator组件，通过slime-boot可以便捷快速的部署slime-module。
-2. slime-controller，slime-module的核心线程，感知SlimeCRD并转换为IstioCRD。目前slime-controller已经细化为各个模块的controller，slime作为framework提供通用的基础能力。
-3. slime-metric，slime-module的监控获取线程，用于感知服务状态，slime-controller会根据服务状态动态调整服务治理规则。指标来源支持Prometheus或者Accesslog。
+1. slime-boot，部署Slime（slime-modules和slime-framework）的Operator组件。
+2. slime-modules，Slime的核心线程，感知SlimeCRD并转换为IstioCRD，并触发内置的其他逻辑。
+3. slime-framework，作为底座，为modules提供通用的基础能力。
 
 其架构图如下：
 
-![slime架构图](media/arch.png)
+![slime架构图](media/slime-arch-v2.png)
 
-使用者将服务治理策略定义在CRD的spec中，同时，slime-metric获取关于服务状态信息，并将其记录在CRD的metricStatus中。slime-module的控制器通过metricStatus感知服务状态后，将服务治理策略中将对应的监控项渲染出，并计算策略中的算式，最终生成治理规则。
-![limiter治理策略](media/policy_zh.png)
-
-
+Slime支持聚合打包，可以将任意模块聚合成一个镜像。所以，Slime可以以一个Deployment形式部署，避免组件过多。
 
 
 
@@ -78,11 +77,12 @@ Slime-module
 
 ## 交流
 
+- 微信群： 请添加微信号 `yonka_hust` 进群
+
+- QQ群: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - 邮件：slimedotio@gmail.com
-- QQ群: 971298863
-- 微信群： 请添加微信号 `yonka_hust` 进群
-- 其他有用的信息可以查阅我们的[博客](https://slime-io.github.io/)
+- 其他有用的信息可以查阅我们的官网[Slime-Home](https://slime-io.github.io/)
 
 
 

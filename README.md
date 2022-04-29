@@ -9,7 +9,7 @@
 
 [中文](./README_ZH.md)  
 
-![slime-logo](logo/slime-logo.png)    
+![slime-logo](media/slime_logo.png)    
 
  [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
 
@@ -45,15 +45,13 @@ Slime adopts a modular architecture inside. It contains three useful modules now
 
 The Slime architecture is mainly divided into three parts:
 
-1. slime-boot，Deploy the operator component of the slime-module, and the slime-module can be deployed quickly and easily through the slime-boot.
-2. slime-controller，The core thread of slime-module senses SlimeCRD and converts to IstioCRD. The slime-controller has been refined into individual module controllers, and slime provides common base capabilities as a framework.
-3. slime-metric，The monitoring acquisition thread of slime-module is used to perceive the service status, and the slime-controller will dynamically adjust the service traffic rules according to the service status. The source of the metric supports Prometheus or Accesslog.
+1. slime-boot，the operator component which can deploy Slime (slime-modules and slime-framework).
+2. slime-modules，core processes of Slime, watch Slime CRD and convert to Istio CRD, and process other built-in logic.
+3. slime-framework, as a base, provide generic base capabilities for modules.
 
-![slime架构图](media/arch.png)
+![slime架构图](media/slime-arch-v2.png)
 
-The user defines the service traffic policy in the CRD spec. At the same time, slime-metric obtains information about the service status and records it in the metricStatus of the CRD. After the slime-module controller perceives the service status through metricStatus, it renders the corresponding monitoring items in the service governance policy, calculates the formula in the policy, and finally generates traffic rules.
-
-![limiter治理策略](media/policy.png)
+Slime supports aggregated packaging, allowing any module to be aggregated into a single image. So Slime can be deployed as a single deployment, avoiding too many components.
 
 
 
@@ -75,13 +73,15 @@ Slime-module
 
 
 
+
+
 ## Community
 
+- Wechat Group: Please contact Wechat ID: `yonka_hust` to join the group
+- QQ Group: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - email: slimedotio@gmail.com
-- QQ Group: 971298863
-- Wechat Group: Please contact Wechat ID: `yonka_hust` to join the group
-- You'll find many other useful documents on our [Blog](https://slime-io.github.io/)
+- You'll find many other useful documents on our official web[Slime-Home](https://slime-io.github.io/)
 
 
 
