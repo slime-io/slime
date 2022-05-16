@@ -7,11 +7,11 @@
 
 # Smart ServiceMesh Manager
 
-[中文](./README_ZH.md)  
+[中文](./README_ZH.md)
 
 ![slime-logo](media/slime_logo.png)    
 
- [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
+ [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/slime-io/slime/blob/master/LICENSE) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/slime-io/slime?color=green)
 
 Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
 
@@ -81,7 +81,7 @@ Slime-module
 - QQ Group: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - email: slimedotio@gmail.com
-- You'll find many other useful documents on our official web[Slime-Home](https://slime-io.github.io/)
+- You'll find many other useful documents on our official web [Slime-Home](https://slime-io.github.io/)
 
 
 
