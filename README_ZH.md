@@ -7,11 +7,11 @@
 
 # 智能网格管理器
 
-[English](./README.md) 
+[English](./README.md)
 
 ![slime-logo](media/slime_logo.png)
 
- [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime)  
+ [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/slime-io/slime/blob/master/LICENSE) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/slime-io/slime?color=green)
 
 ---
 Slime是基于Istio的智能网格管理器。通过Slime，我们可以定义动态的服务治理策略，从而达到自动便捷使用Istio和Envoy高阶功能的目的。
@@ -82,7 +82,7 @@ Slime-module
 - QQ群: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - 邮件：slimedotio@gmail.com
-- 其他有用的信息可以查阅我们的官网[Slime-Home](https://slime-io.github.io/)
+- 其他有用的信息可以查阅我们的官网 [Slime-Home](https://slime-io.github.io/)
 
 
 
