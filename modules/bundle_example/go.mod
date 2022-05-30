@@ -14,7 +14,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.17.2
 	slime.io/slime/framework => ../../framework
 
-	slime.io/slime/modules/lazyload => ../../../lazyload
-	slime.io/slime/modules/limiter => ../../../limiter
-	slime.io/slime/modules/plugin => ../../../plugin
+	slime.io/slime/modules/lazyload => ../../staging/src/slime.io/slime/modules/lazyload
+	slime.io/slime/modules/limiter => ../../staging/src/slime.io/slime/modules/limiter
+	slime.io/slime/modules/plugin => ../../staging/src/slime.io/slime/modules/plugin
 )

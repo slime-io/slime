@@ -23,15 +23,15 @@ type Module struct {
 	config v1alpha1.General
 }
 
-func (m *Module) Name() string {
+func (mo *Module) Kind() string {
 	return model.ModuleName
 }
 
-func (m *Module) Config() proto.Message {
-	return &m.config
+func (mo *Module) Config() proto.Message {
+	return &mo.config
 }
 
-func (m *Module) InitScheme(scheme *runtime.Scheme) error {
+func (mo *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
 		v1alpha1.AddToScheme,
@@ -44,8 +44,13 @@ func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
-	cfg := &m.config
+func (mo *Module) Clone() module.Module {
+	ret := *mo
+	return &ret
+}
+
+func (mo *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
+	cfg := &mo.config
 
 	var err error
 	if err = (&controllers.ExampleReconciler{

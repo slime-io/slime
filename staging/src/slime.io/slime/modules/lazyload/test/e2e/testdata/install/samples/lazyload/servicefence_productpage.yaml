@@ -1,0 +1,10 @@
+---
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
+metadata:
+  name: productpage
+  labels:
+    {{istioRevKey}}: {{istioRevValue}}
+  #namespace: default
+spec:
+  enable: true

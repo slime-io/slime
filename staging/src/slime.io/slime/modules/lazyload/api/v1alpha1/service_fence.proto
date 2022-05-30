@@ -1,0 +1,133 @@
+/*
+* @Author: yangdihang
+* @Date: 2020/5/21
+*/
+
+syntax = "proto3";
+package slime.microservice.lazyload.v1alpha1;
+
+option go_package = "slime.io/slime/modules/lazyload/api/v1alpha1";
+
+// ServiceFence is a layer of encapsulation on top of the community Sidecar CR
+// Its main role is the same as that of the Sidecar resource, which isolates configurations that the service does not care about,
+// thus improving the performance of the service grid in large-scale scenarios
+// ServiceFence can be used to manage the lifecycle of isolated configurations
+// ServiceFence has three recording strategies:
+// 1. stable, stable configuration, manual user recall configuration
+// 2. deadline, due for recycling
+// 3. auto, automatic recovery based on service deactivation
+
+message Timestamp {
+
+    // Represents seconds of UTC time since Unix epoch
+    // 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z to
+    // 9999-12-31T23:59:59Z inclusive.
+    int64 seconds = 1;
+
+    // Non-negative fractions of a second at nanosecond resolution. Negative
+    // second values with fractions must still have non-negative nanos values
+    // that count forward in time. Must be from 0 to 999,999,999
+    // inclusive.
+    int32 nanos = 2;
+}
+
+// Spec Example
+//   spec:
+//    enable: true
+//    host:
+//      reviews.default.svc.cluster.local: # static dependency of reviews.default service
+//        stable:
+//      test/*: {} # static dependency of all services in namespace 'test'
+//    namespaceSelector: # Match namespace names, multiple namespaces are 'or' relations, static dependency
+//      - foo
+//      - bar
+//    labelSelector: # Match service label, multiple selectors are 'or' relationship, static dependency
+//      - selector:
+//          project: back
+//      - selector: # labels in same selector are 'and' relationship
+//          project: front
+//          group: web
+//    workloadSelector:
+//      labels:
+//        group: foo
+//        zone: hz
+//      fromService: false
+message ServiceFenceSpec {
+    map<string, RecyclingStrategy> host = 1;
+    // Switch to render servicefence as sidecar
+    bool enable = 2;
+    // services in these namespaces are all static dependency, will not expire
+    repeated string namespaceSelector = 3;
+    // services match one selector of the label selector are all static dependency, will not expire
+    repeated Selector labelSelector = 4;
+    WorkloadSelector workloadSelector = 5;
+}
+
+message Selector {
+    map<string, string> selector = 1;
+}
+
+message WorkloadSelector {
+    // take effect when labels is empty
+    // true: sidecar.workloadSelector.labels = svc.spec.selector
+    // false: sidecar.workloadSelector.labels = map[string]string{env.config.global.service: svc.name}
+    bool fromService = 1;
+    // top priority, if labels is not empty, sidecar.workloadSelector.labels = sf.spec.workloadSelector.labels
+    map<string, string> labels = 2;
+}
+
+message RecyclingStrategy {
+
+    message Stable {
+    }
+
+    message Deadline {
+        Timestamp expire = 1;
+    }
+
+    message Auto {
+        Timestamp duration = 1;
+    }
+    // Configuration that will not be cleaned up
+    Stable stable = 1;
+
+    // Configurations that expire after expiration
+    Deadline deadline = 2;
+
+    // Deprecated
+    Auto auto = 3;
+
+    Timestamp RecentlyCalled = 4;
+}
+
+
+message Destinations {
+
+    // Deprecated
+    Timestamp RecentlyCalled = 1;
+
+    repeated string hosts = 2;
+
+    enum Status {
+        ACTIVE = 0;
+        EXPIRE = 1;
+        // In order to avoid deleting frequently, add status EXPIREWAIT between ACTIVE and EXPIRE.
+        // When new metric does not contain host of ACTIVE status, its status will change to EXPIREWAIT. If new metric does not contain
+        // host of EXPIREWAIT status, which means this host is not contained in the last two metrics, the status will change to EXPIRE.
+        // Otherwise, EXPIREWAIT status will change back to ACTIVE.
+        // Hosts of ACTIVE or EXPIREWAIT status are all valid for sidecar.
+        // For prometheus metric source, as metric can continuously be watched, we can set status update interval in the future version,
+        // refer to RecentlyCalled of RecyclingStrategy. But for accesslog metric source, metric only stores in lazyload controller memory.
+        // Metric can not continuously produce after host added to sidecar. So after lazyload controller rebooting, we can not tell whether
+        // old host is valid or not until it is removed from sidecar and goes to global-sidecar again.
+        // We do not have a proper solution to do same thing for accesslog metric source so far. Need further thinking.
+        EXPIREWAIT = 2;
+    }
+    Status status = 3;
+}
+
+message ServiceFenceStatus {
+    map<string, Destinations> domains = 1;
+    map<string, string> metricStatus = 3;
+    map<string, bool> visitor = 2;
+}

@@ -1,0 +1,7 @@
+apiVersion: microservice.slime.io/v1alpha1
+kind: Servicefence
+metadata:
+  name: servicefence-sample
+spec:
+  # Add fields here
+  foo: bar

@@ -1,0 +1,10 @@
+domain: my.domain
+repo: slime.io/slime
+resources:
+- group: microservice.slime.io
+  kind: PluginManager
+  version: v1alpha1
+- group: microservice.slime.io
+  kind: EnvoyPlugin
+  version: v1alpha1
+version: "2"

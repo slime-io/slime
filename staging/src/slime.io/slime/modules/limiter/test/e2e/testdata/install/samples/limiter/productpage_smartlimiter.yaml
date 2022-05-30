@@ -1,0 +1,17 @@
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: productpage
+  namespace: temp
+spec:
+  sets:
+    _base:
+      descriptor:
+        - action:
+            fill_interval:
+              seconds: 60
+            quota: "4/{{._base.pod}}"
+            stragety: "average"
+          condition: "true"
+          target:
+            port: 9080

@@ -19,7 +19,7 @@
 
 为了更好的进行模块化测试，Slime引入了E2E(End to End)测试框架。主要函数实现参考了Kubernetes的test/e2e。由于Kubernetes的E2E测试太过庞大，我们摘取了一个子集，满足基本需求。
 
-测试框架位于[Slime项目](https://github.com/slime-io/slime)的slime-framework/test/e2e路径下，测试文件则位于各个modules项目中。以[lazyload项目](https://github.com/slime-io/lazyload)为例，测试文件路径为test/e2e/lazyload_test.go。
+测试框架位于[Slime项目](https://github.com/slime-io/slime)的slime-framework/test/e2e路径下，测试文件则位于各个modules项目中。以[lazyload项目](../../staging/src/slime.io/slime/modules/lazyload)为例，测试文件路径为test/e2e/lazyload_test.go。
 
 
 

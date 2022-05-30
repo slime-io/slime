@@ -1,0 +1,24 @@
+/*
+* @Author: wangchenyu
+* @Date: 2022/2/23
+*/
+
+syntax = "proto3";
+package slime.microservice.limiter.v1alpha2;
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+import "google/protobuf/duration.proto";
+
+option go_package = "slime.io/slime/modules/limiter/api/v1alpha2";
+
+message Limiter {
+  enum RateLimitBackend {
+    netEaseLocalFlowControl = 0;
+    envoyLocalRateLimit = 1;
+  }
+  RateLimitBackend backend = 3;
+  google.protobuf.Duration refresh = 4 [(gogoproto.stdduration) = true];
+  bool disableGlobalRateLimit = 5;
+  bool disableAdaptive = 6;
+  bool enableServiceEntry = 7;
+}

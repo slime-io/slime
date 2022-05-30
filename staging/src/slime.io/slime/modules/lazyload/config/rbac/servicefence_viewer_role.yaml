@@ -1,0 +1,20 @@
+# permissions for end users to view servicefences.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: servicefence-viewer-role
+rules:
+- apiGroups:
+  - microservice.slime.io
+  resources:
+  - servicefences
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - microservice.slime.io
+  resources:
+  - servicefences/status
+  verbs:
+  - get
