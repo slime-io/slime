@@ -31,11 +31,11 @@ In order to solving the current shortcomings of Istio, we make Slime project. It
 
 Slime adopts a modular architecture inside. It contains three useful modules now.
 
-[Configuration Lazy Loading](https://github.com/slime-io/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem. The source of the service relationship supports Prometheus or Accesslog.
+[Configuration Lazy Loading](./staging/src/slime.io/slime/modules/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem. The source of the service relationship supports Prometheus or Accesslog.
 
-[Http Plugin Management](https://github.com/slime-io/plugin): Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
+[Http Plugin Management](./staging/src/slime.io/slime/modules/plugin): Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
 
-[Adaptive Ratelimit](https://github.com/slime-io/limiter): It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
+[Adaptive Ratelimit](./staging/src/slime.io/slime/modules/limiter): It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
 
 
 
@@ -65,9 +65,9 @@ Slime supports aggregated packaging, allowing any module to be aggregated into a
 
 Slime-module
 
-- [Lazyload Usage](https://github.com/slime-io/lazyload/blob/master/README.md)
-- [PluginManager Usage](https://github.com/slime-io/plugin/blob/master/README.md)
-- [SmartLimiter Usage](https://github.com/slime-io/limiter/blob/master/README.md)
+- [Lazyload Usage](./staging/src/slime.io/slime/modules/lazyload/README.md)
+- [PluginManager Usage](./staging/src/slime.io/slime/modules/plugin/README.md)
+- [SmartLimiter Usage](./staging/src/slime.io/slime/modules/limiter/README.md)
 
 [E2E Test Tutorials](./doc/en/slime_e2e_test.md)
 

@@ -1,0 +1,24 @@
+# permissions for end users to edit servicefences.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: servicefence-editor-role
+rules:
+- apiGroups:
+  - microservice.slime.io
+  resources:
+  - servicefences
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - microservice.slime.io
+  resources:
+  - servicefences/status
+  verbs:
+  - get

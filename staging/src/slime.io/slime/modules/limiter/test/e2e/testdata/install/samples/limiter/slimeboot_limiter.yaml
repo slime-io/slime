@@ -1,0 +1,33 @@
+---
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: limiter
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: liuliluo/limiter
+    tag: {{limitTag}}
+  module:
+    - enable: true
+      limiter:
+        backend: 1
+      metric:
+        k8s:
+          handlers:
+            - pod
+        prometheus:
+          address: 'http://prometheus.istio-system:9090'
+          handlers:
+            cpu.max:
+              query: >
+                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            cpu.sum:
+              query: >
+                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
+            rt99:
+              query: >
+                histogram_quantile(0.99,
+                sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
+      name: limiter

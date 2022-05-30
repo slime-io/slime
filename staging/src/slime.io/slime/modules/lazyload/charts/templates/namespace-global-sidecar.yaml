@@ -1,0 +1,382 @@
+{{ if .Values.component }}
+  {{ if .Values.component.globalSidecar }}
+  {{ if .Values.component.globalSidecar.enable }}
+  {{ $gs := .Values.component.globalSidecar }}
+  {{ range $.Values.module }}
+  {{ if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
+  {{ if .global }}
+  {{ if .global.misc }}
+  {{ if .global.misc.globalSidecarMode }}
+  {{ if eq .global.misc.globalSidecarMode "namespace" }}
+  {{ $f := .general }}
+  {{ if .fence }}
+  {{ $f = .fence }}
+  {{- end -}}
+  {{ $g := .global }}
+  {{ $name := .name }}
+  {{ range $_, $ns := $f.namespace }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+  labels:
+    app: global-sidecar
+    service: global-sidecar
+    slime.io/serviceFenced: "false"
+spec:
+  ports:
+      {{- range $f.wormholePort }}
+      - name: http-{{ . }}
+        port: {{ int . }}
+        protocol: TCP
+        targetPort: {{ int . }}
+      {{- end }}
+  selector:
+    app: global-sidecar
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+  labels:
+    account: global-sidecar
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+  labels:
+    app: global-sidecar
+spec:
+  replicas: {{ $gs.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: global-sidecar
+  template:
+    metadata:
+      annotations:
+        proxy.istio.io/config: |
+          proxyMetadata:
+            ISTIO_META_SLIME_APP:
+              LAZYLOAD_GLOBAL_SIDECAR
+            ISTIO_META_ISTIO_VERSION:
+              "999.0.0"
+        {{- if $g }}
+        {{- if $g.misc }}
+        {{- if $g.misc.metricSourceType }}
+        {{- if (eq $g.misc.metricSourceType "accesslog") }}
+        sidecar.istio.io/bootstrapOverride: "lazyload-accesslog-source"
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+#        {{- if $f.globalSidecar }}
+#        {{- if $f.globalSidecar.excludeInbounds }}
+#        traffic.sidecar.istio.io/excludeInboundPorts: {{ $f.globalSidecar.excludeInboundPorts }}
+#        {{- end }}
+#        {{- end }}
+      labels:
+        app: global-sidecar
+        {{- if $gs.sidecarInject }}
+        {{- if $gs.sidecarInject.enable }}
+        {{- if eq  $gs.sidecarInject.mode "pod" }}
+        {{- with $gs.sidecarInject.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+    spec:
+      serviceAccountName: global-sidecar
+      containers:
+        - name: global-sidecar
+          env:
+            - name: PROBE_PORT
+              value: {{ default 18181 $gs.probePort | quote }}
+            - name: LOG_LEVEL
+              value: {{ default "info" $g.log.logLevel }}
+            - name: WORMHOLE_PORTS
+              value: {{ join "," $f.wormholePort | quote }}
+          {{- if $gs.image.tag }}
+          image: "{{ $gs.image.repository }}:{{ $gs.image.tag }}"
+          {{- else }}
+          image: "{{ $gs.image.repository }}"
+          {{- end }}
+          imagePullPolicy: Always
+          ports:
+            {{- range $f.wormholePort }}
+            - containerPort: {{ int . }}
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz/live
+              port: {{ default 18181 $gs.probePort }}
+              scheme: HTTP
+            initialDelaySeconds: 600
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 15
+          readinessProbe:
+            failureThreshold: 30
+            httpGet:
+              path: /healthz/ready
+              port: {{ default 18181 $gs.probePort }}
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 2
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            {{- toYaml $gs.resources | nindent 12 }}
+          securityContext:
+            runAsUser: 1000
+---
+  {{- if or (not $g) (not $g.misc) (eq (default "prometheus" $g.misc.metricSourceType) "prometheus") }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: global-sidecar-metadata-exchange-remove
+  namespace: {{ $ns }}
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: istio.metadata_exchange
+      patch:
+        operation: REMOVE
+    - applyTo: HTTP_FILTER
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: SIDECAR_OUTBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: istio.metadata_exchange
+      patch:
+        operation: REMOVE
+    - applyTo: HTTP_FILTER
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: istio.metadata_exchange
+      patch:
+        operation: REMOVE
+  {{- end }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: to-global-sidecar
+  namespace:  {{ $ns }}
+spec:
+  configPatches:
+    {{- range $f.wormholePort}}
+    - applyTo: VIRTUAL_HOST
+      match:
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          name: "{{ . }}"
+          vhost:
+            name: allow_any
+      patch:
+        operation: REMOVE
+    - applyTo: ROUTE_CONFIGURATION
+      match:
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          name: "{{ . }}"
+      patch:
+        operation: MERGE
+        value:
+          virtual_hosts:
+            {{- if $f.dispatches }}
+              {{- $svcPort := . }}
+              {{- range $f.dispatches }}
+              - domains: {{ toYaml .domains | nindent 12 }}
+                name: {{ .name }}
+                routes:
+                  - match:
+                      prefix: /
+                    route:
+                      {{- if eq .cluster "_GLOBAL_SIDECAR" }}
+                      cluster: outbound|{{$svcPort}}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      {{- else }}
+                      cluster: {{ tpl .cluster $ }}
+                      # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
+                      {{- end }}
+              {{- end }}
+              {{ else }}
+              - domains:
+                  - '*'
+                name: to_global_sidecar
+                routes:
+                  - match:
+                      prefix: /
+                    route:
+                      cluster: outbound|{{.}}||global-sidecar.{{ $ns }}.svc.cluster.local
+              {{- end }}
+          request_headers_to_add:
+            - header:
+                key: "Slime-Orig-Dest"
+                value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+              append: true
+            - header:
+                key: "Slime-Source-Ns"
+                value: {{ $ns }}
+              append: true
+    - applyTo: VIRTUAL_HOST
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          name: "{{ . }}"
+          vhost:
+            name: to_global_sidecar
+      patch:
+        operation: REMOVE
+    - applyTo: ROUTE_CONFIGURATION
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          name: "{{ . }}"
+      patch:
+        operation: MERGE
+        value:
+          virtual_hosts:
+            - domains:
+                - '*'
+              name: allow_any_new
+              routes:
+                - match:
+                    prefix: /
+                  route:
+                    cluster: PassthroughCluster
+    {{- end }}
+---
+  {{- if $g }}
+  {{- if $g.misc }}
+  {{- if $g.misc.metricSourceType }}
+  {{- if (eq $g.misc.metricSourceType "accesslog") }}
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: global-sidecar-accesslog
+  namespace: {{ $ns }}
+spec:
+  workloadSelector:
+    labels:
+      app: global-sidecar
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        #context: GATEWAY
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+            access_log:
+              - name: envoy.access_loggers.http_grpc
+                typed_config:
+                  "@type": type.googleapis.com/envoy.extensions.access_loggers.grpc.v3.HttpGrpcAccessLogConfig
+                  common_config:
+                    log_name: http_envoy_accesslog
+                    transport_api_version: "V3"
+                    grpc_service:
+                      envoy_grpc:
+                        #cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
+                        cluster_name: lazyload-accesslog-source
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+---
+  {{- if $g }}
+  {{- if $g.misc }}
+  {{- if $g.misc.metricSourceType }}
+  {{- if (eq $g.misc.metricSourceType "accesslog") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lazyload-accesslog-source
+  namespace: {{ $ns }}
+data:
+  custom_bootstrap.json: |
+    {
+      "static_resources": {
+        "clusters": [{
+          "name": "lazyload-accesslog-source",
+          "type": "STRICT_DNS",
+          "connect_timeout": "5s",
+          "http2_protocol_options": {},
+          "dns_lookup_family": "V4_ONLY",
+          "load_assignment": {
+            "cluster_name": "lazyload-accesslog-source",
+            "endpoints": [{
+              "lb_endpoints": [{
+                "endpoint": {
+                  "address": {
+                    "socket_address": {
+                      "address": "{{ $name }}.{{ $.Values.namespace }}",
+                      "port_value": {{ $.Values.service.logSourcePort }}
+                    }
+                  }
+                }
+              }]
+            }]
+          },
+          "respect_dns_ttl": true
+        }]
+      }
+    }
+  {{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}

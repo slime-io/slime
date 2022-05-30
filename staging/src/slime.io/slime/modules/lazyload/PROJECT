@@ -1,0 +1,7 @@
+domain: my.domain
+repo: slime.io/slime
+resources:
+- group: microservice.slime.io
+  kind: Servicefence
+  version: v1alpha1
+version: "2"

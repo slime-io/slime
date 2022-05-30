@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+  <testsuite name="e2e test suite" tests="1" failures="0" errors="0" time="260.725">
+      <testcase name="Slime e2e test clean resource" classname="e2e test suite" time="0">
+          <skipped></skipped>
+      </testcase>
+      <testcase name="Slime e2e test enable-strictRev: strictRev=true lazyload works" classname="e2e test suite" time="260.725060522"></testcase>
+      <testcase name="Slime e2e test disable-strictRev: strictRev=false lazyload works" classname="e2e test suite" time="0">
+          <skipped></skipped>
+      </testcase>
+  </testsuite>

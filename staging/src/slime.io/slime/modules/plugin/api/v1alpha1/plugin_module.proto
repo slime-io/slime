@@ -1,0 +1,24 @@
+/*
+* @Author: wangchenyu
+* @Date: 2022/2/23
+*/
+
+syntax = "proto3";
+package slime.microservice.plugin.v1alpha1;
+
+option go_package = "slime.io/slime/modules/plugin/api/v1alpha1";
+
+message LocalSource {
+  string mount = 1;
+}
+
+message RemoteSource {
+  string address = 1;
+}
+
+message PluginModule {
+  oneof wasm_source {
+    LocalSource local = 2;
+    RemoteSource remote = 3;
+  }
+}

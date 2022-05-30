@@ -1,0 +1,28 @@
+{
+  "enable":true,
+  "limiter":{
+    "backend":1
+  },
+  "metric":{
+    "k8s":{
+      "handlers":[
+        "pod"
+      ]
+    },
+    "prometheus":{
+      "address":"http://127.0.0.1:9090",
+      "handlers":{
+        "cpu.max":{
+          "query":"max(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod_name\",image=\"\"})\n"
+        },
+        "cpu.sum":{
+          "query":"sum(container_cpu_usage_seconds_total{namespace=\"$namespace\",pod=~\"$pod_name\",image=\"\"})\n"
+        },
+        "rt99":{
+          "query":"histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~\"$pod_name\"}[2m]))by(le))\n"
+        }
+      }
+    }
+  },
+  "name":"limiter"
+}
