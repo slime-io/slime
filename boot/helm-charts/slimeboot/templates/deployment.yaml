@@ -68,6 +68,8 @@ spec:
                   fieldPath: metadata.name
             - name: OPERATOR_NAME
               value: "slime"
+            - name: GODEBUG
+              value: gctrace=1
           {{- if $.Values.env }}
           {{- toYaml $.Values.env | nindent 12 }}
           {{- end }}
