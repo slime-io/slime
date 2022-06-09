@@ -76,6 +76,7 @@ tags
 .history
 ### idea ###
 .idea/*
+staging/src/slime.io/slime/modules/*/.idea/*
 # End of https://www.gitignore.io/api/go,vim,emacs,visualstudiocode
 
 ### kubeconfig ###
