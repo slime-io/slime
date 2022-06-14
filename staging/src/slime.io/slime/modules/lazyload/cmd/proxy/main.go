@@ -35,11 +35,11 @@ func main() {
 	})
 
 	// start health check server
-	probePort := ":" + os.Getenv(EnvProbePort)
+	probePort := os.Getenv(EnvProbePort)
 	go func() {
 		handler := &proxy.HealthzProxy{}
-		log.Println("Starting health check on", probePort)
-		if err := http.ListenAndServe(probePort, handler); err != nil {
+		log.Println("Starting health check on", ":" + probePort)
+		if err := http.ListenAndServe(":" + probePort, handler); err != nil {
 			log.Fatal("ListenAndServe:", err)
 		}
 	}()

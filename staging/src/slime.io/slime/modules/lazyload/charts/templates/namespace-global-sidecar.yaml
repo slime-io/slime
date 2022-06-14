@@ -2,6 +2,7 @@
   {{ if .Values.component.globalSidecar }}
   {{ if .Values.component.globalSidecar.enable }}
   {{ $gs := .Values.component.globalSidecar }}
+  {{ $gsPort := $gs.port | default 80 }}
   {{ range $.Values.module }}
   {{ if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
   {{ if .global }}
@@ -14,6 +15,17 @@
   {{- end -}}
   {{ $g := .global }}
   {{ $name := .name }}
+  {{ $gsSvcPorts := list }}
+  {{ $hasGsPort := false }}
+  {{- range $f.wormholePort }}
+  {{- if eq (int .) $gsPort }}
+  {{ $hasGsPort = true }}
+  {{- end -}}
+  {{ $gsSvcPorts = append $gsSvcPorts . }}
+  {{- end -}}
+  {{- if not $hasGsPort }}
+  {{ $gsSvcPorts = append $gsSvcPorts $gsPort }}
+  {{- end -}}
   {{ range $_, $ns := $f.namespace }}
 ---
 apiVersion: v1
@@ -27,12 +39,12 @@ metadata:
     slime.io/serviceFenced: "false"
 spec:
   ports:
-      {{- range $f.wormholePort }}
-      - name: http-{{ . }}
-        port: {{ int . }}
-        protocol: TCP
-        targetPort: {{ int . }}
-      {{- end }}
+    {{- range $gsSvcPorts }}
+    - name: http-{{ . }}
+      port: {{ int . }}
+      protocol: TCP
+      targetPort: {{ int . }}
+    {{- end }}
   selector:
     app: global-sidecar
   sessionAffinity: None
@@ -102,7 +114,7 @@ spec:
             - name: LOG_LEVEL
               value: {{ default "info" $g.log.logLevel }}
             - name: WORMHOLE_PORTS
-              value: {{ join "," $f.wormholePort | quote }}
+              value: {{ join "," $gsSvcPorts | quote }}
           {{- if $gs.image.tag }}
           image: "{{ $gs.image.repository }}:{{ $gs.image.tag }}"
           {{- else }}
@@ -110,7 +122,7 @@ spec:
           {{- end }}
           imagePullPolicy: Always
           ports:
-            {{- range $f.wormholePort }}
+            {{- range $gsSvcPorts }}
             - containerPort: {{ int . }}
               protocol: TCP
             {{- end }}
@@ -198,7 +210,7 @@ metadata:
   namespace:  {{ $ns }}
 spec:
   configPatches:
-    {{- range $f.wormholePort}}
+    {{- range $gsSvcPorts}}
     - applyTo: VIRTUAL_HOST
       match:
         context: SIDECAR_OUTBOUND
@@ -241,7 +253,7 @@ spec:
                   - match:
                       prefix: /
                     route:
-                      cluster: outbound|{{.}}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
               {{- end }}
           request_headers_to_add:
             - header:
