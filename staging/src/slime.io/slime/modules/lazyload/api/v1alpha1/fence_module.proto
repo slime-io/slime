@@ -23,6 +23,9 @@ message Fence {
   // default behavior of create fence or not when autoFence is true
   // default value is false
   bool defaultFence = 6;
+  // whether enable http service port auto management
+  // default value is false
+  bool autoPort = 7;
 }
 
 // The general idea is to assign different default traffic to different targets

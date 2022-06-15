@@ -189,7 +189,7 @@ func newProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 			MetricChan: make(chan metric.Metric),
 			TickerTriggerConfig: trigger.TickerTriggerConfig{
 				Durations: []time.Duration{
-					30 * time.Second,
+					10 * time.Second,
 				},
 				EventChan: make(chan trigger.TickerEvent),
 			},

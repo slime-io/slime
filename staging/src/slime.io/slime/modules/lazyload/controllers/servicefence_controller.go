@@ -64,6 +64,7 @@ type ServicefenceReconciler struct {
 	enabledNamespaces    map[string]bool
 	nsSvcCache           *NsSvcCache
 	labelSvcCache        *LabelSvcCache
+	portProtocolCache    *PortProtocolCache
 	defaultAddNamespaces []string
 	doAliasRules         []*domainAliasRule
 }
@@ -95,11 +96,7 @@ func NewReconciler(cfg *lazyloadv1alpha1.Fence, mgr manager.Manager, env bootstr
 	}
 
 	// start service related cache
-	r.nsSvcCache, r.labelSvcCache, err = newSvcCache(env.K8SClient)
-	if err != nil {
-		log.Errorf("init LabelSvcCache err: %v", err)
-		return nil
-	}
+	r.startSvcCache()
 
 	// reconciler defines producer metric handler
 	pc.WatcherProducerConfig.NeedUpdateMetricHandler = r.handleWatcherEvent
