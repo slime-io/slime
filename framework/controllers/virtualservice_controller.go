@@ -76,7 +76,7 @@ func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, err
 
 	// 资源更新
 	m := parseDestination(instance)
-	log.Infof("get destination after parse, %+v", m)
+	log.Debugf("get destination after parse, %+v", m)
 	for k, v := range m {
 		HostDestinationMapping.Set(k, v)
 	}
@@ -104,8 +104,9 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 				if ds, ok := hr[vsRoute].([]interface{}); ok {
 					for _, d := range ds {
 						if route, ok := d.(map[string]interface{}); ok {
-							destinationHost := route[vsDestination].(map[string]interface{})[vsHost].(string)
-							dhs[destinationHost] = struct{}{}
+							if destinationHost, ok := route[vsDestination].(map[string]interface{})[vsHost].(string); ok {
+								dhs[destinationHost] = struct{}{}
+							}
 						}
 					}
 				}
