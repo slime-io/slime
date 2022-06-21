@@ -34,12 +34,13 @@ type SlimeBoot struct {
 }
 
 type SlimeBootSpec struct {
-	Modules        []Module   `json:"module" yaml:"module"`
-	Image          *Image     `json:"image" yaml:"image"`
-	Component      *Component `json:"component" yaml:"component"`
-	Namespace      string     `json:"namespace" yaml:"namespace"`
-	IstioNamespace string     `json:"istioNamespace" yaml:"istioNamespace"`
-	Resources      *Resources `json:"resources" yaml:"resources"`
+	Modules          []Module            `json:"module" yaml:"module"`
+	Image            *Image              `json:"image" yaml:"image"`
+	ImagePullSecrets []map[string]string `json:"imagePullSecrets" yaml:"imagePullSecrets"`
+	Component        *Component          `json:"component" yaml:"component"`
+	Namespace        string              `json:"namespace" yaml:"namespace"`
+	IstioNamespace   string              `json:"istioNamespace" yaml:"istioNamespace"`
+	Resources        *Resources          `json:"resources" yaml:"resources"`
 }
 
 type Component struct {
@@ -47,19 +48,21 @@ type Component struct {
 }
 
 type GlobalSidecar struct {
-	Enable        bool           `json:"enable" yaml:"enable"`
-	Image         *Image         `json:"image" yaml:"image"`
-	Port          int            `json:"port" yaml:"port"`
-	ProbePort     int            `json:"probePort" yaml:"probePort"`
-	Replicas      int            `json:"replicas" yaml:"replicas"`
-	Resources     *Resources     `json:"resources" yaml:"resources"`
-	SidecarInject *SidecarInject `json:"sidecarInject" yaml:"sidecarInject"`
+	Enable           bool           `json:"enable" yaml:"enable"`
+	Image            *Image         `json:"image" yaml:"image"`
+	Port             int            `json:"port" yaml:"port"`
+	ProbePort        int            `json:"probePort" yaml:"probePort"`
+	Replicas         int            `json:"replicas" yaml:"replicas"`
+	Resources        *Resources     `json:"resources" yaml:"resources"`
+	SidecarInject    *SidecarInject `json:"sidecarInject" yaml:"sidecarInject"`
+	LegacyFilterName bool           `json:"legacyFilterName" yaml:"legacyFilterName"`
 }
 
 type SidecarInject struct {
-	Enable bool              `json:"enable" yaml:"enable"`
-	Mode   string            `json:"mode" yaml:"mode"`
-	Labels map[string]string `json:"labels" yaml:"labels"`
+	Enable      bool              `json:"enable" yaml:"enable"`
+	Mode        string            `json:"mode" yaml:"mode"`
+	Labels      map[string]string `json:"labels" yaml:"labels"`
+	Annotations map[string]string `json:"annotations" yaml:"annotations"`
 }
 
 type Resources struct {
