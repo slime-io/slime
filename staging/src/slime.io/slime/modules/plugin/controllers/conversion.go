@@ -90,6 +90,11 @@ func translateRlsAndCorsToDirectPatch(settings *types.Struct, applyToHTTPRoute b
 
 func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *istio.EnvoyFilter_Patch {
 	patch := &istio.EnvoyFilter_Patch{}
+
+	if fieldPatchTo == "ROOT" {
+		fieldPatchTo = ""
+	}
+
 	if fieldPatchTo != "" {
 		patch.Value = &types.Struct{
 			Fields: map[string]*types.Value{
