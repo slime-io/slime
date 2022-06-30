@@ -17,10 +17,16 @@ const (
 
 	Outbound = "outbound"
 
+	Gateway = "gateway"
+
 	// AllowAllPort use the implicit semantic "empty means match-all"
 	AllowAllPort = ""
 
 	GlobalSmartLimiter = "global"
+
+	SingleSmartLimiter = "single"
+
+	AverageSmartLimiter = "average"
 
 	RateLimitService = "outbound|18081||rate-limit.istio-system.svc.cluster.local"
 
@@ -47,4 +53,6 @@ const (
 	InlineMetricPod = "pod"
 
 	InboundDefaultRoute = "default"
+
+	MockHost = "mock_host"
 )

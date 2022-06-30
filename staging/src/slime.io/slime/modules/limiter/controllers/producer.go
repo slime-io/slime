@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"slime.io/slime/modules/limiter/model"
+
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"istio.io/api/networking/v1alpha3"
@@ -43,7 +45,13 @@ func (s StaticMeta) String() string {
 
 // handleWatcherEvent is triggered by endpoint event
 func (r *SmartLimiterReconciler) handleWatcherEvent(event trigger.WatcherEvent) metric.QueryMap {
+	queryMap := make(map[string][]metric.Handler, 0)
 	log.Infof("%v trigger handleWatcherEvent", event)
+	_, ok := r.interest.Get(FQN(event.NN.Namespace, event.NN.Name))
+	if !ok {
+		log.Debugf("key %s not in interest map", event.NN)
+		return queryMap
+	}
 	return r.handleEvent(event.NN)
 }
 
@@ -51,8 +59,7 @@ func (r *SmartLimiterReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) metric.QueryMap {
 	log.Infof("ticker trigger handleTickerEvent")
 	queryMap := make(map[string][]metric.Handler, 0)
-
-	// traverse interest map
+	// traverse interest map, if gw, skip
 	for k := range r.interest.Items() {
 		item := strings.Split(k, "/")
 		namespace, name := item[0], item[1]
@@ -65,13 +72,10 @@ func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) me
 	return queryMap
 }
 
+// TODO serviceEntry
 func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.QueryMap {
 	// handle loc which is in interest map
-	if _, ok := r.interest.Get(loc.Namespace + "/" + loc.Name); !ok {
-		log.Infof("%v is not in interest map", loc)
-		return nil
-	}
-	if r.env.Config != nil && r.env.Config.Limiter != nil && !r.env.Config.Limiter.GetDisableAdaptive() {
+	if !r.cfg.GetDisableAdaptive() {
 		return r.handlePrometheusEvent(loc)
 	} else {
 		return r.handleLocalEvent(loc)
@@ -80,6 +84,23 @@ func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.Qu
 }
 
 func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metric.QueryMap {
+	queryMap := make(map[string][]metric.Handler, 0)
+
+	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
+	if !ok {
+		log.Infof("key %s not in interest map", loc)
+		return queryMap
+	}
+	if v.(string) == model.MockHost {
+		meta := &StaticMeta{
+			Name:      loc.Name,
+			Namespace: loc.Namespace,
+		}
+		metaInfo := meta.String()
+		queryMap[metaInfo] = []metric.Handler{}
+		return queryMap
+	}
+
 	pods, err := queryServicePods(r.env.K8SClient, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
@@ -90,7 +111,6 @@ func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metr
 		log.Infof("%+v", err.Error())
 		return nil
 	}
-	queryMap := make(map[string][]metric.Handler, 0)
 	meta := generateMeta(subsetsPods, loc)
 	metaInfo := meta.String()
 	if metaInfo == "" {
@@ -105,7 +125,7 @@ func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metr
 // cpu.max => max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
 func (r *SmartLimiterReconciler) handlePrometheusEvent(loc types.NamespacedName) metric.QueryMap {
 	if r.env.Config == nil || r.env.Config.Metric == nil || r.env.Config.Metric.Prometheus == nil || r.env.Config.Metric.Prometheus.Handlers == nil {
-		log.Debugf("query handler is empty, skip query")
+		log.Infof("query handler is empty, skip query")
 		return nil
 	}
 	handlers := r.env.Config.Metric.Prometheus.Handlers

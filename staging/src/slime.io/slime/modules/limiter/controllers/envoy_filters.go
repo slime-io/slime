@@ -14,6 +14,17 @@ import (
 	"slime.io/slime/modules/limiter/model"
 )
 
+// LimiterSpec info come from config and SmartLimiterSpec
+type LimiterSpec struct {
+	rls                         string
+	gw                          bool
+	labels                      map[string]string
+	loc                         types.NamespacedName
+	disableGlobalRateLimit      bool
+	disableInsertLocalRateLimit bool
+	context                     string
+}
+
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
 	material map[string]string, loc types.NamespacedName) (
 	map[string]*networking.EnvoyFilter, map[string]*microservicev1alpha2.SmartLimitDescriptors, []*model.Descriptor, error,
@@ -21,30 +32,32 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	materialInterface := util.MapToMapInterface(material)
 	setsEnvoyFilter := make(map[string]*networking.EnvoyFilter)
 	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha2.SmartLimitDescriptors)
-	// global descriptors
 	globalDescriptors := make([]*model.Descriptor, 0)
-	host := util.UnityHost(loc.Name, loc.Namespace)
-	rls := spec.Rls
+	params := &LimiterSpec{
+		rls:                         spec.Rls,
+		gw:                          spec.Gateway,
+		labels:                      spec.WorkloadSelector,
+		loc:                         loc,
+		disableGlobalRateLimit:      r.cfg.GetDisableGlobalRateLimit(),
+		disableInsertLocalRateLimit: r.cfg.GetDisableInsertLocalRateLimit(),
+	}
 
-	// get destinationrule subset of the host
 	var sets []*networking.Subset
-	if controllers.HostSubsetMapping.Get(host) != nil {
-		sets = controllers.HostSubsetMapping.Get(host).([]*networking.Subset)
-	} else {
-		sets = make([]*networking.Subset, 0, 1)
-	}
-	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
-
-	svc := &v1.Service{}
-	if err := r.Client.Get(context.TODO(), loc, svc); err != nil {
-		if errors.IsNotFound(err) {
-			log.Errorf("svc %s:%s is not found", loc.Name, loc.Namespace)
+	if !params.gw {
+		host := util.UnityHost(loc.Name, loc.Namespace)
+		if controllers.HostSubsetMapping.Get(host) != nil {
+			sets = controllers.HostSubsetMapping.Get(host).([]*networking.Subset)
 		} else {
-			log.Errorf("get svc %s:%s err: %+v", loc.Name, loc.Namespace, err.Error())
+			sets = make([]*networking.Subset, 0, 1)
 		}
-		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, err
 	}
-	svcSelector := svc.Spec.Selector
+
+	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
+	svcSelector := generateServiceSelector(r, params)
+	if len(svcSelector) == 0 {
+		log.Info("get empty svc selector by %v", params)
+		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+	}
 
 	for _, set := range sets {
 		if setDescriptor, ok := spec.Sets[set.Name]; !ok {
@@ -90,11 +103,11 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 				for k, v := range set.Labels {
 					selector[k] = v
 				}
-				ef := descriptorsToEnvoyFilter(validDescriptor.Descriptor_, selector, loc, rls)
+				ef := descriptorsToEnvoyFilter(validDescriptor.Descriptor_, selector, params)
 				setsEnvoyFilter[set.Name] = ef
 				setsSmartLimitDescriptor[set.Name] = validDescriptor
 
-				desc := descriptorsToGlobalRateLimit(validDescriptor.Descriptor_, loc)
+				desc := descriptorsToGlobalRateLimit(validDescriptor.Descriptor_, params.loc)
 				globalDescriptors = append(globalDescriptors, desc...)
 			}
 		}
@@ -102,7 +115,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
 }
 
-func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, loc types.NamespacedName, rls string) *networking.EnvoyFilter {
+func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networking.EnvoyFilter {
 	ef := &networking.EnvoyFilter{
 		WorkloadSelector: &networking.WorkloadSelector{
 			Labels: labels,
@@ -124,7 +137,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 	}
 
 	// http router
-	httpRouterPatches, err := generateHttpRouterPatch(descriptors, loc)
+	httpRouterPatches, err := generateHttpRouterPatch(descriptors, params)
 	if err != nil {
 		log.Errorf("generateHttpRouterPatch err: %+v", err.Error())
 		return nil
@@ -134,7 +147,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 
 	// config plugin envoy.filters.http.ratelimit
 	if len(globalDescriptors) > 0 {
-		server := getRateLimiterServerCluster(rls)
+		server := getRateLimiterServerCluster(params.rls)
 		httpFilterEnvoyRateLimitPatch := generateEnvoyHttpFilterGlobalRateLimitPatch(server)
 		if httpFilterEnvoyRateLimitPatch != nil {
 			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterEnvoyRateLimitPatch)
@@ -143,10 +156,15 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 
 	// enable and config plugin envoy.filters.http.local_ratelimit
 	if len(localDescriptors) > 0 {
-		httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch()
-		ef.ConfigPatches = append(ef.ConfigPatches, httpFilterLocalRateLimitPatch)
-
-		perFilterPatch := generateLocalRateLimitPerFilterPatch(localDescriptors, loc)
+		// if disableInsertLocalRateLimit=false in gw, multi smartlimiter will patch duplicate configurations, This will lead dysfunctional behavior.
+		// so disable it, and apply envoyfilter like staging/src/slime.io/slime/modules/limiter/install/gw_limiter_envoyfilter.yaml to your gw pilot
+		if !params.disableInsertLocalRateLimit {
+			httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch(params.context)
+			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterLocalRateLimitPatch)
+		} else {
+			log.Infof("disableInsertLocalRateLimit set true, skip")
+		}
+		perFilterPatch := generateLocalRateLimitPerFilterPatch(localDescriptors, params)
 		ef.ConfigPatches = append(ef.ConfigPatches, perFilterPatch...)
 	}
 	return ef
@@ -160,4 +178,24 @@ func descriptorsToGlobalRateLimit(descriptors []*microservicev1alpha2.SmartLimit
 		}
 	}
 	return generateGlobalRateLimitDescriptor(globalDescriptors, loc)
+}
+
+// TODO get labels base on serviceentry
+func generateServiceSelector(r *SmartLimiterReconciler, spec *LimiterSpec) map[string]string {
+	var labels map[string]string
+	// top level
+	if len(spec.labels) > 0 {
+		labels = spec.labels
+	} else {
+		svc := &v1.Service{}
+		if err := r.Client.Get(context.TODO(), spec.loc, svc); err != nil {
+			if errors.IsNotFound(err) {
+				log.Errorf("svc %s is not found", spec.loc)
+			} else {
+				log.Errorf("get svc %s err: %+v", spec.loc, err.Error())
+			}
+		}
+		labels = svc.Spec.Selector
+	}
+	return labels
 }

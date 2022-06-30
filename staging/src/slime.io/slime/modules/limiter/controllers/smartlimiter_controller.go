@@ -18,10 +18,14 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
+	"strconv"
 	"sync"
 	"time"
+
+	"slime.io/slime/framework/util"
 
 	cmap "github.com/orcaman/concurrent-map"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -63,7 +67,6 @@ type SmartLimiterReconciler struct {
 
 	watcherMetricChan <-chan metric.Metric
 	tickerMetricChan  <-chan metric.Metric
-	// Interest     cmap.ConcurrentMap
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters,verbs=get;list;watch;create;update;patch;delete
@@ -71,7 +74,7 @@ type SmartLimiterReconciler struct {
 
 func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	_ = context.Background()
-	log.Debugf("begin reconcile,get smartlimiter %+v", req)
+	log.Debugf("begin reconcile, get smartlimiter %+v", req)
 	instance := &microservicev1alpha2.SmartLimiter{}
 	if err := r.Client.Get(context.TODO(), req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
@@ -85,18 +88,10 @@ func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 	}
 	// deleted
 	if instance == nil {
-		log.Infof("metricInfo.Pop, name %s, namespace,%s", req.Name, req.Namespace)
-		r.metricInfo.Pop(req.Namespace + "/" + req.Name)
-		r.interest.Pop(req.Namespace + "/" + req.Name)
 		r.lastUpdatePolicyLock.Lock()
 		r.lastUpdatePolicy = microservicev1alpha2.SmartLimiterSpec{}
 		r.lastUpdatePolicyLock.Unlock()
-		// if contain global smart limiter, should delete info in configmap
-		if r.env.Config != nil && r.env.Config.Limiter != nil && !r.env.Config.Limiter.GetDisableGlobalRateLimit() {
-			refreshConfigMap([]*model.Descriptor{}, r, req.NamespacedName)
-		} else {
-			log.Info("global rate limiter is closed")
-		}
+		r.RemoveInterested(req)
 		return reconcile.Result{}, nil
 	} else {
 		// add or update
@@ -110,11 +105,16 @@ func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error
 			r.lastUpdatePolicyLock.RUnlock()
 			return reconcile.Result{}, nil
 		} else {
-			r.lastUpdatePolicyLock.RUnlock()
-			r.lastUpdatePolicyLock.Lock()
-			r.lastUpdatePolicy = instance.Spec
-			r.lastUpdatePolicyLock.Unlock()
-			r.interest.Set(req.Namespace+"/"+req.Name, struct{}{})
+			if out, err := r.Validate(instance); err != nil {
+				log.Errorf("invalid smartlimiter, %s", err)
+				return reconcile.Result{}, nil
+			} else {
+				r.lastUpdatePolicyLock.RUnlock()
+				r.lastUpdatePolicyLock.Lock()
+				r.lastUpdatePolicy = instance.Spec
+				r.lastUpdatePolicyLock.Unlock()
+				r.RegisterInterest(instance, req, out)
+			}
 		}
 	}
 	return ctrl.Result{}, nil
@@ -126,8 +126,9 @@ func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func NewReconciler(mgr ctrl.Manager, env bootstrap.Environment) *SmartLimiterReconciler {
+func NewReconciler(mgr ctrl.Manager, env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) *SmartLimiterReconciler {
 	r := &SmartLimiterReconciler{
+		cfg:                  cfg,
 		Client:               mgr.GetClient(),
 		scheme:               mgr.GetScheme(),
 		metricInfo:           cmap.New(),
@@ -136,7 +137,7 @@ func NewReconciler(mgr ctrl.Manager, env bootstrap.Environment) *SmartLimiterRec
 		lastUpdatePolicyLock: &sync.RWMutex{},
 	}
 
-	pc, err := newProducerConfig(env)
+	pc, err := newProducerConfig(env, cfg)
 	if err != nil {
 		log.Errorf("new producer config err, %v", err)
 		os.Exit(1)
@@ -152,7 +153,7 @@ func NewReconciler(mgr ctrl.Manager, env bootstrap.Environment) *SmartLimiterRec
 	return r
 }
 
-func newProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error) {
+func newProducerConfig(env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) (*metric.ProducerConfig, error) {
 	pc := &metric.ProducerConfig{
 		EnableWatcherProducer: false,
 		WatcherProducerConfig: metric.WatcherProducerConfig{
@@ -184,7 +185,7 @@ func newProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 		StopChan: env.Stop,
 	}
 
-	if env.Config != nil && env.Config.Limiter != nil && !env.Config.Limiter.GetDisableAdaptive() {
+	if !cfg.GetDisableAdaptive() {
 		log.Info("enable adaptive ratelimiter")
 		prometheusSourceConfig, err := newPrometheusSourceConfig(env)
 		if err != nil {
@@ -198,6 +199,78 @@ func newProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 		log.Info("disable adaptive ratelimiter and promql is closed")
 		pc.EnableMockSource = true
 	}
-
 	return pc, nil
+}
+
+func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, out bool) {
+	key := FQN(req.Namespace, req.Name)
+	// store nn to host
+	// TODO add service entry
+	if out {
+		r.interest.Set(key, model.MockHost)
+		log.Infof("direction is outbound, set %s/%s = %s", req.Namespace, req.Name, model.MockHost)
+	} else {
+		// get name.namespaces.svc.cluster.local by default
+		host := util.UnityHost(req.Name, req.Namespace)
+		r.interest.Set(key, host)
+		log.Infof("use default fqn, set %s/%s = %s", req.Namespace, req.Name, host)
+	}
+}
+
+func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
+	key := FQN(req.Namespace, req.Name)
+	r.metricInfo.Pop(key)
+	r.interest.Pop(key)
+	log.Infof("name %s, namespace %s has poped", req.Name, req.Namespace)
+	// if contain global smart limiter, should delete info in configmap
+	if !r.cfg.GetDisableGlobalRateLimit() {
+		log.Infof(" refresh global rate limiter configmap")
+		refreshConfigMap([]*model.Descriptor{}, r, req.NamespacedName)
+	} else {
+		log.Info("global rate limiter is closed")
+	}
+}
+
+func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, error) {
+	var out bool
+	gw := instance.Spec.Gateway
+	for _, descriptors := range instance.Spec.Sets {
+		for _, descriptor := range descriptors.Descriptor_ {
+
+			if descriptor.Target == nil {
+				return out, fmt.Errorf("invalid target")
+			}
+			if descriptor.Action == nil {
+				return out, fmt.Errorf("invalid action")
+			}
+			if descriptor.Condition == "" {
+				return out, fmt.Errorf("invalid condition")
+			}
+			strategy := descriptor.Action.Strategy
+			condition := descriptor.Condition
+			direction := descriptor.Target.Direction
+			quota := descriptor.Action.Quota
+
+			if gw || direction == model.Outbound {
+				out = true
+				if !r.cfg.GetDisableAdaptive() {
+					return out, fmt.Errorf("outbound/gw must disable adaptive limiter")
+				}
+				if strategy != model.SingleSmartLimiter {
+					return out, fmt.Errorf("strategy must single in outbound")
+				}
+				if condition != "true" {
+					return out, fmt.Errorf("condition must true in outbound")
+				}
+				if _, err := strconv.Atoi(quota); err != nil {
+					return out, fmt.Errorf("quota must number in outbound ")
+				}
+			}
+		}
+	}
+	return out, nil
+}
+
+func FQN(ns, name string) string {
+	return ns + "/" + name
 }

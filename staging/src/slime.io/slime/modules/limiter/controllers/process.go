@@ -191,7 +191,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 			log.Errorf("generated/deleted EnvoyFilter %s failed:%+v", efcr.Name, err)
 		}
 	}
-	if r.env.Config != nil && r.env.Config.Limiter != nil && !r.env.Config.Limiter.GetDisableGlobalRateLimit() {
+	if !r.cfg.GetDisableGlobalRateLimit() {
 		refreshConfigMap(gdesc, r, loc)
 	} else {
 		log.Info("global rate limiter is closed")

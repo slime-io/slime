@@ -18,7 +18,11 @@ message Limiter {
   }
   RateLimitBackend backend = 3;
   google.protobuf.Duration refresh = 4 [(gogoproto.stdduration) = true];
+  // it will disable GlobalRateLimit
   bool disableGlobalRateLimit = 5;
+  // it will disable use promql
   bool disableAdaptive = 6;
   bool enableServiceEntry = 7;
+  // it will not generate envoy.filters.http.local_ratelimit insert before http.router when true
+  bool disableInsertLocalRateLimit =8;
 }
