@@ -23,7 +23,7 @@ func generateEnvoyHttpFilterGlobalRateLimitPatch(server string) *networking.Envo
 	}
 	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
-		Match:   generateEnvoyHttpFilterMatch(),
+		Match:   generateEnvoyHttpFilterMatch(model.Inbound),
 		Patch:   generateEnvoyHttpFilterRateLimitServicePatch(rs),
 	}
 	return patch
@@ -41,8 +41,8 @@ func generateRateLimitService(clusterName string) *envoy_config_ratelimit_v3.Rat
 	return rateLimitServiceConfig
 }
 
-func generateEnvoyHttpFilterMatch() *networking.EnvoyFilter_EnvoyConfigObjectMatch {
-	return &networking.EnvoyFilter_EnvoyConfigObjectMatch{
+func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
+	match := &networking.EnvoyFilter_EnvoyConfigObjectMatch{
 		Context: networking.EnvoyFilter_SIDECAR_INBOUND,
 		ObjectTypes: &networking.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
 			Listener: &networking.EnvoyFilter_ListenerMatch{
@@ -57,6 +57,12 @@ func generateEnvoyHttpFilterMatch() *networking.EnvoyFilter_EnvoyConfigObjectMat
 			},
 		},
 	}
+	if context == model.Gateway {
+		match.Context = networking.EnvoyFilter_GATEWAY
+	} else if context == model.Outbound {
+		match.Context = networking.EnvoyFilter_SIDECAR_OUTBOUND
+	}
+	return match
 }
 
 func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct) *networking.EnvoyFilter_Patch {

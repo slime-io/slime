@@ -8,13 +8,14 @@ package slime.microservice.limiter.v1alpha2;
 
 option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha2";
 
+//dispatch envoyFilter to pods in service b.powerful
+//and take effect in inbound traffic :9080/default
 //apiVersion: microservice.slime.io/v1alpha2
 //kind: SmartLimiter
 //metadata:
 //  name: b
 //  namespace: powerful
 //spec:
-//  rls: ""
 //  sets:
 //    _base:
 //      descriptor:
@@ -27,14 +28,14 @@ option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha2";
 //        target:
 //          port: 9080
 
-
+//dispatch envoyFilter to pods in service b.powerful
+//and take effect in outbound traffic a.test.com:80/r1
 //apiVersion: microservice.slime.io/v1alpha2
 //kind: SmartLimiter
 //metadata:
 //  name: b
 //  namespace: powerful
 //spec:
-//  rls: ""
 //  sets:
 //    _base:
 //      descriptor:
@@ -48,12 +49,39 @@ option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha2";
 //          direction: outbound
 //          route: a.test.com:80/r1
 
+//dispatch envoyFilter to pods with labels 'gw_cluster: prod-gateway'
+//and take effect in outbound a.test.com:80/r1
+//apiVersion: microservice.slime.io/v1alpha2
+//kind: SmartLimiter
+//metadata:
+//  name: b
+//  namespace: powerful
+//spec:
+//  gateway: true
+//  workloadSelector:
+//    gw_cluster: prod-gateway
+//  sets:
+//    _base:
+//      descriptor:
+//      - action:
+//          fill_interval:
+//            seconds: 60
+//          quota: "10"
+//          strategy: "single"
+//        conditon: "true"
+//        target:
+//          direction: outbound
+//          route: a.test.com:80/r1
 
 message SmartLimiterSpec {
     // subset rate-limit,the key is subset name.
     map<string, SmartLimitDescriptors> sets = 1;
     // rls service
     string rls = 2; // rls 服务地址
+    // workload selector , it should not be nil in Gateway Scenarios
+    map<string, string> workloadSelector = 4;
+    // is gateway
+    bool gateway = 5;
 }
 
 message SmartLimiterStatus {

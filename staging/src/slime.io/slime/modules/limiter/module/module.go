@@ -49,7 +49,9 @@ func (m *Module) Clone() module.Module {
 }
 
 func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
-	reconciler := controllers.NewReconciler(mgr, env)
+	log.Infof("get limiter cfg %v", m.config)
+	cfg := &m.config
+	reconciler := controllers.NewReconciler(mgr, env, cfg)
 	if err := reconciler.SetupWithManager(mgr); err != nil {
 		log.Errorf("unable to create controller SmartLimiter, %+v", err)
 		os.Exit(1)
