@@ -79,6 +79,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 			return reconcile.Result{}, nil
 		}
 	}
+	model.PatchObjectMeta(&ef.ObjectMeta, &instance.ObjectMeta)
 	model.PatchIstioRevLabel(&ef.Labels, istioRev)
 
 	found := &v1alpha3.EnvoyFilter{}
