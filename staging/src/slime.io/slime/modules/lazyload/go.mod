@@ -20,6 +20,8 @@ require (
 )
 
 replace (
+	istio.io/api => istio.io/api v0.0.0-20200807181912-0e773b04cfc7
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20220711081451-575e86a9da6e
 	k8s.io/api => k8s.io/api v0.17.2
 	k8s.io/apimachinery => k8s.io/apimachinery v0.17.2
 

@@ -47,6 +47,11 @@ var defaultModuleConfig = &bootconfig.Config{
 			"globalSidecarMode":      "namespace",
 			"metricSourceType":       "prometheus", // can be prometheus or accesslog
 			"logSourcePort":          ":8082",
+			// which label keys of serviceEntry select endpoints
+			// will take effect when serviceEntry does not have workloadSelector field
+			"seLabelSelectorKeys":    "app",
+			// indicate whether xds config source enable increment push or not
+			"xdsSourceEnableIncPush": "true",
 		},
 	},
 }
@@ -170,11 +175,12 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 }
 
 type Environment struct {
-	Config          *bootconfig.Config
-	K8SClient       *kubernetes.Clientset
-	DynamicClient   dynamic.Interface
-	HttpPathHandler common.PathHandler
-	Stop            <-chan struct{}
+	Config           *bootconfig.Config
+	K8SClient        *kubernetes.Clientset
+	DynamicClient    dynamic.Interface
+	HttpPathHandler  common.PathHandler
+	Stop             <-chan struct{}
+	ConfigController ConfigController
 }
 
 func (env *Environment) IstioRev() string {
