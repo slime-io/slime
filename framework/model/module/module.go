@@ -6,14 +6,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/gogo/protobuf/jsonpb"
-	"os"
-	"strings"
-
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	restclient "k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
+	"os"
+	"strings"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -152,7 +153,17 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	var conf *restclient.Config
+	if config.Global != nil && config.Global.GetMasterUrl() != "" {
+		if conf, err = clientcmd.BuildConfigFromFlags(config.Global.GetMasterUrl(), ""); err != nil {
+			log.Errorf("unable to build rest client by %s", config.Global.GetMasterUrl())
+			os.Exit(1)
+		}
+	} else {
+		conf = ctrl.GetConfigOrDie()
+	}
+
+	mgr, err := ctrl.NewManager(conf, ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: config.Global.Misc["metrics-addr"],
 		Port:               9443,
@@ -186,6 +197,14 @@ func Main(bundle string, modules []Module) {
 	ctx := context.Background()
 
 	ph := bootstrap.NewPathHandler()
+
+	// init configController if configSource field is used
+	stop := make(chan struct{})
+	cc, err := bootstrap.NewConfigController(config, mgr.GetConfig())
+	if err != nil {
+		log.Errorf("start ConfigController error: %+v", err)
+		os.Exit(1)
+	}
 
 	// init modules
 	for _, mc := range mcs {
@@ -238,9 +257,10 @@ func Main(bundle string, modules []Module) {
 		}
 
 		env := bootstrap.Environment{
-			Config:        modCfg,
-			K8SClient:     clientSet,
-			DynamicClient: dynamicClient,
+			Config:           modCfg,
+			ConfigController: cc,
+			K8SClient:        clientSet,
+			DynamicClient:    dynamicClient,
 			HttpPathHandler: bootstrap.PrefixPathHandlerManager{
 				Prefix:      modCfg.Name,
 				PathHandler: ph,
@@ -263,6 +283,7 @@ func Main(bundle string, modules []Module) {
 	log.Infof("starting manager bundle %s with modules %v", bundle, modKinds)
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		log.Errorf("problem running manager, %+v", err)
+		stop <- struct{}{}
 		os.Exit(1)
 	}
 }

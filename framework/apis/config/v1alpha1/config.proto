@@ -43,6 +43,16 @@ message Global {
   map<string, string> misc = 6;
   string istioRev = 7;
   bool strictRev = 8;
+  // ConfigSource describes a source of configuration data for networking
+  // rules, and other Istio configuration artifacts. Multiple data sources
+  // can be configured for a single control plane.
+  repeated ConfigSource configSources = 9;
+  // specify the address of k8s api-server instead of default value
+  string masterUrl = 10;
+  // configRev is the value used by slime configController to fetch/filter configs
+  // in format comma-separated revisions, e.g. "1-11-1,prod"
+  // will add istioRev to configRev if it exists
+  string configRev = 11;
 }
 
 message Log {
@@ -116,4 +126,14 @@ message Config {
   Mode mode = 10;
   // like bundle item kind, necessary if not bundle
   string kind = 11;
+}
+
+// ConfigSource describes information about a configuration store inside a
+// mesh. A single control plane instance can interact with one or more data
+// sources.
+message ConfigSource {
+  // Address of the server implementing the Istio Mesh Configuration
+  // protocol (MCP). Can be IP address or a fully qualified DNS name.
+  // Use fs:/// to specify a file-based backend with absolute path to the directory.
+  string address = 1;
 }
