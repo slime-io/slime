@@ -8,6 +8,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"slime.io/slime/framework/bootstrap/resource"
+	slime_serviceregistry "slime.io/slime/framework/bootstrap/serviceregistry/model"
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/util"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
@@ -23,6 +25,8 @@ type LimiterSpec struct {
 	disableGlobalRateLimit      bool
 	disableInsertLocalRateLimit bool
 	context                     string
+	// svc hostname
+	host string
 }
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
@@ -40,22 +44,26 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		loc:                         loc,
 		disableGlobalRateLimit:      r.cfg.GetDisableGlobalRateLimit(),
 		disableInsertLocalRateLimit: r.cfg.GetDisableInsertLocalRateLimit(),
+		host:                        spec.Host,
 	}
 
 	var sets []*networking.Subset
+	// var host string
 	if !params.gw {
-		host := util.UnityHost(loc.Name, loc.Namespace)
+		key, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
+		if !ok {
+			return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+		}
+		host := key.(string)
 		if controllers.HostSubsetMapping.Get(host) != nil {
 			sets = controllers.HostSubsetMapping.Get(host).([]*networking.Subset)
-		} else {
-			sets = make([]*networking.Subset, 0, 1)
 		}
 	}
 
 	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
 	svcSelector := generateServiceSelector(r, params)
 	if len(svcSelector) == 0 {
-		log.Info("get empty svc selector by %v", params)
+		log.Info("get empty svc selector base on %v", params)
 		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
 	}
 
@@ -162,7 +170,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 			httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch(params.context)
 			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterLocalRateLimitPatch)
 		} else {
-			log.Infof("disableInsertLocalRateLimit set true, skip")
+			log.Debugf("disableInsertLocalRateLimit set true, skip")
 		}
 		perFilterPatch := generateLocalRateLimitPerFilterPatch(localDescriptors, params)
 		ef.ConfigPatches = append(ef.ConfigPatches, perFilterPatch...)
@@ -180,22 +188,80 @@ func descriptorsToGlobalRateLimit(descriptors []*microservicev1alpha2.SmartLimit
 	return generateGlobalRateLimitDescriptor(globalDescriptors, loc)
 }
 
-// TODO get labels base on serviceentry
 func generateServiceSelector(r *SmartLimiterReconciler, spec *LimiterSpec) map[string]string {
+	// service selector
 	var labels map[string]string
-	// top level
+
 	if len(spec.labels) > 0 {
 		labels = spec.labels
-	} else {
-		svc := &v1.Service{}
-		if err := r.Client.Get(context.TODO(), spec.loc, svc); err != nil {
-			if errors.IsNotFound(err) {
-				log.Errorf("svc %s is not found", spec.loc)
-			} else {
-				log.Errorf("get svc %s err: %+v", spec.loc, err.Error())
-			}
+		return labels
+	}
+
+	// if spec.host is not empty
+	if spec.host != "" {
+		istioSvc, err := getIstioService(r, types.NamespacedName{Namespace: spec.loc.Namespace, Name: spec.host})
+		if err != nil {
+			log.Errorf("getIstioService err, %s", err)
+		} else {
+			labels = formatLabels(getIstioServiceLabels(istioSvc))
 		}
-		labels = svc.Spec.Selector
+		return labels
+	}
+
+	// default
+	labels, err := getK8sServiceLabels(r, spec)
+	if err != nil {
+		log.Errorf("getK8sServiceLabels err, %s", err)
+	}
+	return labels
+}
+
+// get svc labels base on framework
+func getIstioServiceLabels(svc *slime_serviceregistry.Service) map[string]string {
+	selector := svc.Attributes.LabelSelectors
+	log.Debugf("get istio service labelselector %s", selector)
+	return selector
+}
+
+func getIstioService(r *SmartLimiterReconciler, nn types.NamespacedName) (*slime_serviceregistry.Service, error) {
+	// get config from framework
+	config := r.env.ConfigController.Get(resource.IstioService, nn.Name, nn.Namespace)
+	if config == nil {
+		return nil, fmt.Errorf("get empty config base on %s/%s", nn.Namespace, nn.Name)
+	}
+
+	svc, ok := config.Spec.(*slime_serviceregistry.Service)
+	if !ok {
+		return nil, fmt.Errorf("convert config to istio service err")
+	}
+	return svc, nil
+}
+
+// get svc labels base on clientSet ,
+// if the svc arrives later than smartlimiter,
+// ticker mechanism will ensure modules get the svc
+func getK8sServiceLabels(r *SmartLimiterReconciler, spec *LimiterSpec) (map[string]string, error) {
+	svc := &v1.Service{}
+
+	err := r.Client.Get(context.TODO(), spec.loc, svc)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, fmt.Errorf("k8s svc %s is not found", spec.loc)
+		} else {
+			return nil, fmt.Errorf("get k8s svc %s err: %+v", spec.loc, err.Error())
+		}
+	}
+	return svc.Spec.Selector, nil
+}
+
+func formatLabels(selector map[string]string) map[string]string {
+	labels := make(map[string]string)
+	for key, val := range selector {
+		if val == "" {
+			labels[key] = "default"
+		} else {
+			labels[key] = val
+		}
 	}
 	return labels
 }

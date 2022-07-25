@@ -194,7 +194,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 	if !r.cfg.GetDisableGlobalRateLimit() {
 		refreshConfigMap(gdesc, r, loc)
 	} else {
-		log.Info("global rate limiter is closed")
+		log.Debugf("global rate limiter is closed")
 	}
 	instance.Status = microservicev1alpha2.SmartLimiterStatus{
 		RatelimitStatus: descriptor,
@@ -251,7 +251,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		}
 	}
 
-	// Envoy is found or not
+	// envoyfilter is found or not
 	if found == nil {
 		// found is nil and obj's spec is not nil , create envoyFilter
 		if obj.Spec != nil {
@@ -261,7 +261,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 			log.Infof("creating a new EnvoyFilter,%+v", loc)
 			return reconcile.Result{}, nil
 		} else {
-			log.Infof("envoyfilter %+v is not found, and obj spec is nil, skip ", loc)
+			log.Debugf("envoyfilter %+v is not found, and obj spec is nil, skip ", loc)
 		}
 	} else {
 

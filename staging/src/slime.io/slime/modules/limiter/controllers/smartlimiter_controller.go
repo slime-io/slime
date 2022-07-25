@@ -52,7 +52,10 @@ type SmartLimiterReconciler struct {
 	cfg    *microservicev1alpha2.Limiter
 	env    bootstrap.Environment
 	scheme *runtime.Scheme
-
+	// key is limiter's namespace and name
+	// value is the host
+	// use service.ns.svc.cluster.local as default if host not specified
+	// or use mock host when limiter in gw and outbound
 	interest cmap.ConcurrentMap
 	// reuse, or use anther filed to store interested nn
 	// key is the interested namespace/name
@@ -204,21 +207,18 @@ func newProducerConfig(env bootstrap.Environment, cfg *microservicev1alpha2.Limi
 
 func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, out bool) {
 	key := FQN(req.Namespace, req.Name)
-	// store nn to host
-	// TODO add service entry
-	if out {
-		r.interest.Set(key, model.MockHost)
-		log.Infof("direction is outbound, set %s/%s = %s", req.Namespace, req.Name, model.MockHost)
-	} else {
-		// get name.namespaces.svc.cluster.local by default
-		host := util.UnityHost(req.Name, req.Namespace)
-		r.interest.Set(key, host)
-		log.Infof("use default fqn, set %s/%s = %s", req.Namespace, req.Name, host)
-	}
+
+	// query hostname base on instance
+	host := buildHost(instance, out)
+
+	// set interest mapping
+	r.interest.Set(key, host)
+	log.Infof("set %s/%s = %s", instance.Namespace, instance.Name, host)
 }
 
 func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 	key := FQN(req.Namespace, req.Name)
+
 	r.metricInfo.Pop(key)
 	r.interest.Pop(key)
 	log.Infof("name %s, namespace %s has poped", req.Name, req.Namespace)
@@ -263,7 +263,7 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 					return out, fmt.Errorf("condition must true in outbound")
 				}
 				if _, err := strconv.Atoi(quota); err != nil {
-					return out, fmt.Errorf("quota must number in outbound ")
+					return out, fmt.Errorf("quota must number in outbound")
 				}
 			}
 		}
@@ -273,4 +273,16 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 
 func FQN(ns, name string) string {
 	return ns + "/" + name
+}
+
+func buildHost(instance *microservicev1alpha2.SmartLimiter, out bool) string {
+	// get name.namespaces.svc.cluster.local by default
+	host := util.UnityHost(instance.Name, instance.Namespace)
+
+	if out {
+		host = model.MockHost
+	} else if instance.Spec.Host != "" {
+		host = instance.Spec.Host
+	}
+	return host
 }

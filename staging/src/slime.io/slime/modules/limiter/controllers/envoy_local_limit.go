@@ -109,7 +109,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			}
 		}
 	}
-	log.Infof("get route2RouteConfig %v", route2RouteConfig)
+	log.Debugf("get route2RouteConfig %v", route2RouteConfig)
 
 	for _, rcs := range route2RouteConfig {
 		rateLimits := make([]*envoy_config_route_v3.RateLimit, 0)
