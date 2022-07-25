@@ -82,6 +82,8 @@ message SmartLimiterSpec {
     map<string, string> workloadSelector = 4;
     // is gateway
     bool gateway = 5;
+    // hostname specify svc host
+    string host = 6;
 }
 
 message SmartLimiterStatus {

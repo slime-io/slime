@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"slime.io/slime/modules/limiter/model"
-
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"istio.io/api/networking/v1alpha3"
@@ -22,6 +20,7 @@ import (
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
 	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/limiter/model"
 )
 
 // StaticMeta is static info and do not to query from prometheus
@@ -74,33 +73,67 @@ func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) me
 
 // TODO serviceEntry
 func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.QueryMap {
-	// handle loc which is in interest map
-	if !r.cfg.GetDisableAdaptive() {
-		return r.handlePrometheusEvent(loc)
-	} else {
-		return r.handleLocalEvent(loc)
-	}
-	return nil
-}
-
-func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metric.QueryMap {
 	queryMap := make(map[string][]metric.Handler, 0)
-
 	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 	if !ok {
-		log.Infof("key %s not in interest map", loc)
+		log.Infof("%s not in interest map", loc)
 		return queryMap
 	}
-	if v.(string) == model.MockHost {
-		meta := &StaticMeta{
-			Name:      loc.Name,
-			Namespace: loc.Namespace,
-		}
+	// no need to query service information in outbound and gateway scenario
+	host := v.(string)
+	if host == model.MockHost {
+		meta := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
 		metaInfo := meta.String()
 		queryMap[metaInfo] = []metric.Handler{}
 		return queryMap
 	}
 
+	// handle loc which is in interest map in inbound scenario
+	if !r.cfg.GetDisableAdaptive() {
+		return r.handlePrometheusEvent(host, loc)
+	} else {
+		return r.handleLocalEvent(host, loc)
+	}
+	return nil
+}
+
+func (r *SmartLimiterReconciler) handleLocalEvent(host string, loc types.NamespacedName) metric.QueryMap {
+	queryMap := make(map[string][]metric.Handler, 0)
+
+	// if it does not end with .svc.cluster.local, it means that se host is specified
+	if !strings.HasSuffix(host, util.Wellkonw_K8sSuffix) {
+		svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
+		if err != nil {
+			log.Errorf("get empty istio service base on %s/%s, %s", loc.Namespace, host, err)
+			return queryMap
+		}
+		serviceLabels := formatLabels(getIstioServiceLabels(svc))
+		subsetInfo := make(map[string]int)
+		// if subset is existed, assign pods to subset
+		subsetInfo[util.Wellkonw_BaseSet] = len(svc.Endpoints)
+
+		if controllers.HostSubsetMapping.Get(host) != nil {
+			if subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
+				for _, ep := range svc.Endpoints {
+					for _, sb := range subsets {
+						if util.IsContain(ep.Labels, serviceLabels) {
+							subsetInfo[sb.GetName()] = subsetInfo[sb.GetName()] + 1
+						}
+					}
+				}
+			}
+		}
+		meta := generateMeta(subsetInfo, loc)
+		metaInfo := meta.String()
+		log.Infof("get se meta info %s", metaInfo)
+		if metaInfo == "" {
+			return nil
+		}
+		queryMap[metaInfo] = []metric.Handler{}
+		return queryMap
+	}
+
+	// otherwise, use k8s svc
 	pods, err := queryServicePods(r.env.K8SClient, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
@@ -111,7 +144,11 @@ func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metr
 		log.Infof("%+v", err.Error())
 		return nil
 	}
-	meta := generateMeta(subsetsPods, loc)
+	sbInfo := make(map[string]int)
+	for key, item := range subsetsPods {
+		sbInfo[key] = len(item)
+	}
+	meta := generateMeta(sbInfo, loc)
 	metaInfo := meta.String()
 	if metaInfo == "" {
 		return nil
@@ -123,12 +160,18 @@ func (r *SmartLimiterReconciler) handleLocalEvent(loc types.NamespacedName) metr
 // handlePrometheusEvent means construct query map as following
 // example: handler is a map
 // cpu.max => max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-func (r *SmartLimiterReconciler) handlePrometheusEvent(loc types.NamespacedName) metric.QueryMap {
+func (r *SmartLimiterReconciler) handlePrometheusEvent(host string, loc types.NamespacedName) metric.QueryMap {
 	if r.env.Config == nil || r.env.Config.Metric == nil || r.env.Config.Metric.Prometheus == nil || r.env.Config.Metric.Prometheus.Handlers == nil {
 		log.Infof("query handler is empty, skip query")
 		return nil
 	}
 	handlers := r.env.Config.Metric.Prometheus.Handlers
+
+	if !strings.HasSuffix(host, util.Wellkonw_K8sSuffix) {
+		log.Errorf("promql is closed when se host is specified")
+		return nil
+	}
+
 	pods, err := queryServicePods(r.env.K8SClient, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
@@ -216,7 +259,11 @@ func generateQueryString(subsetsPods map[string][]string, loc types.NamespacedNa
 	queryHandlers := make([]metric.Handler, 0)
 	isGroup := make(map[string]bool)
 
-	meta := generateMeta(subsetsPods, loc)
+	m := make(map[string]int)
+	for key, item := range subsetsPods {
+		m[key] = len(item)
+	}
+	meta := generateMeta(m, loc)
 
 	//  example
 	//	item 	=>  cpu.max: max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
@@ -239,15 +286,15 @@ func generateQueryString(subsetsPods map[string][]string, loc types.NamespacedNa
 }
 
 // some metric is not query from prometheus, so add it to staticMeta
-func generateMeta(subsetsPods map[string][]string, loc types.NamespacedName) StaticMeta {
+func generateMeta(subsetsPods map[string]int, loc types.NamespacedName) StaticMeta {
 	// NPOD record like
 	// _base.pod: 6
 	// v1.pod: 2
 	// v2.pod: 4
 	nPod := make(map[string]int)
 	for k, v := range subsetsPods {
-		if len(v) > 0 {
-			nPod[k+".pod"] = len(v)
+		if v > 0 {
+			nPod[k+".pod"] = v
 		}
 	}
 	meta := StaticMeta{
