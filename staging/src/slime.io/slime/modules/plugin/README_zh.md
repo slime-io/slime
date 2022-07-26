@@ -1,14 +1,19 @@
 - [HTTP插件管理](#http插件管理)
   - [安装和使用](#安装和使用)
-  - [内建插件](#内建插件)
-  - [PluginManager样例](#pluginmanager样例)
-  - [EnvoyPlugin样例](#envoyplugin样例)
+  - [PluginManager](#pluginmanager)
+    - [内建插件的打开/停用](#内建插件的打开停用)
+    - [全局配置](#全局配置)
+    - [PluginManager样例](#pluginmanager样例)
+  - [EnvoyPlugin](#envoyplugin)
+    - [EnvoyPlugin 样例](#envoyplugin-样例)
+      - [使用 EnvoyPlugin 配置 RDS typedPerFilterConfig 设置 http filter](#使用-envoyplugin-配置-rds-typedperfilterconfig-设置-http-filter)
+      - [使用 EnvoyPlugin 配置非 typedPerFilterConfig 字段设置流量治理规则](#使用-envoyplugin-配置非-typedperfilterconfig-字段设置流量治理规则)
 
 [English](./README.md) 
 
-### HTTP插件管理
+# HTTP插件管理
 
-#### 安装和使用
+## 安装和使用
 
 使用如下配置安装HTTP插件管理模块：
 
@@ -31,17 +36,15 @@ spec:
 
 [完整样例](./install/samples/plugin/slimeboot_plugin.yaml)
 
-pluginmanager和envoyplugin是平级关系。每个envoyplugin可以管理一个envoyfilter，而pluginmanager可以管理多个envoyfilter。
+pluginmanager 和 envoyplugin 是平级关系。pluginmanager 作用于 LDS 对象，用于自动生成针对 HTTP 链接管理器（HCM）的路由过滤器（envoy.filters.http.router）的 envoyfilter。envoyplugin 作用于 RDS 对象，用于自动生成针对虚拟主机（config.route.v3.VirtualHost）和路由（config.route.v3.Route）的 envoyfilter。
 
+## PluginManager
 
+### 内建插件的打开/停用
 
-#### 内建插件
+> **注意:** envoy 的二进制需支持扩展插件
 
-**注意:** envoy的二进制需支持扩展插件
-
-**打开/停用**   
-
-按如下格式配置PluginManager，即可打开内建插件:
+按如下格式配置PluginManager，即可打开内建插件：
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -60,13 +63,11 @@ spec:
     name: {{plugin-N}}
 ```
 
-其中，{{plugin-N}}为插件名称，PluginManager中的排序为插件执行顺序。将enable字段设置为false即可停用插件。
+其中，`{{plugin-N}}` 为插件名称，PluginManager 中的排序为插件执行顺序。将 enable 字段设置为 false 即可停用插件。
 
+### 全局配置
 
-
-**全局配置**
-
-全局配置对应LDS中的插件配置，按如下格式设置全局配置:
+全局配置对应LDS中的插件配置，按如下格式设置全局配置：
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -78,7 +79,7 @@ spec:
   workload_labels:
     app: my-app
   plugin:
-  - enable: true          # switch
+  - enable: true            # switch
     name: {{plugin-1}}      # plugin name
     inline:
       settings:
@@ -88,11 +89,9 @@ spec:
     name: {{plugin-N}}
 ```
 
+### PluginManager样例
 
-
-#### PluginManager样例
-
-按如下格式配置PluginManager，启用reviews-ep
+按如下格式配置 PluginManager，启用 reviews-ep：
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -121,10 +120,9 @@ spec:
           stage: 0
 ```
 
-生成EnvoyFilter如下
+生成EnvoyFilter如下：
 
 ```yaml
-$ kubectl -n default get envoyfilter reviews-pm -oyaml
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -149,9 +147,9 @@ spec:
       listener:
         filterChain:
           filter:
-            name: envoy.http_connection_manager
+            name: envoy.filters.network.http_connection_manager
             subFilter:
-              name: envoy.router
+              name: envoy.filters.http.router
     patch:
       operation: INSERT_BEFORE
       value:
@@ -176,11 +174,100 @@ spec:
       app: reviews
 ```
 
+## EnvoyPlugin
 
+EnvoyPlugin 通过配置 envoy RDS api 的 `typedPerFilterConfig` 可以启用并设置指定的 http filter。同时，对在 `typedPerFilterConfig` 之外的流量治理接口，如 `rate_limits(config.route.v3.RateLimit)`、`cors(config.route.v3.CorsPolicy)` 等，EnvoyPlugin 提供了 DirectPatch 模式用于设置这类配置。可按照如下格式配置：
 
-#### EnvoyPlugin样例
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: reviews-ep
+  namespace: default
+spec:
+  route:
+    - inbound|http|80/default
+  plugin:
+  # typedPerFilterConfig
+  - enable: true
+    name: {{http_filter-1}}     # http filter name
+    inline:
+      settings:
+        {{filter_settings}}     # filter settings
+  # ...
+  - enable: true
+    name: {{http_filter-N}}
+  # !typedPerFilterConfig
+  - enable: true
+    inline:
+      directPatch: true
+      settings:
+        {{api_settings}}
+```
 
-按如下格式配置EnvoyPlugin:
+其中，`{{api_settings}}` 为 RDS api 对象中非 typedPerFilterConfig 字段的设置。
+
+### EnvoyPlugin 样例
+
+#### 使用 EnvoyPlugin 配置 RDS typedPerFilterConfig 设置 http filter
+
+以配置禁用 `envoy.filters.http.buffer` 为例，按如下格式配置 EnvoyPlugin：
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: reviews-ep
+  namespace: default
+spec:
+  route:
+    - inbound|http|80/default
+  plugins:
+  - enable: true
+    inline:
+      settings:
+        disabled: true
+    name: envoy.filters.http.buffer
+```
+
+生成的envoyfilter如下：
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: reviews-ep
+  namespace: default
+  ownerReferences:
+  - apiVersion: microservice.slime.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: EnvoyPlugin
+    name: reviews-ep
+    uid: c2f672bf-588a-4cbe-b0d4-0625ef1320e8
+spec:
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      routeConfiguration:
+        vhost:
+          name: inbound|http|80
+          route:
+            name: default
+    patch:
+      operation: MERGE
+      value:
+        typedPerFilterConfig:
+          envoy.filters.http.buffer:
+            '@type': type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: ""
+            value:
+              disabled: true
+```
+
+#### 使用 EnvoyPlugin 配置非 typedPerFilterConfig 字段设置流量治理规则
+
+以配置 `rate_limits` 和 `cors` 为例，按如下格式配置 EnvoyPlugin：
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -198,6 +285,7 @@ spec:
   - name: envoy.filters.network.ratelimit
     enable: true
     inline:
+      directPatch: true
       settings:
         rate_limits:
         - actions:
@@ -213,6 +301,7 @@ spec:
   - name: envoy.filters.http.cors
     enable: true
     inline:
+      directPatch: true
       settings:
         cors:
           allow_origin_string_match:
@@ -222,15 +311,12 @@ spec:
                 regex: www.163.com|
 ```
 
-生成的envoyfilter如下
+生成的envoyfilter如下：
 
-```sh
-$ kubectl -n default get envoyfilter reviews-ep -oyaml
+```yaml
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  creationTimestamp: "2021-08-26T08:13:56Z"
-  generation: 1
   name: reviews-ep
   namespace: default
   ownerReferences:
@@ -240,8 +326,6 @@ metadata:
     kind: EnvoyPlugin
     name: reviews-ep
     uid: fcf9d63b-115f-4a2a-bfc4-40d5ce1bcfee
-  resourceVersion: "658067"
-  uid: 762768a7-48ae-4939-afa3-f687e0cca826
 spec:
   configPatches:
   - applyTo: HTTP_ROUTE
@@ -287,4 +371,3 @@ spec:
     labels:
       app: reviews
 ```
-
