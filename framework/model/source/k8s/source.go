@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -111,12 +112,13 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 
 	k8sClient := env.K8SClient
 	epsClient := k8sClient.CoreV1().Endpoints("")
+	ctx := context.Background()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return epsClient.List(options)
+			return epsClient.List(ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return epsClient.Watch(options)
+			return epsClient.Watch(ctx, options)
 		},
 	}
 	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Endpoints{})

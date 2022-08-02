@@ -43,8 +43,7 @@ type DestinationRuleReconciler struct {
 // +kubebuilder:rbac:groups=networking.istio.io,resources=destinationrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=destinationrules/status,verbs=get;update;patch
 
-func (r *DestinationRuleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+func (r *DestinationRuleReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.WithField("destinationRule", req.NamespacedName)
 
 	// Fetch the DestinationRule instance

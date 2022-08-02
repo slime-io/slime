@@ -1,6 +1,8 @@
 package trigger
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,15 +47,16 @@ func (t *WatcherTrigger) Start() {
 
 	t.watchersMap = make(map[watch.Interface]chan struct{})
 
+	ctx := context.Background()
 	for _, gvk := range t.kinds {
 		gvr, _ := meta.UnsafeGuessKindToResource(gvk)
 		dc := t.dynamicClient
 		lw := &cache.ListWatch{
 			ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-				return dc.Resource(gvr).List(options)
+				return dc.Resource(gvr).List(ctx, options)
 			},
 			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-				return dc.Resource(gvr).Watch(options)
+				return dc.Resource(gvr).Watch(ctx, options)
 			},
 		}
 		_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &unstructured.Unstructured{})

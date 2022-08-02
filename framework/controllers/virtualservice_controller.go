@@ -50,8 +50,7 @@ type VirtualServiceReconciler struct {
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices/status,verbs=get;update;patch
 
-func (r *VirtualServiceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.WithField("virtualService", req.NamespacedName)
 	// Fetch the VirtualService instance
 	instance := &networkingistioiov1alpha3.VirtualService{}
