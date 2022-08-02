@@ -1,6 +1,7 @@
 package pod
 
 import (
+	"context"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -40,7 +41,7 @@ func WaitTimeoutForPodReadyInNamespace(c clientset.Interface, podName, namespace
 
 func podRunningAndReady(c clientset.Interface, podName, namespace string) wait.ConditionFunc {
 	return func() (bool, error) {
-		pod, err := c.CoreV1().Pods(namespace).Get(podName, metav1.GetOptions{})
+		pod, err := c.CoreV1().Pods(namespace).Get(context.TODO(), podName, metav1.GetOptions{})
 		if err != nil {
 			return false, err
 		}

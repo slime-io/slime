@@ -2,6 +2,7 @@ package framework
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/url"
 	"strings"
@@ -41,14 +42,14 @@ func (f *Framework) ExecShellInPodWithFullOutput(podName, ns string, cmd string)
 }
 
 func (f *Framework) execCommandInPod(podName, ns string, cmd ...string) string {
-	pod, err := f.ClientSet.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainer(podName, pod.Spec.Containers[0].Name, ns, cmd...)
 }
 
 func (f *Framework) execCommandInPodWithFullOutput(podName, ns string, cmd ...string) (string, string, error) {
-	pod, err := f.ClientSet.CoreV1().Pods(ns).Get(podName, metav1.GetOptions{})
+	pod, err := f.ClientSet.CoreV1().Pods(ns).Get(context.TODO(), podName, metav1.GetOptions{})
 	ExpectNoError(err, "failed to get pod %v", podName)
 	gomega.Expect(pod.Spec.Containers).NotTo(gomega.BeEmpty())
 	return f.ExecCommandInContainerWithFullOutput(podName, pod.Spec.Containers[0].Name, ns, cmd...)

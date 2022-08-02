@@ -3,8 +3,8 @@ package controllers
 import (
 	"fmt"
 
-	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -14,7 +14,7 @@ type SetupAware interface {
 
 // RegisterObjectReconciler is a shortcut to register reconciler for a specific api type.
 // Especially caller can use reconcile.Func to fastly convert a callback to a reconciler impl.
-func RegisterObjectReconciler(apiType runtime.Object, r reconcile.Reconciler, mgr ctrl.Manager) error {
+func RegisterObjectReconciler(apiType client.Object, r reconcile.Reconciler, mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(apiType).
 		Complete(r)
@@ -22,7 +22,7 @@ func RegisterObjectReconciler(apiType runtime.Object, r reconcile.Reconciler, mg
 
 type ObjectReconcileItem struct {
 	Name     string
-	ApiType  runtime.Object
+	ApiType  client.Object
 	R        reconcile.Reconciler
 	Mgr      ctrl.Manager
 	Optional bool

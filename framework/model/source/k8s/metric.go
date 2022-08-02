@@ -67,14 +67,14 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 	pods := make([]v1.Pod, 0)
 	var service *v1.Service
 	for _, c := range m.K8sClient {
-		ps, err := c.CoreV1().Pods(meta.Namespace).List(metav1.ListOptions{})
+		ps, err := c.CoreV1().Pods(meta.Namespace).List(context.TODO(), metav1.ListOptions{})
 		if err != nil {
 			log.Errorf("query pod list faild, %+v", err)
 			continue
 		}
 		pods = append(pods, ps.Items...)
 
-		s, err := c.CoreV1().Services(meta.Namespace).Get(meta.Name, metav1.GetOptions{})
+		s, err := c.CoreV1().Services(meta.Namespace).Get(context.TODO(), meta.Name, metav1.GetOptions{})
 		if err == nil {
 			service = s
 			break
