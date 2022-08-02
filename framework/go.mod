@@ -17,7 +17,6 @@ require (
 	github.com/prometheus/common v0.4.1
 	github.com/sirupsen/logrus v1.4.2
 	go.uber.org/zap v1.10.0
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974
 	google.golang.org/grpc v1.35.0
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.2.8
