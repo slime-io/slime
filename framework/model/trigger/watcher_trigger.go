@@ -1,8 +1,6 @@
 package trigger
 
 import (
-	"context"
-
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -13,7 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/cache"
-	"slime.io/slime/framework/util"
+	watchtools "k8s.io/client-go/tools/watch"
 )
 
 type WatcherTrigger struct {
@@ -58,7 +56,7 @@ func (t *WatcherTrigger) Start() {
 				return dc.Resource(gvr).Watch(options)
 			},
 		}
-		watcher := util.ListWatcher(context.Background(), lw)
+		_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &unstructured.Unstructured{})
 		t.watchersMap[watcher] = make(chan struct{})
 		log.Infof("add watcher %s to watcher trigger", gvr.String())
 	}

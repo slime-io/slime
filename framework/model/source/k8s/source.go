@@ -1,20 +1,21 @@
 package k8s
 
 import (
-	"context"
 	"sync"
 	"time"
 
-	"github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map"
 	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
@@ -118,7 +119,7 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 			return epsClient.Watch(options)
 		},
 	}
-	watcher := util.ListWatcher(context.Background(), lw)
+	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Endpoints{})
 
 	es := &Source{
 		EventChan:  eventChan,
