@@ -28,15 +28,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/util"
 	microserviceslimeiov1alpha1types "slime.io/slime/modules/plugin/api/v1alpha1"
 	"slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
-	"slime.io/slime/modules/plugin/controllers/wasm"
-
 	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
+	"slime.io/slime/modules/plugin/controllers/wasm"
 )
 
 // PluginManagerReconciler reconciles a PluginManager object
@@ -51,13 +51,10 @@ type PluginManagerReconciler struct {
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=pluginmanagers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=pluginmanagers/status,verbs=get;update;patch
 
-func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	// your logic here
+func (r *PluginManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	// Fetch the PluginManager instance
 	instance := &wrapper.PluginManager{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
-
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// TODO del relevant resource
@@ -91,18 +88,16 @@ func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 
 	found := &v1alpha3.EnvoyFilter{}
 	nsName := types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}
-	err = r.Client.Get(context.TODO(), nsName, found)
-
+	err = r.Client.Get(ctx, nsName, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			found = nil
-			err = nil
 		}
 	}
 
 	if found == nil {
 		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
-		err = r.Client.Create(context.TODO(), ef)
+		err := r.Client.Create(ctx, ef)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -112,7 +107,7 @@ func (r *PluginManagerReconciler) Reconcile(req ctrl.Request) (ctrl.Result, erro
 	} else {
 		log.Infof("Update a EnvoyFilter in %v", nsName)
 		ef.ResourceVersion = found.ResourceVersion
-		err := r.Client.Update(context.TODO(), ef)
+		err := r.Client.Update(ctx, ef)
 		if err != nil {
 			return reconcile.Result{}, err
 		}

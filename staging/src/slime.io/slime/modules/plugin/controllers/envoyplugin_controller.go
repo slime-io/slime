@@ -28,6 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
@@ -45,11 +46,11 @@ type EnvoyPluginReconciler struct {
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=envoyplugins,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=envoyplugins/status,verbs=get;update;patch
 
-func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	// Fetch the EnvoyPlugin instance
 	instance := &microserviceslimeiov1alpha1.EnvoyPlugin{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
 
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -83,7 +84,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	model.PatchIstioRevLabel(&ef.Labels, istioRev)
 
 	found := &v1alpha3.EnvoyFilter{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			err = nil
@@ -95,7 +96,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 
 	if found == nil {
 		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
-		err = r.Client.Create(context.TODO(), ef)
+		err = r.Client.Create(ctx, ef)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
@@ -105,7 +106,7 @@ func (r *EnvoyPluginReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error)
 	} else {
 		log.Infof("Update a EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion
-		err := r.Client.Update(context.TODO(), ef)
+		err := r.Client.Update(ctx, ef)
 		if err != nil {
 			return reconcile.Result{}, err
 		}
