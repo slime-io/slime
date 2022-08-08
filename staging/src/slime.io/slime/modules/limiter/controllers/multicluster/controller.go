@@ -6,6 +6,7 @@
 package multicluster
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -50,12 +51,12 @@ func New(env *bootstrap.Environment, subscriber []func(*kubernetes.Clientset), u
 		&cache.ListWatch{
 			ListFunc: func(opts meta_v1.ListOptions) (runtime.Object, error) {
 				opts.LabelSelector = env.Config.Global.Multicluster + "=true"
-				obj, err := c.k8sClient.CoreV1().Secrets(RootNamespace).List(opts)
+				obj, err := c.k8sClient.CoreV1().Secrets(RootNamespace).List(context.TODO(), opts)
 				return obj, err
 			},
 			WatchFunc: func(opts meta_v1.ListOptions) (watch.Interface, error) {
 				opts.LabelSelector = env.Config.Global.Multicluster + "=true"
-				return c.k8sClient.CoreV1().Secrets(RootNamespace).Watch(opts)
+				return c.k8sClient.CoreV1().Secrets(RootNamespace).Watch(context.TODO(), opts)
 			},
 		},
 		&corev1.Secret{}, 0, cache.Indexers{},

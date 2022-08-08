@@ -75,11 +75,11 @@ type SmartLimiterReconciler struct {
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters/status,verbs=get;update;patch
 
-func (r *SmartLimiterReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	log.Debugf("begin reconcile, get smartlimiter %+v", req)
 	instance := &microservicev1alpha2.SmartLimiter{}
-	if err := r.Client.Get(context.TODO(), req.NamespacedName, instance); err != nil {
+	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			instance = nil
 			err = nil
