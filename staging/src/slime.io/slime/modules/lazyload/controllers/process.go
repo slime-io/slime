@@ -151,8 +151,7 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 	}
 }
 
-func (r *ServicefenceReconciler) ReconcileService(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.TODO()
+func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
@@ -160,8 +159,7 @@ func (r *ServicefenceReconciler) ReconcileService(req ctrl.Request) (ctrl.Result
 	return r.refreshFenceStatusOfService(ctx, nil, req.NamespacedName)
 }
 
-func (r *ServicefenceReconciler) ReconcileNamespace(req ctrl.Request) (ret ctrl.Result, err error) {
-	ctx := context.TODO()
+func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ret ctrl.Result, err error) {
 
 	// Fetch the namespace instance
 	ns := &corev1.Namespace{}

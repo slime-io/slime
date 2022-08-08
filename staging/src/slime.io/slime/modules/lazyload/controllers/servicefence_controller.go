@@ -118,13 +118,13 @@ func NewReconciler(cfg *lazyloadv1alpha1.Fence, mgr manager.Manager, env bootstr
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences/status,verbs=get;update;patch
 
-func (r *ServicefenceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
+func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	log := modmodel.ModuleLog.WithField(model.LogFieldKeyResource, req.NamespacedName)
 
 	// Fetch the ServiceFence instance
 	instance := &lazyloadv1alpha1.ServiceFence{}
-	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
+	err := r.Client.Get(ctx, req.NamespacedName, instance)
 
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -110,7 +111,7 @@ func updateResources(wormholePort []string, env bootstrap.Environment) bool {
 	// get slimeboot cr name
 	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
 	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
-	deploy, err := cliSet.AppsV1().Deployments(slimeBootNs).Get(deployName, metav1.GetOptions{})
+	deploy, err := cliSet.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
 	if err != nil {
 		log.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
 		return false
@@ -118,7 +119,7 @@ func updateResources(wormholePort []string, env bootstrap.Environment) bool {
 	slimeBootName := deploy.OwnerReferences[0].Name
 
 	// Unstructured
-	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(slimeBootName, metav1.GetOptions{}, "")
+	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
 	if err != nil {
 		log.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
 		return false
@@ -153,7 +154,7 @@ func updateResources(wormholePort []string, env bootstrap.Environment) bool {
 		return false
 	}
 	utd.SetUnstructuredContent(obj)
-	utd, err = dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Update(utd, metav1.UpdateOptions{})
+	utd, err = dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Update(context.TODO(), utd, metav1.UpdateOptions{})
 	if err != nil {
 		log.Errorf("update slimeboot %s/%s error: %+v", slimeBootNs, slimeBootName, err)
 		return false
