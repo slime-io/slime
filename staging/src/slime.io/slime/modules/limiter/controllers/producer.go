@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	stderrors "errors"
 	"fmt"
 	"strings"
@@ -192,11 +193,11 @@ func queryServicePods(c *kubernetes.Clientset, loc types.NamespacedName) ([]v1.P
 	var service *v1.Service
 	pods := make([]v1.Pod, 0)
 
-	service, err = c.CoreV1().Services(loc.Namespace).Get(loc.Name, metav1.GetOptions{})
+	service, err = c.CoreV1().Services(loc.Namespace).Get(context.TODO(), loc.Name, metav1.GetOptions{})
 	if err != nil {
 		return pods, fmt.Errorf("get service %+v faild, %s", loc, err.Error())
 	}
-	podList, err := c.CoreV1().Pods(loc.Namespace).List(metav1.ListOptions{
+	podList, err := c.CoreV1().Pods(loc.Namespace).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: labels.SelectorFromSet(service.Spec.Selector).String(),
 	})
 	if err != nil {
