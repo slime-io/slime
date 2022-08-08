@@ -2,16 +2,17 @@ package controllers
 
 import (
 	"context"
+	watchtools "k8s.io/client-go/tools/watch"
 	"strconv"
 	"strings"
 	"time"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	"slime.io/slime/framework/util"
 )
 
 func (r *ServicefenceReconciler) startSvcCache() {
@@ -25,15 +26,16 @@ func (r *ServicefenceReconciler) startSvcCache() {
 
 	// init service watcher
 	servicesClient := clientSet.CoreV1().Services("")
+	ctx := context.Background()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return servicesClient.List(options)
+			return servicesClient.List(ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return servicesClient.Watch(options)
+			return servicesClient.Watch(ctx, options)
 		},
 	}
-	watcher := util.ListWatcher(context.Background(), lw)
+	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Service{})
 
 	go func() {
 		log.Infof("Service cacher is running")
@@ -123,7 +125,7 @@ func (r *ServicefenceReconciler) startSvcCache() {
 			// polling request
 			pollTicker := time.NewTicker(10 * time.Second)
 			// init and retry request
-			retryCh := time.After(1*time.Second)
+			retryCh := time.After(1 * time.Second)
 			for {
 				select {
 				case <-pollTicker.C:
@@ -140,7 +142,7 @@ func (r *ServicefenceReconciler) startSvcCache() {
 					successUpdate = updateResources(wormholePort, r.env)
 					if !successUpdate {
 						log.Infof("retry to update resources")
-						retryCh = time.After(1*time.Second)
+						retryCh = time.After(1 * time.Second)
 					}
 				} else {
 					log.Debugf("no need to update resources")

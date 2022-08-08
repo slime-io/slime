@@ -18,6 +18,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	go.uber.org/zap v1.19.0
 	google.golang.org/grpc v1.38.0
+	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf

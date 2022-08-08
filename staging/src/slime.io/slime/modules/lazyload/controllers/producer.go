@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	watchtools "k8s.io/client-go/tools/watch"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -25,7 +27,6 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
-	"slime.io/slime/framework/util"
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 )
 
@@ -228,7 +229,7 @@ func newInitCache(env bootstrap.Environment) (map[string]map[string]string, erro
 	}
 
 	dc := env.DynamicClient
-	svfList, err := dc.Resource(svfGvr).List(metav1.ListOptions{})
+	svfList, err := dc.Resource(svfGvr).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("list servicefence error: %v", err)
 	}
@@ -401,7 +402,7 @@ func newIpToSvcCache(clientSet *kubernetes.Clientset) (map[string]string, map[st
 	var cacheLock sync.RWMutex
 
 	// init svcToIps
-	eps, err := clientSet.CoreV1().Endpoints("").List(metav1.ListOptions{})
+	eps, err := clientSet.CoreV1().Endpoints("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, nil, nil, stderrors.New("failed to get endpoints list")
 	}
@@ -420,15 +421,16 @@ func newIpToSvcCache(clientSet *kubernetes.Clientset) (map[string]string, map[st
 
 	// init endpoint watcher
 	epsClient := clientSet.CoreV1().Endpoints("")
+	ctx := context.Background()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return epsClient.List(options)
+			return epsClient.List(ctx, options)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return epsClient.Watch(options)
+			return epsClient.Watch(ctx, options)
 		},
 	}
-	watcher := util.ListWatcher(context.Background(), lw)
+	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Endpoints{})
 
 	go func() {
 		log.Infof("Endpoint cacher is running")
@@ -458,7 +460,7 @@ func newIpToSvcCache(clientSet *kubernetes.Clientset) (map[string]string, map[st
 			}
 
 			// add, update event
-			ep, err := clientSet.CoreV1().Endpoints(ep.GetNamespace()).Get(ep.GetName(), metav1.GetOptions{})
+			ep, err := clientSet.CoreV1().Endpoints(ep.GetNamespace()).Get(ctx, ep.GetName(), metav1.GetOptions{})
 			if err != nil {
 				continue
 			}
