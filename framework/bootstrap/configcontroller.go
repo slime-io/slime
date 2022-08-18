@@ -260,7 +260,6 @@ func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigCon
 		case EventUpdate:
 			isCfg := imc.Get(resource.IstioService, string(hostname), cfg.Namespace)
 			if isCfg == nil {
-				log.Errorf("[epsToIstioResHandler] [EventUpdate] failed to get IstioService %s/%s, related endpoint is %s", cfg.Namespace, string(hostname), cfg.Name)
 				return
 			}
 			is := isCfg.Spec.(*model.Service)
