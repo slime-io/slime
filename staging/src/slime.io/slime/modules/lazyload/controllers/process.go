@@ -256,7 +256,9 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 	}
 
 	if sf == nil {
-		if svc != nil && r.isServiceFenced(ctx, svc) {
+		// ignore services without label selector
+		if svc != nil && &(svc.Spec) != nil && svc.Spec.Selector != nil &&
+			len(svc.Spec.Selector) > 0 && r.isServiceFenced(ctx, svc) {
 			// add svc -> add sf
 			sf = &lazyloadv1alpha1.ServiceFence{
 				TypeMeta: metav1.TypeMeta{},
