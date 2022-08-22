@@ -387,7 +387,7 @@ func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache 
 	svc := destParts[1] + "/" + destParts[0]
 	if _, ok := svcToIpsCache[svc]; ok {
 		// dest is abbreviation of service, add suffix
-		destSvc = dest + suffix
+		destSvc = dest + "." + suffix
 	} else {
 		// not abbreviation of service, no suffix
 		destSvc = dest
