@@ -1,6 +1,7 @@
 package e2e
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,7 +70,7 @@ func createSlimeBoot(f *framework.Framework) {
 	slimebootDeploymentInstalled := false
 
 	for i := 0; i < 10; i++ {
-		pods, err := cs.CoreV1().Pods(nsSlime).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsSlime).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) == 0 {
 			time.Sleep(500 * time.Millisecond)
@@ -101,7 +102,7 @@ func createSlimeModuleLimiter(f *framework.Framework) {
 	limitDeploymentInstalled := false
 
 	for i := 0; i < 60; i++ {
-		pods, err := cs.CoreV1().Pods(nsSlime).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsSlime).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) <= 1 {
 			time.Sleep(1000 * time.Millisecond)
@@ -133,7 +134,7 @@ func createExampleApps(f *framework.Framework) {
 
 	// check
 	for i := 0; i < 60; i++ {
-		pods, err := cs.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
+		pods, err := cs.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
 		if len(pods.Items) != 6 {
 			time.Sleep(500 * time.Millisecond)
@@ -162,7 +163,7 @@ func createSmartLimiter(f *framework.Framework) {
 	}
 	created := false
 	for i := 0; i < 60; i++ {
-		_, err := f.DynamicClient.Resource(smartLimiterGVR).Namespace(nsApps).Get("productpage", metav1.GetOptions{})
+		_, err := f.DynamicClient.Resource(smartLimiterGVR).Namespace(nsApps).Get(context.TODO(), "productpage", metav1.GetOptions{})
 		if err != nil {
 			time.Sleep(500 * time.Millisecond)
 			continue
@@ -181,7 +182,7 @@ func createSmartLimiter(f *framework.Framework) {
 		Resource: efResource,
 	}
 	for i := 0; i < 30; i++ {
-		_, err := f.DynamicClient.Resource(envoyFilterGVR).Namespace(nsApps).Get("productpage.temp.ratelimit", metav1.GetOptions{})
+		_, err := f.DynamicClient.Resource(envoyFilterGVR).Namespace(nsApps).Get(context.TODO(), "productpage.temp.ratelimit", metav1.GetOptions{})
 		if err != nil {
 			time.Sleep(1000 * time.Millisecond)
 			continue
@@ -199,7 +200,7 @@ func createSmartLimiter(f *framework.Framework) {
 // curl -I http://reviews:9080/
 func limiterTackEffect(f *framework.Framework) {
 	time.Sleep(20 * time.Second)
-	pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(metav1.ListOptions{})
+	pods, err := f.ClientSet.CoreV1().Pods(nsApps).List(context.TODO(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 	for _, pod := range pods.Items {
 		if strings.Contains(pod.Name, "ratings") {
