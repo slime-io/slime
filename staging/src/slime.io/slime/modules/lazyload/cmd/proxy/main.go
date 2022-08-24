@@ -50,7 +50,7 @@ func main() {
 	var whPorts []int
 	for _, whp := range wormholePortsArr {
 		if whp == probePort {
-			log.Errorf("wormholePort can not be %s, which is reserved for health check", probePort)
+			log.Errorf("probePort is conflict with wormholePorts %v, please choose another one", wormholePortsArr)
 			os.Exit(1)
 		}
 

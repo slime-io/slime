@@ -21,11 +21,7 @@ const (
 type HealthzProxy struct{}
 
 func (p *HealthzProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
-	// health check
-	if req.RequestURI == "/healthz/live" || req.RequestURI == "/healthz/ready" {
-		w.Write([]byte("Healthy!"))
-		return
-	}
+	// health check, return 200 directly
 }
 
 type Proxy struct {
