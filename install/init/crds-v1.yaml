@@ -1,0 +1,257 @@
+# json supported values: "array", "boolean", "integer", "number", "object", "string"
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: servicefences.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    shortNames:
+      - svf
+    kind: ServiceFence
+    listKind: ServiceFenceList
+    plural: servicefences
+    singular: servicefence
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: 'ServiceFence is a layer of encapsulation on top of the community Sidecar CR.
+                Its main role is the same as that of the Sidecar resource, which isolates configurations that the service does not care about,
+                thus improving the performance of the service mesh in large-scale scenarios'
+              type: object
+              properties:
+                host:
+                  description: 'Manage the lifecycle of service dependency'
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      stable:
+                        description: 'Configuration that will not be cleaned up'
+                        type: object
+                        x-kubernetes-preserve-unknown-fields: true
+                      deadline:
+                        description: 'Configurations that expire after expiration'
+                        type: object
+                        properties:
+                          expire:
+                            type: object
+                            properties:
+                              seconds:
+                                description: 'Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
+                                  Must be from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z inclusive.'
+                                type: integer
+                              nanos:
+                                description: 'Non-negative fractions of a second at nanosecond resolution.
+                                  Negative second values with fractions must still have non-negative nanos values
+                                  that count forward in time. Must be from 0 to 999,999,999 inclusive.'
+                                type: integer
+                      auto:
+                        description: 'Deprecated, automatic recovery based on service deactivation'
+                        type: object
+                        properties:
+                          duration:
+                            type: object
+                            properties:
+                              seconds:
+                                description: 'Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
+                                  Must be from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z inclusive.'
+                                type: integer
+                              nanos:
+                                description: 'Non-negative fractions of a second at nanosecond resolution.
+                                  Negative second values with fractions must still have non-negative nanos values
+                                  that count forward in time. Must be from 0 to 999,999,999 inclusive.'
+                                type: integer
+                      recentlyCalled:
+                        description: 'Deprecated, take effect if recently called'
+                        type: object
+                        properties:
+                          seconds:
+                            description: 'Represents seconds of UTC time since Unix epoch 1970-01-01T00:00:00Z.
+                              Must be from 0001-01-01T00:00:00Z to 9999-12-31T23:59:59Z inclusive.'
+                            type: integer
+                          nanos:
+                            description: 'Non-negative fractions of a second at nanosecond resolution.
+                              Negative second values with fractions must still have non-negative nanos values
+                              that count forward in time. Must be from 0 to 999,999,999 inclusive.'
+                            type: integer
+                enable:
+                  description: 'Switch to render servicefence as sidecar'
+                  type: boolean
+                namespaceSelector:
+                  description: 'Services in these namespaces are all static dependency, will not expire'
+                  type: array
+                  items:
+                    type: string
+                labelSelector:
+                  description: 'Services match one selector of the label selector are all static dependency, will not expire'
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      selector:
+                        type: object
+                        additionalProperties:
+                          type: string
+                workloadSelector:
+                  type: object
+                  properties:
+                    fromService:
+                      description: 'Take effect when labels is empty
+                        true: sidecar.workloadSelector.labels = svc.spec.selector
+                        false: sidecar.workloadSelector.labels = map[string]string{env.config.global.service: svc.name}'
+                      type: boolean
+                    labels:
+                      description: 'Top priority, if labels is not empty, sidecar.workloadSelector.labels = sf.spec.workloadSelector.labels'
+                      type: object
+                      additionalProperties:
+                        type: string
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: smartlimiters.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    shortNames:
+      - sml
+    kind: SmartLimiter
+    listKind: SmartLimiterList
+    plural: smartlimiters
+    singular: smartlimiter
+  scope: Namespaced
+  versions:
+    - name: v1alpha2
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: 'SmartLimiter is useful for xxx'
+              type: object
+              properties:
+                xxx:
+                  type: string # TODO
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: envoyplugins.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    shortNames:
+      - evp
+    kind: EnvoyPlugin
+    listKind: EnvoyPluginList
+    plural: envoyplugins
+    singular: envoyplugin
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: 'EnvoyPlugin is useful for xxx'
+              type: object
+              properties:
+                xxx:
+                  type: string # TODO
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: pluginmanagers.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    shortNames:
+      - plm
+    kind: PluginManager
+    listKind: PluginManagerList
+    plural: pluginmanagers
+    singular: pluginmanager
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: 'PluginManager is useful for xxx'
+              type: object
+              properties:
+                xxx:
+                  type: string # TODO
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: slimeboots.config.netease.com
+spec:
+  group: config.netease.com
+  names:
+    shortNames:
+      - slb
+    kind: SlimeBoot
+    listKind: SlimeBootList
+    plural: slimeboots
+    singular: slimeboot
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: 'SlimeBoot is useful for xxx'
+              type: object
+              properties:
+                xxx:
+                  type: string # TODO
+            status:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+      served: true
+      storage: true
+      subresources:
+        status: {}
