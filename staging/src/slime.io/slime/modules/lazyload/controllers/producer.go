@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"fmt"
 	watchtools "k8s.io/client-go/tools/watch"
+	"net"
 	"strconv"
 	"strings"
 	"sync"
@@ -359,6 +360,13 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 	// get destination service info from request.authority
 	auth := entry.Request.Authority
 	dest := strings.Split(auth, ":")[0]
+
+	// check if dest is ip
+	if net.ParseIP(dest) != nil {
+		log.Debugf("Accesslog is %s -> %s, in which the destination is not domain, skip", sourceSvc, dest)
+		return ""
+	}
+
 	destParts := strings.Split(dest, ".")
 	switch len(destParts) {
 	case 1:
