@@ -240,6 +240,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 	loc := types.NamespacedName{Name: obj.Name, Namespace: instance.Namespace}
 	istioRev := slime_model.IstioRevFromLabel(instance.Labels)
 	slime_model.PatchIstioRevLabel(&obj.Labels, istioRev)
+	slime_model.PatchObjectMeta(&obj.ObjectMeta, &instance.ObjectMeta)
 
 	found := &v1alpha3.EnvoyFilter{}
 	if err := r.Client.Get(context.TODO(), loc, found); err != nil {
@@ -281,7 +282,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		}
 		// spec is not nil , update
 		if obj.Spec != nil {
-			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) {
+			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) || !reflect.DeepEqual(found.Labels, obj.Labels){
 				obj.ResourceVersion = found.ResourceVersion
 				err := r.Client.Update(context.TODO(), obj)
 				if err != nil {
