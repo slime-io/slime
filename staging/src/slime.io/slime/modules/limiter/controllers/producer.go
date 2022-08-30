@@ -209,6 +209,11 @@ func queryServicePods(c *kubernetes.Clientset, loc types.NamespacedName) ([]v1.P
 			// pod is deleted
 			continue
 		}
+		if item.Status.Phase != v1.PodRunning {
+			// pods not running
+			log.Debugf("pod %s/%s is not running. Status=%v. skip", item.Namespace, item.Name, item.Status.Phase)
+			continue
+		}
 		pods = append(pods, item)
 	}
 	return pods, nil
