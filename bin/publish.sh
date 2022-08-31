@@ -19,7 +19,7 @@ function fatal() {
 function calc_unstaged_hash() {
   local tmp_f
   tmp_f=$(mktemp)
-  cp .git/index "$tmp_f"
+  cp $(git rev-parse --show-toplevel)/.git/index "$tmp_f"
   GIT_INDEX_FILE="$tmp_f" git add -u
   GIT_INDEX_FILE="$tmp_f" git write-tree
 }
