@@ -274,7 +274,24 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
-	go bootstrap.AuxiliaryHttpServerStart(ph, config.Global.Misc["aux-addr"])
+	go func() {
+		auxAddr := config.Global.Misc["aux-addr"]
+
+		// parse pathRedirect param
+		pathRedirects := make(map[string]string)
+		mappings := strings.Split(config.Global.Misc["pathRedirect"], ",")
+		for _, m := range mappings {
+			paths := strings.Split(m, "->")
+			if len(paths) != 2 {
+				log.Errorf("pathRedirect '%s' parse error: ilegal expression", m)
+				continue
+			}
+			redirectPath, path := paths[0], paths[1]
+			pathRedirects[redirectPath] = path
+		}
+
+		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects)
+	}()
 
 	for _, startup := range startups {
 		startup(ctx)

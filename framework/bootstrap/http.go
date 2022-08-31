@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"strconv"
+	"sync"
 
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kube-openapi/pkg/common"
@@ -14,17 +15,23 @@ import (
 
 // PathHandler for module using
 type PathHandler struct {
-	mux *http.ServeMux
+	mux     *http.ServeMux
+	mapping map[string]http.Handler
+	sync.RWMutex
 }
 
 func NewPathHandler() *PathHandler {
 	return &PathHandler{
-		mux: http.NewServeMux(),
+		mux:     http.NewServeMux(),
+		mapping: make(map[string]http.Handler),
 	}
 }
 
-func (ph PathHandler) Handle(path string, handler http.Handler) {
+func (ph *PathHandler) Handle(path string, handler http.Handler) {
 	ph.mux.Handle(path, handler)
+	ph.Lock()
+	ph.mapping[path] = handler
+	ph.Unlock()
 }
 
 // PrefixPathHandlerManager for module env init
@@ -37,16 +44,38 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
-func AuxiliaryHttpServerStart(ph *PathHandler, addr string) {
+func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[string]string) {
 	// register
 	HealthCheckRegister(ph)
 	PprofRegister(ph)
 	LogLevelRegister(ph)
+	pathRedirectRegister(ph, pathRedirects)
 
-	log.Infof("auxiliary http server is starting to listen %s", addr)
+	log.Infof("aux server is starting to listen %s", addr)
 	if err := http.ListenAndServe(addr, ph.mux); err != nil {
-		log.Errorf("auxiliary http server starts error, %+v", err)
+		log.Errorf("aux server starts error, %+v", err)
 	}
+}
+
+func pathRedirectRegister(ph *PathHandler, pathRedirects map[string]string) {
+	if len(pathRedirects) == 0 {
+		log.Infof("none pathRedirect on aux server, skip")
+		return
+	}
+
+	for redirectPath, path := range pathRedirects {
+		ph.RLock()
+		handler := ph.mapping[path]
+		ph.RUnlock()
+		if handler == nil {
+			log.Errorf("pathRedirect '%s -> %s' error: path is not registered", redirectPath, path)
+			continue
+		}
+		ph.mux.Handle(redirectPath, handler)
+		log.Debugf("pathRedirect '%s -> %s' succeed", redirectPath, path)
+	}
+
+	log.Infof("all pathRedirect succeed on aux server")
 }
 
 func HealthCheckRegister(ph *PathHandler) {
