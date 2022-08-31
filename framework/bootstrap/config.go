@@ -49,9 +49,11 @@ var defaultModuleConfig = &bootconfig.Config{
 			"logSourcePort":          ":8082",
 			// which label keys of serviceEntry select endpoints
 			// will take effect when serviceEntry does not have workloadSelector field
-			"seLabelSelectorKeys":    "app",
+			"seLabelSelectorKeys": "app",
 			// indicate whether xds config source enable increment push or not
 			"xdsSourceEnableIncPush": "true",
+			// path redirect mapping of aux server, default is null
+			"pathRedirect": "",
 		},
 	},
 }
