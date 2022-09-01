@@ -35,6 +35,7 @@ func InitLog(logConfig *bootconfig.Log) error {
 	log.SetLevel(level)
 	log.SetFormatter(&log.TextFormatter{
 		TimestampFormat: time.RFC3339,
+		DisableQuote: !logConfig.EnableQuote,
 	})
 
 	var output io.Writer
