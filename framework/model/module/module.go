@@ -196,7 +196,22 @@ func Main(bundle string, modules []Module) {
 
 	ctx := context.Background()
 
-	ph := bootstrap.NewPathHandler()
+	// parse pathRedirect param
+	pathRedirects := make(map[string]string)
+	if config.Global.Misc["pathRedirect"] != "" {
+		mappings := strings.Split(config.Global.Misc["pathRedirect"], ",")
+		for _, m := range mappings {
+			paths := strings.Split(m, "->")
+			if len(paths) != 2 {
+				log.Errorf("pathRedirect '%s' parse error: ilegal expression", m)
+				continue
+			}
+			redirectPath, path := paths[0], paths[1]
+			pathRedirects[redirectPath] = path
+		}
+	}
+
+	ph := bootstrap.NewPathHandler(pathRedirects)
 
 	// init configController if configSource field is used
 	stop := make(chan struct{})
@@ -276,22 +291,6 @@ func Main(bundle string, modules []Module) {
 
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
-
-		// parse pathRedirect param
-		pathRedirects := make(map[string]string)
-		if config.Global.Misc["pathRedirect"] != "" {
-			mappings := strings.Split(config.Global.Misc["pathRedirect"], ",")
-			for _, m := range mappings {
-				paths := strings.Split(m, "->")
-				if len(paths) != 2 {
-					log.Errorf("pathRedirect '%s' parse error: ilegal expression", m)
-					continue
-				}
-				redirectPath, path := paths[0], paths[1]
-				pathRedirects[redirectPath] = path
-			}
-		}
-
 		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects)
 	}()
 
