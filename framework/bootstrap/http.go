@@ -15,23 +15,63 @@ import (
 
 // PathHandler for module using
 type PathHandler struct {
-	mux     *http.ServeMux
-	mapping map[string]http.Handler
+	mux           *http.ServeMux
+	mapping       map[string]http.Handler
+	pathRedirects map[string]string
 	sync.RWMutex
 }
 
-func NewPathHandler() *PathHandler {
+func NewPathHandler(pathRedirects map[string]string) *PathHandler {
+	var reversePathRedirects map[string]string
+	if len(pathRedirects) > 0 {
+		reversePathRedirects = make(map[string]string, len(pathRedirects))
+		for k, v := range pathRedirects {
+			if k != v {
+				reversePathRedirects[v] = k
+			}
+		}
+	}
+
 	return &PathHandler{
-		mux:     http.NewServeMux(),
-		mapping: make(map[string]http.Handler),
+		mux:           http.NewServeMux(),
+		mapping:       make(map[string]http.Handler),
+		pathRedirects: reversePathRedirects,
 	}
 }
 
 func (ph *PathHandler) Handle(path string, handler http.Handler) {
-	ph.mux.Handle(path, handler)
+	if path == "" {
+		log.Warn("ignore empty path")
+		return
+	}
+
 	ph.Lock()
+	if _, ok := ph.mapping[path]; ok {
+		ph.Unlock()
+		log.Warnf("ignore dup path %s", path)
+		return
+	}
 	ph.mapping[path] = handler
+
+	var (
+		redir      = ph.pathRedirects[path]
+		redirInUse = redir
+	)
+	if _, ok := ph.mapping[redir]; ok {
+		redirInUse = ""
+	} else {
+		ph.mapping[redir] = handler
+	}
 	ph.Unlock()
+
+	log.Infof("register path %s", path)
+	ph.mux.Handle(path, handler)
+	if redirInUse != "" {
+		log.Infof("register redir path %s", redirInUse)
+		ph.mux.Handle(redir, handler)
+	} else if redir != "" {
+		log.Warnf("ignore dup redir path %s", redir)
+	}
 }
 
 // PrefixPathHandlerManager for module env init
@@ -41,6 +81,10 @@ type PrefixPathHandlerManager struct {
 }
 
 func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
+	if path != "" && path[0] == '/' {
+		path = path[1:]
+	}
+
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
@@ -49,33 +93,11 @@ func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[st
 	HealthCheckRegister(ph)
 	PprofRegister(ph)
 	LogLevelRegister(ph)
-	pathRedirectRegister(ph, pathRedirects)
 
 	log.Infof("aux server is starting to listen %s", addr)
 	if err := http.ListenAndServe(addr, ph.mux); err != nil {
 		log.Errorf("aux server starts error, %+v", err)
 	}
-}
-
-func pathRedirectRegister(ph *PathHandler, pathRedirects map[string]string) {
-	if len(pathRedirects) == 0 {
-		log.Infof("none pathRedirect on aux server, skip")
-		return
-	}
-
-	for redirectPath, path := range pathRedirects {
-		ph.RLock()
-		handler := ph.mapping[path]
-		ph.RUnlock()
-		if handler == nil {
-			log.Errorf("pathRedirect '%s -> %s' error: path is not registered", redirectPath, path)
-			continue
-		}
-		ph.mux.Handle(redirectPath, handler)
-		log.Debugf("pathRedirect '%s -> %s' succeed", redirectPath, path)
-	}
-
-	log.Infof("all pathRedirect succeed on aux server")
 }
 
 func HealthCheckRegister(ph *PathHandler) {
