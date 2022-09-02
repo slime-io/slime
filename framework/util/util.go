@@ -36,3 +36,18 @@ func UnityHost(host string, namespace string) string {
 func Fatal() {
 	os.Exit(1)
 }
+
+type AnyMessage struct {
+	Raw     []byte
+	RawJson []byte
+}
+
+func (a *AnyMessage) Reset() {
+}
+
+func (a *AnyMessage) String() string {
+	return ""
+}
+
+func (a *AnyMessage) ProtoMessage() {
+}

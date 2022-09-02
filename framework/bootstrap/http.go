@@ -15,19 +15,26 @@ import (
 
 // PathHandler for module using
 type PathHandler struct {
-	mux           *http.ServeMux
-	mapping       map[string]http.Handler
-	pathRedirects map[string]string
+	mux     *http.ServeMux
+	mapping map[string]http.Handler
+	// realPath -> redirectPath mapping
+	pathRedirects map[string]map[string]struct{}
 	sync.RWMutex
 }
 
 func NewPathHandler(pathRedirects map[string]string) *PathHandler {
-	var reversePathRedirects map[string]string
+	// from redirectPath -> realPath to realPath -> redirectPath
+	var reversePathRedirects map[string]map[string]struct{}
 	if len(pathRedirects) > 0 {
-		reversePathRedirects = make(map[string]string, len(pathRedirects))
+		reversePathRedirects = make(map[string]map[string]struct{}, len(pathRedirects))
 		for k, v := range pathRedirects {
 			if k != v {
-				reversePathRedirects[v] = k
+				m := reversePathRedirects[v]
+				if m == nil {
+					m = map[string]struct{}{}
+					reversePathRedirects[v] = m
+				}
+				m[k] = struct{}{}
 			}
 		}
 	}
@@ -48,29 +55,33 @@ func (ph *PathHandler) Handle(path string, handler http.Handler) {
 	ph.Lock()
 	if _, ok := ph.mapping[path]; ok {
 		ph.Unlock()
-		log.Warnf("ignore dup path %s", path)
+		log.Warnf("path %s has existed, skip dup", path)
 		return
 	}
 	ph.mapping[path] = handler
 
-	var (
-		redir      = ph.pathRedirects[path]
-		redirInUse = redir
-	)
-	if _, ok := ph.mapping[redir]; ok {
-		redirInUse = ""
-	} else {
-		ph.mapping[redir] = handler
+	redirectPaths := ph.pathRedirects[path]
+	var toRedirectPaths, skippedRedirectPaths []string
+	for redirectPath := range redirectPaths {
+		if _, ok := ph.mapping[redirectPath]; ok {
+			skippedRedirectPaths = append(skippedRedirectPaths, redirectPath)
+		} else {
+			ph.mapping[redirectPath] = handler
+			toRedirectPaths = append(toRedirectPaths, redirectPath)
+		}
 	}
 	ph.Unlock()
 
 	log.Infof("register path %s", path)
 	ph.mux.Handle(path, handler)
-	if redirInUse != "" {
-		log.Infof("register redir path %s", redirInUse)
-		ph.mux.Handle(redir, handler)
-	} else if redir != "" {
-		log.Warnf("ignore dup redir path %s", redir)
+	if len(toRedirectPaths) > 0 {
+		log.Infof("register redir paths %v", toRedirectPaths)
+		for _, redirectPath := range toRedirectPaths {
+			ph.mux.Handle(redirectPath, handler)
+		}
+	}
+	if len(skippedRedirectPaths) > 0 {
+		log.Warnf("redirect path %v has existed, skip dup", skippedRedirectPaths)
 	}
 }
 
