@@ -31,7 +31,7 @@ import (
 // if routeName is "", it means the config is specified to vhost (contain all route in vhost)
 type routeConfig struct {
 	gw        bool
-	action    *envoy_config_route_v3.RateLimit_Action
+	action    []*envoy_config_route_v3.RateLimit_Action
 	routeName string
 	vhostName string
 	direction string
@@ -147,7 +147,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 	for _, rcs := range route2RouteConfig {
 		rateLimits := make([]*envoy_config_route_v3.RateLimit, 0)
 		for _, rc := range rcs {
-			rateLimits = append(rateLimits, &envoy_config_route_v3.RateLimit{Actions: []*envoy_config_route_v3.RateLimit_Action{rc.action}})
+			rateLimits = append(rateLimits, &envoy_config_route_v3.RateLimit{Actions: rc.action})
 		}
 
 		match := generateEnvoyVhostMatch(rcs[0])
@@ -302,7 +302,7 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 // PresentMatch(name是否存在)互斥
 // 这里之前打算在pb声明为oneof,但是用kubebuilder生成api的过程中无法识别相关interface{}
 */
-func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) *envoy_config_route_v3.RateLimit_Action {
+func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_config_route_v3.RateLimit_Action {
 	action := &envoy_config_route_v3.RateLimit_Action{}
 	if descriptor.CustomKey != "" && descriptor.CustomValue != "" {
 		log.Infof("customKey/customValue is not empty, users should apply a envoyplugin with same customKey/customValue")
@@ -331,12 +331,27 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 			default:
 				if match.IsExactMatchEmpty {
 					header.HeaderMatchSpecifier = generateExactMatch(match)
-				} else {
+				} else if match.PresentMatch {
 					header.HeaderMatchSpecifier = generatePresentMatch(match)
+				} else if match.PresentMatchSeparate {
+					action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_RequestHeaders_{
+						RequestHeaders: &envoy_config_route_v3.RateLimit_Action_RequestHeaders{
+							HeaderName:    match.Name,
+							DescriptorKey: generateDescriptorKey(descriptor, loc),
+						},
+					}
+					generic := &envoy_config_route_v3.RateLimit_Action{}
+					generic.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_GenericKey_{
+						GenericKey: &envoy_config_route_v3.RateLimit_Action_GenericKey{
+							DescriptorValue: generateDescriptorValue(descriptor, loc),
+						},
+					}
+					return []*envoy_config_route_v3.RateLimit_Action{generic, action}
 				}
 			}
 			headers = append(headers, header)
 		}
+
 		action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch_{
 			HeaderValueMatch: &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch{
 				DescriptorValue: generateDescriptorValue(descriptor, loc),
@@ -344,7 +359,7 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 			},
 		}
 	}
-	return action
+	return []*envoy_config_route_v3.RateLimit_Action{action}
 }
 
 func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.LocalRateLimitDescriptor {
@@ -389,7 +404,7 @@ func generateTokenBucket(item *microservicev1alpha2.SmartLimitDescriptor) *envoy
 
 func generateDescriptorValue(item *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) string {
 	id := adler32.Checksum([]byte(item.String() + loc.String()))
-	return fmt.Sprintf("Service[%s.%s]-User[none]-Id[%d]", loc.Name, loc.Namespace, id)
+	return fmt.Sprintf("Service[%s.%s]-Id[%d]", loc.Name, loc.Namespace, id)
 }
 
 func generateSafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) *envoy_config_route_v3.HeaderMatcher_SafeRegexMatch {
@@ -475,10 +490,10 @@ func generateEnvoyVhostMatch(rc *routeConfig) *networking.EnvoyFilter_EnvoyConfi
 	// if gateway is enabled, match context should be EnvoyFilter_GATEWAY
 	if rc.gw {
 		match.Context = networking.EnvoyFilter_GATEWAY
-		log.Info("gw is true, set context to gateway")
+		log.Debugf("gw is true, set context to gateway")
 	} else if rc.direction == model.Outbound {
 		match.Context = networking.EnvoyFilter_SIDECAR_OUTBOUND
-		log.Info("direction is outbound and gw is false, set context to outbound")
+		log.Debugf("direction is outbound and gw is false, set context to outbound")
 	}
 	// if allow_any, config.RouteConfiguration.Vhost.Name is ""
 	config, ok := match.ObjectTypes.(*networking.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration)

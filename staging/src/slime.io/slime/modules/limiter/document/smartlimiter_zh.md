@@ -197,7 +197,6 @@ metadata:
 spec:
   sets:
     _base:
-      #rls: 'outbound|18081||rate-limit.istio-system.svc.cluster.local' 如果不指定默认是该地址
       descriptor:
       - action:
           fill_interval:

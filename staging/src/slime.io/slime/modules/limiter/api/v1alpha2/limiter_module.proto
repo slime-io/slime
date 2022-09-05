@@ -25,4 +25,29 @@ message Limiter {
   bool enableServiceEntry = 7;
   // it will not generate envoy.filters.http.local_ratelimit insert before http.router when true
   bool disableInsertLocalRateLimit =8;
+  // it will not generate envoy.filters.http.ratelimit insert before http.router when true
+  bool disableInsertGlobalRateLimit =9;
+  // specify the rls namespaces
+  RlsConfigMap rlsConfigMap =10;
+  // specify domain, it is useful in global ratelimiter
+  string domain =11;
+  // specify rls server address, if disableInsertGlobalRateLimit if false
+  RateLimitService rls =12;
 }
+
+// configmap will mount to RateLimitService '/data/ratelimit/config'
+message RlsConfigMap {
+  // configmap name
+  string name = 1;
+  // configmap namespace
+  string namespace =2;
+}
+
+message RateLimitService {
+  // rate-limit.gateway-system.svc.cluster.local
+  string service = 1;
+  // service port
+  int32 port = 2;
+}
+
+

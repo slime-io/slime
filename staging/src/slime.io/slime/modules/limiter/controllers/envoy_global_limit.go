@@ -1,8 +1,18 @@
 package controllers
 
 import (
+	"context"
 	"fmt"
+	"hash/adler32"
+	"reflect"
+	"sort"
 	"strconv"
+	"strings"
+
+	"gopkg.in/yaml.v2"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	envoy_core_v3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoy_config_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/config/ratelimit/v3"
@@ -14,7 +24,7 @@ import (
 	"slime.io/slime/modules/limiter/model"
 )
 
-func generateEnvoyHttpFilterGlobalRateLimitPatch(server string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
 	rateLimitServiceConfig := generateRateLimitService(server)
 	rs, err := util.MessageToStruct(rateLimitServiceConfig)
 	if err != nil {
@@ -23,8 +33,8 @@ func generateEnvoyHttpFilterGlobalRateLimitPatch(server string) *networking.Envo
 	}
 	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
-		Match:   generateEnvoyHttpFilterMatch(model.Inbound),
-		Patch:   generateEnvoyHttpFilterRateLimitServicePatch(rs),
+		Match:   generateEnvoyHttpFilterMatch(context),
+		Patch:   generateEnvoyHttpFilterRateLimitServicePatch(rs, domain),
 	}
 	return patch
 }
@@ -65,7 +75,7 @@ func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyC
 	return match
 }
 
-func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct) *networking.EnvoyFilter_Patch {
+func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain string) *networking.EnvoyFilter_Patch {
 	return &networking.EnvoyFilter_Patch{
 		Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
 		Value: &structpb.Struct{
@@ -88,7 +98,7 @@ func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct) *networki
 										StructValue: &structpb.Struct{
 											Fields: map[string]*structpb.Value{
 												model.StructDomain: {
-													Kind: &structpb.Value_StringValue{StringValue: model.Domain},
+													Kind: &structpb.Value_StringValue{StringValue: domain},
 												},
 												model.StructRateLimitService: {
 													Kind: &structpb.Value_StructValue{StructValue: rs},
@@ -114,17 +124,30 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 			log.Errorf("calculateQuotaPerUnit err: %+v", err)
 			return desc
 		}
-		item := &model.Descriptor{
-			Value: generateDescriptorValue(descriptor, loc),
-			RateLimit: &model.RateLimit{
-				RequestsPerUnit: uint32(quota),
-				Unit:            unit,
-			},
+		ratelimit := &model.RateLimit{
+			RequestsPerUnit: uint32(quota),
+			Unit:            unit,
 		}
+
+		item := &model.Descriptor{}
+
 		if len(descriptor.Match) == 0 {
 			item.Key = model.GenericKey
+			item.RateLimit = ratelimit
+			item.Value = generateDescriptorValue(descriptor, loc)
+		} else if containsHeaderRequest(descriptors) {
+			// item.Key = generateDescriptorKey(descriptor, loc)
+			// item.RateLimit = ratelimit
+			item.Key = model.GenericKey
+			item.Value = generateDescriptorValue(descriptor, loc)
+			item.Descriptors = append(item.Descriptors, model.Descriptor{
+				Key:       generateDescriptorKey(descriptor, loc),
+				RateLimit: ratelimit,
+			})
 		} else {
 			item.Key = model.HeaderValueMatch
+			item.RateLimit = ratelimit
+			item.Value = generateDescriptorValue(descriptor, loc)
 		}
 		desc = append(desc, item)
 	}
@@ -153,17 +176,127 @@ func calculateQuotaPerUnit(descriptor *microservicev1alpha2.SmartLimitDescriptor
 	return quota, unit, nil
 }
 
-func getRateLimiterServerCluster(server string) string {
-	if server == "" {
-		return model.RateLimitService
-	} else {
-		return server
+func getRateLimiterService(service *microservicev1alpha2.RateLimitService) (string, error) {
+	var svc string
+	var port int32
+	if service != nil {
+		svc = service.GetService()
+		port = service.GetPort()
+		if svc == "" {
+			return "", fmt.Errorf("rls svc is empty")
+		}
+		if port == 0 {
+			return "", fmt.Errorf("rls svc port is zero")
+		}
+		return fmt.Sprintf("outbound|%d||%s", port, svc), nil
+	}
+	return "", fmt.Errorf("rls svc is empty")
+}
+
+func getDomain(str string) string {
+	if str != "" {
+		return str
+	}
+	return model.Domain
+}
+
+func getConfigMapNamespaceName(cm *microservicev1alpha2.RlsConfigMap) (types.NamespacedName, error) {
+	loc := types.NamespacedName{
+		Namespace: cm.Namespace,
+		Name:      cm.Name,
+	}
+	if loc.Namespace == "" || loc.Name == "" {
+		return 	loc, fmt.Errorf("rlsConfigMap is invalid")
+	}
+	return loc, nil
+}
+
+
+// if configmap rate-limit-config not exist, return
+func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, serviceLoc types.NamespacedName) {
+	loc, err := getConfigMapNamespaceName(r.cfg.RlsConfigMap)
+	if err != nil {
+		log.Errorf("getConfigMapNamespaceName err: %s", err.Error())
+		return
+	}
+
+	found := &v1.ConfigMap{}
+	err = r.Client.Get(context.TODO(), loc, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Errorf("configmap %s:%s is not found", loc.Namespace, loc.Name)
+			return
+		} else {
+			log.Errorf("get configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
+			return
+		}
+	}
+
+	config, ok := found.Data[model.ConfigMapConfig]
+	if !ok {
+		log.Errorf("config.yaml not found in configmap %s:%s", loc.Namespace, loc.Name)
+		return
+	}
+	rc := &model.RateLimitConfig{}
+	if err = yaml.Unmarshal([]byte(config), &rc); err != nil {
+		log.Errorf("unmarshal ratelimitConfig %s err: %+v", config, err.Error())
+		return
+	}
+	newCm := make([]*model.Descriptor, 0)
+	serviceInfo := fmt.Sprintf("%s.%s", serviceLoc.Name, serviceLoc.Namespace)
+	for _, item := range rc.Descriptors {
+		if !strings.Contains(item.Value, serviceInfo) {
+			newCm = append(newCm, item)
+		}
+	}
+	newCm = append(newCm, desc...)
+	sort.Slice(newCm, func(i, j int) bool {
+		return newCm[i].Value < newCm[j].Value
+	})
+
+	configmap := constructConfigMap(newCm, loc, getDomain(r.cfg.GetDomain()))
+	if !reflect.DeepEqual(found.Data["config.yaml"], configmap.Data["config.yaml"]) {
+		log.Infof("update rate-limit-config %s:%s", loc.Namespace, loc.Name)
+		configmap.ResourceVersion = found.ResourceVersion
+		err = r.Client.Update(context.TODO(), configmap)
+		if err != nil {
+			log.Infof("update configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
+			return
+		}
 	}
 }
 
-func getConfigMapNamespaceName() types.NamespacedName {
-	return types.NamespacedName{
-		Namespace: model.ConfigMapNamespace,
-		Name:      model.ConfigMapName,
+func constructConfigMap(desc []*model.Descriptor, loc types.NamespacedName, domain string) *v1.ConfigMap {
+	rateLimitConfig := &model.RateLimitConfig{
+		Domain:      domain,
+		Descriptors: desc,
 	}
+
+	b, _ := yaml.Marshal(rateLimitConfig)
+	configmap := &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      loc.Name,
+			Namespace: loc.Namespace,
+		},
+		Data: map[string]string{
+			model.ConfigMapConfig: string(b),
+		},
+	}
+	return configmap
+}
+
+func generateDescriptorKey(item *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) string {
+	id := adler32.Checksum([]byte(item.String() + loc.String()))
+	return fmt.Sprintf("RequestHeader[%s.%s]-Id[%d]", loc.Name, loc.Namespace, id)
+}
+
+func containsHeaderRequest(descriptors []*microservicev1alpha2.SmartLimitDescriptor) bool {
+	for _, descriptor := range descriptors {
+		for _, match := range descriptor.Match {
+			if match.PresentMatchSeparate {
+				return true
+			}
+		}
+	}
+	return false
 }

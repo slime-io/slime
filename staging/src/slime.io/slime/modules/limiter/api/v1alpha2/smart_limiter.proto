@@ -76,7 +76,7 @@ option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha2";
 message SmartLimiterSpec {
     // subset rate-limit,the key is subset name.
     map<string, SmartLimitDescriptors> sets = 1;
-    // rls service
+    // deprecated, mv to limiter_module.proto
     string rls = 2; // rls 服务地址
     // workload selector , it should not be nil in Gateway Scenarios
     map<string, string> workloadSelector = 4;
@@ -120,6 +120,11 @@ message SmartLimitDescriptor {
 
         // if specified, the exact match the value ""
         bool is_exact_match_empty = 8;
+
+        // similar to present_match, the difference is that the different values have separate token
+        // while present_match shares token
+        // it only works in envoy.filters.http.ratelimit (global)
+        bool present_match_separate = 9;
     }
 
     message Action {
