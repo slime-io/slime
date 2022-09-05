@@ -1,9 +1,7 @@
 package model
 
 const (
-	ConfigMapName = "slime-rate-limit-config"
-
-	ConfigMapNamespace = "istio-system"
+	ConfigMapName = "rate-limit-config"
 
 	ConfigMapConfig = "config.yaml"
 
@@ -27,8 +25,6 @@ const (
 	SingleSmartLimiter = "single"
 
 	AverageSmartLimiter = "average"
-
-	RateLimitService = "outbound|18081||rate-limit.istio-system.svc.cluster.local"
 
 	TypeUrlEnvoyRateLimit = "type.googleapis.com/envoy.extensions.filters.http.ratelimit.v3.RateLimit"
 

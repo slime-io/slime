@@ -225,7 +225,7 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 	log.Infof("name %s, namespace %s has poped", req.Name, req.Namespace)
 	// if contain global smart limiter, should delete info in configmap
 	if !r.cfg.GetDisableGlobalRateLimit() {
-		log.Infof(" refresh global rate limiter configmap")
+		log.Infof("refresh global rate limiter configmap")
 		refreshConfigMap([]*model.Descriptor{}, r, req.NamespacedName)
 	} else {
 		log.Info("global rate limiter is closed")
@@ -270,7 +270,6 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 		}
 	}
 	return out, nil
-
 }
 
 func FQN(ns, name string) string {

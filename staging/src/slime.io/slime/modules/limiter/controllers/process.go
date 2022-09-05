@@ -10,11 +10,8 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"strings"
 
-	"gopkg.in/yaml.v2"
 	networking "istio.io/api/networking/v1alpha3"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -282,7 +279,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		}
 		// spec is not nil , update
 		if obj.Spec != nil {
-			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) || !reflect.DeepEqual(found.Labels, obj.Labels){
+			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) || !reflect.DeepEqual(found.Labels, obj.Labels) {
 				obj.ResourceVersion = found.ResourceVersion
 				err := r.Client.Update(context.TODO(), obj)
 				if err != nil {
@@ -303,79 +300,4 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		}
 	}
 	return reconcile.Result{}, nil
-}
-
-// if configmap rate-limit-config not exist, ratelimit server will not running
-func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, serviceLoc types.NamespacedName) {
-	loc := getConfigMapNamespaceName()
-
-	found := &v1.ConfigMap{}
-	err := r.Client.Get(context.TODO(), loc, found)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Errorf("configmap %s:%s is not found, can not refresh configmap", loc.Namespace, loc.Name)
-			return
-		} else {
-			log.Errorf("get configmap %s:%s err: %+v, cant not refresh configmap", loc.Namespace, loc.Name, err.Error())
-			return
-		}
-	}
-
-	config, ok := found.Data[model.ConfigMapConfig]
-	if !ok {
-		log.Errorf("config.yaml not found in configmap %s:%s", loc.Namespace, loc.Name)
-		return
-	}
-	rc := &model.RateLimitConfig{}
-	if err = yaml.Unmarshal([]byte(config), &rc); err != nil {
-		log.Infof("unmarshal ratelimitConfig %s err: %+v", config, err.Error())
-		return
-	}
-
-	newCm := make([]*model.Descriptor, 0)
-	serviceInfo := fmt.Sprintf("%s.%s", serviceLoc.Name, serviceLoc.Namespace)
-	for _, item := range rc.Descriptors {
-		if !strings.Contains(item.Value, serviceInfo) {
-			newCm = append(newCm, item)
-		}
-	}
-	newCm = append(newCm, desc...)
-
-	configmap := constructConfigMap(newCm)
-	if !reflect.DeepEqual(found.Data, configmap.Data) {
-		log.Infof("update configmap %s:%s", loc.Namespace, loc.Name)
-		configmap.ResourceVersion = found.ResourceVersion
-		err = r.Client.Update(context.TODO(), configmap)
-		if err != nil {
-			log.Infof("update configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
-			return
-		}
-	}
-}
-
-func constructConfigMap(desc []*model.Descriptor) *v1.ConfigMap {
-	rateLimitConfig := &model.RateLimitConfig{
-		Domain:      model.Domain,
-		Descriptors: desc,
-	}
-	b, _ := yaml.Marshal(rateLimitConfig)
-	loc := getConfigMapNamespaceName()
-	configmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loc.Name,
-			Namespace: loc.Namespace,
-			Labels:    generateConfigMapLabels(),
-		},
-		Data: map[string]string{
-			model.ConfigMapConfig: string(b),
-		},
-	}
-	return configmap
-}
-
-// TODO query from global config
-func generateConfigMapLabels() map[string]string {
-	labels := make(map[string]string)
-	labels["app"] = "rate-limit"
-	return labels
 }

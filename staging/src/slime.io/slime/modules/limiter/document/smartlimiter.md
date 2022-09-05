@@ -198,7 +198,6 @@ metadata:
 spec:
   sets:
     _base:
-      #rls: 'outbound|18081||rate-limit.istio-system.svc.cluster.local' # default
       descriptor:
       - action:
           fill_interval:
