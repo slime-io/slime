@@ -5,10 +5,9 @@ import (
 	"encoding/json"
 	ghYaml "github.com/ghodss/yaml"
 	"io/ioutil"
-	"os"
-
 	"k8s.io/client-go/dynamic"
 	"k8s.io/kube-openapi/pkg/common"
+	"os"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"k8s.io/client-go/kubernetes"
@@ -176,11 +175,22 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 	return c, rawJson, generalJson, nil
 }
 
+type ReadyManager interface {
+	AddReadyChecker(name string, checker func() error)
+}
+
+type ReadyManagerFunc func(name string, checker func() error)
+
+func (f ReadyManagerFunc) AddReadyChecker(name string, checker func() error) {
+	f(name, checker)
+}
+
 type Environment struct {
 	Config           *bootconfig.Config
 	K8SClient        *kubernetes.Clientset
 	DynamicClient    dynamic.Interface
 	HttpPathHandler  common.PathHandler
+	ReadyManager     ReadyManager
 	Stop             <-chan struct{}
 	ConfigController ConfigController
 }

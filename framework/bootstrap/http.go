@@ -99,9 +99,9 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
-func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[string]string) {
+func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[string]string, readyChecker func() error) {
 	// register
-	HealthCheckRegister(ph)
+	HealthCheckRegister(ph, readyChecker)
 	PprofRegister(ph)
 	LogLevelRegister(ph)
 
@@ -111,9 +111,9 @@ func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[st
 	}
 }
 
-func HealthCheckRegister(ph *PathHandler) {
+func HealthCheckRegister(ph *PathHandler, readyChecker func() error) {
 	ph.Handle("/modules/livez", livezHandler())
-	ph.Handle("/modules/readyz", readyzHandler())
+	ph.Handle("/modules/readyz", readyzHandler(readyChecker))
 }
 
 func HealthCheckPathRegister() {
@@ -128,11 +128,13 @@ func livezHandler() http.Handler {
 	})
 }
 
-func readyzHandler() http.Handler {
+func readyzHandler(checker func() error) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// TODO - Add proper readiness check logic
-		if _, err := w.Write([]byte("Healthy!")); err != nil {
-			log.Errorf("readyz probe error, %+v", err)
+		if checker != nil {
+			if err := checker(); err != nil {
+				log.Errorf("readyz probe error, %+v", err)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+			}
 		}
 	})
 }

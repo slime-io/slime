@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -15,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"strings"
+	"sync"
 
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -43,6 +45,52 @@ type Module interface {
 	InitScheme(scheme *runtime.Scheme) error
 	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs InitCallbacks) error
 	Clone() Module
+}
+
+type readyChecker struct {
+	name    string
+	checker func() error
+}
+
+type moduleReadyManager struct {
+	mut                 sync.RWMutex
+	moduleReadyCheckers map[string][]readyChecker
+}
+
+func (rm *moduleReadyManager) addReadyChecker(module, name string, checker func() error) {
+	rm.mut.Lock()
+	defer rm.mut.Unlock()
+
+	dup := make(map[string][]readyChecker, len(rm.moduleReadyCheckers))
+	for k, v := range rm.moduleReadyCheckers {
+		dup[k] = v
+	}
+
+	dup[module] = append(dup[module], readyChecker{name, checker})
+	rm.moduleReadyCheckers = dup
+}
+
+func (rm *moduleReadyManager) check() error {
+	rm.mut.RLock()
+	checkers := rm.moduleReadyCheckers
+	rm.mut.RUnlock()
+
+	var buf *bytes.Buffer
+	for m, mCheckers := range checkers {
+		for _, chk := range mCheckers {
+			if err := chk.checker(); err != nil {
+				if buf == nil {
+					buf = &bytes.Buffer{}
+					buf.WriteString(fmt.Sprintf("module %s checker %s not ready %v\n", m, chk.name, err))
+				}
+			}
+		}
+	}
+
+	if buf == nil {
+		return nil
+	}
+	return errors.New(buf.String())
 }
 
 func Main(bundle string, modules []Module) {
@@ -213,6 +261,8 @@ func Main(bundle string, modules []Module) {
 
 	ph := bootstrap.NewPathHandler(pathRedirects)
 
+	readyMgr := &moduleReadyManager{moduleReadyCheckers: map[string][]readyChecker{}}
+
 	// init configController if configSource field is used
 	stop := make(chan struct{})
 	cc, err := bootstrap.NewConfigController(config, mgr.GetConfig())
@@ -281,6 +331,11 @@ func Main(bundle string, modules []Module) {
 			ConfigController: cc,
 			K8SClient:        clientSet,
 			DynamicClient:    dynamicClient,
+			ReadyManager: bootstrap.ReadyManagerFunc(func(moduleName string) func(name string, checker func() error) {
+				return func(name string, checker func() error) {
+					readyMgr.addReadyChecker(moduleName, name, checker)
+				}
+			}(modCfg.Name)),
 			HttpPathHandler: bootstrap.PrefixPathHandlerManager{
 				Prefix:      modCfg.Name,
 				PathHandler: ph,
@@ -296,7 +351,7 @@ func Main(bundle string, modules []Module) {
 
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
-		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects)
+		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects, readyMgr.check)
 	}()
 
 	for _, startup := range startups {
