@@ -76,8 +76,7 @@ type SmartLimiterReconciler struct {
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters/status,verbs=get;update;patch
 
 func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
-	log.Debugf("begin reconcile, get smartlimiter %+v", req)
+	log.Infof("begin reconcile, get smartlimiter %+v", req)
 	instance := &microservicev1alpha2.SmartLimiter{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
@@ -95,9 +94,11 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.lastUpdatePolicy = microservicev1alpha2.SmartLimiterSpec{}
 		r.lastUpdatePolicyLock.Unlock()
 		r.RemoveInterested(req)
+		log.Infof("%v is deleted", req)
 		return reconcile.Result{}, nil
 	} else {
 		// add or update
+		log.Infof("%v is added or updated", req)
 		if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
 			log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
 				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
@@ -234,10 +235,12 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, error) {
 	var out bool
 	gw := instance.Spec.Gateway
+	var target *microservicev1alpha2.Target
+
 	for _, descriptors := range instance.Spec.Sets {
 		for _, descriptor := range descriptors.Descriptor_ {
 
-			if descriptor.Target == nil {
+			if descriptor.Target == nil && instance.Spec.Target == nil {
 				return out, fmt.Errorf("invalid target")
 			}
 			if descriptor.Action == nil {
@@ -246,29 +249,28 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 			if descriptor.Condition == "" {
 				return out, fmt.Errorf("invalid condition")
 			}
-			strategy := descriptor.Action.Strategy
-			condition := descriptor.Condition
-			direction := descriptor.Target.Direction
-			quota := descriptor.Action.Quota
 
+			condition := descriptor.Condition
+			direction := target.GetDirection()
+
+			quota := descriptor.Action.Quota
 			if gw || direction == model.Outbound {
 				out = true
 				if !r.cfg.GetDisableAdaptive() {
 					return out, fmt.Errorf("outbound/gw must disable adaptive limiter")
 				}
-				if strategy != model.SingleSmartLimiter {
-					return out, fmt.Errorf("strategy must single in outbound")
-				}
+
 				if condition != "true" {
 					return out, fmt.Errorf("condition must true in outbound")
 				}
 				if _, err := strconv.Atoi(quota); err != nil {
-					return out, fmt.Errorf("quota must number in outbound")
+					return out, fmt.Errorf("quota must be number in outbound")
 				}
 			}
 		}
 	}
 	return out, nil
+
 }
 
 func FQN(ns, name string) string {
