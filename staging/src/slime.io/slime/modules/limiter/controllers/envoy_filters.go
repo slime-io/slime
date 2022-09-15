@@ -26,7 +26,8 @@ type LimiterSpec struct {
 	disableInsertLocalRateLimit bool
 	context                     string
 	// svc hostname
-	host string
+	host   string
+	target *microservicev1alpha2.Target
 }
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
@@ -45,6 +46,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		disableGlobalRateLimit:      r.cfg.GetDisableGlobalRateLimit(),
 		disableInsertLocalRateLimit: r.cfg.GetDisableInsertLocalRateLimit(),
 		host:                        spec.Host,
+		target:                      spec.Target,
 	}
 
 	var sets []*networking.Subset

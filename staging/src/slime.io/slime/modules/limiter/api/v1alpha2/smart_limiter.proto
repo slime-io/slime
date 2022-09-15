@@ -84,6 +84,8 @@ message SmartLimiterSpec {
     bool gateway = 5;
     // hostname specify svc host
     string host = 6;
+    // rate limit target
+    Target target = 7;
 }
 
 message SmartLimiterStatus {
@@ -126,13 +128,6 @@ message SmartLimitDescriptor {
         string strategy= 3; // 策略
     }
 
-    message Target {
-        string direction = 1;  // 进出
-        int32 port = 2;
-        repeated string route = 3;
-        repeated string host = 4;
-    }
-
     string condition = 1;
 
     Action action = 2;
@@ -165,5 +160,12 @@ message Duration {
     // of the same sign as the `seconds` field. Must be from -999,999,999
     // to +999,999,999 inclusive.
     int32 nanos = 2;
+}
+
+message Target {
+    string direction = 1;  // 进出
+    int32 port = 2;
+    repeated string route = 3;
+    repeated string host = 4;
 }
 

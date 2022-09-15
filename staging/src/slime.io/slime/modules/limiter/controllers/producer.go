@@ -57,7 +57,7 @@ func (r *SmartLimiterReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 
 // handleTickerEvent is triggered by ticker
 func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) metric.QueryMap {
-	log.Infof("ticker trigger handleTickerEvent")
+	log.Debugf("ticker trigger handleTickerEvent")
 	queryMap := make(map[string][]metric.Handler, 0)
 	// traverse interest map, if gw, skip
 	for k := range r.interest.Items() {
