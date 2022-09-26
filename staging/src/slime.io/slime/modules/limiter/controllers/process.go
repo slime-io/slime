@@ -268,7 +268,6 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 				loc, slime_model.IstioRevFromLabel(found.Labels), istioRev)
 			return reconcile.Result{}, nil
 		}
-
 		foundSpec, err := json.Marshal(found.Spec)
 		if err != nil {
 			log.Errorf("marshal found.spec err: %+v", err)
