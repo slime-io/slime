@@ -125,6 +125,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	// route2RouteConfig store the vhostName/routeName => routeConfig
 	route2RouteConfig := make(map[string][]*routeConfig)
+	routeNameList := make([]string, 0)
 
 	for _, descriptor := range descriptors {
 		rcs := generateRouteConfigs(descriptor.Target, params.target, params.gw)
@@ -135,6 +136,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 		for _, rc := range rcs {
 			rc.action = action
 			vHostRouteName := genVhostRouteName(rc)
+			routeNameList = append(routeNameList, vHostRouteName)
 			if _, ok := route2RouteConfig[vHostRouteName]; !ok {
 				route2RouteConfig[vHostRouteName] = []*routeConfig{rc}
 			} else {
@@ -143,8 +145,11 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 		}
 	}
 	log.Debugf("get route2RouteConfig %v", route2RouteConfig)
-
-	for _, rcs := range route2RouteConfig {
+	for _, rn := range routeNameList {
+		rcs, ok := route2RouteConfig[rn]
+		if !ok {
+			continue
+		}
 		rateLimits := make([]*envoy_config_route_v3.RateLimit, 0)
 		for _, rc := range rcs {
 			rateLimits = append(rateLimits, &envoy_config_route_v3.RateLimit{Actions: rc.action})
@@ -242,11 +247,14 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
 	route2RouteConfig := make(map[string][]*routeConfig)
+	routeNameList := make([]string, 0)
 
 	for _, descriptor := range descriptors {
 		rcs := generateRouteConfigs(descriptor.Target, params.target, params.gw)
 		for _, rc := range rcs {
 			vHostRouteName := genVhostRouteName(rc)
+			routeNameList = append(routeNameList, vHostRouteName)
+
 			if _, ok := route2Descriptors[vHostRouteName]; !ok {
 				route2Descriptors[vHostRouteName] = []*microservicev1alpha2.SmartLimitDescriptor{descriptor}
 			} else {
@@ -261,8 +269,11 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		}
 	}
 
-	for vr, desc := range route2Descriptors {
-
+	for _, vr := range routeNameList {
+		desc, ok:= route2Descriptors[vr]
+		if !ok {
+			continue
+		}
 		rcs, ok := route2RouteConfig[vr]
 		if !ok {
 			continue
