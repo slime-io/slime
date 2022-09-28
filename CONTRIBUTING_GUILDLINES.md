@@ -2,7 +2,7 @@
 
 Thank you for your interest in the slime program. Please take some time to learn about participation and communication in the slime program.
 
-First, please review the [Code of Conduct](. /CODE_OF_CONDUCT.md) file, and we will adhere to the principles therein.
+First, please review the [Code of Conduct](./CODE_OF_CONDUCT.md) file, and we will adhere to the principles therein.
 
 
 
@@ -14,7 +14,7 @@ In general, we encourage you to make communication as simple and easy as possibl
 
 
 
-For more formal and definite communication content, such as bug reports, feature suggestions, etc., we recommend using [issue](https://github.com/slime-io/slime/issues/new/choose). For others, such as usage issues, feature questions, etc., a more flexible communication method is recommended, see [Community](. /README.md#Community).
+For more formal and definite communication content, such as bug reports, feature suggestions, etc., we recommend using [issue](https://github.com/slime-io/slime/issues/new/choose). For others, such as usage issues, feature questions, etc., a more flexible communication method is recommended, see [Community](./README.md#Community).
 
 
 
@@ -28,7 +28,7 @@ For the issue method, we have preset several types and created different content
 
 If you are interested in participating in the slime project, you can find appropriate content in [issues](https://github.com/slime-io/slime/issues), and participation in the issue discussion is also a good form.
 
-If you wish to participate in the development, you can look for a feature with [feature](https://github.com/slime-io/slime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature) or [bug](https://github. com/slime-io/slime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature+label%3Abug) label and judge whether it is suitable for you according to the description therein. If you decide to take over, you can reply below the issue, and our maintainers will determine it as soon as possible to avoid duplication of work.
+If you wish to participate in the development, you can look for a feature with [feature](https://github.com/slime-io/slime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature) or [bug](https://github.com/slime-io/slime/issues?q=is%3Aopen+is%3Aissue+label%3Afeature+label%3Abug) label and judge whether it is suitable for you according to the description therein. If you decide to take over, you can reply below the issue, and our maintainers will determine it as soon as possible to avoid duplication of work.
 
 Of course, if there is already clear content, you can directly follow the process below to submit a PR.
 
