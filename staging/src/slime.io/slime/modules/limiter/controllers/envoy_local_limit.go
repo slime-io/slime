@@ -136,9 +136,10 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 		for _, rc := range rcs {
 			rc.action = action
 			vHostRouteName := genVhostRouteName(rc)
-			routeNameList = append(routeNameList, vHostRouteName)
+
 			if _, ok := route2RouteConfig[vHostRouteName]; !ok {
 				route2RouteConfig[vHostRouteName] = []*routeConfig{rc}
+				routeNameList = append(routeNameList, vHostRouteName)
 			} else {
 				route2RouteConfig[vHostRouteName] = append(route2RouteConfig[vHostRouteName], rc)
 			}
@@ -253,10 +254,10 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		rcs := generateRouteConfigs(descriptor.Target, params.target, params.gw)
 		for _, rc := range rcs {
 			vHostRouteName := genVhostRouteName(rc)
-			routeNameList = append(routeNameList, vHostRouteName)
 
 			if _, ok := route2Descriptors[vHostRouteName]; !ok {
 				route2Descriptors[vHostRouteName] = []*microservicev1alpha2.SmartLimitDescriptor{descriptor}
+				routeNameList = append(routeNameList, vHostRouteName)
 			} else {
 				route2Descriptors[vHostRouteName] = append(route2Descriptors[vHostRouteName], descriptor)
 			}
