@@ -281,147 +281,156 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 	}
 
 	var err error
-	if in.PluginSettings != nil {
-		switch m := in.PluginSettings.(type) {
-		case *v1alpha1.Plugin_Wasm:
-			out.Patch.Value.Fields[util.Struct_Wasm_Name] = &types.Value{
-				Kind: &types.Value_StringValue{
-					StringValue: util.Envoy_FilterHttpWasm,
-				},
-			}
+	if in.PluginSettings == nil {
+		if err = r.applyInlinePlugin(in, nil, out.Patch.Value); err != nil {
+			return nil, err
+		}
+		return out, nil
+	}
 
-			if m.Wasm.RootID == "" {
-				err = fmt.Errorf("plugin:%s, wasm插件rootID丢失", in.Name)
-			} else if m.Wasm.FileName == "" {
-				err = fmt.Errorf("plugin: %s, wasm 文件缺失", in.Name)
-			} else {
-				if err == nil {
-					filepath := r.wasm.Get(m.Wasm.FileName)
-					pluginConfig := &envoy_extensions_wasm_v3.PluginConfig{
-						Name:   in.Name,
-						RootId: m.Wasm.RootID,
-						Vm: &envoy_extensions_wasm_v3.PluginConfig_VmConfig{
-							VmConfig: &envoy_extensions_wasm_v3.VmConfig{
-								VmId:    in.Name,
-								Runtime: util.Envoy_WasmV8,
-								Code: &envoy_config_core_v3.AsyncDataSource{
-									Specifier: &envoy_config_core_v3.AsyncDataSource_Local{
-										Local: &envoy_config_core_v3.DataSource{
-											Specifier: &envoy_config_core_v3.DataSource_Filename{
-												Filename: filepath,
-											},
-										},
-									},
-								},
-							},
+	switch m := in.PluginSettings.(type) {
+	case *v1alpha1.Plugin_Wasm:
+		if err = r.applyWasmPlugin(in, m, out.Patch.Value); err != nil {
+			return nil, err
+		}
+	case *v1alpha1.Plugin_Inline:
+		if err = r.applyInlinePlugin(in, m, out.Patch.Value); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func (r *PluginManagerReconciler) applyInlinePlugin(in *v1alpha1.Plugin, settings *v1alpha1.Plugin_Inline, out *types.Struct) error {
+	out.Fields[util.Struct_HttpFilter_Name] = &types.Value{
+		Kind: &types.Value_StringValue{
+			StringValue: in.Name,
+		},
+	}
+
+	if settings != nil {
+		out.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+			Kind: &types.Value_StructValue{
+				StructValue: &types.Struct{
+					Fields: map[string]*types.Value{
+						util.Struct_Any_TypedUrl: {
+							Kind: &types.Value_StringValue{StringValue: in.TypeUrl},
 						},
-					}
-					settings, err := util.MessageToStruct(pluginConfig)
-					if m.Wasm.Settings != nil {
-						isStringSettings := false
+						util.Struct_Any_AtType: {
+							Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+						},
+						util.Struct_Any_Value: {
+							Kind: &types.Value_StructValue{StructValue: settings.Inline.Settings},
+						},
+					},
+				},
+			},
+		}
+	}
 
-						// string类型的配置解析为 google.protobuf.StringValue
-						if len(m.Wasm.Settings.Fields) == 1 && m.Wasm.Settings.Fields["_string"] != nil {
-							parseTostring := m.Wasm.Settings.Fields["_string"]
-							if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
-								isStringSettings = true
-								settings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
-									Kind: &types.Value_StructValue{
-										StructValue: &types.Struct{
-											Fields: map[string]*types.Value{
-												util.Struct_Any_AtType: {
-													Kind: &types.Value_StringValue{StringValue: util.TypeUrl_StringValue},
-												},
-												util.Struct_Any_Value: {
-													Kind: s,
-												},
-											},
-										},
-									},
-								}
-							}
-						}
+	return nil
+}
 
-						// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
-						if !isStringSettings {
-							settings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
-								Kind: &types.Value_StructValue{
-									StructValue: &types.Struct{
-										Fields: map[string]*types.Value{
-											util.Struct_Any_AtType: {
-												Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
-											},
-											util.Struct_Any_Value: {
-												Kind: &types.Value_StructValue{StructValue: m.Wasm.Settings},
-											},
-										},
-									},
-								},
-							}
-						}
-					}
-					if err == nil {
-						out.Patch.Value.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
-							Kind: &types.Value_StructValue{
-								StructValue: &types.Struct{
-									Fields: map[string]*types.Value{
-										util.Struct_Any_TypedUrl: {
-											Kind: &types.Value_StringValue{StringValue: util.TypeUrl_EnvoyFilterHttpWasm},
-										},
-										util.Struct_Any_AtType: {
-											Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
-										},
-										util.Struct_Any_Value: {
-											Kind: &types.Value_StructValue{StructValue: &types.Struct{
-												Fields: map[string]*types.Value{
-													util.Struct_Wasm_Config: {
-														Kind: &types.Value_StructValue{
-															StructValue: settings,
-														},
-													},
-												},
-											}},
-										},
-									},
-								},
-							},
-						}
-					}
-				}
-			}
-		case *v1alpha1.Plugin_Inline:
-			out.Patch.Value.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
-				Kind: &types.Value_StructValue{
-					StructValue: &types.Struct{
-						Fields: map[string]*types.Value{
-							util.Struct_Any_TypedUrl: {
-								Kind: &types.Value_StringValue{StringValue: in.TypeUrl},
-							},
-							util.Struct_Any_AtType: {
-								Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
-							},
-							util.Struct_Any_Value: {
-								Kind: &types.Value_StructValue{StructValue: m.Inline.Settings},
+func (r *PluginManagerReconciler) applyWasmPlugin(in *v1alpha1.Plugin, settings *v1alpha1.Plugin_Wasm, out *types.Struct) error {
+	out.Fields[util.Struct_Wasm_Name] = &types.Value{
+		Kind: &types.Value_StringValue{
+			StringValue: util.Envoy_FilterHttpWasm,
+		},
+	}
+
+	if settings.Wasm.RootID == "" {
+		return fmt.Errorf("plugin:%s, wasm插件rootID丢失", in.Name)
+	} else if settings.Wasm.FileName == "" {
+		return fmt.Errorf("plugin: %s, wasm 文件缺失", in.Name)
+	}
+
+	filepath := r.wasm.Get(settings.Wasm.FileName)
+	pluginConfig := &envoy_extensions_wasm_v3.PluginConfig{
+		Name:   in.Name,
+		RootId: settings.Wasm.RootID,
+		Vm: &envoy_extensions_wasm_v3.PluginConfig_VmConfig{
+			VmConfig: &envoy_extensions_wasm_v3.VmConfig{
+				VmId:    in.Name,
+				Runtime: util.Envoy_WasmV8,
+				Code: &envoy_config_core_v3.AsyncDataSource{
+					Specifier: &envoy_config_core_v3.AsyncDataSource_Local{
+						Local: &envoy_config_core_v3.DataSource{
+							Specifier: &envoy_config_core_v3.DataSource_Filename{
+								Filename: filepath,
 							},
 						},
 					},
 				},
-			}
-			out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
-				Kind: &types.Value_StringValue{
-					StringValue: in.Name,
-				},
+			},
+		},
+	}
+
+	wasmSettings, err := util.MessageToStruct(pluginConfig)
+	if err != nil {
+		return err
+	}
+
+	if settings.Wasm.Settings != nil {
+		var (
+			anyType  string
+			anyValue *types.Value
+		)
+
+		// string类型的配置解析为 google.protobuf.StringValue
+		if len(settings.Wasm.Settings.Fields) == 1 && settings.Wasm.Settings.Fields["_string"] != nil {
+			parseTostring := settings.Wasm.Settings.Fields["_string"]
+			if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
+				anyType = util.TypeUrl_StringValue
+				anyValue = &types.Value{Kind: s}
 			}
 		}
-	} else {
-		out.Patch.Value.Fields[util.Struct_HttpFilter_Name] = &types.Value{
-			Kind: &types.Value_StringValue{
-				StringValue: in.Name,
+
+		// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
+		if anyValue == nil {
+			anyType = util.TypeUrl_UdpaTypedStruct
+			anyValue = &types.Value{Kind: &types.Value_StructValue{StructValue: settings.Wasm.Settings}}
+		}
+
+		wasmSettings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
+			Kind: &types.Value_StructValue{
+				StructValue: &types.Struct{
+					Fields: map[string]*types.Value{
+						util.Struct_Any_AtType: {
+							Kind: &types.Value_StringValue{StringValue: anyType},
+						},
+						util.Struct_Any_Value: anyValue,
+					},
+				},
 			},
 		}
 	}
-	if err != nil {
-		return nil, err
+
+	out.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+		Kind: &types.Value_StructValue{
+			StructValue: &types.Struct{
+				Fields: map[string]*types.Value{
+					util.Struct_Any_TypedUrl: {
+						Kind: &types.Value_StringValue{StringValue: util.TypeUrl_EnvoyFilterHttpWasm},
+					},
+					util.Struct_Any_AtType: {
+						Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+					},
+					util.Struct_Any_Value: {
+						Kind: &types.Value_StructValue{StructValue: &types.Struct{
+							Fields: map[string]*types.Value{
+								util.Struct_Wasm_Config: {
+									Kind: &types.Value_StructValue{
+										StructValue: wasmSettings,
+									},
+								},
+							},
+						}},
+					},
+				},
+			},
+		},
 	}
-	return out, nil
+
+	return nil
 }
