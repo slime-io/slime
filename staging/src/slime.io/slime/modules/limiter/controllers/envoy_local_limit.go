@@ -227,7 +227,7 @@ func generateHttpFilterLocalRateLimitPatch(context string) *networking.EnvoyFilt
 									util.StructAnyAtType: {
 										Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 									},
-									util.StructAnyTypedURL: {
+									util.StructAnyTypeURL: {
 										Kind: &structpb.Value_StringValue{StringValue: util.TypeURLEnvoyLocalRateLimit},
 									},
 									util.StructAnyValue: {
@@ -538,7 +538,7 @@ func generatePerFilterPatch(local *structpb.Struct) *networking.EnvoyFilter_Patc
 												util.StructAnyAtType: {
 													Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 												},
-												util.StructAnyTypedURL: {
+												util.StructAnyTypeURL: {
 													Kind: &structpb.Value_StringValue{StringValue: util.TypeURLEnvoyLocalRateLimit},
 												},
 												util.StructAnyValue: {

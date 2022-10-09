@@ -51,22 +51,27 @@ const (
 	StructWasmName          = "name"
 	StructWasmConfiguration = "configuration"
 
-	StructAnyTypedURL = "type_url"
-	StructAnyAtType   = "@type"
-	StructAnyValue    = "value"
+	StructAnyTypeURL = "type_url"
+	StructAnyAtType  = "@type"
+	StructAnyValue   = "value"
 
 	StructHttpFilterTypedConfig          = "typed_config"
 	StructHttpFilterName                 = "name"
+	StructHttpFilterConfigDiscovery      = "config_discovery"
+	StructHttpFilterConfigSource         = "config_source"
+	StructHttpFilterAds                  = "ads"
+	StructHttpFilterTypeURLs             = "type_urls"
 	StructHttpFilterTypedPerFilterConfig = "typedPerFilterConfig"
 
 	StructEnvoyLocalRateLimitLimiter  = "http_local_rate_limiter"
 	StructEnvoyLocalRateLimitEnabled  = "local_rate_limit_enabled"
 	StructEnvoyLocalRateLimitEnforced = "local_rate_limit_enforced"
 
-	TypeURLEnvoyFilterHTTPWasm = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
-	TypeURLStringValue         = "type.googleapis.com/google.protobuf.StringValue"
-	TypeURLUDPATypedStruct     = "type.googleapis.com/udpa.type.v1.TypedStruct"
-	TypeURLEnvoyLocalRateLimit = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
+	TypeURLEnvoyFilterHTTPWasm  = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+	TypeURLEnvoyFilterHTTPRider = "type.googleapis.com/proxy.filters.http.rider.v3alpha1.FilterConfig"
+	TypeURLStringValue          = "type.googleapis.com/google.protobuf.StringValue"
+	TypeURLUDPATypedStruct      = "type.googleapis.com/udpa.type.v1.TypedStruct"
+	TypeURLEnvoyLocalRateLimit  = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
 
 	EnvoyFilterGlobalSidecar = "to_global_sidecar"
 

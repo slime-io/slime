@@ -1,7 +1,8 @@
 
 # usage: sh <path_of_this_scipt> <path_of_proto_files>
 # like:
-#   cd to slime dir, exec: sh bin/gen_proto.sh api/v1alpha1/*.proto
+#   cd to slime module dir, exec: sh bin/gen_proto.sh api/v1alpha1/*.proto
+# if in staging dir layout, exec: sh <slime_dir>/bin/gen_proto.sh api/v1alpha1/*.proto
 
 # sudo apt install protobuf-compiler
 # GO111MODULE=off go get github.com/gogo/protobuf/proto
@@ -14,5 +15,6 @@ for f in "$@"; do
     --gogo_opt=paths=source_relative \
     --gogo_opt=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types \
     --gogo_opt=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types \
+    --gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
     --gogo_out="$d" "$f"
 done
