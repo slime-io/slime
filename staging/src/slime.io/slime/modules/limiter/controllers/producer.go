@@ -102,7 +102,7 @@ func (r *SmartLimiterReconciler) handleLocalEvent(host string, loc types.Namespa
 	queryMap := make(map[string][]metric.Handler, 0)
 
 	// if it does not end with .svc.cluster.local, it means that se host is specified
-	if !strings.HasSuffix(host, util.Wellkonw_K8sSuffix) {
+	if !strings.HasSuffix(host, util.WellknownK8sSuffix) {
 		svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
 		if err != nil {
 			log.Errorf("get empty istio service base on %s/%s, %s", loc.Namespace, host, err)
@@ -111,7 +111,7 @@ func (r *SmartLimiterReconciler) handleLocalEvent(host string, loc types.Namespa
 		serviceLabels := formatLabels(getIstioServiceLabels(svc))
 		subsetInfo := make(map[string]int)
 		// if subset is existed, assign pods to subset
-		subsetInfo[util.Wellkonw_BaseSet] = len(svc.Endpoints)
+		subsetInfo[util.WellknownBaseSet] = len(svc.Endpoints)
 
 		if controllers.HostSubsetMapping.Get(host) != nil {
 			if subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
@@ -168,7 +168,7 @@ func (r *SmartLimiterReconciler) handlePrometheusEvent(host string, loc types.Na
 	}
 	handlers := r.env.Config.Metric.Prometheus.Handlers
 
-	if !strings.HasSuffix(host, util.Wellkonw_K8sSuffix) {
+	if !strings.HasSuffix(host, util.WellknownK8sSuffix) {
 		log.Errorf("promql is closed when se host is specified")
 		return nil
 	}
@@ -252,10 +252,10 @@ func append2Subsets(subsetName string, subsetsPods map[string][]string, pod v1.P
 }
 
 func append2Base(subsetsPods map[string][]string, pod v1.Pod) {
-	if subsetsPods[util.Wellkonw_BaseSet] != nil {
-		subsetsPods[util.Wellkonw_BaseSet] = append(subsetsPods[util.Wellkonw_BaseSet], pod.Name)
+	if subsetsPods[util.WellknownBaseSet] != nil {
+		subsetsPods[util.WellknownBaseSet] = append(subsetsPods[util.WellknownBaseSet], pod.Name)
 	} else {
-		subsetsPods[util.Wellkonw_BaseSet] = []string{pod.Name}
+		subsetsPods[util.WellknownBaseSet] = []string{pod.Name}
 	}
 }
 

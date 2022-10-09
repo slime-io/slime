@@ -202,7 +202,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 // only enable local rate limit
 func generateHttpFilterLocalRateLimitPatch(context string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
 	localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
-		StatPrefix: util.Struct_EnvoyLocalRateLimit_Limiter,
+		StatPrefix: util.StructEnvoyLocalRateLimitLimiter,
 	}
 	local, err := util.MessageToStruct(localRateLimit)
 	if err != nil {
@@ -217,20 +217,20 @@ func generateHttpFilterLocalRateLimitPatch(context string) *networking.EnvoyFilt
 			Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
 			Value: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
-					util.Struct_HttpFilter_Name: {
-						Kind: &structpb.Value_StringValue{StringValue: util.Envoy_LocalRateLimit},
+					util.StructHttpFilterName: {
+						Kind: &structpb.Value_StringValue{StringValue: util.EnvoyLocalRateLimit},
 					},
-					util.Struct_HttpFilter_TypedConfig: {
+					util.StructHttpFilterTypedConfig: {
 						Kind: &structpb.Value_StructValue{
 							StructValue: &structpb.Struct{
 								Fields: map[string]*structpb.Value{
-									util.Struct_Any_AtType: {
-										Kind: &structpb.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+									util.StructAnyAtType: {
+										Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 									},
-									util.Struct_Any_TypedUrl: {
-										Kind: &structpb.Value_StringValue{StringValue: util.TypeUrl_EnvoyLocalRatelimit},
+									util.StructAnyTypedURL: {
+										Kind: &structpb.Value_StringValue{StringValue: util.TypeURLEnvoyLocalRateLimit},
 									},
-									util.Struct_Any_Value: {
+									util.StructAnyValue: {
 										Kind: &structpb.Value_StructValue{StructValue: local},
 									},
 								},
@@ -271,7 +271,7 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 	}
 
 	for _, vr := range routeNameList {
-		desc, ok:= route2Descriptors[vr]
+		desc, ok := route2Descriptors[vr]
 		if !ok {
 			continue
 		}
@@ -285,7 +285,7 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
 			TokenBucket:    generateCustomTokenBucket(100000, 100000, 1),
 			Descriptors:    localRateLimitDescriptors,
-			StatPrefix:     util.Struct_EnvoyLocalRateLimit_Limiter,
+			StatPrefix:     util.StructEnvoyLocalRateLimitLimiter,
 			FilterEnabled:  generateEnvoyLocalRateLimitEnabled(),
 			FilterEnforced: generateEnvoyLocalRateLimitEnforced(),
 		}
@@ -465,7 +465,7 @@ func generateCustomTokenBucket(maxTokens, tokensPerFill, second int) *envoy_type
 // for a given route_key specified in the local rate limit configuration. Defaults to 0.
 func generateEnvoyLocalRateLimitEnabled() *envoy_core_v3.RuntimeFractionalPercent {
 	return &envoy_core_v3.RuntimeFractionalPercent{
-		RuntimeKey: util.Struct_EnvoyLocalRateLimit_Enabled,
+		RuntimeKey: util.StructEnvoyLocalRateLimitEnabled,
 		DefaultValue: &envoy_type_v3.FractionalPercent{
 			Numerator:   100,
 			Denominator: envoy_type_v3.FractionalPercent_HUNDRED,
@@ -477,7 +477,7 @@ func generateEnvoyLocalRateLimitEnabled() *envoy_core_v3.RuntimeFractionalPercen
 // Defaults to 0. This can be used to test what would happen before fully enforcing the outcome.
 func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPercent {
 	return &envoy_core_v3.RuntimeFractionalPercent{
-		RuntimeKey: util.Struct_EnvoyLocalRateLimit_Enforced,
+		RuntimeKey: util.StructEnvoyLocalRateLimitEnforced,
 		DefaultValue: &envoy_type_v3.FractionalPercent{
 			Numerator:   100,
 			Denominator: envoy_type_v3.FractionalPercent_HUNDRED,
@@ -531,17 +531,17 @@ func generatePerFilterPatch(local *structpb.Struct) *networking.EnvoyFilter_Patc
 					Kind: &structpb.Value_StructValue{
 						StructValue: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								util.Envoy_LocalRateLimit: {
+								util.EnvoyLocalRateLimit: {
 									Kind: &structpb.Value_StructValue{
 										StructValue: &structpb.Struct{
 											Fields: map[string]*structpb.Value{
-												util.Struct_Any_AtType: {
-													Kind: &structpb.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+												util.StructAnyAtType: {
+													Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 												},
-												util.Struct_Any_TypedUrl: {
-													Kind: &structpb.Value_StringValue{StringValue: util.TypeUrl_EnvoyLocalRatelimit},
+												util.StructAnyTypedURL: {
+													Kind: &structpb.Value_StringValue{StringValue: util.TypeURLEnvoyLocalRateLimit},
 												},
-												util.Struct_Any_Value: {
+												util.StructAnyValue: {
 													Kind: &structpb.Value_StructValue{StructValue: local},
 												},
 											},

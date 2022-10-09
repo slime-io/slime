@@ -58,9 +58,9 @@ func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyC
 			Listener: &networking.EnvoyFilter_ListenerMatch{
 				FilterChain: &networking.EnvoyFilter_ListenerMatch_FilterChainMatch{
 					Filter: &networking.EnvoyFilter_ListenerMatch_FilterMatch{
-						Name: util.Envoy_HttpConnectionManager,
+						Name: util.EnvoyHTTPConnectionManager,
 						SubFilter: &networking.EnvoyFilter_ListenerMatch_SubFilterMatch{
-							Name: util.Envoy_Route,
+							Name: util.EnvoyRoute,
 						},
 					},
 				},
@@ -80,20 +80,20 @@ func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain st
 		Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
 		Value: &structpb.Struct{
 			Fields: map[string]*structpb.Value{
-				util.Struct_HttpFilter_Name: {
+				util.StructHttpFilterName: {
 					Kind: &structpb.Value_StringValue{StringValue: model.EnvoyFiltersHttpRateLimit},
 				},
-				util.Struct_HttpFilter_TypedConfig: {
+				util.StructHttpFilterTypedConfig: {
 					Kind: &structpb.Value_StructValue{
 						StructValue: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								util.Struct_Any_AtType: {
-									Kind: &structpb.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+								util.StructAnyAtType: {
+									Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 								},
-								util.Struct_Any_TypedUrl: {
+								util.StructAnyTypedURL: {
 									Kind: &structpb.Value_StringValue{StringValue: model.TypeUrlEnvoyRateLimit},
 								},
-								util.Struct_Any_Value: {
+								util.StructAnyValue: {
 									Kind: &structpb.Value_StructValue{
 										StructValue: &structpb.Struct{
 											Fields: map[string]*structpb.Value{
@@ -206,11 +206,10 @@ func getConfigMapNamespaceName(cm *microservicev1alpha2.RlsConfigMap) (types.Nam
 		Name:      cm.Name,
 	}
 	if loc.Namespace == "" || loc.Name == "" {
-		return 	loc, fmt.Errorf("rlsConfigMap is invalid")
+		return loc, fmt.Errorf("rlsConfigMap is invalid")
 	}
 	return loc, nil
 }
-
 
 // if configmap rate-limit-config not exist, return
 func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, serviceLoc types.NamespacedName) {

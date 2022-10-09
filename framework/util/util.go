@@ -24,12 +24,12 @@ func IsK8SService(host string) (string, string, bool) {
 
 func UnityHost(host string, namespace string) string {
 	if len(strings.Split(host, ".")) == 1 {
-		return host + "." + namespace + Wellkonw_K8sSuffix
+		return host + "." + namespace + WellknownK8sSuffix
 	}
 	if svc, ns, ok := IsK8SService(host); !ok {
 		return host
 	} else {
-		return svc + "." + ns + Wellkonw_K8sSuffix
+		return svc + "." + ns + WellknownK8sSuffix
 	}
 }
 
