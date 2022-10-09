@@ -102,10 +102,10 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 						}
 					}
 				}
-				if subsetsPods[util.Wellkonw_BaseSet] != nil {
-					subsetsPods[util.Wellkonw_BaseSet] = append(subsetsPods[util.Wellkonw_BaseSet], pod.Name)
+				if subsetsPods[util.WellknownBaseSet] != nil {
+					subsetsPods[util.WellknownBaseSet] = append(subsetsPods[util.WellknownBaseSet], pod.Name)
 				} else {
-					subsetsPods[util.Wellkonw_BaseSet] = []string{pod.Name}
+					subsetsPods[util.WellknownBaseSet] = []string{pod.Name}
 				}
 			}
 		}

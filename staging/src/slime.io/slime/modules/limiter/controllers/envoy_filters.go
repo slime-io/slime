@@ -30,8 +30,8 @@ type LimiterSpec struct {
 	host   string
 	target *microservicev1alpha2.Target
 
-	domain string
-	rlsConfigmap               *microservicev1alpha2.RlsConfigMap
+	domain       string
+	rlsConfigmap *microservicev1alpha2.RlsConfigMap
 }
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
@@ -69,7 +69,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		}
 	}
 
-	sets = append(sets, &networking.Subset{Name: util.Wellkonw_BaseSet})
+	sets = append(sets, &networking.Subset{Name: util.WellknownBaseSet})
 	svcSelector := generateServiceSelector(r, params)
 	if len(svcSelector) == 0 {
 		log.Info("get empty svc selector base on %v", params)

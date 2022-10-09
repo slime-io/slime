@@ -161,7 +161,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 	}
 	for k, ef := range efs {
 		var efcr *v1alpha3.EnvoyFilter
-		if k == util.Wellkonw_BaseSet {
+		if k == util.WellknownBaseSet {
 			efcr = &v1alpha3.EnvoyFilter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),

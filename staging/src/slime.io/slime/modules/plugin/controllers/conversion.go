@@ -32,9 +32,9 @@ type target struct {
 
 var (
 	directPatchingPlugins = []string{
-		util.Envoy_HttpRatelimit,
-		util.Envoy_Cors,
-		util.Envoy_Ratelimit_v1, // keep backward compatibility
+		util.EnvoyHTTPRateLimit,
+		util.EnvoyCors,
+		util.EnvoyRatelimitV1, // keep backward compatibility
 	}
 )
 
@@ -52,21 +52,21 @@ func translatePluginToPatch(name, typeurl string, setting *types.Struct) *istio.
 	patch := &istio.EnvoyFilter_Patch{}
 	patch.Value = &types.Struct{
 		Fields: map[string]*types.Value{
-			util.Struct_HttpFilter_TypedPerFilterConfig: {
+			util.StructHttpFilterTypedPerFilterConfig: {
 				Kind: &types.Value_StructValue{
 					StructValue: &types.Struct{
 						Fields: map[string]*types.Value{
 							name: {
 								Kind: &types.Value_StructValue{StructValue: &types.Struct{
 									Fields: map[string]*types.Value{
-										util.Struct_Any_Value: {
+										util.StructAnyValue: {
 											Kind: &types.Value_StructValue{StructValue: setting},
 										},
-										util.Struct_Any_TypedUrl: {
+										util.StructAnyTypedURL: {
 											Kind: &types.Value_StringValue{StringValue: typeurl},
 										},
-										util.Struct_Any_AtType: {
-											Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+										util.StructAnyAtType: {
+											Kind: &types.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 										},
 									},
 								}},
@@ -231,22 +231,23 @@ func (r *PluginManagerReconciler) translatePluginManager(in *v1alpha1.PluginMana
 		if !p.Enable {
 			continue
 		}
-		patch, err := r.convertPluginToPatch(p)
+		patches, err := r.convertPluginToPatch(p)
 		if err != nil {
 			log.Errorf("cause error happened, skip plugin build, plugin: %s, %+v", p.Name, err)
 			continue
 		}
-		out.ConfigPatches = append(out.ConfigPatches, patch)
+
+		out.ConfigPatches = append(out.ConfigPatches, patches...)
 	}
 }
 
-func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*istio.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) ([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, error) {
 	listener := &istio.EnvoyFilter_ListenerMatch{
 		FilterChain: &istio.EnvoyFilter_ListenerMatch_FilterChainMatch{
 			Filter: &istio.EnvoyFilter_ListenerMatch_FilterMatch{
-				Name: util.Envoy_HttpConnectionManager,
+				Name: util.EnvoyHTTPConnectionManager,
 				SubFilter: &istio.EnvoyFilter_ListenerMatch_SubFilterMatch{
-					Name: util.Envoy_Route,
+					Name: util.EnvoyRoute,
 				},
 			},
 		},
@@ -271,6 +272,8 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 		},
 	}
 
+	ret := []*istio.EnvoyFilter_EnvoyConfigObjectPatch{out}
+
 	switch in.ListenerType {
 	case v1alpha1.Plugin_Outbound:
 		out.Match.Context = istio.EnvoyFilter_SIDECAR_OUTBOUND
@@ -280,47 +283,47 @@ func (r *PluginManagerReconciler) convertPluginToPatch(in *v1alpha1.Plugin) (*is
 		out.Match.Context = istio.EnvoyFilter_GATEWAY
 	}
 
-	var err error
 	if in.PluginSettings == nil {
-		if err = r.applyInlinePlugin(in, nil, out.Patch.Value); err != nil {
+		if err := r.applyInlinePlugin(in, nil, out.Patch.Value); err != nil {
 			return nil, err
 		}
-		return out, nil
+		return ret, nil
 	}
 
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		if err = r.applyWasmPlugin(in, m, out.Patch.Value); err != nil {
+		if err := r.applyWasmPlugin(in, m, out.Patch.Value); err != nil {
 			return nil, err
 		}
+		// TODO add extension patch
 	case *v1alpha1.Plugin_Inline:
-		if err = r.applyInlinePlugin(in, m, out.Patch.Value); err != nil {
+		if err := r.applyInlinePlugin(in, m, out.Patch.Value); err != nil {
 			return nil, err
 		}
 	}
 
-	return out, nil
+	return ret, nil
 }
 
 func (r *PluginManagerReconciler) applyInlinePlugin(in *v1alpha1.Plugin, settings *v1alpha1.Plugin_Inline, out *types.Struct) error {
-	out.Fields[util.Struct_HttpFilter_Name] = &types.Value{
+	out.Fields[util.StructHttpFilterName] = &types.Value{
 		Kind: &types.Value_StringValue{
 			StringValue: in.Name,
 		},
 	}
 
 	if settings != nil {
-		out.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+		out.Fields[util.StructHttpFilterTypedConfig] = &types.Value{
 			Kind: &types.Value_StructValue{
 				StructValue: &types.Struct{
 					Fields: map[string]*types.Value{
-						util.Struct_Any_TypedUrl: {
+						util.StructAnyTypedURL: {
 							Kind: &types.Value_StringValue{StringValue: in.TypeUrl},
 						},
-						util.Struct_Any_AtType: {
-							Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+						util.StructAnyAtType: {
+							Kind: &types.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 						},
-						util.Struct_Any_Value: {
+						util.StructAnyValue: {
 							Kind: &types.Value_StructValue{StructValue: settings.Inline.Settings},
 						},
 					},
@@ -333,9 +336,9 @@ func (r *PluginManagerReconciler) applyInlinePlugin(in *v1alpha1.Plugin, setting
 }
 
 func (r *PluginManagerReconciler) applyWasmPlugin(in *v1alpha1.Plugin, settings *v1alpha1.Plugin_Wasm, out *types.Struct) error {
-	out.Fields[util.Struct_Wasm_Name] = &types.Value{
+	out.Fields[util.StructWasmName] = &types.Value{
 		Kind: &types.Value_StringValue{
-			StringValue: util.Envoy_FilterHttpWasm,
+			StringValue: util.EnvoyFilterHTTPWasm,
 		},
 	}
 
@@ -352,7 +355,7 @@ func (r *PluginManagerReconciler) applyWasmPlugin(in *v1alpha1.Plugin, settings 
 		Vm: &envoy_extensions_wasm_v3.PluginConfig_VmConfig{
 			VmConfig: &envoy_extensions_wasm_v3.VmConfig{
 				VmId:    in.Name,
-				Runtime: util.Envoy_WasmV8,
+				Runtime: util.EnvoyWasmV8,
 				Code: &envoy_config_core_v3.AsyncDataSource{
 					Specifier: &envoy_config_core_v3.AsyncDataSource_Local{
 						Local: &envoy_config_core_v3.DataSource{
@@ -381,45 +384,45 @@ func (r *PluginManagerReconciler) applyWasmPlugin(in *v1alpha1.Plugin, settings 
 		if len(settings.Wasm.Settings.Fields) == 1 && settings.Wasm.Settings.Fields["_string"] != nil {
 			parseTostring := settings.Wasm.Settings.Fields["_string"]
 			if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
-				anyType = util.TypeUrl_StringValue
+				anyType = util.TypeURLStringValue
 				anyValue = &types.Value{Kind: s}
 			}
 		}
 
 		// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
 		if anyValue == nil {
-			anyType = util.TypeUrl_UdpaTypedStruct
+			anyType = util.TypeURLUDPATypedStruct
 			anyValue = &types.Value{Kind: &types.Value_StructValue{StructValue: settings.Wasm.Settings}}
 		}
 
-		wasmSettings.Fields[util.Struct_Wasm_Configuration] = &types.Value{
+		wasmSettings.Fields[util.StructWasmConfiguration] = &types.Value{
 			Kind: &types.Value_StructValue{
 				StructValue: &types.Struct{
 					Fields: map[string]*types.Value{
-						util.Struct_Any_AtType: {
+						util.StructAnyAtType: {
 							Kind: &types.Value_StringValue{StringValue: anyType},
 						},
-						util.Struct_Any_Value: anyValue,
+						util.StructAnyValue: anyValue,
 					},
 				},
 			},
 		}
 	}
 
-	out.Fields[util.Struct_HttpFilter_TypedConfig] = &types.Value{
+	out.Fields[util.StructHttpFilterTypedConfig] = &types.Value{
 		Kind: &types.Value_StructValue{
 			StructValue: &types.Struct{
 				Fields: map[string]*types.Value{
-					util.Struct_Any_TypedUrl: {
-						Kind: &types.Value_StringValue{StringValue: util.TypeUrl_EnvoyFilterHttpWasm},
+					util.StructAnyTypedURL: {
+						Kind: &types.Value_StringValue{StringValue: util.TypeURLEnvoyFilterHTTPWasm},
 					},
-					util.Struct_Any_AtType: {
-						Kind: &types.Value_StringValue{StringValue: util.TypeUrl_UdpaTypedStruct},
+					util.StructAnyAtType: {
+						Kind: &types.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 					},
-					util.Struct_Any_Value: {
+					util.StructAnyValue: {
 						Kind: &types.Value_StructValue{StructValue: &types.Struct{
 							Fields: map[string]*types.Value{
-								util.Struct_Wasm_Config: {
+								util.StructWasmConfig: {
 									Kind: &types.Value_StructValue{
 										StructValue: wasmSettings,
 									},

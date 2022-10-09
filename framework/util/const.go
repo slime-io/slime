@@ -5,77 +5,73 @@ import (
 )
 
 var (
-	Envoy_HttpRatelimit         string
-	Envoy_Route                 string
-	Envoy_HttpConnectionManager string
-	Envoy_Cors                  string
+	EnvoyHTTPRateLimit         string
+	EnvoyRoute                 string
+	EnvoyHTTPConnectionManager string
+	EnvoyCors                  string
 )
 
 func init() {
 	if os.Getenv("ENVOY_FILTER_NAME_LEGACY") != "" {
-		Envoy_HttpRatelimit = Envoy_HttpRatelimit_v1
-		Envoy_Route = Envoy_Route_v1
-		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v1
-		Envoy_Cors = Envoy_Cors_v1
+		EnvoyHTTPRateLimit = EnvoyHTTPRateLimitV1
+		EnvoyRoute = EnvoyRouteV1
+		EnvoyHTTPConnectionManager = EnvoyHTTPConnectionManagerV1
+		EnvoyCors = EnvoyCorsV1
 	} else {
-		Envoy_HttpRatelimit = Envoy_HttpRatelimit_v2
-		Envoy_Route = Envoy_Route_v2
-		Envoy_HttpConnectionManager = Envoy_HttpConnectionManager_v2
-		Envoy_Cors = Envoy_Cors_v2
+		EnvoyHTTPRateLimit = EnvoyHTTPRateLimitV2
+		EnvoyRoute = EnvoyRouteV2
+		EnvoyHTTPConnectionManager = EnvoyHTTPConnectionManagerV2
+		EnvoyCors = EnvoyCorsV2
 	}
 }
 
-// v1
+// v1 plugin names
 const (
-	// Plugins
-	Envoy_Ratelimit_v1             = "envoy.ratelimit"
-	Envoy_HttpRatelimit_v1         = "envoy.rate_limit"
-	Envoy_Route_v1                 = "envoy.router"
-	Envoy_HttpConnectionManager_v1 = "envoy.http_connection_manager"
-	Envoy_Cors_v1                  = "envoy.cors"
+	EnvoyRatelimitV1             = "envoy.ratelimit"
+	EnvoyHTTPRateLimitV1         = "envoy.rate_limit"
+	EnvoyRouteV1                 = "envoy.router"
+	EnvoyHTTPConnectionManagerV1 = "envoy.http_connection_manager"
+	EnvoyCorsV1                  = "envoy.cors"
 )
 
-// v2
+// v2 plugin names
 const (
-	// Plugins
-	Envoy_HttpRatelimit_v2         = "envoy.filters.http.ratelimit"
-	Envoy_Route_v2                 = "envoy.filters.http.router"
-	Envoy_HttpConnectionManager_v2 = "envoy.filters.network.http_connection_manager"
-	Envoy_Cors_v2                  = "envoy.filters.http.cors"
+	EnvoyHTTPRateLimitV2         = "envoy.filters.http.ratelimit"
+	EnvoyRouteV2                 = "envoy.filters.http.router"
+	EnvoyHTTPConnectionManagerV2 = "envoy.filters.network.http_connection_manager"
+	EnvoyCorsV2                  = "envoy.filters.http.cors"
 )
 
 const (
-	Envoy_FilterHttpWasm     = "envoy.filters.http.wasm"
-	Envoy_WasmV8             = "envoy.wasm.runtime.v8"
-	Envoy_LocalRateLimit     = "envoy.filters.http.local_ratelimit"
-	Netease_LocalFlowControl = "com.netease.local_flow_control"
+	EnvoyFilterHTTPWasm = "envoy.filters.http.wasm"
+	EnvoyWasmV8         = "envoy.wasm.runtime.v8"
+	EnvoyLocalRateLimit = "envoy.filters.http.local_ratelimit"
 
-	Struct_Wasm_Config        = "config"
-	Struct_Wasm_Name          = "name"
-	Struct_Wasm_Configuration = "configuration"
+	StructWasmConfig        = "config"
+	StructWasmName          = "name"
+	StructWasmConfiguration = "configuration"
 
-	Struct_Any_TypedUrl = "type_url"
-	Struct_Any_AtType   = "@type"
-	Struct_Any_Value    = "value"
+	StructAnyTypedURL = "type_url"
+	StructAnyAtType   = "@type"
+	StructAnyValue    = "value"
 
-	Struct_HttpFilter_TypedConfig          = "typed_config"
-	Struct_HttpFilter_Name                 = "name"
-	Struct_HttpFilter_TypedPerFilterConfig = "typedPerFilterConfig"
+	StructHttpFilterTypedConfig          = "typed_config"
+	StructHttpFilterName                 = "name"
+	StructHttpFilterTypedPerFilterConfig = "typedPerFilterConfig"
 
-	Struct_EnvoyLocalRateLimit_Limiter  = "http_local_rate_limiter"
-	Struct_EnvoyLocalRateLimit_Enabled  = "local_rate_limit_enabled"
-	Struct_EnvoyLocalRateLimit_Enforced = "local_rate_limit_enforced"
+	StructEnvoyLocalRateLimitLimiter  = "http_local_rate_limiter"
+	StructEnvoyLocalRateLimitEnabled  = "local_rate_limit_enabled"
+	StructEnvoyLocalRateLimitEnforced = "local_rate_limit_enforced"
 
-	TypeUrl_EnvoyFilterHttpWasm     = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
-	TypeUrl_StringValue             = "type.googleapis.com/google.protobuf.StringValue"
-	TypeUrl_UdpaTypedStruct         = "type.googleapis.com/udpa.type.v1.TypedStruct"
-	TypeUrl_EnvoyLocalRatelimit     = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
-	TypeUrl_NeteaseLocalFlowControl = "type.googleapis.com/netease.filters.http.local_flow_control.v2"
+	TypeURLEnvoyFilterHTTPWasm = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+	TypeURLStringValue         = "type.googleapis.com/google.protobuf.StringValue"
+	TypeURLUDPATypedStruct     = "type.googleapis.com/udpa.type.v1.TypedStruct"
+	TypeURLEnvoyLocalRateLimit = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
 
-	EnvoyFilter_GlobalSidecar = "to_global_sidecar"
+	EnvoyFilterGlobalSidecar = "to_global_sidecar"
 
-	Wellknow_Waidcard  = "*"
-	Wellknow_RootPath  = "/"
-	Wellkonw_BaseSet   = "_base"
-	Wellkonw_K8sSuffix = ".svc.cluster.local"
+	WellknownWildcard  = "*"
+	WellknownRootpath  = "/"
+	WellknownBaseSet   = "_base"
+	WellknownK8sSuffix = ".svc.cluster.local"
 )
