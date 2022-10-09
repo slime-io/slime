@@ -55,8 +55,9 @@ func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs
 
 	var err error
 	if err = (&controllers.PluginManagerReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		K8sClient: env.K8SClient,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		log.Errorf("unable to create pluginManager controller, %+v", err)
 		os.Exit(1)

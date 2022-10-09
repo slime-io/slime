@@ -18,12 +18,12 @@ package controllers
 
 import (
 	"context"
-
 	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -42,7 +42,8 @@ import (
 // PluginManagerReconciler reconciles a PluginManager object
 type PluginManagerReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme    *runtime.Scheme
+	K8sClient *kubernetes.Clientset
 
 	wasm wasm.Getter
 	env  *bootstrap.Environment
@@ -124,7 +125,7 @@ func (r *PluginManagerReconciler) newPluginManagerForEnvoyPlugin(cr *wrapper.Plu
 	}
 
 	envoyFilter := &istio.EnvoyFilter{}
-	r.translatePluginManager(pb.(*microserviceslimeiov1alpha1types.PluginManager), envoyFilter)
+	r.translatePluginManager(cr.ObjectMeta, pb.(*microserviceslimeiov1alpha1types.PluginManager), envoyFilter)
 	envoyFilterWrapper := &v1alpha3.EnvoyFilter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,

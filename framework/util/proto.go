@@ -120,3 +120,11 @@ func StructToMessage(pbst *types.Struct, out proto.Message) error {
 
 	return jsonpb.Unmarshal(buf, out)
 }
+
+func ToTypedStruct(typeURL string, value *types.Struct) *types.Struct {
+	return &types.Struct{Fields: map[string]*types.Value{
+		StructAnyAtType:  {Kind: &types.Value_StringValue{StringValue: TypeURLUDPATypedStruct}},
+		StructAnyTypeURL: {Kind: &types.Value_StringValue{StringValue: typeURL}},
+		StructAnyValue:   {Kind: &types.Value_StructValue{StructValue: value}},
+	}}
+}

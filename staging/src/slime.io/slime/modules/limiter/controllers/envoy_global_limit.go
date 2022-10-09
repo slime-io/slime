@@ -90,7 +90,7 @@ func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain st
 								util.StructAnyAtType: {
 									Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 								},
-								util.StructAnyTypedURL: {
+								util.StructAnyTypeURL: {
 									Kind: &structpb.Value_StringValue{StringValue: model.TypeUrlEnvoyRateLimit},
 								},
 								util.StructAnyValue: {
