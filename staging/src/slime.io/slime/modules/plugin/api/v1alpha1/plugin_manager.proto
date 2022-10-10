@@ -85,9 +85,14 @@ message Plugin {
 }
 
 message Wasm {
-    string rootID = 1;
-    string fileName = 2;
-    google.protobuf.Struct settings = 3;
+    google.protobuf.Struct settings = 1;
+    string plugin_name = 2;
+    string url = 3;
+    string sha256 = 4;
+    oneof image_pull_secret {
+        string image_pull_secret_name = 5;
+        string image_pull_secret_content = 6;
+    }
 }
 
 message Inline {
