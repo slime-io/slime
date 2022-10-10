@@ -53,6 +53,8 @@ message Global {
   // in format comma-separated revisions, e.g. "1-11-1,prod"
   // will add istioRev to configRev if it exists
   string configRev = 11;
+  // control the maximum QPS to the master from this client
+  ClientGoTokenBucket clientGoTokenBucket = 12;
 }
 
 message Log {
@@ -137,4 +139,11 @@ message ConfigSource {
   // protocol (MCP). Can be IP address or a fully qualified DNS name.
   // Use fs:/// to specify a file-based backend with absolute path to the directory.
   string address = 1;
+}
+
+message ClientGoTokenBucket {
+  // QPS indicates the maximum QPS to the master from this client.
+  int32 qps = 1;
+  // Maximum burst for throttle.
+  int32 burst = 2;
 }

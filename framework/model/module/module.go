@@ -211,6 +211,12 @@ func Main(bundle string, modules []Module) {
 		conf = ctrl.GetConfigOrDie()
 	}
 
+	if config.Global != nil && config.Global.ClientGoTokenBucket != nil {
+		conf.Burst = int(config.Global.ClientGoTokenBucket.Burst)
+		conf.QPS = float32(config.Global.ClientGoTokenBucket.Qps)
+		log.Infof("set burst: %d, qps %f based on user-specified value in client config", conf.Burst, conf.QPS)
+	}
+
 	mgr, err := ctrl.NewManager(conf, ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: config.Global.Misc["metrics-addr"],
