@@ -5,15 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
-	"strings"
-
 	"github.com/ghodss/yaml"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
 	"github.com/hashicorp/go-multierror"
 	yaml2 "gopkg.in/yaml.v2"
+	"io"
+	"reflect"
 )
 
 // General type conversion
@@ -59,6 +58,15 @@ func Make(messageName string) (proto.Message, error) {
 	return reflect.New(pbt.Elem()).Interface().(proto.Message), nil
 }
 
+func FromJSONMapToMessage(data interface{}, msg proto.Message) error {
+	js, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+
+	return ApplyJSON(bytes.NewReader(js), msg)
+}
+
 func FromJSONMap(messageName string, data interface{}) (proto.Message, error) {
 	// Marshal to YAML bytes
 	str, err := yaml2.Marshal(data)
@@ -91,20 +99,13 @@ func ApplyYAML(yml string, pb proto.Message) error {
 	if err != nil {
 		return err
 	}
-	return ApplyJSON(string(js), pb)
+	return ApplyJSON(bytes.NewReader(js), pb)
 }
 
 // ApplyJSON unmarshals a JSON string into a proto message.
-func ApplyJSON(js string, pb proto.Message) error {
-	reader := strings.NewReader(js)
-	m := jsonpb.Unmarshaler{}
-	if err := m.Unmarshal(reader, pb); err != nil {
-		// log.Debugf("Failed to decode proto: %q. Trying decode with AllowUnknownFields=true", err)
-		m.AllowUnknownFields = true
-		reader.Reset(js)
-		return m.Unmarshal(reader, pb)
-	}
-	return nil
+func ApplyJSON(r io.Reader, pb proto.Message) error {
+	m := jsonpb.Unmarshaler{AllowUnknownFields: true}
+	return m.Unmarshal(r, pb)
 }
 
 // StructToMessage decodes a protobuf Message from a Struct.
