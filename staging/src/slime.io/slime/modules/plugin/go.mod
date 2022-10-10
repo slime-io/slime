@@ -9,7 +9,9 @@ require (
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.15.0
 	github.com/sirupsen/logrus v1.8.1
+	google.golang.org/protobuf v1.28.1
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
+	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
 	sigs.k8s.io/controller-runtime v0.10.3
@@ -17,6 +19,7 @@ require (
 )
 
 replace (
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20220711081451-575e86a9da6e
 

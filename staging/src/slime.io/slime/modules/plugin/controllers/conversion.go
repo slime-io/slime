@@ -9,8 +9,11 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
+	"google.golang.org/protobuf/types/known/durationpb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"net/url"
 	"strings"
+	"time"
 
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/plugin/api/v1alpha1"
@@ -22,6 +25,16 @@ import (
 	envoyextensionswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	"github.com/gogo/protobuf/types"
 	istio "istio.io/api/networking/v1alpha3"
+)
+
+const (
+	fileScheme = "file"
+	ociScheme  = "oci"
+
+	// name of environment variable at Wasm VM, which will carry the Wasm image pull secret.
+	WasmSecretEnv = "ISTIO_META_WASM_IMAGE_PULL_SECRET"
+
+	nilRemoteCodeSha256 = "nil"
 )
 
 // genGatewayCfps is a custom func to handle EnvoyPlugin gateway
@@ -300,7 +313,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		if err := r.applyConfigDiscoveryPlugin(name, util.TypeURLEnvoyFilterHTTPWasm, out.Patch.Value); err != nil {
 			return nil, err
 		}
-		wasmFilterConfig, err := r.convertWasmFilterConfig(name, in, m)
+		wasmFilterConfig, err := r.convertWasmFilterConfig(name, meta, in, m)
 		if err != nil {
 			return nil, err
 		}
@@ -308,7 +321,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		if err != nil {
 			return nil, err
 		}
-		if err := r.addExtensionConfigPath(name, util.ToTypedStruct(util.TypeURLEnvoyFilterHTTPWasm, wasmFilterConfigStruct), &ret); err != nil {
+		if err = r.addExtensionConfigPath(name, util.ToTypedStruct(util.TypeURLEnvoyFilterHTTPWasm, wasmFilterConfigStruct), &ret); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Inline:
@@ -390,30 +403,85 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(name string, value *typ
 	return nil
 }
 
-func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, in *microserviceslimeiov1alpha1types.Plugin, pluginWasm *microserviceslimeiov1alpha1types.Plugin_Wasm) (*envoyextensionsfilterswasmv3.Wasm, error) {
-	if pluginWasm.Wasm.RootID == "" {
-		return nil, fmt.Errorf("plugin:%s, wasm插件rootID丢失", in.Name)
-	} else if pluginWasm.Wasm.FileName == "" {
-		return nil, fmt.Errorf("plugin: %s, wasm 文件缺失", in.Name)
+func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin, pluginWasm *microserviceslimeiov1alpha1types.Plugin_Wasm) (*envoyextensionsfilterswasmv3.Wasm, error) {
+	var (
+		imageURL   *url.URL
+		datasource *envoyconfigcorev3.AsyncDataSource
+		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
+	)
+	if v, err := url.Parse(pluginWasm.Wasm.Url); err != nil {
+		return nil, fmt.Errorf("plugin:%s, invalid url %s", in.Name, pluginWasm.Wasm.Url)
+	} else {
+		imageURL = v
 	}
 
-	filepath := r.wasm.Get(pluginWasm.Wasm.FileName)
-	pluginConfig := &envoyextensionswasmv3.PluginConfig{
-		Name:   name,
-		RootId: pluginWasm.Wasm.RootID,
-		Vm: &envoyextensionswasmv3.PluginConfig_VmConfig{
-			VmConfig: &envoyextensionswasmv3.VmConfig{
-				// VmId:    in.Name,
-				Runtime: util.EnvoyWasmV8,
-				Code: &envoyconfigcorev3.AsyncDataSource{
-					Specifier: &envoyconfigcorev3.AsyncDataSource_Local{
-						Local: &envoyconfigcorev3.DataSource{
-							Specifier: &envoyconfigcorev3.DataSource_Filename{
-								Filename: filepath,
-							},
-						},
+	// when no scheme is given, default to oci scheme
+	if imageURL.Scheme == "" {
+		imageURL.Scheme = ociScheme
+	}
+
+	if imageURL.Scheme == fileScheme {
+		datasource = &envoyconfigcorev3.AsyncDataSource{
+			Specifier: &envoyconfigcorev3.AsyncDataSource_Local{
+				Local: &envoyconfigcorev3.DataSource{
+					Specifier: &envoyconfigcorev3.DataSource_Filename{
+						Filename: strings.TrimPrefix(pluginWasm.Wasm.Url, "file://"),
 					},
 				},
+			},
+		}
+	} else {
+		sha256 := pluginWasm.Wasm.Sha256
+		if sha256 == "" {
+			sha256 = nilRemoteCodeSha256
+		}
+		datasource = &envoyconfigcorev3.AsyncDataSource{
+			Specifier: &envoyconfigcorev3.AsyncDataSource_Remote{
+				Remote: &envoyconfigcorev3.RemoteDataSource{
+					HttpUri: &envoyconfigcorev3.HttpUri{
+						Uri:     imageURL.String(),
+						Timeout: durationpb.New(30 * time.Second),
+						HttpUpstreamType: &envoyconfigcorev3.HttpUri_Cluster{
+							// this will be fetched by the agent anyway, so no need for a cluster
+							Cluster: "_",
+						},
+					},
+					Sha256: sha256,
+				},
+			},
+		}
+
+		var imagePullSecretContent string
+		if imagePullSecretContent = pluginWasm.Wasm.GetImagePullSecretContent(); imagePullSecretContent == "" {
+			if secretName := pluginWasm.Wasm.GetImagePullSecretName(); secretName != "" {
+				if r.credController == nil {
+					return nil, fmt.Errorf("plugin:%s use secret %s but cred controller disabled", in.Name, secretName)
+				}
+				secretBytes, err := r.credController.GetDockerCredential(secretName, meta.Namespace)
+				if err != nil {
+					return nil, fmt.Errorf("plugin:%s use secret %s but get secret met err %+v", in.Name, secretName, err)
+				}
+				imagePullSecretContent = string(secretBytes)
+			}
+		}
+
+		if imagePullSecretContent != "" {
+			wasmEnv = &envoyextensionswasmv3.EnvironmentVariables{
+				KeyValues: map[string]string{
+					WasmSecretEnv: imagePullSecretContent,
+				},
+			}
+		}
+	}
+
+	pluginConfig := &envoyextensionswasmv3.PluginConfig{
+		Name:   name,
+		RootId: pluginWasm.Wasm.PluginName,
+		Vm: &envoyextensionswasmv3.PluginConfig_VmConfig{
+			VmConfig: &envoyextensionswasmv3.VmConfig{
+				Runtime:              util.EnvoyWasmV8,
+				Code:                 datasource,
+				EnvironmentVariables: wasmEnv,
 			},
 		},
 	}

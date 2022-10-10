@@ -17,7 +17,6 @@ package controllers
 import (
 	"fmt"
 	"k8s.io/client-go/informers"
-	"sync"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
@@ -29,49 +28,18 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-const (
-	// The ID/name for the certificate chain in kubernetes generic secret.
-	GenericScrtCert = "cert"
-	// The ID/name for the private key in kubernetes generic secret.
-	GenericScrtKey = "key"
-	// The ID/name for the CA certificate in kubernetes generic secret.
-	GenericScrtCaCert = "cacert"
-
-	// The ID/name for the certificate chain in kubernetes tls secret.
-	TLSSecretCert = "tls.crt"
-	// The ID/name for the k8sKey in kubernetes tls secret.
-	TLSSecretKey = "tls.key"
-	// The ID/name for the CA certificate in kubernetes tls secret
-	TLSSecretCaCert = "ca.crt"
-
-	// GatewaySdsCaSuffix is the suffix of the sds resource name for root CA. All resource
-	// names for gateway root certs end with "-cacert".
-	GatewaySdsCaSuffix = "-cacert"
-)
-
 type CredentialsController struct {
 	secrets      informersv1.SecretInformer
 	secretLister listersv1.SecretLister
-
-	mu sync.RWMutex
 }
 
-func NewCredentialsController(client *kubernetes.Clientset) *CredentialsController {
-	kubeInformer := informers.NewSharedInformerFactory(client, 0)
+func NewCredentialsController(kubeInformer informers.SharedInformerFactory) *CredentialsController {
 	informer := kubeInformer.InformerFor(&v1.Secret{}, func(k kubernetes.Interface, resync time.Duration) cache.SharedIndexInformer {
 		return informersv1.NewFilteredSecretInformer(
 			k, metav1.NamespaceAll, resync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
 			func(options *metav1.ListOptions) {
-				// We only care about TLS certificates and docker config for Wasm image pulling.
-				// Unfortunately, it is not as simple as selecting type=kubernetes.io/tls and type=kubernetes.io/dockerconfigjson.
-				// Because of legacy reasons and supporting an extra ca.crt, we also support generic types.
-				// Its also likely users have started to use random types and expect them to continue working.
-				// This makes the assumption we will never care about Helm secrets or SA token secrets - two common
-				// large Secrets in clusters.
-				// This is a best effort optimization only; the code would behave correctly if we watched all Secrets.
 				options.FieldSelector = fields.AndSelectors(
-					fields.OneTermNotEqualSelector("type", "helm.sh/release.v1"),
-					fields.OneTermNotEqualSelector("type", string(v1.SecretTypeServiceAccountToken)),
+					fields.OneTermEqualSelector("type", string(v1.SecretTypeDockerConfigJson)),
 				).String()
 			},
 		)
