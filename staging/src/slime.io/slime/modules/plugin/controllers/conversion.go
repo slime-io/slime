@@ -12,6 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -321,7 +322,12 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		if err != nil {
 			return nil, err
 		}
-		if err = r.addExtensionConfigPath(name, util.ToTypedStruct(util.TypeURLEnvoyFilterHTTPWasm, wasmFilterConfigStruct), &ret); err != nil {
+		asTypedStruct := os.Getenv("WASM_TYPED_STRUCT") != ""
+		atType, typeURL := util.TypeURLEnvoyFilterHTTPWasm, ""
+		if asTypedStruct {
+			atType, typeURL = typeURL, atType
+		}
+		if err = r.addExtensionConfigPath(name, toTypedConfig(atType, typeURL, wasmFilterConfigStruct), &ret); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Inline:
@@ -331,6 +337,14 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 	}
 
 	return ret, nil
+}
+
+func toTypedConfig(atType, typeURL string, value *types.Struct) *types.Struct {
+	if typeURL != "" {
+		return util.ToTypedStruct(typeURL, value)
+	}
+	value.Fields[util.StructAnyAtType] = &types.Value{Kind: &types.Value_StringValue{StringValue: atType}}
+	return value
 }
 
 func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settings *v1alpha1.Plugin_Inline, out *types.Struct) error {
