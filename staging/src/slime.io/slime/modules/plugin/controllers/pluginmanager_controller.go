@@ -104,7 +104,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	watchSecrets := getPluginManagerWatchSecrets(nn.Namespace, pluginManager)
 	r.updateWatchSecrets(nn, watchSecrets) // XXX concurrent...
 
-	ef := r.newPluginManagerForEnvoyPlugin(instance, pluginManager)
+	ef := r.translatePluginManagerToEnvoyFilter(instance, pluginManager)
 	if ef == nil {
 		// 由于配置错误导致的，因此直接返回nil，避免reconcile重试
 		return reconcile.Result{}, nil
@@ -148,7 +148,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	return ctrl.Result{}, nil
 }
 
-func (r *PluginManagerReconciler) newPluginManagerForEnvoyPlugin(cr *wrapper.PluginManager, pluginManager *microserviceslimeiov1alpha1types.PluginManager) *v1alpha3.EnvoyFilter {
+func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *wrapper.PluginManager, pluginManager *microserviceslimeiov1alpha1types.PluginManager) *v1alpha3.EnvoyFilter {
 	envoyFilter := &istio.EnvoyFilter{}
 	r.translatePluginManager(cr.ObjectMeta, pluginManager, envoyFilter)
 

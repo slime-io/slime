@@ -7,9 +7,10 @@ package controllers
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/jsonpb"
+	gogojsonpb "github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/protobuf/types/known/durationpb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
@@ -36,6 +37,10 @@ const (
 	WasmSecretEnv = "ISTIO_META_WASM_IMAGE_PULL_SECRET"
 
 	nilRemoteCodeSha256 = "nil"
+
+	riderPluginSuffix = ".rider"
+	riderPackagePath  = "/usr/local/lib/rider/?/init.lua;/usr/local/lib/rider/?.lua;"
+	RiderEnvKey       = "ISTIO_RIDER_ENV"
 )
 
 // genGatewayCfps is a custom func to handle EnvoyPlugin gateway
@@ -428,67 +433,20 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(name string, value *typ
 
 func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
 	var (
-		imageURL   *url.URL
-		datasource *envoyconfigcorev3.AsyncDataSource
 		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
 		pluginWasm = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Wasm)
 	)
-	if v, err := url.Parse(pluginWasm.Wasm.Url); err != nil {
-		return nil, fmt.Errorf("plugin:%s, invalid url %s", in.Name, pluginWasm.Wasm.Url)
-	} else {
-		imageURL = v
+
+	datasource, err := convertDataSource(pluginWasm.Wasm.Url, pluginWasm.Wasm.Sha256)
+	if err != nil {
+		return nil, err
 	}
 
-	// when no scheme is given, default to oci scheme
-	if imageURL.Scheme == "" {
-		imageURL.Scheme = ociScheme
-	}
-
-	if imageURL.Scheme == fileScheme {
-		datasource = &envoyconfigcorev3.AsyncDataSource{
-			Specifier: &envoyconfigcorev3.AsyncDataSource_Local{
-				Local: &envoyconfigcorev3.DataSource{
-					Specifier: &envoyconfigcorev3.DataSource_Filename{
-						Filename: strings.TrimPrefix(pluginWasm.Wasm.Url, "file://"),
-					},
-				},
-			},
+	if datasource.GetRemote() != nil {
+		imagePullSecretContent, err := r.convertImagePullSecret(pluginWasm.Wasm.GetImagePullSecretName(), pluginWasm.Wasm.GetImagePullSecretContent(), meta.Namespace)
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		sha256 := pluginWasm.Wasm.Sha256
-		if sha256 == "" {
-			sha256 = nilRemoteCodeSha256
-		}
-		datasource = &envoyconfigcorev3.AsyncDataSource{
-			Specifier: &envoyconfigcorev3.AsyncDataSource_Remote{
-				Remote: &envoyconfigcorev3.RemoteDataSource{
-					HttpUri: &envoyconfigcorev3.HttpUri{
-						Uri:     imageURL.String(),
-						Timeout: durationpb.New(30 * time.Second),
-						HttpUpstreamType: &envoyconfigcorev3.HttpUri_Cluster{
-							// this will be fetched by the agent anyway, so no need for a cluster
-							Cluster: "_",
-						},
-					},
-					Sha256: sha256,
-				},
-			},
-		}
-
-		var imagePullSecretContent string
-		if imagePullSecretContent = pluginWasm.Wasm.GetImagePullSecretContent(); imagePullSecretContent == "" {
-			if secretName := pluginWasm.Wasm.GetImagePullSecretName(); secretName != "" {
-				if r.credController == nil {
-					return nil, fmt.Errorf("plugin:%s use secret %s but cred controller disabled", in.Name, secretName)
-				}
-				secretBytes, err := r.credController.GetDockerCredential(secretName, meta.Namespace)
-				if err != nil {
-					return nil, fmt.Errorf("plugin:%s use secret %s but get secret met err %+v", in.Name, secretName, err)
-				}
-				imagePullSecretContent = string(secretBytes)
-			}
-		}
-
 		if imagePullSecretContent != "" {
 			wasmEnv = &envoyextensionswasmv3.EnvironmentVariables{
 				KeyValues: map[string]string{
@@ -510,28 +468,27 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 		},
 	}
 
-	if pluginWasm.Wasm.Settings != nil {
+	if settings := pluginWasm.Wasm.Settings; settings != nil {
 		var (
 			anyType  string
-			anyValue *types.Value
+			anyValue *wrappers.StringValue // != Value_StringValue
 		)
 
 		// string类型的配置解析为 google.protobuf.StringValue
-		if len(pluginWasm.Wasm.Settings.Fields) == 1 && pluginWasm.Wasm.Settings.Fields["_string"] != nil {
-			parseTostring := pluginWasm.Wasm.Settings.Fields["_string"]
-			if s, ok := parseTostring.Kind.(*types.Value_StringValue); ok {
+		if strField := settings.Fields["_string"]; strField != nil && len(settings.Fields) == 1 {
+			if _, ok := strField.Kind.(*types.Value_StringValue); ok {
 				anyType = util.TypeURLStringValue
-				anyValue = &types.Value{Kind: s}
+				anyValue = &wrappers.StringValue{Value: strField.GetStringValue()}
 			}
 		}
 
 		// to json string to align with istio behaviour
 		if anyValue == nil {
 			anyType = util.TypeURLStringValue
-			if s, err := (&jsonpb.Marshaler{OrigName: true}).MarshalToString(pluginWasm.Wasm.Settings); err != nil {
+			if s, err := (&gogojsonpb.Marshaler{OrigName: true}).MarshalToString(settings); err != nil {
 				return nil, err
 			} else {
-				anyValue = &types.Value{Kind: &types.Value_StringValue{StringValue: s}}
+				anyValue = &wrappers.StringValue{Value: s}
 			}
 		}
 
@@ -550,6 +507,136 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 }
 
 func (r *PluginManagerReconciler) convertRiderFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
-	// TODO
-	return nil, nil
+	var (
+		pluginRider            = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Rider)
+		imagePullSecretContent string
+		err                    error
+	)
+
+	datasource, err := convertDataSource(pluginRider.Rider.Url, pluginRider.Rider.Sha256)
+	if err != nil {
+		return nil, err
+	}
+
+	if datasource.GetRemote() != nil {
+		if imagePullSecretContent, err = r.convertImagePullSecret(
+			pluginRider.Rider.GetImagePullSecretName(), pluginRider.Rider.GetImagePullSecretContent(),
+			meta.Namespace); err != nil {
+			return nil, err
+		}
+	}
+
+	datasourceStruct, err := util.MessageToGogoStruct(datasource)
+	if err != nil {
+		return nil, err
+	}
+
+	riderPluginConfig := &types.Struct{Fields: map[string]*types.Value{
+		"name": {Kind: &types.Value_StringValue{StringValue: name}},
+		"vm_config": {Kind: &types.Value_StructValue{StructValue: &types.Struct{
+			Fields: map[string]*types.Value{
+				"package_path": {Kind: &types.Value_StringValue{StringValue: riderPackagePath}},
+			},
+		}}},
+		"code": {Kind: &types.Value_StructValue{StructValue: datasourceStruct}},
+	}}
+	riderFilterConfig := &types.Struct{
+		Fields: map[string]*types.Value{
+			"plugin": {Kind: &types.Value_StructValue{StructValue: riderPluginConfig}},
+		},
+	}
+
+	config := pluginRider.Rider.Settings
+	ensureEnv := func() *types.Struct {
+		if config.GetFields() == nil {
+			config = &types.Struct{Fields: map[string]*types.Value{}}
+		}
+
+		envSt := config.Fields[RiderEnvKey].GetStructValue()
+		if envSt == nil {
+			envSt = &types.Struct{Fields: map[string]*types.Value{}}
+			config.Fields[RiderEnvKey] = &types.Value{Kind: &types.Value_StructValue{StructValue: envSt}}
+		}
+		if envSt.Fields == nil {
+			envSt.Fields = map[string]*types.Value{}
+		}
+		return envSt
+	}
+	if imagePullSecretContent != "" {
+		ensureEnv().Fields[WasmSecretEnv] = &types.Value{Kind: &types.Value_StringValue{StringValue: imagePullSecretContent}}
+	}
+
+	if config != nil {
+		riderPluginConfig.Fields["config"] = &types.Value{Kind: &types.Value_StructValue{StructValue: config}}
+	}
+
+	return riderFilterConfig, nil
+}
+
+func convertDataSource(urlStr, sha256 string) (*envoyconfigcorev3.AsyncDataSource, error) {
+	var (
+		imageURL   *url.URL
+		datasource *envoyconfigcorev3.AsyncDataSource
+	)
+	if v, err := url.Parse(urlStr); err != nil {
+		return nil, err
+	} else {
+		imageURL = v
+	}
+
+	// when no scheme is given, default to oci scheme
+	if imageURL.Scheme == "" {
+		imageURL.Scheme = ociScheme
+	}
+
+	if imageURL.Scheme == fileScheme {
+		datasource = &envoyconfigcorev3.AsyncDataSource{
+			Specifier: &envoyconfigcorev3.AsyncDataSource_Local{
+				Local: &envoyconfigcorev3.DataSource{
+					Specifier: &envoyconfigcorev3.DataSource_Filename{
+						Filename: strings.TrimPrefix(urlStr, "file://"),
+					},
+				},
+			},
+		}
+	} else {
+		if sha256 == "" {
+			sha256 = nilRemoteCodeSha256
+		}
+		datasource = &envoyconfigcorev3.AsyncDataSource{
+			Specifier: &envoyconfigcorev3.AsyncDataSource_Remote{
+				Remote: &envoyconfigcorev3.RemoteDataSource{
+					HttpUri: &envoyconfigcorev3.HttpUri{
+						Uri:     imageURL.String(),
+						Timeout: durationpb.New(30 * time.Second),
+						HttpUpstreamType: &envoyconfigcorev3.HttpUri_Cluster{
+							// this will be fetched by the agent anyway, so no need for a cluster
+							Cluster: "_",
+						},
+					},
+					Sha256: sha256,
+				},
+			},
+		}
+	}
+
+	return datasource, nil
+}
+
+func (r *PluginManagerReconciler) convertImagePullSecret(name, content, ns string) (string, error) {
+	if content != "" {
+		return content, nil
+	}
+	if name == "" {
+		return "", nil
+	}
+
+	if r.credController == nil {
+		return "", fmt.Errorf("plugin use secret %s but cred controller disabled", name)
+	}
+	secretBytes, err := r.credController.GetDockerCredential(name, ns)
+	if err != nil {
+		return "", fmt.Errorf("plugin: use secret %s but get secret met err %+v", name, err)
+	}
+	return string(secretBytes), nil
 }
