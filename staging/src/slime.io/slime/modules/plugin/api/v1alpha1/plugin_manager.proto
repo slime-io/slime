@@ -80,11 +80,23 @@ message Plugin {
         Wasm wasm = 6;
         // plugin compiled inside envoy
         Inline inline = 7;
+        Rider rider = 9;
     }
     uint32 port = 8;
 }
 
 message Wasm {
+    google.protobuf.Struct settings = 1;
+    string plugin_name = 2;
+    string url = 3;
+    string sha256 = 4;
+    oneof image_pull_secret {
+        string image_pull_secret_name = 5;
+        string image_pull_secret_content = 6;
+    }
+}
+
+message Rider {
     google.protobuf.Struct settings = 1;
     string plugin_name = 2;
     string url = 3;
