@@ -3,6 +3,8 @@
 # usage
 # `sh ./publish.sh ALL` in each submodules
 
+source "$(dirname $0)"/*.env.sh 2>/dev/null
+
 HUB=${HUB:-"docker.io/slimeio registry.cn-hangzhou.aliyuncs.com/slimeio"}
 PUSH_HUBS="$HUB"
 first_hub=$(echo $HUB | awk -F " " '{print $1}')
