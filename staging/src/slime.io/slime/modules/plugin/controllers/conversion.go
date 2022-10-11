@@ -7,6 +7,7 @@ package controllers
 
 import (
 	"fmt"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -334,6 +335,10 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		}); err != nil {
 			return nil, err
 		}
+	case *v1alpha1.Plugin_Rider:
+		if err := applyConfigDiscoveryPlugin(util.TypeURLEnvoyFilterHTTPRider, r.convertRiderFilterConfig); err != nil {
+			return nil, err
+		}
 	case *v1alpha1.Plugin_Inline:
 		if err := r.applyInlinePlugin(in.Name, in.TypeUrl, m, out.Patch.Value); err != nil {
 			return nil, err
@@ -520,10 +525,14 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 			}
 		}
 
-		// 非string类型的配置解析为 "type.googleapis.com/udpa.type.v1.TypedStruct"
+		// to json string to align with istio behaviour
 		if anyValue == nil {
-			anyType = util.TypeURLUDPATypedStruct
-			anyValue = &types.Value{Kind: &types.Value_StructValue{StructValue: pluginWasm.Wasm.Settings}}
+			anyType = util.TypeURLStringValue
+			if s, err := (&jsonpb.Marshaler{OrigName: true}).MarshalToString(pluginWasm.Wasm.Settings); err != nil {
+				return nil, err
+			} else {
+				anyValue = &types.Value{Kind: &types.Value_StringValue{StringValue: s}}
+			}
 		}
 
 		valueBytes, err := proto.Marshal(anyValue)
@@ -538,4 +547,9 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 	}
 
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
+}
+
+func (r *PluginManagerReconciler) convertRiderFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+	// TODO
+	return nil, nil
 }
