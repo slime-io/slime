@@ -307,23 +307,31 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		return ret, nil
 	}
 
+	applyConfigDiscoveryPlugin := func(
+		pluginTypeURL string,
+		converter func(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error)) error {
+		name := fmt.Sprintf("%s.%s", meta.Namespace, in.Name)
+		if err := r.applyConfigDiscoveryPlugin(name, pluginTypeURL, out.Patch.Value); err != nil {
+			return err
+		}
+		filterConfigStruct, err := converter(name, meta, in)
+		if err != nil {
+			return err
+		}
+		atType, typeURL := "", pluginTypeURL
+		// if want raw type, just do: atType, typeURL = typeURL, atType
+		return r.addExtensionConfigPath(name, toTypedConfig(atType, typeURL, filterConfigStruct), &ret)
+	}
+
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		name := fmt.Sprintf("%s.%s", meta.Namespace, in.Name)
-		if err := r.applyConfigDiscoveryPlugin(name, util.TypeURLEnvoyFilterHTTPWasm, out.Patch.Value); err != nil {
-			return nil, err
-		}
-		wasmFilterConfig, err := r.convertWasmFilterConfig(name, meta, in, m)
-		if err != nil {
-			return nil, err
-		}
-		wasmFilterConfigStruct, err := util.MessageToGogoStruct(wasmFilterConfig)
-		if err != nil {
-			return nil, err
-		}
-		atType, typeURL := "", util.TypeURLEnvoyFilterHTTPWasm
-		// if want raw type, just do: atType, typeURL = typeURL, atType
-		if err = r.addExtensionConfigPath(name, toTypedConfig(atType, typeURL, wasmFilterConfigStruct), &ret); err != nil {
+		if err := applyConfigDiscoveryPlugin(util.TypeURLEnvoyFilterHTTPWasm, func(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+			wasmFilterConfig, err := r.convertWasmFilterConfig(name, meta, in)
+			if err != nil {
+				return nil, err
+			}
+			return util.MessageToGogoStruct(wasmFilterConfig)
+		}); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Inline:
@@ -413,11 +421,12 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(name string, value *typ
 	return nil
 }
 
-func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin, pluginWasm *microserviceslimeiov1alpha1types.Plugin_Wasm) (*envoyextensionsfilterswasmv3.Wasm, error) {
+func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
 	var (
 		imageURL   *url.URL
 		datasource *envoyconfigcorev3.AsyncDataSource
 		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
+		pluginWasm = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Wasm)
 	)
 	if v, err := url.Parse(pluginWasm.Wasm.Url); err != nil {
 		return nil, fmt.Errorf("plugin:%s, invalid url %s", in.Name, pluginWasm.Wasm.Url)
