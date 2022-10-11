@@ -149,24 +149,22 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 }
 
 func (r *PluginManagerReconciler) newPluginManagerForEnvoyPlugin(cr *wrapper.PluginManager, pluginManager *microserviceslimeiov1alpha1types.PluginManager) *v1alpha3.EnvoyFilter {
-	if err := util.FromJSONMapToMessage(cr.Spec, pluginManager); err != nil {
-		log.Errorf("unable to convert pluginManager to envoyFilter, %+v", err)
+	envoyFilter := &istio.EnvoyFilter{}
+	r.translatePluginManager(cr.ObjectMeta, pluginManager, envoyFilter)
+
+	m, err := util.ProtoToMap(envoyFilter)
+	if err != nil {
+		log.Errorf("ProtoToMap for envoyfilter %s/%s met err %v", cr.Namespace, cr.Name, err)
 		return nil
 	}
 
-	envoyFilter := &istio.EnvoyFilter{}
-	r.translatePluginManager(cr.ObjectMeta, pluginManager, envoyFilter)
-	envoyFilterWrapper := &v1alpha3.EnvoyFilter{
+	return &v1alpha3.EnvoyFilter{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Name,
 			Namespace: cr.Namespace,
 		},
+		Spec: m,
 	}
-	if m, err := util.ProtoToMap(envoyFilter); err == nil {
-		envoyFilterWrapper.Spec = m
-		return envoyFilterWrapper
-	}
-	return nil
 }
 
 func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
