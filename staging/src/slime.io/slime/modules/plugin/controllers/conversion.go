@@ -12,7 +12,6 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
-	"os"
 	"strings"
 	"time"
 
@@ -322,11 +321,8 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		if err != nil {
 			return nil, err
 		}
-		asTypedStruct := os.Getenv("WASM_TYPED_STRUCT") != ""
-		atType, typeURL := util.TypeURLEnvoyFilterHTTPWasm, ""
-		if asTypedStruct {
-			atType, typeURL = typeURL, atType
-		}
+		atType, typeURL := "", util.TypeURLEnvoyFilterHTTPWasm
+		// if want raw type, just do: atType, typeURL = typeURL, atType
 		if err = r.addExtensionConfigPath(name, toTypedConfig(atType, typeURL, wasmFilterConfigStruct), &ret); err != nil {
 			return nil, err
 		}
