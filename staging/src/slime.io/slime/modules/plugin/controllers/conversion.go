@@ -318,7 +318,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		if err != nil {
 			return nil, err
 		}
-		wasmFilterConfigStruct, err := util.MessageToStruct(wasmFilterConfig)
+		wasmFilterConfigStruct, err := util.MessageToGogoStruct(wasmFilterConfig)
 		if err != nil {
 			return nil, err
 		}

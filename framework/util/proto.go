@@ -6,17 +6,39 @@ import (
 	"errors"
 	"fmt"
 	"github.com/ghodss/yaml"
-	"github.com/gogo/protobuf/jsonpb"
+	gogojsonpb "github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	"github.com/gogo/protobuf/types"
+	"github.com/golang/protobuf/jsonpb"
 	"github.com/hashicorp/go-multierror"
 	yaml2 "gopkg.in/yaml.v2"
 	"io"
 	"reflect"
 )
 
-// General type conversion
+// MessageToStruct
+// Deprecated
+// WARN:
+// the callers which use this func to convert envoy api to gogo struct should mirgate to MessageToGogoStruct and do test
 func MessageToStruct(msg proto.Message) (*types.Struct, error) {
+	if msg == nil {
+		return nil, errors.New("nil message")
+	}
+
+	buf := &bytes.Buffer{}
+	if err := (&gogojsonpb.Marshaler{OrigName: true}).Marshal(buf, msg); err != nil {
+		return nil, err
+	}
+
+	pbs := &types.Struct{}
+	if err := gogojsonpb.Unmarshal(buf, pbs); err != nil {
+		return nil, err
+	}
+	return pbs, nil
+}
+
+// MessageToGogoStruct converts golang proto msg to gogo struct
+func MessageToGogoStruct(msg proto.Message) (*types.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
 	}
@@ -27,15 +49,14 @@ func MessageToStruct(msg proto.Message) (*types.Struct, error) {
 	}
 
 	pbs := &types.Struct{}
-	if err := jsonpb.Unmarshal(buf, pbs); err != nil {
+	if err := gogojsonpb.Unmarshal(buf, pbs); err != nil {
 		return nil, err
 	}
-
 	return pbs, nil
 }
 
 func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
-	m := &jsonpb.Marshaler{}
+	m := &gogojsonpb.Marshaler{}
 	var buf bytes.Buffer
 	if err := m.Marshal(&buf, pb); err == nil {
 		var mapResult map[string]interface{}
@@ -104,7 +125,7 @@ func ApplyYAML(yml string, pb proto.Message) error {
 
 // ApplyJSON unmarshals a JSON string into a proto message.
 func ApplyJSON(r io.Reader, pb proto.Message) error {
-	m := jsonpb.Unmarshaler{AllowUnknownFields: true}
+	m := gogojsonpb.Unmarshaler{AllowUnknownFields: true}
 	return m.Unmarshal(r, pb)
 }
 
@@ -115,11 +136,11 @@ func StructToMessage(pbst *types.Struct, out proto.Message) error {
 	}
 
 	buf := &bytes.Buffer{}
-	if err := (&jsonpb.Marshaler{OrigName: true}).Marshal(buf, pbst); err != nil {
+	if err := (&gogojsonpb.Marshaler{OrigName: true}).Marshal(buf, pbst); err != nil {
 		return err
 	}
 
-	return jsonpb.Unmarshal(buf, out)
+	return gogojsonpb.Unmarshal(buf, out)
 }
 
 func ToTypedStruct(typeURL string, value *types.Struct) *types.Struct {
