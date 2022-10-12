@@ -201,9 +201,7 @@ func (r *PluginManagerReconciler) notifySecretChange(nn types.NamespacedName) {
 
 func (r *PluginManagerReconciler) handleSecretChange() {
 	for {
-		select {
-		case <-r.changeSecretNotifyCh:
-		}
+		<-r.changeSecretNotifyCh
 
 		var (
 			resourceToReconcile map[types.NamespacedName]struct{}
