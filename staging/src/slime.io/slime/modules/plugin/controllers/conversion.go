@@ -314,25 +314,25 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 	}
 
 	applyConfigDiscoveryPlugin := func(
-		pluginTypeURL string,
+		resourceName, pluginTypeURL string,
 		converter func(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error)) error {
-		name := fmt.Sprintf("%s.%s", meta.Namespace, in.Name)
-		if err := r.applyConfigDiscoveryPlugin(name, pluginTypeURL, out.Patch.Value); err != nil {
+		fullResourceName := fmt.Sprintf("%s.%s", meta.Namespace, resourceName)
+		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, out.Patch.Value); err != nil {
 			return err
 		}
-		filterConfigStruct, err := converter(name, meta, in)
+		filterConfigStruct, err := converter(fullResourceName, meta, in)
 		if err != nil {
 			return err
 		}
 		atType, typeURL := "", pluginTypeURL
 		// if want raw type, just do: atType, typeURL = typeURL, atType
-		return r.addExtensionConfigPath(name, toTypedConfig(atType, typeURL, filterConfigStruct), &ret)
+		return r.addExtensionConfigPath(fullResourceName, toTypedConfig(atType, typeURL, filterConfigStruct), &ret)
 	}
 
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		if err := applyConfigDiscoveryPlugin(util.TypeURLEnvoyFilterHTTPWasm, func(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
-			wasmFilterConfig, err := r.convertWasmFilterConfig(name, meta, in)
+		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+			wasmFilterConfig, err := r.convertWasmFilterConfig(resourceName, meta, in)
 			if err != nil {
 				return nil, err
 			}
@@ -341,7 +341,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Rider:
-		if err := applyConfigDiscoveryPlugin(util.TypeURLEnvoyFilterHTTPRider, r.convertRiderFilterConfig); err != nil {
+		if err := applyConfigDiscoveryPlugin(in.Name+riderPluginSuffix, util.TypeURLEnvoyFilterHTTPRider, r.convertRiderFilterConfig); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Inline:
@@ -391,10 +391,10 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 	return nil
 }
 
-func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(name, typeURL string, out *types.Struct) error {
+func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, out *types.Struct) error {
 	out.Fields[util.StructHttpFilterName] = &types.Value{
 		Kind: &types.Value_StringValue{
-			StringValue: name,
+			StringValue: filterName,
 		},
 	}
 	out.Fields[util.StructHttpFilterConfigDiscovery] = &types.Value{
@@ -413,14 +413,14 @@ func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(name, typeURL strin
 	return nil
 }
 
-func (r *PluginManagerReconciler) addExtensionConfigPath(name string, value *types.Struct, target *[]*istio.EnvoyFilter_EnvoyConfigObjectPatch) error {
+func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, value *types.Struct, target *[]*istio.EnvoyFilter_EnvoyConfigObjectPatch) error {
 	out := &istio.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: istio.EnvoyFilter_EXTENSION_CONFIG,
 		Patch: &istio.EnvoyFilter_Patch{
 			Operation: istio.EnvoyFilter_Patch_ADD,
 			Value: &types.Struct{
 				Fields: map[string]*types.Value{
-					util.StructHttpFilterName:        {Kind: &types.Value_StringValue{StringValue: name}},
+					util.StructHttpFilterName:        {Kind: &types.Value_StringValue{StringValue: filterName}},
 					util.StructHttpFilterTypedConfig: {Kind: &types.Value_StructValue{StructValue: value}},
 				},
 			},
@@ -431,7 +431,7 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(name string, value *typ
 	return nil
 }
 
-func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
+func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
 	var (
 		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
 		pluginWasm = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Wasm)
@@ -457,7 +457,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 	}
 
 	pluginConfig := &envoyextensionswasmv3.PluginConfig{
-		Name:   name,
+		Name:   resourceName,
 		RootId: pluginWasm.Wasm.PluginName,
 		Vm: &envoyextensionswasmv3.PluginConfig_VmConfig{
 			VmConfig: &envoyextensionswasmv3.VmConfig{
@@ -506,7 +506,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(name string, meta meta
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
 }
 
-func (r *PluginManagerReconciler) convertRiderFilterConfig(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
 	var (
 		pluginRider            = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Rider)
 		imagePullSecretContent string
@@ -532,7 +532,7 @@ func (r *PluginManagerReconciler) convertRiderFilterConfig(name string, meta met
 	}
 
 	riderPluginConfig := &types.Struct{Fields: map[string]*types.Value{
-		"name": {Kind: &types.Value_StringValue{StringValue: name}},
+		"name": {Kind: &types.Value_StringValue{StringValue: pluginRider.Rider.PluginName}},
 		"vm_config": {Kind: &types.Value_StructValue{StructValue: &types.Struct{
 			Fields: map[string]*types.Value{
 				"package_path": {Kind: &types.Value_StringValue{StringValue: riderPackagePath}},
