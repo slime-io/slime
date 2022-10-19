@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
 
 export MOD=lazyload
-../../../../../../bin/publish.sh "$@"
+
+if [[ "$1" == "publish" ]]; then
+  ../../../../../../bin/multiarch.sh "$@"
+else
+  ../../../../../../bin/publish.sh "$@"
+fi

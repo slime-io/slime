@@ -5,8 +5,8 @@
 #   v1_linux_amd64 v1_linux_arm64
 ##   or
 #   ./multiarch.sh --push docker.io/slimeio/slime-limiter:v1 \
-#   slimeio/slime-limiter:v1_linux_arm64-dirty \
-#   slimeio/slime-limiter:v1_linux_amd64-dirty
+#   slimeio/slime-limiter:v1_linux_arm64 \
+#   slimeio/slime-limiter:v1_linux_amd64
 
 # usage: deploy multiarch image for submodules
 ## will to build,image,push,manifest-create,manifest-push for specified archs and target
@@ -25,7 +25,7 @@ if [[ "$1" == "publish" ]]; then
     images+=("$(TARGET_GOARCH=$arch ./publish.sh print-image)")
   done
 
-   ../slime/bin/multiarch.sh --push "$image_no_arch" "${images[@]}"
+   $0 --push "$image_no_arch" "${images[@]}"
   exit
 fi
 
