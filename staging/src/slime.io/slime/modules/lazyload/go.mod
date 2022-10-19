@@ -11,11 +11,13 @@ require (
 	github.com/onsi/gomega v1.15.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
+	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
 	sigs.k8s.io/controller-runtime v0.10.3
+	sigs.k8s.io/yaml v1.2.0
 	slime.io/slime/framework v0.0.0-00010101000000-000000000000
 )
 

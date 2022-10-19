@@ -32,6 +32,8 @@ kind: Service
 metadata:
   name: global-sidecar
   namespace: {{ $.Values.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
   labels:
     app: global-sidecar
     service: global-sidecar
@@ -56,6 +58,51 @@ metadata:
   namespace: {{ $.Values.namespace }}
   labels:
     account: global-sidecar
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: global-sidecar
+  namespace: {{ $.Values.namespace }}
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: global-sidecar
+  namespace: {{ $.Values.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: global-sidecar
+subjects:
+- kind: ServiceAccount
+  name: global-sidecar
+  namespace: {{ $.Values.namespace }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-sidecar
+  namespace: {{ $.Values.namespace }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    lazyload.slime.io/config: global-sidecar
+data:
+  cfg: |-
+    wormholePorts:
+    {{- range $gsSvcPorts }}
+    - {{ . }}
+    {{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -122,9 +169,15 @@ spec:
             - name: PROBE_PORT
               value: {{ default 18181 $gs.probePort | quote }}
             - name: LOG_LEVEL
+              {{- if $g.log }}
               value: {{ default "info" $g.log.logLevel }}
-            - name: WORMHOLE_PORTS
-              value: {{ join "," $gsSvcPorts | quote }}
+              {{- else }}
+              value: "info"
+              {{- end }}
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           {{- if $gs.image.tag }}
           image: "{{ $gs.image.repository }}:{{ $gs.image.tag}}"
           {{- else }}
@@ -218,6 +271,8 @@ kind: EnvoyFilter
 metadata:
   name: to-global-sidecar
   namespace:  {{ $.Values.istioNamespace }}
+  annotations:
+    helm.sh/resource-policy: keep
 spec:
   configPatches:
     {{- range $gsSvcPorts }}
