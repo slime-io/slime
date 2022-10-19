@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+mkdir -p ./helm-charts/slimeboot/templates/modules
 MODS=${MODS:-"lazyload limiter plugin"}
 for m in $MODS; do
   rm -rf "./helm-charts/slimeboot/templates/modules/$m"
