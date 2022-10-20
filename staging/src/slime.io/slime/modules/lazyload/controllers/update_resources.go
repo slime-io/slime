@@ -2,15 +2,27 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"sort"
+	"strings"
+	"sync"
+
+	"helm.sh/helm/v3/pkg/chart"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"os"
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+
 	config "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/lazyload/api/v1alpha1"
-	"sort"
-	"strings"
+	"slime.io/slime/modules/lazyload/charts"
+	"slime.io/slime/modules/lazyload/pkg/helm"
+	"slime.io/slime/modules/lazyload/pkg/kube"
 )
 
 var (
@@ -19,12 +31,27 @@ var (
 		Version:  "v1alpha1",
 		Resource: "slimeboots",
 	}
+
 	defaultPort      = 80
 	defaultProbePort = 18181
 	defaultReplicas  = 1
 	defaultIstioNs   = "istio-system"
 	defaultSlimeNs   = "mesh-operator"
+
+	renderOnce         sync.Once
+	globalSidecarChart *chart.Chart
 )
+
+func loadGlobalSidecarChart() *chart.Chart {
+	renderOnce.Do(func() {
+		var err error
+		globalSidecarChart, err = helm.LoadChartFromFS(charts.GlobalSidecarFS, charts.GlobalSidecar)
+		if err != nil {
+			log.Errorf("load global sidecar chart failed: %v", err)
+		}
+	})
+	return globalSidecarChart
+}
 
 // TODO change these structs to framework
 
@@ -102,68 +129,7 @@ type Module struct {
 	Kind string `protobuf:"bytes,11,opt,name=kind,proto3" json:"kind,omitempty"`
 }
 
-func updateResources(wormholePort []string, env bootstrap.Environment) bool {
-
-	log := log.WithField("function", "updateResources")
-	cliSet := env.K8SClient
-	dynCli := env.DynamicClient
-
-	// get slimeboot cr name
-	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
-	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
-	deploy, err := cliSet.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
-	if err != nil {
-		log.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
-		return false
-	}
-	slimeBootName := deploy.OwnerReferences[0].Name
-
-	// Unstructured
-	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
-	if err != nil {
-		log.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
-		return false
-	}
-	// Unstructured -> SlimeBoot
-	var slimeBoot SlimeBoot
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {
-		log.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, slimeBootName, err)
-		return false
-	}
-
-	sort.Strings(wormholePort)
-	log.Debugf("sorted wormholePort: %v", wormholePort)
-
-	for _, module := range slimeBoot.Spec.Modules {
-		if module.Kind != "lazyload" {
-			continue
-		}
-		// update wormholePort
-		module.General.WormholePort = wormholePort
-		// add default value
-		module.addDefaultValue()
-	}
-
-	// add default value
-	slimeBoot.addDefaultValue()
-
-	// update slimeBoot
-	obj, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&slimeBoot)
-	if err != nil {
-		log.Errorf("convert slimeboot %s/%s to unstructured error: %+v", slimeBootNs, slimeBootName, err)
-		return false
-	}
-	utd.SetUnstructuredContent(obj)
-	utd, err = dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Update(context.TODO(), utd, metav1.UpdateOptions{})
-	if err != nil {
-		log.Errorf("update slimeboot %s/%s error: %+v", slimeBootNs, slimeBootName, err)
-		return false
-	}
-	log.Infof("update slimeboot %s/%s successfully, new wormholePort: %+v", slimeBootNs, slimeBootName, wormholePort)
-	return true
-}
-
-func (module Module) addDefaultValue() {
+func (module *Module) addDefaultValue() {
 	if module.Global.IstioNamespace == "" {
 		module.Global.IstioNamespace = defaultIstioNs
 	}
@@ -172,7 +138,7 @@ func (module Module) addDefaultValue() {
 	}
 }
 
-func (slimeBoot SlimeBoot) addDefaultValue() {
+func (slimeBoot *SlimeBoot) addDefaultValue() {
 	if slimeBoot.Spec.Namespace == "" {
 		slimeBoot.Spec.Namespace = defaultSlimeNs
 	}
@@ -188,4 +154,153 @@ func (slimeBoot SlimeBoot) addDefaultValue() {
 	if slimeBoot.Spec.Component.GlobalSidecar.Replicas == 0 {
 		slimeBoot.Spec.Component.GlobalSidecar.Replicas = defaultReplicas
 	}
+}
+
+func updateResources(wormholePort []string, env bootstrap.Environment) bool {
+	log := log.WithField("function", "updateResources")
+	dynCli := env.DynamicClient
+
+	// chart
+	chrt := loadGlobalSidecarChart()
+	if chrt == nil {
+		log.Errorf("can't load global sidecar chart")
+		return false
+	}
+
+	// values
+	values, err := generateValuesFormSlimeboot(wormholePort, env)
+	if err != nil {
+		log.Errorf("generate values of global sidecar chart error: %v", err)
+		return false
+	}
+	log.Debugf("got values %v to render global sider chart", values)
+
+	// rander to generate new resources
+	resources, err := generateNewReources(chrt, values)
+	if err != nil {
+		log.Errorf("generate new resources error: %v", err)
+		return false
+	}
+	var ctx = context.Background()
+	for gvr, resList := range resources {
+		for _, res := range resList {
+			ns, name := res.GetNamespace(), res.GetName()
+			got, err := dynCli.Resource(gvr).Namespace(ns).Get(ctx, name, metav1.GetOptions{})
+			if err != nil {
+				if !errors.IsNotFound(err) {
+					log.Errorf("got resource %s %s/%s from apiserver error: %v", gvr, ns, name, err)
+					return false
+				}
+				_, err = dynCli.Resource(gvr).Namespace(ns).Create(ctx, res, metav1.CreateOptions{})
+				if err != nil {
+					log.Errorf("create resource %s %s/%s error: %v", gvr.String(), ns, name, err)
+					return false
+				}
+				log.Info("create resource %s %s/%s")
+			}
+			obj := mergeObject(gvr, got, res)
+			_, err = dynCli.Resource(gvr).Namespace(ns).Update(ctx, obj, metav1.UpdateOptions{})
+			if err != nil {
+				log.Errorf("update resource %s %s/%s error: %v", gvr, ns, name, err)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func generateValuesFormSlimeboot(wormholePort []string, env bootstrap.Environment) (map[string]interface{}, error) {
+	kubeCli := env.K8SClient
+	dynCli := env.DynamicClient
+
+	// get slimeboot cr name
+	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
+	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
+	deploy, err := kubeCli.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
+	}
+	slimeBootName := deploy.OwnerReferences[0].Name
+
+	// Unstructured
+	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
+	if err != nil {
+		return nil, fmt.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
+	}
+	// Unstructured -> SlimeBoot
+	var slimeBoot SlimeBoot
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {
+		return nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, slimeBootName, err)
+	}
+
+	sort.Strings(wormholePort)
+	log.Debugf("sorted wormholePort: %v", wormholePort)
+
+	for idx, module := range slimeBoot.Spec.Modules {
+		if module.Kind != "lazyload" {
+			continue
+		}
+		slimeBoot.Spec.Modules[idx].General.WormholePort = wormholePort
+		slimeBoot.Spec.Modules[idx].addDefaultValue()
+	}
+	slimeBoot.addDefaultValue()
+	values, err := object2Values(slimeBoot.Spec)
+	if err != nil {
+		return nil, fmt.Errorf("convert slimeboot spec to values error: %v", err)
+	}
+	return values, nil
+}
+
+func object2Values(obj interface{}) (map[string]interface{}, error) {
+	data, err := json.Marshal(obj)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]interface{})
+	err = json.Unmarshal(data, &m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func generateNewReources(chrt *chart.Chart, values map[string]interface{}) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
+	manifests, err := helm.RenderChartWithValues(chrt, values)
+	if err != nil {
+		return nil, fmt.Errorf("render global sidecar chart with values error: %v", err)
+	}
+
+	outs := make(map[schema.GroupVersionResource][]*unstructured.Unstructured)
+	for _, resList := range manifests {
+		for _, res := range resList {
+			r := strings.NewReader(res)
+			decoder := utilyaml.NewYAMLOrJSONDecoder(r, 1024)
+			utd := &unstructured.Unstructured{}
+			if err := decoder.Decode(utd); err != nil {
+				return nil, fmt.Errorf("decode object from resource manifest: %q error: %v", res, err)
+			}
+			switch gvk := utd.GetObjectKind().GroupVersionKind(); gvk {
+			case kube.ServiceGVK, kube.ConfigMapGVK, kube.EnvoyFilterGVK:
+				gvr := kube.ConvertToGroupVersionResource(gvk)
+				outs[gvr] = append(outs[gvr], utd)
+			default:
+				continue
+			}
+		}
+	}
+	return outs, nil
+}
+
+func mergeObject(gvr schema.GroupVersionResource, got, utd *unstructured.Unstructured) *unstructured.Unstructured {
+	ret := got.DeepCopy()
+	switch gvr {
+	case kube.ConfigMapGVR:
+		ret.Object["data"] = utd.Object["data"]
+	case kube.EnvoyFilterGVR:
+		ret.Object["spec"] = utd.Object["spec"]
+	case kube.ServiceGVR:
+		ports, _, _ := unstructured.NestedSlice(utd.Object, "spec", "ports")
+		_ = unstructured.SetNestedSlice(ret.Object, ports, "spec", "ports")
+	}
+	return ret
 }
