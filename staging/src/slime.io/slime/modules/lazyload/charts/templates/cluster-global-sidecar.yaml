@@ -32,8 +32,6 @@ kind: Service
 metadata:
   name: global-sidecar
   namespace: {{ $.Values.namespace }}
-  annotations:
-    helm.sh/resource-policy: keep
   labels:
     app: global-sidecar
     service: global-sidecar
@@ -93,8 +91,6 @@ kind: ConfigMap
 metadata:
   name: global-sidecar
   namespace: {{ $.Values.namespace }}
-  annotations:
-    helm.sh/resource-policy: keep
   labels:
     lazyload.slime.io/config: global-sidecar
 data:
@@ -271,8 +267,6 @@ kind: EnvoyFilter
 metadata:
   name: to-global-sidecar
   namespace:  {{ $.Values.istioNamespace }}
-  annotations:
-    helm.sh/resource-policy: keep
 spec:
   configPatches:
     {{- range $gsSvcPorts }}
