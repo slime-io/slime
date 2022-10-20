@@ -1,6 +1,6 @@
 module slime.io/slime/modules/lazyload
 
-go 1.13
+go 1.16
 
 require (
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
@@ -12,6 +12,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
 	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
+	helm.sh/helm/v3 v3.6.2
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2

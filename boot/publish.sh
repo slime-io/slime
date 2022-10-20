@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
-
+set -x
 mkdir -p ./helm-charts/slimeboot/templates/modules
 MODS=${MODS:-"lazyload limiter plugin"}
 for m in $MODS; do
   rm -rf "./helm-charts/slimeboot/templates/modules/$m"
   cp -r "../staging/src/slime.io/slime/modules/$m/charts/" "./helm-charts/slimeboot/templates/modules/$m"
+done
+find ./helm-charts/slimeboot/templates/modules -type f | grep -v ".yaml" | xargs --no-run-if-empty  rm -f 
+for e in Chart.yaml values.yaml; do
+  find ./helm-charts/slimeboot/templates/modules -type f -name "$e" -delete
 done
 
 export MOD=boot

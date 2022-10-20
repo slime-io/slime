@@ -1,0 +1,5 @@
+namespace: mesh-operator
+istioNamespace: istio-system
+
+service:
+  logSourcePort: 8082

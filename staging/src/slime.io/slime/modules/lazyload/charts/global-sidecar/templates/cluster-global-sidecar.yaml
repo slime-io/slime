@@ -18,7 +18,7 @@
   {{ $gsSvcPorts := list }}
   {{ $hasGsPort := false }}
   {{- range $f.wormholePort }}
-  {{- if eq (int .) $gsPort }}
+  {{- if eq (int .) (int $gsPort) }}
   {{ $hasGsPort = true }}
   {{- end -}}
   {{ $gsSvcPorts = append $gsSvcPorts . }}
