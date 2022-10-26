@@ -1,0 +1,130 @@
+---
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: slime-hango
+  namespace: hango-system
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: slime-hango
+  namespace: hango-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bundle
+  template:
+    metadata:
+      labels:
+        app: bundle
+    spec:
+      containers:
+        - args:
+            - --enable-leader-election
+          command:
+            - /manager
+          env:
+            - name: WATCH_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: OPERATOR_NAME
+              value: slime
+            - name: GODEBUG
+              value: gctrace=1
+          image: docker.io/slimeio/slime-bundle-hango:master-cb6098f_linux_amd64
+          imagePullPolicy: Always
+          livenessProbe:
+            failureThreshold: 2
+            httpGet:
+              path: /modules/livez
+              port: aux-port
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          name: slime
+          ports:
+            - containerPort: 80
+              name: http
+              protocol: TCP
+            - containerPort: 8081
+              name: aux-port
+              protocol: TCP
+            - containerPort: 8082
+              name: log-source-port
+              protocol: TCP
+          readinessProbe:
+            failureThreshold: 1
+            httpGet:
+              path: /modules/readyz
+              port: aux-port
+              scheme: HTTP
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            successThreshold: 1
+            timeoutSeconds: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 1Gi
+            requests:
+              cpu: 200m
+              memory: 200Mi
+          securityContext: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+            - mountPath: /etc/slime/config
+              name: config-volume
+      securityContext: {}
+      serviceAccount: slime-hango
+      serviceAccountName: slime-hango
+      volumes:
+        - configMap:
+            defaultMode: 420
+            name: slime-hango
+          name: config-volume
+
+---
+
+apiVersion: v1
+data:
+  cfg: |
+    {"bundle":{"modules":[{"kind":"limiter","name":"limiter"},{"kind":"plugin","name":"plugin"}]},"enable":true,"global":{"configSources":[{"address":"ss://"}],"log":{"logLevel":"info"}},"name":"bundle"}
+  cfg_limiter: |
+    {"enable":true,"general":{"disableAdaptive":true,"disableGlobalRateLimit":true,"disableInsertGlobalRateLimit":true},"kind":"limiter","mode":"BundleItem","name":"limiter"}
+  cfg_plugin: |
+    {"enable":true,"kind":"plugin","mode":"BundleItem","name":"plugin"}
+kind: ConfigMap
+metadata:
+  name: slime-hango
+  namespace: hango-system
+
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: slime-hango
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: slime-hango
+    namespace: hango-system
