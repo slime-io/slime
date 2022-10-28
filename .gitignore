@@ -86,3 +86,4 @@ staging/src/slime.io/slime/modules/*/.idea/*
 
 ### module helm chats ###
 boot/helm-charts/slimeboot/templates/modules/*
+
