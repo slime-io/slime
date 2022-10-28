@@ -6,7 +6,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   module:
     - name: limiter
       kind: limiter
