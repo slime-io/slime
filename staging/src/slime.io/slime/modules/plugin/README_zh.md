@@ -53,7 +53,7 @@ metadata:
   name: reviews-pm
   namespace: default
 spec:
-  workload_labels:
+  workloadLabels:
     app: reviews
   plugin:
   - enable: true
@@ -76,7 +76,7 @@ metadata:
   name: my-plugin
   namespace: default
 spec:
-  workload_labels:
+  workloadLabels:
     app: my-app
   plugin:
   - enable: true            # switch
@@ -100,7 +100,7 @@ metadata:
   name: reviews-pm
   namespace: default
 spec:
-  workload_labels:
+  workloadLabels:
     app: reviews
   plugin:
   - enable: true
