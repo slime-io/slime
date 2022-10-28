@@ -127,7 +127,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-bundle-example-all
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   module:
     - name: bundle
       enable: true
@@ -177,7 +177,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -227,7 +227,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: master-cb6098f_linux_amd64
+        tag: v0.5.0_linux_amd64
       probePort: 20000
 ```
 
@@ -255,7 +255,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   module:
     - name: limiter
       kind: limiter
@@ -292,7 +292,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   module:
     - name: plugin
       kind: plugin
@@ -316,7 +316,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-bundle-example-all
-    tag: master-cb6098f_linux_amd64
+    tag: v0.5.0_linux_amd64
   module:
     - name: bundle
       enable: true
@@ -382,7 +382,7 @@ spec:
           memory: 1024Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: master-cb6098f_linux_amd64
+        tag: v0.5.0_linux_amd64
       probePort: 20000 # health probe port
       port: 80 # global-sidecar default svc port
       legacyFilterName: true

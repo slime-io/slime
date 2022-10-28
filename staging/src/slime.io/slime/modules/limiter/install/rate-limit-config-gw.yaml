@@ -5,4 +5,4 @@ data:
 kind: ConfigMap
 metadata:
   name: rate-limit-config
-  namespace: istio-gateway
+  namespace: gateway-system

@@ -43,7 +43,7 @@ spec:
               value: slime
             - name: GODEBUG
               value: gctrace=1
-          image: docker.io/slimeio/slime-bundle-hango:master-cb6098f_linux_amd64
+          image: docker.io/slimeio/slime-bundle-hango:v0.5.0_linux_amd64
           imagePullPolicy: Always
           livenessProbe:
             failureThreshold: 2
