@@ -38,7 +38,7 @@ spec:
                   items:
                     type: string
                   type: array
-                plugins:
+                plugin:
                   items:
                     oneOf:
                       - not:
@@ -84,7 +84,7 @@ spec:
                             description: Unordered map of dynamically typed values.
                             type: object
                         type: object
-                      type_url:
+                      typeUrl:
                         type: string
                       rider:
                         type: object
@@ -155,7 +155,7 @@ spec:
                             type: string
                     type: object
                   type: array
-                workload_selector:
+                workloadLabels:
                   description: '`WorkloadSelector` specifies the criteria used to determine
                   if the `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry` configuration
                   can be applied to a proxy. The matching criteria includes the metadata
@@ -164,15 +164,8 @@ spec:
                   the initial handshake. If multiple conditions are specified, all conditions
                   need to match in order for the workload instance to be selected. Currently,
                   only label based selection mechanism is supported.'
-                  properties:
-                    labels:
-                      additionalProperties:
-                        type: string
-                      description: One or more labels that indicate a specific set of pods/VMs
-                        on which the configuration should be applied. The scope of label
-                        search is restricted to the configuration namespace in which the
-                        the resource is present.
-                      type: object
+                  additionalProperties:
+                    type: string
                   type: object
             status:
               type: object
@@ -294,7 +287,7 @@ spec:
                             description: Unordered map of dynamically typed values.
                             type: object
                         type: object
-                      type_url:
+                      typeUrl:
                         type: string
                       rider:
                         type: object
@@ -380,7 +373,7 @@ spec:
                   items:
                     type: string
                   type: array
-                workload_selector:
+                workloadSelector:
                   description: '`WorkloadSelector` specifies the criteria used to determine
                   if the `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry` configuration
                   can be applied to a proxy. The matching criteria includes the metadata
@@ -389,15 +382,8 @@ spec:
                   the initial handshake. If multiple conditions are specified, all conditions
                   need to match in order for the workload instance to be selected. Currently,
                   only label based selection mechanism is supported.'
-                  properties:
-                    labels:
-                      additionalProperties:
-                        type: string
-                      description: One or more labels that indicate a specific set of pods/VMs
-                        on which the configuration should be applied. The scope of label
-                        search is restricted to the configuration namespace in which the
-                        the resource is present.
-                      type: object
+                  additionalProperties:
+                    type: string
                   type: object
             status:
               type: object
