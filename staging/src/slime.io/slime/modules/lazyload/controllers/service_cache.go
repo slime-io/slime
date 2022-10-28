@@ -2,10 +2,11 @@ package controllers
 
 import (
 	"context"
-	watchtools "k8s.io/client-go/tools/watch"
 	"strconv"
 	"strings"
 	"time"
+
+	watchtools "k8s.io/client-go/tools/watch"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
@@ -120,6 +121,7 @@ func (r *ServicefenceReconciler) startSvcCache() {
 	needUpdate, successUpdate := false, true
 
 	if r.cfg.AutoPort {
+        // Todo: need leader election
 		log.Infof("Lazyload port auto management is running")
 		go func() {
 			// polling request

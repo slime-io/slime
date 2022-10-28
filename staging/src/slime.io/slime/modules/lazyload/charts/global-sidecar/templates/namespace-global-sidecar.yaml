@@ -1,32 +1,34 @@
-{{ if .Values.component }}
-  {{ if .Values.component.globalSidecar }}
-  {{ if .Values.component.globalSidecar.enable }}
+{{- if and .Values.component .Values.component.globalSidecar .Values.component.globalSidecar.enable }}
   {{ $gs := .Values.component.globalSidecar }}
   {{ $gsPort := $gs.port | default 80 }}
-  {{ range $.Values.module }}
-  {{ if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
-  {{ if .global }}
-  {{ if .global.misc }}
-  {{ if .global.misc.globalSidecarMode }}
-  {{ if eq .global.misc.globalSidecarMode "namespace" }}
-  {{ $f := .general }}
-  {{ if .fence }}
-  {{ $f = .fence }}
-  {{- end -}}
-  {{ $g := .global }}
-  {{ $name := .name }}
-  {{ $gsSvcPorts := list }}
-  {{ $hasGsPort := false }}
-  {{- range $f.wormholePort }}
-  {{- if eq (int .) $gsPort }}
-  {{ $hasGsPort = true }}
-  {{- end -}}
-  {{ $gsSvcPorts = append $gsSvcPorts . }}
-  {{- end -}}
-  {{- if not $hasGsPort }}
-  {{ $gsSvcPorts = append $gsSvcPorts $gsPort }}
-  {{- end -}}
-  {{ range $_, $ns := $f.namespace }}
+  {{- range $.Values.module }}
+    {{- if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
+      {{- if and .global .global.misc }}
+        {{- if eq .global.misc.globalSidecarMode "namespace" }}
+          {{ $f := .general }}
+              {{ if .fence }}
+                  {{ $f = .fence }}
+              {{- end -}}
+          {{ $g := .global }}
+          {{ $name := .name }}
+          {{ $gsSvcPorts := list }}
+          {{ $hasGsPort := false }}
+          {{ $autoPort := .general.autoPort }}
+          {{- range $f.wormholePort }}
+             {{- if eq (int .) (int $gsPort) }}
+                 {{ $hasGsPort = true }}
+             {{- end -}}
+             {{ $gsSvcPorts = append $gsSvcPorts . }}
+          {{- end -}}
+          {{- if not $hasGsPort }}
+             {{ $gsSvcPorts = append $gsSvcPorts $gsPort }}
+          {{- end -}}
+          {{- range $_, $ns := $f.namespace }}
+
+{{- /*
+Now, we will render all the resources of the global-sidecar, reset indentation for readability.
+*/}}
+{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
 ---
 apiVersion: v1
 kind: Service
@@ -49,6 +51,7 @@ spec:
     app: global-sidecar
   sessionAffinity: None
   type: ClusterIP
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -86,6 +89,7 @@ subjects:
 - kind: ServiceAccount
   name: global-sidecar
   namespace: {{ $ns }}
+{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -100,6 +104,7 @@ data:
     {{- range $gsSvcPorts }}
     - {{ . }}
     {{- end }}
+{{- end }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -138,11 +143,13 @@ spec:
         {{- end }}
         {{- end }}
         {{- end }}
-#        {{- if $f.globalSidecar }}
-#        {{- if $f.globalSidecar.excludeInbounds }}
-#        traffic.sidecar.istio.io/excludeInboundPorts: {{ $f.globalSidecar.excludeInboundPorts }}
-#        {{- end }}
-#        {{- end }}
+{{- /*
+        {{- if $f.globalSidecar }}
+        {{- if $f.globalSidecar.excludeInbounds }}
+        traffic.sidecar.istio.io/excludeInboundPorts: {{ $f.globalSidecar.excludeInboundPorts }}
+        {{- end }}
+        {{- end }}
+*/}}
       labels:
         app: global-sidecar
         {{- if $gs.sidecarInject }}
@@ -210,8 +217,8 @@ spec:
             {{- toYaml $gs.resources | nindent 12 }}
           securityContext:
             privileged: true
+{{- if or (not $g) (not $g.misc) (eq (default "prometheus" $g.misc.metricSourceType) "prometheus") }}
 ---
-  {{- if or (not $g) (not $g.misc) (eq (default "prometheus" $g.misc.metricSourceType) "prometheus") }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -261,7 +268,8 @@ spec:
                 name: istio.metadata_exchange
       patch:
         operation: REMOVE
-  {{- end }}
+{{- end }}
+{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -357,11 +365,9 @@ spec:
                   route:
                     cluster: PassthroughCluster
     {{- end }}
+{{- end }}
+{{- if (eq $g.misc.metricSourceType "accesslog") }}
 ---
-  {{- if $g }}
-  {{- if $g.misc }}
-  {{- if $g.misc.metricSourceType }}
-  {{- if (eq $g.misc.metricSourceType "accesslog") }}
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -397,17 +403,13 @@ spec:
                     transport_api_version: "V3"
                     grpc_service:
                       envoy_grpc:
-                        #cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
+{{- /*
+                        cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
+*/}}
                         cluster_name: lazyload-accesslog-source
-  {{- end }}
-  {{- end }}
-  {{- end }}
-  {{- end }}
+{{- end }}
+{{- if (eq $g.misc.metricSourceType "accesslog") }}
 ---
-  {{- if $g }}
-  {{- if $g.misc }}
-  {{- if $g.misc.metricSourceType }}
-  {{- if (eq $g.misc.metricSourceType "accesslog") }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -442,17 +444,14 @@ data:
         }]
       }
     }
+{{- end }}
+{{- /*
+Now that we've rendered all the resources for the global-sidecar, restore the indentation.
+*/}}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
   {{- end }}
-  {{- end }}
-  {{- end }}
-  {{- end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
-{{ end }}
+{{- end }}
+

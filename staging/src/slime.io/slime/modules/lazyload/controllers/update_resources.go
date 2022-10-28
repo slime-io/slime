@@ -136,6 +136,10 @@ func (module *Module) addDefaultValue() {
 	if module.Global.SlimeNamespace == "" {
 		module.Global.SlimeNamespace = defaultSlimeNs
 	}
+	if module.Global.Misc == nil {
+		module.Global.Misc = make(map[string]string)
+	}
+	module.Global.Misc["render"] = "lazyload"
 }
 
 func (slimeBoot *SlimeBoot) addDefaultValue() {
