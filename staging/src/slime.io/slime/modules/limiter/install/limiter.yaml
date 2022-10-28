@@ -1,33 +1,22 @@
----
-apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: smartlimiter
+  name: limiter
   namespace: mesh-operator
 spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0_linux_amd64
+    tag: master-cb6098f_linux_amd64
   module:
-    - name: limiter # custom value
-      kind: limiter # should be "limiter"
+    - name: limiter
+      kind: limiter
       enable: true
-      general: # replace previous "limiter" field
-        backend: 1
-      metric:
-        prometheus:
-          address: http://prometheus.istio-system:9090
-          handlers:
-            cpu.sum:
-              query: |
-                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            cpu.max:
-              query: |
-                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            rt99:
-              query: |
-                histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-        k8s:
-          handlers:
-            - pod # inline
+      limiter:
+        disableGlobalRateLimit: true
+        disableAdaptive: true
+        disableInsertGlobalRateLimit: true
+      global:
+        log:
+          logLevel: info
+        configSources:
+          - address: ss://

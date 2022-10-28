@@ -1,8 +1,8 @@
+
 - [自适应限流概述](#自适应限流概述)
   - [背景](#背景)
   - [特点](#特点)
   - [功能](#功能)
-  - [思路](#思路)
   - [架构](#架构)
   - [样例](#样例)
   - [依赖](#依赖)
@@ -12,24 +12,58 @@
 
 ## 背景
 
-在网格中，为了配置限流规则用户不得不面对复杂的`EnvoyFilter`配置，为了解决这个问题，我们们推出了自适应限流组件`slime/limiter`。用户只需要提交符合我们定义的`SmartLimiter`，即可完成灵活的服务限流要求。[安装和使用](./document/smartlimiter_zh.md#安装和使用)
+服务限流的目的是为了保护服务不被大量请求击垮，通过限制请求速率保护服务正常运行，在服务网格体系中，需要下发复杂的的EnvoyFilter才能完成限流。为了减轻用户使用难度，我们们推出了限流组件slime/limiter，用户只需提交贴近用户语义的SmartLimiter资源，即可完成限流规则的下发。
 
 ## 特点
 
 1. 方便使用，只需提交`SmartLimiter`资源即可达到服务限流的目的。
 2. 自适应限流，根据`pod`的资源使用量动态的触发限流规则。
-3. 覆盖场景多，支持全局共享限流，全局均分限流，单机限流。
+3. 覆盖场景多，网格入口流量限流，网关出口流量限流
+4. 支持功能多，支持全局共享限流，全局均分限流，单机限流。
+
+## 实现
+slime/limiter 组件监听smartlimiter资源，自动生成包含限流规则的envoyfilter。
+- 对于网格场景，envoyfilter会下发给作为sidecar的envoy,在envoy的入口进行限流判断。
+- 对于网关场景，envoyfilter被下发给作为router的envoy，在envoy的出口进行限流判断。
 
 
 ## 功能
-1. 单机限流，每个pod单独的计数器
-2. 全局共享限流，所有pod共享一个全局计数器
-3. 全局均分限流，所有pod均分计数。
-[功能](./document/smartlimiter_zh.md#smartlimiter)
 
-## 思路
+目前slime/limiter模块支持以下几个类型的限流：
 
-为了让用户从复杂的`EnvoyFilter`配置中脱离出来，我们利用`kubernetes`的`CRD`机制定义了一套简便的`API`，即`kubernetes`内的`SmartLimiter`资源。用户只需要按照`SmartLimiter`的规范提交一个`CR`,就会在集群中自动生成一个`EnvoyFilter`
+网格场景下：
+
+1. 支持单机限流：对于指定的服务的每一个pod,都有一个固定的限流数值，使用的限流插件是http.local_ratelimit（限流计数器在本地), 详见[单机限流](./document/smartlimiter_zh.md#网格场景单机限流)
+2. 支持全局均分限流：服务的所有pod，平均分配限流数，使用的限流插件是http.local_ratelimit（限流计数器在本地, 详见[全局均分限流](./document/smartlimiter_zh.md#网格场景全局均分限流)
+3. 支持全局共享限流：服务的所有pod, 共享一个限流计数器，使用的限流插件是http.ratelimit（限流计数器在远端, 详见[全局共享限流](./document/smartlimiter_zh.md#网格场景全局共享限流)
+
+网关场景下：
+1. 支持单机限流，详见[单机限流](./document/smartlimiter_zh.md#网关场景单机限流)
+2. 支持全局共享限流，详见[全局共享限流](./document/smartlimiter_zh.md#网关场景单机限流)
+
+
+
+网格网关场景下支持限流类型如下
+
+|      | 单机限流 | 全局均分限流 | 全局共享 |
+| ---- | -------- | ------------ | -------- |
+| 网格 | 支持     | 支持         | 支持     |
+| 网关 | 支持     | -            | 支持     |
+
+网格网关场景下支持限流方向如下
+
+|      | 入方向限流 | 出方向限流               |
+| ---- | ---------- | ------------------------ |
+| 网格 | 支持       | 部分支持（单机限流） |
+| 网关 | -          | 支持                     |
+
+网格网关场景下一些功能的差异如下
+
+|      | headerMatch | host限流 | serviceEntry |
+| ---- | ---------------- | ---------- | ------------ |
+| 网格 | 支持             | -          | 支持         |
+| 网关 | 支持             | 支持       | -            |
+
 
 
 ## 架构
@@ -40,7 +74,9 @@
 
 ## 样例
 
-`SmartLimiter`的CRD定义的比较接近自然语义，例如，希望当`reviews`服务的`v1`版本的服务消耗`cpu`总量大于10的时候，触发限流，让其每个`POD`的9080端口的服务每秒钟只能处理10次请求。 [实践](./document/smartlimiter_zh.md#实践)
+`SmartLimiter`的CRD定义的比较接近自然语义
+
+例如，以下样例中，对review服务的9080端口设置限流规则 10次/s [实践](./document/smartlimiter_zh.md#实践)
 
 ~~~yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -57,11 +93,14 @@ spec:
             seconds: 1
           quota: "10"
           strategy: "single"
-        condition: "{{.v1.cpu.sum}}>10"
+        condition: "true"
         target:
           port: 9080
 ~~~
 
 ## 依赖
-1. 依赖 `Prometheus` , [prometheus安装](./document/smartlimiter_zh.md#安装-prometheus)
-2. 依赖 `RLS` ,可选，[RLS安装](./document/smartlimiter_zh.md#安装-rls--redis)
+1. 依赖 `Prometheus`可选,如果不需支持自适应限流，无需安装， [prometheus安装](./document/smartlimiter_zh.md#安装-prometheus)
+2. 依赖 `RLS`，可选，如果不需要支持全局共享限流，无需安装，[RLS安装](./document/smartlimiter_zh.md#安装-rls--redis)
+
+
+更多详细信息可以参考 [limiter](./document/smartlimiter_zh.md#自适应限流模块)
