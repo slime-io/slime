@@ -9,13 +9,22 @@ spec:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
     tag: v0.5.0_linux_amd64
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+    limits:
+      cpu: 600m
+      memory: 600Mi
   module:
     - name: lazyload # custom value
       kind: lazyload # should be "lazyload"
       enable: true
       general: # replace previous "fence" field
+        autoPort: true
+        autoFence: true
+        defaultFence: false
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "80"
           - "9080"
       global:
         misc:

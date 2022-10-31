@@ -1,40 +1,29 @@
 - [懒加载教程](#懒加载教程)
   - [架构](#架构)
   - [安装和使用](#安装和使用)
-    - [Cluster模式](#cluster模式)
-      - [Accesslog](#accesslog)
-      - [Prometheus](#prometheus)
-    - [Namespace模式](#namespace模式)
-      - [accesslog metric](#accesslog-metric)
-      - [prometheus metric](#prometheus-metric)
-  - [特性介绍](#特性介绍)
-    - [基于Accesslog开启懒加载](#基于accesslog开启懒加载)
-    - [基于namespace/service label自动生成ServiceFence](#基于namespaceservice-label自动生成servicefence)
-    - [自定义兜底流量分派](#自定义兜底流量分派)
-    - [静态服务依赖关系添加](#静态服务依赖关系添加)
-      - [依赖某个服务](#依赖某个服务)
-      - [依赖某个namespace所有服务](#依赖某个namespace所有服务)
-      - [依赖具有某个label的所有服务](#依赖具有某个label的所有服务)
-    - [支持自定义服务依赖别名](#支持自定义服务依赖别名)
-    - [日志输出到本地并轮转](#日志输出到本地并轮转)
-      - [创建存储卷](#创建存储卷)
-      - [在SlimeBoot中声明挂载信息](#在slimeboot中声明挂载信息)
-  - [示例](#示例)
     - [安装 istio (1.8+)](#安装-istio-18)
-    - [设定tag](#设定tag)
-    - [安装 slime](#安装-slime)
+    - [安装 slime-boot](#安装-slime-boot)
+    - [安装 lazyload](#安装-lazyload)
     - [安装bookinfo](#安装bookinfo)
     - [开启懒加载](#开启懒加载)
     - [首次访问观察](#首次访问观察)
     - [再次访问观察](#再次访问观察)
     - [卸载](#卸载)
-    - [补充说明](#补充说明)
-  - [FAQ](#faq)
-    - [支持的Istio版本？](#支持的istio版本)
-    - [为什么必须指定服务端口？](#为什么必须指定服务端口)
-    - [为什么必须指定使用懒加载的namespace列表？](#为什么必须指定使用懒加载的namespace列表)
-    - [~~global-sidecar-pilot的意义？~~（组件已废弃）](#global-sidecar-pilot的意义组件已废弃)
-    - [~~global sidecar不能正常启动？~~（已解决）](#global-sidecar不能正常启动已解决)
+  - [特性介绍](#特性介绍)
+    - [服务端口自动纳管](#服务端口自动纳管)
+    - [基于Accesslog开启懒加载](#基于accesslog开启懒加载)
+    - [手动或自动为服务启用懒加载](#手动或自动为服务启用懒加载)
+      - [自动模式](#自动模式)
+      - [手动模式](#手动模式)
+    - [自定义兜底流量分派](#自定义兜底流量分派)
+    - [添加静态服务依赖关系](#添加静态服务依赖关系)
+      - [依赖某个服务](#依赖某个服务)
+      - [依赖某个namespace所有服务](#依赖某个namespace所有服务)
+      - [依赖具有某个label的所有服务](#依赖具有某个label的所有服务)
+    - [自定义服务依赖别名](#自定义服务依赖别名)
+    - [日志输出到本地并轮转](#日志输出到本地并轮转)
+      - [创建存储卷](#创建存储卷)
+      - [在SlimeBoot中声明挂载信息](#在slimeboot中声明挂载信息)
 
 
 
@@ -43,6 +32,10 @@
 # 懒加载教程
 
 ## 架构
+
+服务网格中的所有namespace都可以使用懒加载，无需显式指定使用懒加载的命令空间列表。
+
+使用懒加载需要部署一个global-sidecar应用，位于lazyload controller的namespace下，默认为mesh-operator。所有兜底请求都会发到这个global-sidecar应用。
 
 
 
@@ -98,48 +91,49 @@
 
 
 
+
+
+
+
 ## 安装和使用
 
-请先按照安装slime-boot小节的指引安装slime-boot。使用懒加载功能需要在`SlimeBoot.spec.module`中添加`fence`，并且`enable: true`，同时指定global-sidecar组件的使用方式。如下
+本教程演示为bookinfo的productpage服务开启懒加载。
 
-```yaml
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: lazyload
-  namespace: mesh-operator
-spec:
-  module:
-    - name: lazyload
-      kind: lazyload
-      enable: true
-      general:
-        # other config
-  component:
-    globalSidecar:
-      enable: true
-      # other config
+### 安装 istio (1.8+)
+
+自行安装好 istio 。
+
+
+
+### 安装 slime-boot
+
+安装懒加载前，需要先安装 `SlimeBoot CRD`， `ServiceFence CRD`和`deployment/slime-boot`。这一步是为了准备好懒加载需要的 CRD 以及懒加载模块的启动器。不同 k8s 版本的安装文件略有u区别，详见 [SlimeBoot 介绍与使用 - 准备](../../../../../../doc/zh/slime-boot.md#%E5%87%86%E5%A4%87) 。
+
+此处我们假设 k8s version 为1.16+
+
+```sh
+export tag_or_commit=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+kubectl create ns mesh-operator
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds-v1.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
+```
+
+确认所有组件已正常运行
+
+```sh
+$ kubectl get pod -n mesh-operator
+NAME                              READY   STATUS    RESTARTS   AGE
+slime-boot-6f778b75cd-4v675       1/1     Running   0          26s
 ```
 
 
 
-根据global-sidecar部署方式与服务依赖的指标的来源不同，可分为四种模式。
+### 安装 lazyload
 
-### Cluster模式
+创建 `SlimeBoot` CR
 
-在该模式下，服务网格中的所有namespace都可以使用懒加载，无需像Namespace模式一样，显式指定使用懒加载的命令空间列表。
-
-该模式会部署一个global-sidecar应用，位于lazyload controller的namespace下，默认为mesh-operator。所有兜底请求都会发到这个global-sidecar应用。
-
-#### Accesslog
-
-指标来源为global-sidecar的accesslog。
-
-> [完整样例](./install/samples/lazyload/slimeboot_cluster_accesslog.yaml)
-
-```yaml
----
-apiVersion: config.netease.com/v1alpha1
+```sh
+$ echo 'apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
   name: lazyload
@@ -148,143 +142,44 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
+    tag: v0.5.0_linux_amd64
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+    limits:
+      cpu: 600m
+      memory: 600Mi
   module:
     - name: lazyload # custom value
       kind: lazyload # should be "lazyload"
       enable: true
       general: # replace previous "fence" field
+        autoPort: false
+        autoFence: true
+        defaultFence: false
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "{{your_port}}"
+          - "9080"
       global:
+        log:
+          logLevel: info
         misc:
-          globalSidecarMode: cluster # inform the lazyload controller of the global-sidecar mode
-          metricSourceType: accesslog # infrom the metric source
-  component:
-    globalSidecar:
-      enable: true
-      type: cluster # inform the slime-boot operator of the global-sidecar mode
-      sidecarInject:
-        enable: true # must be true
-        mode: pod # if type = cluster, can only be "pod"; if type = namespace, can be "pod" or "namespace"
-        labels: # optional, used for sidecarInject.mode = pod, indicate the labels for sidecar auto inject 
-          {{your_istio_autoinject_labels}}
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 400m
-          memory: 400Mi
-      image:
-        repository: docker.io/slimeio/slime-global-sidecar
-        tag: {{your_global-sidecar_tag}}
-```
-
-
-
-#### Prometheus
-
-指标来源为Prometheus。
-
-> [完整样例](./install/samples/lazyload/slimeboot_cluster_prometheus.yaml)
-
-```yaml
----
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: lazyload
-  namespace: mesh-operator
-spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
-  module:
-    - name: lazyload # custom value
-      kind: lazyload # should be "lazyload"
-      enable: true
-      general: # replace previous "fence" field
-        wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "{{your_port}}"
-      global:
-        misc:
-          globalSidecarMode: cluster # inform the lazyload controller of the global-sidecar mode
-      metric: # indicate the metric source
-        prometheus:
-          address: {{your_prometheus_address}}
-          handlers:
-            destination:
-              query: |
-                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
-              type: Group
-  component:
-    globalSidecar:
-      enable: true
-      type: cluster # inform the slime-boot operator of the global-sidecar mode
-      sidecarInject:
-        enable: true # must be true
-        mode: pod # if type = cluster, can only be "pod"; if type = namespace, can be "pod" or "namespace"
-        labels: # optional, used for sidecarInject.mode = pod, indicate the labels for sidecar auto inject 
-          {{your_istio_autoinject_labels}}
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 400m
-          memory: 400Mi
-      image:
-        repository: docker.io/slimeio/slime-global-sidecar
-        tag: {{your_global-sidecar_tag}}
-```
-
-
-
-### Namespace模式
-
-该模式需要显式指定使用懒加载的命名空间列表，位置是SlimeBoot的`spec.module.general.namespace`。该模式会在每个打算启用懒加载的namespace下部署一个global-sidecar应用。每个namespace的兜底请求都会发到同namespace下的global-sidecar应用。
-
-#### accesslog metric
-
-指标来源为global-sidecar的accesslog。
-
-> [完整样例](./install/samples/lazyload/slimeboot_namespace_accesslog.yaml)
-
-```yaml
----
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: lazyload
-  namespace: mesh-operator
-spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
-  module:
-    - name: lazyload # custom value
-      kind: lazyload # should be "lazyload"
-      enable: true
-      general: # replace previous "fence" field
-        wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "{{your_port}}"
-        namespace: # replace to your service's namespace which will use lazyload, and extend the list in case of multi namespaces
-          - {{your_namespace}}
-      global:
-        misc:
+          globalSidecarMode: cluster # inform the mode of global-sidecar
           metricSourceType: accesslog # indicate the metric source
   component:
     globalSidecar:
       enable: true
-      type: namespace # inform the slime-boot operator of the global-sidecar mode
       sidecarInject:
-        enable: true # must be true
-        mode: namespace # if type = cluster, can only be "pod"; if type = namespace, can be "pod" or "namespace"
-        #labels: # optional, used for sidecarInject.mode = pod
-          #sidecar.istio.io/inject: "true"
+        enable: true # should be true
+        # mode definition:
+        # "pod": sidecar auto-inject on pod level, need provide labels for injection
+        # "namespace": sidecar auto-inject on namespace level, no need to provide labels for injection
+        # if globalSidecarMode is cluster, global-sidecar will be deployed in slime namespace, which does not enable auto-inject on namespace level, mode can only be "pod".
+        # if globalSidecarMode is namespace, depending on the namespace definition, mode can be "pod" or "namespace".
+        mode: pod
+        labels: # optional, used for sidecarInject.mode = pod
+          sidecar.istio.io/inject: "true"
+          # istio.io/rev: canary # use control plane revisions
       resources:
         requests:
           cpu: 200m
@@ -294,72 +189,287 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: {{your_global-sidecar_tag}}
+        tag: v0.5.0_linux_amd64
+      probePort: 20000
+' > /tmp/lazyload-slimeboot.yaml
+
+$ kubectl apply -f /tmp/lazyload-slimeboot.yaml
+```
+
+一些字段说明，可参考 [lazyload安装样例](../../../../../../doc/zh/slime-boot.md#lazyload%E5%AE%89%E8%A3%85%E6%A0%B7%E4%BE%8B)
+
+
+
+确认所有组件已正常运行
+
+```sh
+$ kubectl get slimeboot -n mesh-operator
+NAME       AGE
+lazyload   12s
+$ kubectl get pod -n mesh-operator
+NAME                              READY   STATUS    RESTARTS   AGE
+global-sidecar-7dd48b65c8-gc7g4   2/2     Running   0          18s
+lazyload-85987bbd4b-djshs         1/1     Running   0          18s
+slime-boot-6f778b75cd-4v675       1/1     Running   0          126s
 ```
 
 
 
-#### prometheus metric
+### 安装bookinfo
 
-指标来源为Prometheus。
+   创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
 
->[完整样例](./install/samples/lazyload/slimeboot_namespace_prometheus.yaml)
+```sh
+$ kubectl label namespace default istio-injection=enabled
+$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/v0.5.0/install/config/bookinfo.yaml"
+```
 
-```yaml
----
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
+创建完后，状态如下
+
+```sh
+$ kubectl get po -n default
+NAME                              READY   STATUS    RESTARTS   AGE
+details-v1-79f774bdb9-6vzj6       2/2     Running   0          60s
+productpage-v1-6b746f74dc-vkfr7   2/2     Running   0          59s
+ratings-v1-b6994bb9-klg48         2/2     Running   0          59s
+reviews-v1-545db77b95-z5ql9       2/2     Running   0          59s
+reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
+reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
+```
+
+
+
+
+
+### 开启懒加载
+
+修改service的label，自动创建servicefence，为productpage服务启用懒加载
+
+```sh
+$ kubectl label service productpage -n default slime.io/serviceFenced=true
+```
+
+
+
+确认生成servicefence和sidecar对象。
+
+```sh
+$ kubectl get servicefence -n default
+NAME          AGE
+productpage   12s
+$ kubectl get sidecar -n default
+NAME          AGE
+productpage   22s
+$ kubectl get servicefence productpage -n default -oyaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
 metadata:
-  name: lazyload
-  namespace: mesh-operator
+  creationTimestamp: "2021-12-23T06:21:14Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/created-by: fence-controller
+  name: productpage
+  namespace: default
+  resourceVersion: "10662886"
+  uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
 spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-lazyload
-    tag: {{your_lazyload_tag}}
-  module:
-    - name: lazyload # custom value
-      kind: lazyload # should be "lazyload"
-      enable: true
-      general: # replace previous "fence" field
-        wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "{{your_port}}"
-        namespace: # replace to your service's namespace which will use lazyload, and extend the list in case of multi namespaces
-          - {{your_namespace}}
-      metric: # indicate the metric source
-        prometheus:
-          address: http://prometheus.istio-system:9090
-          handlers:
-            destination:
-              query: |
-                sum(istio_requests_total{source_app="$source_app",reporter="destination"})by(destination_service)
-              type: Group
-  component:
-    globalSidecar:
-      enable: true
-      type: namespace # inform the slime-boot operator of the global-sidecar mode
-      sidecarInject:
-        enable: true # must be true
-        mode: namespace # if type = cluster, can only be "pod"; if type = namespace, can be "pod" or "namespace"
-        #labels: # optional, used for sidecarInject.mode = pod
-          #sidecar.istio.io/inject: "true"
-      resources:
-        requests:
-          cpu: 200m
-          memory: 200Mi
-        limits:
-          cpu: 400m
-          memory: 400Mi
-      image:
-        repository: docker.io/slimeio/slime-global-sidecar
-        tag: {{your_global-sidecar_tag}}
+  enable: true
+status: {}
+$ kubectl get sidecar productpage -n default -oyaml
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  creationTimestamp: "2021-12-23T06:21:14Z"
+  generation: 1
+  name: productpage
+  namespace: default
+  ownerReferences:
+  - apiVersion: microservice.slime.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ServiceFence
+    name: productpage
+    uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
+  resourceVersion: "10662887"
+  uid: 85f9dc11-6d83-4b84-8d1b-14bd031cc57b
+spec:
+  egress:
+  - hosts:
+    - istio-system/*
+    - mesh-operator/*
+  workloadSelector:
+    labels:
+      app: productpage
 ```
+
+
+
+### 首次访问观察
+
+此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。
+
+另外也可参考 [对外开放应用程序](https://istio.io/latest/zh/docs/setup/getting-started/#ip) 给应用暴露外访接口。
+
+
+
+第一次访问productpage，并使用`kubectl logs -f productpage-xxx -c istio-proxy -n default`观察访问日志。
+
+```
+[2021-12-23T06:24:55.527Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 12 12 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "details:9080" "172.17.0.10:80" outbound|9080||global-sidecar.mesh-operator.svc.cluster.local 172.17.0.11:45194 10.102.66.227:9080 172.17.0.11:40210 - -
+
+[2021-12-23T06:24:55.552Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 295 30 29 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "reviews:9080" "172.17.0.10:80" outbound|9080||global-sidecar.mesh-operator.svc.cluster.local 172.17.0.11:45202 10.104.97.115:9080 172.17.0.11:40880 - -
+
+[2021-12-23T06:24:55.490Z] "GET /productpage HTTP/1.1" 200 - via_upstream - "-" 0 4183 93 93 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "productpage:9080" "172.17.0.11:9080" inbound|9080|| 127.0.0.6:48621 172.17.0.11:9080 172.17.0.7:41458 outbound_.9080_._.productpage.default.svc.cluster.local default
+```
+
+可以看出，此次outbound后端访问global-sidecar.mesh-operator.svc.cluster.local。
+
+观察servicefence
+
+```sh
+$ kubectl get servicefence productpage -n default -oyaml
+apiVersion: microservice.slime.io/v1alpha1
+kind: ServiceFence
+metadata:
+  creationTimestamp: "2021-12-23T06:21:14Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/created-by: fence-controller
+  name: productpage
+  namespace: default
+  resourceVersion: "10663136"
+  uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
+spec:
+  enable: true
+status:
+  domains:
+    details.default.svc.cluster.local:
+      hosts:
+      - details.default.svc.cluster.local
+    reviews.default.svc.cluster.local:
+      hosts:
+      - reviews.default.svc.cluster.local
+  metricStatus:
+    '{destination_service="details.default.svc.cluster.local"}': "1"
+    '{destination_service="reviews.default.svc.cluster.local"}': "1"
+```
+
+
+
+观察sidecar
+
+```sh
+$ kubectl get sidecar productpage -n default -oyaml
+apiVersion: networking.istio.io/v1beta1
+kind: Sidecar
+metadata:
+  creationTimestamp: "2021-12-23T06:21:14Z"
+  generation: 2
+  name: productpage
+  namespace: default
+  ownerReferences:
+  - apiVersion: microservice.slime.io/v1alpha1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ServiceFence
+    name: productpage
+    uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
+  resourceVersion: "10663141"
+  uid: 85f9dc11-6d83-4b84-8d1b-14bd031cc57b
+spec:
+  egress:
+  - hosts:
+    - '*/details.default.svc.cluster.local'
+    - '*/reviews.default.svc.cluster.local'
+    - istio-system/*
+    - mesh-operator/*
+  workloadSelector:
+    labels:
+      app: productpage
+```
+
+reviews 和 details 被自动加入！
+
+
+
+### 再次访问观察
+
+第二次访问productpage，观察productpage应用日志
+
+```
+[2021-12-23T06:26:47.700Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 13 12 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "details:9080" "172.17.0.13:9080" outbound|9080||details.default.svc.cluster.local 172.17.0.11:50020 10.102.66.227:9080 172.17.0.11:42180 - default
+
+[2021-12-23T06:26:47.718Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 375 78 77 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "reviews:9080" "172.17.0.16:9080" outbound|9080||reviews.default.svc.cluster.local 172.17.0.11:58986 10.104.97.115:9080 172.17.0.11:42846 - default
+
+[2021-12-23T06:26:47.690Z] "GET /productpage HTTP/1.1" 200 - via_upstream - "-" 0 5179 122 121 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "productpage:9080" "172.17.0.11:9080" inbound|9080|| 127.0.0.6:51799 172.17.0.11:9080 172.17.0.7:41458 outbound_.9080_._.productpage.default.svc.cluster.local default
+```
+
+可以看到，outbound日志的后端访问信息变为details.default.svc.cluster.local和reviews.default.svc.cluster.local，直接访问成功。
+
+
+
+### 卸载
+
+卸载 bookinfo
+
+```sh
+$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/v0.5.0/install/config/bookinfo.yaml"
+```
+
+卸载 lazyload
+
+```sh
+$ kubectl delete -f /tmp/lazyload-slimeboot.yaml
+```
+
+卸载 slime-boot
+
+```sh
+export tag_or_commit=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
+kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds-v1.yaml"
+kubectl delete ns mesh-operator
+```
+
+
 
 
 
 
 
 ## 特性介绍
+
+### 服务端口自动纳管
+
+懒加载支持自动监听集群内服务端口信息，并为所有端口启用懒加载，这样就无需手动指定服务端口列表。
+
+懒加载模块配置参数`general.autoPort`是开关，等于true，启动端口自动纳管，等于false或者不指定，则手动管理。兼容之前版本，`general.wormholePort`中手动指定的端口也会被懒加载纳管。为了安全，自动纳管时，端口**只会自动增加**。如果需要缩减端口范围，切换到手动模式，或自动模式下重启懒加载。懒加载遵循Istio对端口协议的判断逻辑（端口名以“HTTP, HTTP2, GRPC, GRPCWeb”开头），只感知HTTP协议的端口变化。
+
+样例：
+
+```yaml
+kind: SlimeBoot
+metadata:
+  name: lazyload
+  namespace: mesh-operator
+spec:
+  # ...
+  module:
+    - name: lazyload
+      kind: lazyload
+      enable: true
+      general:
+        autoPort: true
+      global:
+        misc:
+          globalSidecarMode: cluster # inform the mode of global-sidecar
+          metricSourceType: accesslog # indicate the metric source
+ # ...
+```
+
+
+
+
 
 ### 基于Accesslog开启懒加载
 
@@ -389,11 +499,9 @@ spec:
           metricSourceType: accesslog
 ```
 
-[完整样例](./install/samples/lazyload/slimeboot_cluster_accesslog.yaml)
 
 
-
-### 支持为服务手动或自动启用懒加载
+### 手动或自动为服务启用懒加载
 
 支持通过`autoFence`参数，指定启用懒加载是手动模式、自动模式。这里的启用懒加载，指的是创建serviceFence资源，从而生成Sidecar CR。
 
@@ -547,13 +655,9 @@ module:
 
 
 
-### 静态服务依赖关系添加
+### 添加静态服务依赖关系
 
 懒加载除了从slime metric处根据动态指标更新服务依赖关系，还支持通过`serviceFence.spec`添加静态服务依赖关系。支持三种细分场景：依赖某个服务、依赖某个namespace所有服务、依赖具有某个label的所有服务。
-
-值得注意的是，静态服务依赖关系与动态服务依赖关系一样，支持根据VirtualService规则判断服务的真实后端，并自动扩大Fence的范围。详见[ServiceFence说明](./README_zh.md#ServiceFence%E8%AF%B4%E6%98%8E)
-
-
 
 
 
@@ -638,7 +742,7 @@ spec:
 
 
 
-### 支持自定义服务依赖别名
+### 自定义服务依赖别名
 
 在某些场景，我们希望懒加载根据已知的服务依赖，添加一些额外的服务依赖进去。
 
@@ -836,320 +940,3 @@ spec:
 
 [完整样例](./install/samples/lazyload/slimeboot_logrotate.yaml)
 
-
-
-
-
-## 示例
-
-为bookinfo的productpage服务开启懒加载
-
-### 安装 istio (1.8+)
-
-
-
-### 设定tag
-
-$latest_tag获取最新tag。默认执行的shell脚本和yaml文件均是$latest_tag版本。
-
-```sh
-$ export latest_tag=$(curl -s https://api.github.com/repos/slime-io/lazyload/tags | grep 'name' | cut -d\" -f4 | head -1)
-```
-
-
-
-### 安装 slime 
-
-```shell
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/samples/lazyload/easy_install_lazyload.sh)"
-```
-
-确认所有组件已正常运行
-
-```sh
-$ kubectl get slimeboot -n mesh-operator
-NAME       AGE
-lazyload   12s
-$ kubectl get pod -n mesh-operator
-NAME                              READY   STATUS    RESTARTS   AGE
-global-sidecar-7dd48b65c8-gc7g4   2/2     Running   0          18s
-lazyload-85987bbd4b-djshs         1/1     Running   0          18s
-slime-boot-6f778b75cd-4v675       1/1     Running   0          26s
-```
-
-
-
-### 安装bookinfo
-
-   创建前请将current-context中namespace切换到你想部署bookinfo的namespace，使bookinfo创建在其中。此处以default为例。
-
-```sh
-$ kubectl label namespace default istio-injection=enabled
-$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/config/bookinfo.yaml"
-```
-
-创建完后，状态如下
-
-```sh
-$ kubectl get po -n default
-NAME                              READY   STATUS    RESTARTS   AGE
-details-v1-79f774bdb9-6vzj6       2/2     Running   0          60s
-productpage-v1-6b746f74dc-vkfr7   2/2     Running   0          59s
-ratings-v1-b6994bb9-klg48         2/2     Running   0          59s
-reviews-v1-545db77b95-z5ql9       2/2     Running   0          59s
-reviews-v2-7bf8c9648f-xcvd6       2/2     Running   0          60s
-reviews-v3-84779c7bbc-gb52x       2/2     Running   0          60s
-```
-
-此样例中可以在pod/ratings中发起对productpage的访问，`curl productpage:9080/productpage`。
-
-另外也可参考 [对外开放应用程序](https://istio.io/latest/zh/docs/setup/getting-started/#ip) 给应用暴露外访接口。
-
-
-
-### 开启懒加载
-
-创建servicefence，为productpage服务启用懒加载，共有两种方式：
-
-- 直接手动创建servicefence
-
-```sh
-$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/samples/lazyload/servicefence_productpage.yaml"
-```
-
-- 修改service自动创建servicefence
-
-```sh
-$ kubectl label service productpage -n default slime.io/serviceFenced=true
-```
-
-
-
-确认生成servicefence和sidecar对象。
-
-```sh
-$ kubectl get servicefence -n default
-NAME          AGE
-productpage   12s
-$ kubectl get sidecar -n default
-NAME          AGE
-productpage   22s
-$ kubectl get servicefence productpage -n default -oyaml
-apiVersion: microservice.slime.io/v1alpha1
-kind: ServiceFence
-metadata:
-  creationTimestamp: "2021-12-23T06:21:14Z"
-  generation: 1
-  labels:
-    app.kubernetes.io/created-by: fence-controller
-  name: productpage
-  namespace: default
-  resourceVersion: "10662886"
-  uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
-spec:
-  enable: true
-status: {}
-$ kubectl get sidecar productpage -n default -oyaml
-apiVersion: networking.istio.io/v1beta1
-kind: Sidecar
-metadata:
-  creationTimestamp: "2021-12-23T06:21:14Z"
-  generation: 1
-  name: productpage
-  namespace: default
-  ownerReferences:
-  - apiVersion: microservice.slime.io/v1alpha1
-    blockOwnerDeletion: true
-    controller: true
-    kind: ServiceFence
-    name: productpage
-    uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
-  resourceVersion: "10662887"
-  uid: 85f9dc11-6d83-4b84-8d1b-14bd031cc57b
-spec:
-  egress:
-  - hosts:
-    - istio-system/*
-    - mesh-operator/*
-  workloadSelector:
-    labels:
-      app: productpage
-```
-
-
-
-### 首次访问观察
-
-第一次访问productpage，并使用`kubectl logs -f productpage-xxx -c istio-proxy -n default`观察访问日志。
-
-```
-[2021-12-23T06:24:55.527Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 12 12 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "details:9080" "172.17.0.10:80" outbound|9080||global-sidecar.mesh-operator.svc.cluster.local 172.17.0.11:45194 10.102.66.227:9080 172.17.0.11:40210 - -
-
-[2021-12-23T06:24:55.552Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 295 30 29 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "reviews:9080" "172.17.0.10:80" outbound|9080||global-sidecar.mesh-operator.svc.cluster.local 172.17.0.11:45202 10.104.97.115:9080 172.17.0.11:40880 - -
-
-[2021-12-23T06:24:55.490Z] "GET /productpage HTTP/1.1" 200 - via_upstream - "-" 0 4183 93 93 "-" "curl/7.52.1" "7ec25152-ca8e-923b-a736-49838ce316f4" "productpage:9080" "172.17.0.11:9080" inbound|9080|| 127.0.0.6:48621 172.17.0.11:9080 172.17.0.7:41458 outbound_.9080_._.productpage.default.svc.cluster.local default
-```
-
-可以看出，此次outbound后端访问global-sidecar.mesh-operator.svc.cluster.local。
-
-观察servicefence
-
-```sh
-$ kubectl get servicefence productpage -n default -oyaml
-apiVersion: microservice.slime.io/v1alpha1
-kind: ServiceFence
-metadata:
-  creationTimestamp: "2021-12-23T06:21:14Z"
-  generation: 1
-  labels:
-    app.kubernetes.io/created-by: fence-controller
-  name: productpage
-  namespace: default
-  resourceVersion: "10663136"
-  uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
-spec:
-  enable: true
-status:
-  domains:
-    details.default.svc.cluster.local:
-      hosts:
-      - details.default.svc.cluster.local
-    reviews.default.svc.cluster.local:
-      hosts:
-      - reviews.default.svc.cluster.local
-  metricStatus:
-    '{destination_service="details.default.svc.cluster.local"}': "1"
-    '{destination_service="reviews.default.svc.cluster.local"}': "1"
-```
-
-
-
-观察sidecar
-
-```sh
-$ kubectl get sidecar productpage -n default -oyaml
-apiVersion: networking.istio.io/v1beta1
-kind: Sidecar
-metadata:
-  creationTimestamp: "2021-12-23T06:21:14Z"
-  generation: 2
-  name: productpage
-  namespace: default
-  ownerReferences:
-  - apiVersion: microservice.slime.io/v1alpha1
-    blockOwnerDeletion: true
-    controller: true
-    kind: ServiceFence
-    name: productpage
-    uid: f21e7d2b-4ab3-4de0-9b3d-131b6143d9db
-  resourceVersion: "10663141"
-  uid: 85f9dc11-6d83-4b84-8d1b-14bd031cc57b
-spec:
-  egress:
-  - hosts:
-    - '*/details.default.svc.cluster.local'
-    - '*/reviews.default.svc.cluster.local'
-    - istio-system/*
-    - mesh-operator/*
-  workloadSelector:
-    labels:
-      app: productpage
-```
-
-reviews 和 details 被自动加入！
-
-
-
-### 再次访问观察
-
-第二次访问productpage，观察productpage应用日志
-
-```
-[2021-12-23T06:26:47.700Z] "GET /details/0 HTTP/1.1" 200 - via_upstream - "-" 0 178 13 12 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "details:9080" "172.17.0.13:9080" outbound|9080||details.default.svc.cluster.local 172.17.0.11:50020 10.102.66.227:9080 172.17.0.11:42180 - default
-
-[2021-12-23T06:26:47.718Z] "GET /reviews/0 HTTP/1.1" 200 - via_upstream - "-" 0 375 78 77 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "reviews:9080" "172.17.0.16:9080" outbound|9080||reviews.default.svc.cluster.local 172.17.0.11:58986 10.104.97.115:9080 172.17.0.11:42846 - default
-
-[2021-12-23T06:26:47.690Z] "GET /productpage HTTP/1.1" 200 - via_upstream - "-" 0 5179 122 121 "-" "curl/7.52.1" "899e918c-e44c-9dc2-9629-d8db191af972" "productpage:9080" "172.17.0.11:9080" inbound|9080|| 127.0.0.6:51799 172.17.0.11:9080 172.17.0.7:41458 outbound_.9080_._.productpage.default.svc.cluster.local default
-```
-
-可以看到，outbound日志的后端访问信息变为details.default.svc.cluster.local和reviews.default.svc.cluster.local，直接访问成功。
-
-
-
-### 卸载
-
-卸载bookinfo
-
-```sh
-$ kubectl delete -f "https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/config/bookinfo.yaml"
-```
-
-卸载slime相关
-
-```sh
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/samples/lazyload/easy_uninstall_lazyload.sh)"
-```
-
-
-
-### 补充说明
-
-如想要使用其他tag或commit_id的shell脚本和yaml文件，请显示指定$custom_tag_or_commit。
-
-```sh
-$ export custom_tag_or_commit=xxx
-```
-
-执行的命令涉及到yaml文件，用$custom_tag_or_commit替换$latest_tag，如下
-
-```sh
-#$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/config/bookinfo.yaml"
-$ kubectl apply -f "https://raw.githubusercontent.com/slime-io/lazyload/$custom_tag_or_commit/install/config/bookinfo.yaml"
-```
-
-执行的命令涉及到shell文件，将$custom_tag_or_commit作为shell文件的参数，如下
-
-```sh
-#$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)"
-$ /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/slime-io/lazyload/$latest_tag/install/samples/smartlimiter/easy_install_limiter.sh)" $custom_tag_or_commit
-```
-
-
-
-
-
-## FAQ
-
-### 支持的Istio版本？
-
-Istio 1.8以后均支持，具体的兼容性说明详见[A note on the incompatibility of lazyload with some versions of istio](https://github.com/slime-io/slime/issues/145)
-
-
-
-### 为什么必须指定服务端口？（预计新版本将无需指定）
-
-不指定服务端口信息，由于通常启用懒加载时，sidecar的默认内容只包含istio-system和mesh-operator的服务信息，一些特定端口往往没有服务暴露。由于Istio的机制，只有兜底路由的listener无意义会被移除，无法保证占位listener的存在。
-
-举个例子，bookinfo中服务暴露在"9080"端口，为productpage服务启用懒加载后，productpage的"9080" listener会被移除。再访问`details:9080`时，没有listener，会直接走到Passthrough逻辑，无法转到global-sidecar，也就实现不了服务依赖关系的获取。
-
-
-
-### 为什么必须指定使用懒加载的namespace列表？（预计新版本将无需指定）
-
-由于短域名访问的场景大量存在，不同namespace下需要补充不同的namespace信息。所以懒加载会在这些指定的namespace下分别创建envoyfilter，补充合适的namespace信息。
-
-
-
-### ~~global-sidecar-pilot的意义？~~（组件已废弃）
-
-~~由于global-sidecar的作用不同于普通sidecar，需要一些定制逻辑，比如兜底envoyfilter不对global-sidecar生效否则会死循环等，global-sidecar并不能直接使用集群原有pilot的全量配置。global-sidecar-pilot会从集群原有pilot处获取全量配置后，会进行微调，再推送给global-sidecar。现有global-sidecar-pilot是基于istiod 1.7改造的。~~
-
-~~注：为了降低学习成本、增强兼容性，我们正在考虑去除global-sidecar-pilot，届时不再有定制化的pilot，完全兼容社区版本，预计在下一个大版本中实现此功能。~~
-
-
-
-### ~~global sidecar不能正常启动？~~（已解决）
-
-~~global sidecar启动报错`Internal:Error adding/updating listener(s) 0.0.0.0_15021: cannot bind '0.0.0.0:15021': Address already in use`，这错误通常是端口冲突导致。global-sidecar是以gateway模式运行的sidecar，它会绑定到真实端口上。具体来说是istio-ingressgateway使用了15021端口，这会导致global-sidecar的lds更新失败，修改ingressgateway的15021端口为其他值可解决。~~
-
-~~注：目前是通过端口规划来解决此问题，下个大版本中会摆脱这个局限。~~

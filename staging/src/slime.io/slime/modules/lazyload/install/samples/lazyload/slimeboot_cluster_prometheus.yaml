@@ -9,6 +9,13 @@ spec:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
     tag: v0.5.0_linux_amd64
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+    limits:
+      cpu: 600m
+      memory: 600Mi
   module:
     - name: lazyload # custom value
       kind: lazyload # should be "lazyload"
@@ -18,8 +25,12 @@ spec:
           - "80"
           - "9080"
       global:
+        autoPort: true
+        autoFence: true
+        defaultFence: false
         misc:
           globalSidecarMode: cluster # inform the mode of global-sidecar
+          metricSourceType: prometheus
       metric: # indicate the metric source
         prometheus:
           address: http://prometheus.istio-system:9090
