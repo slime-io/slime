@@ -133,8 +133,9 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 		if err != nil {
 			return reconcile.Result{}, err
 		}
-	} else if model.IstioRevFromLabel(found.Labels) != istioRev {
-		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...", nsName, model.IstioRevFromLabel(found.Labels), istioRev)
+	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
+		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
+			nsName, foundRev, r.env.ConfigRevs())
 		return reconcile.Result{}, nil
 	} else {
 		log.Infof("Update a EnvoyFilter in %v", nsName)

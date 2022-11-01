@@ -4,14 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	ghYaml "github.com/ghodss/yaml"
+	"github.com/gogo/protobuf/jsonpb"
 	"io/ioutil"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-openapi/pkg/common"
 	"os"
-
-	"github.com/gogo/protobuf/jsonpb"
-	"k8s.io/client-go/kubernetes"
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
+	"strings"
 )
 
 const (
@@ -203,18 +203,35 @@ func (env *Environment) IstioRev() string {
 }
 
 // RevInScope check revision
-// when StrictRev is true, return true if revision equals global.IstioRev
-// when StrictRev is false, return true if revision equals global.IstioRev or revision is empty or global.IstioRev is empty
+// when StrictRev is true, return true if revision in global.IstioRev or global.configRev
+// when StrictRev is false, return true if revision in (global.IstioRev or global.configRev) or revision is empty or global.IstioRev is empty
 func (env *Environment) RevInScope(rev string) bool {
 
 	if env == nil || env.Config == nil || env.Config.Global == nil {
 		return true
 	}
 
-	if env.Config.Global.StrictRev {
-		return env.Config.Global.IstioRev == rev
-	} else {
-		return env.Config.Global.IstioRev == rev || rev == "" || env.Config.Global.IstioRev == ""
-	}
+	configRevs := initConfigRevision(env.Config.Global.IstioRev, env.Config.Global.ConfigRev)
+	revs := strings.Split(configRevs, ",")
 
+	if env.Config.Global.StrictRev {
+		return inRevs(rev, revs)
+	} else {
+		return rev == "" || configRevs == "" || inRevs(rev, revs)
+	}
+}
+
+func inRevs(rev string, revs []string) bool {
+	for _, item := range revs {
+		item = strings.Trim(item, " ")
+
+		if item == rev {
+			return true
+		}
+	}
+	return false
+}
+
+func (env *Environment) ConfigRevs() string {
+	return initConfigRevision(env.Config.Global.IstioRev, env.Config.Global.ConfigRev)
 }

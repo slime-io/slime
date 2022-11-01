@@ -57,7 +57,7 @@ type SmartLimiterReconciler struct {
 	// use service.ns.svc.cluster.local as default if host not specified
 	// or use mock host when limiter in gw and outbound
 	interest cmap.ConcurrentMap
-	// reuse, or use anther filed to store interested nn
+	// reuse, or use another filed to store interested nn
 	// key is the interested namespace/name
 	// value is the metricInfo
 	metricInfo   cmap.ConcurrentMap
@@ -101,7 +101,7 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Infof("%v is added or updated", req)
 		if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
 			log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
+				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.ConfigRevs())
 			return ctrl.Result{}, nil
 		}
 		r.lastUpdatePolicyLock.RLock()
