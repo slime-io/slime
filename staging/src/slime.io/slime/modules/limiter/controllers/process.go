@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"strconv"
 
 	networking "istio.io/api/networking/v1alpha3"
@@ -129,6 +130,13 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 			// Error reading the object - requeue the request.
 			return reconcile.Result{}, err
 		}
+	}
+
+	// if rev not in scope, skip
+	if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
+		log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
+			request.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.ConfigRevs())
+		return ctrl.Result{}, nil
 	}
 
 	if result, err := r.refresh(instance); err == nil {
@@ -261,13 +269,10 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		} else {
 			log.Debugf("envoyfilter %+v is not found, and obj spec is nil, skip ", loc)
 		}
+	} else if foundRev := slime_model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
+		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
+			loc, foundRev, r.env.ConfigRevs())
 	} else {
-
-		if slime_model.IstioRevFromLabel(found.Labels) != istioRev {
-			log.Errorf("existing envoyfilter %v istioRev %s but our %s, skip ...",
-				loc, slime_model.IstioRevFromLabel(found.Labels), istioRev)
-			return reconcile.Result{}, nil
-		}
 		foundSpec, err := json.Marshal(found.Spec)
 		if err != nil {
 			log.Errorf("marshal found.spec err: %+v", err)
@@ -290,6 +295,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 				return reconcile.Result{}, nil
 			}
 		} else {
+			log.Infof("obj sepec is nil, delete obj %s/%s", obj.Namespace, obj.Name)
 			// spec is nil , delete
 			err := r.Client.Delete(context.TODO(), obj)
 			if errors.IsNotFound(err) {
