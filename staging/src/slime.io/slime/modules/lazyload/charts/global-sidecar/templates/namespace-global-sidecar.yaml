@@ -28,7 +28,7 @@
 {{- /*
 Now, we will render all the resources of the global-sidecar, reset indentation for readability.
 */}}
-{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: Service
@@ -89,7 +89,7 @@ subjects:
 - kind: ServiceAccount
   name: global-sidecar
   namespace: {{ $ns }}
-{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -269,7 +269,7 @@ spec:
       patch:
         operation: REMOVE
 {{- end }}
-{{- if or (not $autoPort) (eq $g.misc.render "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
