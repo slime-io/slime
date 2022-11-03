@@ -141,7 +141,7 @@ func (r *ServicefenceReconciler) startSvcCache() {
 				wormholePort, needUpdate = updateWormholePort(wormholePort, portProtocolCache)
 				if needUpdate || !successUpdate {
 					log.Debugf("need to update resources")
-					successUpdate = updateResources(wormholePort, r.env)
+					successUpdate = updateResources(wormholePort, &r.env)
 					if !successUpdate {
 						log.Infof("retry to update resources")
 						retryCh = time.After(1 * time.Second)

@@ -160,7 +160,7 @@ func (slimeBoot *SlimeBoot) addDefaultValue() {
 	}
 }
 
-func updateResources(wormholePort []string, env bootstrap.Environment) bool {
+func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 	log := log.WithField("function", "updateResources")
 	dynCli := env.DynamicClient
 
@@ -200,41 +200,25 @@ func updateResources(wormholePort []string, env bootstrap.Environment) bool {
 					log.Errorf("create resource %s %s/%s error: %v", gvr.String(), ns, name, err)
 					return false
 				}
-				log.Info("create resource %s %s/%s")
-			}
-			obj := mergeObject(gvr, got, res)
-			_, err = dynCli.Resource(gvr).Namespace(ns).Update(ctx, obj, metav1.UpdateOptions{})
-			if err != nil {
-				log.Errorf("update resource %s %s/%s error: %v", gvr, ns, name, err)
-				return false
+				log.Infof("create resource %s %s/%s successfully", gvr.String(), ns, name)
+			} else {
+				obj := mergeObject(gvr, got, res)
+				_, err = dynCli.Resource(gvr).Namespace(ns).Update(ctx, obj, metav1.UpdateOptions{})
+				if err != nil {
+					log.Errorf("update resource %s %s/%s error: %v", gvr, ns, name, err)
+					return false
+				}
+				log.Infof("update resource %s %s/%s successfully", gvr.String(), ns, name)
 			}
 		}
 	}
 	return true
 }
 
-func generateValuesFormSlimeboot(wormholePort []string, env bootstrap.Environment) (map[string]interface{}, error) {
-	kubeCli := env.K8SClient
-	dynCli := env.DynamicClient
-
-	// get slimeboot cr name
-	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
-	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
-	deploy, err := kubeCli.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
+func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (map[string]interface{}, error) {
+	slimeBoot, err := getSlimeboot(env)
 	if err != nil {
-		return nil, fmt.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
-	}
-	slimeBootName := deploy.OwnerReferences[0].Name
-
-	// Unstructured
-	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
-	if err != nil {
-		return nil, fmt.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
-	}
-	// Unstructured -> SlimeBoot
-	var slimeBoot SlimeBoot
-	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {
-		return nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, slimeBootName, err)
+		return nil, fmt.Errorf("get slimeboot error: %v", err)
 	}
 
 	sort.Strings(wormholePort)
@@ -253,6 +237,70 @@ func generateValuesFormSlimeboot(wormholePort []string, env bootstrap.Environmen
 		return nil, fmt.Errorf("convert slimeboot spec to values error: %v", err)
 	}
 	return values, nil
+}
+
+func getSlimeboot(env *bootstrap.Environment) (*SlimeBoot, error) {
+	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
+	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
+
+	utd, err := getSlimebootByOwnerRef(slimeBootNs, deployName, env)
+	if err != nil {
+		log.Infof("get slimeboot by ownerreferences failed with %q, try to get it by labelselector", err)
+		utd, err = getSlimebootByLabelSelector(slimeBootNs, deployName, env)
+		if err != nil {
+			log.Infof("get slimeboot by labelselector failed with %q", err)
+			return nil, fmt.Errorf("try to get slimeboot in namespace %s failed", slimeBootNs)
+		}
+	}
+
+	// Unstructured -> SlimeBoot
+	var slimeBoot SlimeBoot
+	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {
+		return nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, utd.GetName(), err)
+	}
+
+	return &slimeBoot, nil
+}
+
+func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Environment) (*unstructured.Unstructured, error) {
+	kubeCli := env.K8SClient
+	dynCli := env.DynamicClient
+
+	// get slimeboot cr name
+	deploy, err := kubeCli.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
+	}
+	if len(deploy.OwnerReferences) == 0 {
+		return nil, fmt.Errorf("lazyload deployment [%s/%s] does not have any ownerReferences", slimeBootNs, deployName)
+
+	}
+	slimeBootName := deploy.OwnerReferences[0].Name
+
+	// Unstructured
+	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
+	if err != nil {
+		return nil, fmt.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
+	}
+
+	return utd, nil
+}
+
+var slimebootSelectorTpl = "slime.io/slimeboot=%s"
+
+func getSlimebootByLabelSelector(slimeBootNs, deployName string, env *bootstrap.Environment) (*unstructured.Unstructured, error) {
+	dynCli := env.DynamicClient
+	utdList, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: fmt.Sprintf(slimebootSelectorTpl, deployName),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list slimeboot in %s error: %+v", slimeBootNs, err)
+	}
+	if utdList == nil || len(utdList.Items) == 0 {
+		return nil, fmt.Errorf("could not find any slimeboot in namespace %s", slimeBootNs)
+	}
+	// By convention only one slimeboot will be matched to
+	return &utdList.Items[0], nil
 }
 
 func object2Values(obj interface{}) (map[string]interface{}, error) {
