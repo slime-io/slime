@@ -266,6 +266,7 @@ func (r *ServicefenceReconciler) prepareDestFence(srcSf *lazyloadv1alpha1.Servic
 		return nil
 	}
 
+	// if the destFence is missing, we create one and store caller in destFence's status
 	destSf := &lazyloadv1alpha1.ServiceFence{}
 retry: // FIXME fix infinite loop
 	err := r.Client.Get(context.TODO(), *nsName, destSf)
@@ -274,8 +275,8 @@ retry: // FIXME fix infinite loop
 			// XXX maybe should not auto create
 			destSf.Name = nsName.Name
 			destSf.Namespace = nsName.Namespace
+			model.PatchIstioRevLabel(&destSf.Labels, r.env.SelfResourceRev())
 			// XXX set controlled by
-			// XXX patch rev
 			if err = r.Client.Create(context.TODO(), destSf); err != nil {
 				goto retry
 			}
