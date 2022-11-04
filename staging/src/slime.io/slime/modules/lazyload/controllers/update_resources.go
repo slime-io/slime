@@ -172,7 +172,7 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 	}
 
 	// values
-	values, err := generateValuesFormSlimeboot(wormholePort, env)
+	owner, values, err := generateValuesFormSlimeboot(wormholePort, env)
 	if err != nil {
 		log.Errorf("generate values of global sidecar chart error: %v", err)
 		return false
@@ -195,6 +195,11 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 					log.Errorf("got resource %s %s/%s from apiserver error: %v", gvr, ns, name, err)
 					return false
 				}
+				// Setting ownerReferences before creation helps us clean up resources.
+				// TODO:
+				//   Resources located in other namespaces cannot be set ownerReferences,
+				//   and we need other ways to clean up these resources.
+				setOwnerReference(owner, res)
 				_, err = dynCli.Resource(gvr).Namespace(ns).Create(ctx, res, metav1.CreateOptions{})
 				if err != nil {
 					log.Errorf("create resource %s %s/%s error: %v", gvr.String(), ns, name, err)
@@ -215,10 +220,10 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 	return true
 }
 
-func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (map[string]interface{}, error) {
+func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (*SlimeBoot, map[string]interface{}, error) {
 	slimeBoot, err := getSlimeboot(env)
 	if err != nil {
-		return nil, fmt.Errorf("get slimeboot error: %v", err)
+		return nil, nil, fmt.Errorf("get slimeboot error: %v", err)
 	}
 
 	sort.Strings(wormholePort)
@@ -234,9 +239,9 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 	slimeBoot.addDefaultValue()
 	values, err := object2Values(slimeBoot.Spec)
 	if err != nil {
-		return nil, fmt.Errorf("convert slimeboot spec to values error: %v", err)
+		return nil, nil, fmt.Errorf("convert slimeboot spec to values error: %v", err)
 	}
-	return values, nil
+	return slimeBoot, values, nil
 }
 
 func getSlimeboot(env *bootstrap.Environment) (*SlimeBoot, error) {
@@ -341,6 +346,24 @@ func generateNewReources(chrt *chart.Chart, values map[string]interface{}) (map[
 		}
 	}
 	return outs, nil
+}
+
+func setOwnerReference(slimeboot *SlimeBoot, utd *unstructured.Unstructured) {
+	// Skip if not in the same namespace
+	if slimeboot.Namespace != utd.GetNamespace() {
+		return
+	}
+	blockOwnerDeletionTrue := true
+	ownerReferences := []metav1.OwnerReference{
+		{
+			APIVersion:         slimeboot.APIVersion,
+			BlockOwnerDeletion: &blockOwnerDeletionTrue,
+			Kind:               slimeboot.Kind,
+			Name:               slimeboot.Name,
+			UID:                slimeboot.UID,
+		},
+	}
+	utd.SetOwnerReferences(ownerReferences)
 }
 
 func mergeObject(gvr schema.GroupVersionResource, got, utd *unstructured.Unstructured) *unstructured.Unstructured {
