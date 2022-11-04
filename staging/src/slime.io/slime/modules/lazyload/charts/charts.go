@@ -6,5 +6,5 @@ import (
 
 const GlobalSidecar = "global-sidecar"
 
-//go:embed all:global-sidecar
+//go:embed global-sidecar
 var GlobalSidecarFS embed.FS

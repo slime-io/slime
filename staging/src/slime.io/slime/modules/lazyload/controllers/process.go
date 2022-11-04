@@ -274,7 +274,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				},
 			}
 			markFenceCreatedByController(sf)
-			model.PatchIstioRevLabel(&sf.Labels, r.env.IstioRev())
+			model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
 			if err = r.Client.Create(ctx, sf); err != nil {
 				log.Errorf("create fence %s failed, %+v", nsName, err)
 				return reconcile.Result{}, err

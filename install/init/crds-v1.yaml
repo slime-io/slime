@@ -151,6 +151,8 @@ spec:
                             type: string
                           strictRev:
                             type: boolean
+                          selfResourceRev:
+                            type: string
                           configSources:
                             type: array
                             items:
@@ -653,8 +655,11 @@ spec:
                   the initial handshake. If multiple conditions are specified, all conditions
                   need to match in order for the workload instance to be selected. Currently,
                   only label based selection mechanism is supported.'
-                  additionalProperties:
-                    type: string
+                  properties:
+                    labels:
+                      type: object
+                      additionalProperties:
+                        type: string
                   type: object
             status:
               type: object
