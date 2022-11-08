@@ -135,7 +135,7 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 	// if rev not in scope, skip
 	if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
 		log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-			request.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.ConfigRevs())
+			request.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
 		return ctrl.Result{}, nil
 	}
 
@@ -271,7 +271,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		}
 	} else if foundRev := slime_model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
-			loc, foundRev, r.env.ConfigRevs())
+			loc, foundRev, r.env.IstioRev())
 	} else {
 		foundSpec, err := json.Marshal(found.Spec)
 		if err != nil {

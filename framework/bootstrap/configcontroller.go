@@ -48,7 +48,7 @@ func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigCon
 	stopCh := make(chan struct{})
 	var mcs []*monitorController
 
-	configRevision := initConfigRevision(config.Global.IstioRev, config.Global.ConfigRev)
+	configRevision := config.Global.ConfigRev
 	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
 
 	// init all monitorControllers
@@ -512,27 +512,4 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 
 	log.Infof("init xds config source [%s] successfully", mc.configSource.Address)
 	return nil
-}
-
-func initConfigRevision(rev, configRev string) string {
-	var (
-		revs []string
-		has  bool
-	)
-
-	if configRev != "" {
-		for _, p := range strings.Split(configRev, ",") {
-			p = strings.Trim(p, " ")
-			if !has && p == rev {
-				has = true
-			}
-
-			revs = append(revs, p)
-		}
-	}
-
-	if !has {
-		revs = append(revs, rev)
-	}
-	return strings.Join(revs, ",")
 }

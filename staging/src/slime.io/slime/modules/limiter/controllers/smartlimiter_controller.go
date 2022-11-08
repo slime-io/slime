@@ -101,7 +101,7 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		log.Infof("%v is added or updated", req)
 		if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
 			log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.ConfigRevs())
+				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
 			return ctrl.Result{}, nil
 		}
 		r.lastUpdatePolicyLock.RLock()

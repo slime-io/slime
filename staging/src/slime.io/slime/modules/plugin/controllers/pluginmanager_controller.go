@@ -135,7 +135,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 		}
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
-			nsName, foundRev, r.env.ConfigRevs())
+			nsName, foundRev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	} else {
 		log.Infof("Update a EnvoyFilter in %v", nsName)
