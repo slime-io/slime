@@ -146,7 +146,7 @@ func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 	if rev := model.IstioRevFromLabel(instance.Labels); !r.env.RevInScope(rev) { // remove watch ?
 		log.Infof("exsiting sf %v istioRev %s but our %s, skip...",
-			req.NamespacedName, rev, r.env.ConfigRevs())
+			req.NamespacedName, rev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	}
 	log.Infof("ServicefenceReconciler got serviceFence request, %+v", req.NamespacedName)
@@ -217,7 +217,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 		}
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Infof("existed sidecar %v istioRev %s but our rev %s, skip update ...",
-			nsName, foundRev, r.env.ConfigRevs())
+			nsName, foundRev, r.env.IstioRev())
 	} else {
 		if !reflect.DeepEqual(found.Spec, sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
 			log.Infof("Update a Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
@@ -647,92 +647,6 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	}
 	return ret, nil
 }
-
-//func (r *ServicefenceReconciler) Subscribe(host string, destination interface{}) { // FIXME not used?
-//	svc, namespace, ok := util.IsK8SService(host)
-//	if !ok {
-//		return
-//	}
-//
-//	sf := &lazyloadv1alpha1.ServiceFence{}
-//	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: svc, Namespace: namespace}, sf); err != nil {
-//		return
-//	}
-//	istioRev := model.IstioRevFromLabel(sf.Labels)
-//	if !r.env.RevInScope(istioRev) {
-//		return
-//	}
-//
-//	for k := range sf.Status.Visitor {
-//		i := strings.Index(k, "/")
-//		if i < 0 {
-//			continue
-//		}
-//
-//		visitorSf := &lazyloadv1alpha1.ServiceFence{}
-//		visitorNamespace := k[:i]
-//		visitorName := k[i+1:]
-//
-//		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: visitorName, Namespace: visitorNamespace}, visitorSf)
-//		if err != nil {
-//			return
-//		}
-//		visitorRev := model.IstioRevFromLabel(visitorSf.Labels)
-//		if !r.env.RevInScope(visitorRev) {
-//			return
-//		}
-//
-//		r.updateVisitedHostStatus(visitorSf)
-//
-//		sidecar, err := r.newSidecar(visitorSf, r.env)
-//		if sidecar == nil {
-//			continue
-//		}
-//		if err != nil {
-//			return
-//		}
-//
-//		// Set VisitedHost instance as the owner and controller
-//		if err := controllerutil.SetControllerReference(visitorSf, sidecar, r.Scheme); err != nil {
-//			return
-//		}
-//		model.PatchIstioRevLabel(&sidecar.Labels, visitorRev)
-//
-//		// Check for existence
-//		found := &v1alpha3.Sidecar{}
-//		nsName := types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}
-//		err = r.Client.Get(context.TODO(), nsName, found)
-//		if err != nil {
-//			if errors.IsNotFound(err) {
-//				found = nil
-//				err = nil
-//			} else {
-//				return
-//			}
-//		}
-//
-//		if found == nil {
-//			err = r.Client.Create(context.TODO(), sidecar)
-//			if err != nil {
-//				log.Errorf("create sidecar %+v met err %v", sidecar, err)
-//			}
-//		} else if scRev := model.IstioRevFromLabel(found.Labels); scRev != visitorRev {
-//			log.Infof("existing sidecar %v istioRev %s but our %s, skip ...",
-//				nsName, scRev, visitorRev)
-//		} else {
-//			if !reflect.DeepEqual(found.Spec, sidecar.Spec) {
-//				sidecar.ResourceVersion = found.ResourceVersion
-//				err = r.Client.Update(context.TODO(), sidecar)
-//
-//				if err != nil {
-//					log.Errorf("create sidecar %+v met err %v", sidecar, err)
-//				}
-//			}
-//		}
-//		return
-//	}
-//	return
-//}
 
 func getDestination(k string) []string {
 	if i := controllers.HostDestinationMapping.Get(k); i != nil {

@@ -203,37 +203,22 @@ func (env *Environment) IstioRev() string {
 }
 
 // RevInScope check revision
-// when StrictRev is true, return true if revision in global.IstioRev or global.configRev
-// when StrictRev is false, return true if revision in (global.IstioRev or global.configRev) or revision is empty or global.IstioRev is empty
+// when StrictRev is true, return true if revision in global.IstioRev
+// when StrictRev is false, return true if revision in global.IstioRev or revision is empty or global.IstioRev is empty
 func (env *Environment) RevInScope(rev string) bool {
 
-	if env == nil || env.Config == nil || env.Config.Global == nil {
+	// if IstioRev is "", strictRev is meaningless, we will manage all resource
+	if env == nil || env.Config == nil || env.Config.Global == nil || env.Config.Global.IstioRev == "" {
 		return true
 	}
 
-	configRevs := initConfigRevision(env.Config.Global.IstioRev, env.Config.Global.ConfigRev)
-	revs := strings.Split(configRevs, ",")
+	istioRevs := strings.Split(env.Config.Global.IstioRev, ",")
 
 	if env.Config.Global.StrictRev {
-		return inRevs(rev, revs)
+		return inRevs(rev, istioRevs)
 	} else {
-		return rev == "" || configRevs == "" || inRevs(rev, revs)
+		return rev == "" || inRevs(rev, istioRevs)
 	}
-}
-
-func inRevs(rev string, revs []string) bool {
-	for _, item := range revs {
-		item = strings.Trim(item, " ")
-
-		if item == rev {
-			return true
-		}
-	}
-	return false
-}
-
-func (env *Environment) ConfigRevs() string {
-	return initConfigRevision(env.Config.Global.IstioRev, env.Config.Global.ConfigRev)
 }
 
 // SelfResourceRev
@@ -246,4 +231,15 @@ func (env *Environment) SelfResourceRev() string {
 		return ""
 	}
 	return env.Config.Global.SelfResourceRev
+}
+
+func inRevs(rev string, revs []string) bool {
+	for _, item := range revs {
+		item = strings.Trim(item, " ")
+
+		if item == rev {
+			return true
+		}
+	}
+	return false
 }

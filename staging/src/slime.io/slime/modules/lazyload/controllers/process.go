@@ -84,7 +84,7 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 	// if rev not in scope, skip
 	if foundRev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-			req.NamespacedName, foundRev, r.env.ConfigRevs())
+			req.NamespacedName, foundRev, r.env.IstioRev())
 		return ctrl.Result{}, nil
 	}
 
@@ -93,7 +93,7 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 		return reconcile.Result{}, nil
 	} else if rev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(rev) {
 		log.Infof("existing sf %v istioRev %s but our %s, skip ...",
-			req.NamespacedName, rev, r.env.ConfigRevs())
+			req.NamespacedName, rev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	}
 
@@ -290,7 +290,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 	} else if rev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(rev) {
 		// check if svc needs auto fence created
 		log.Errorf("existed fence %v istioRev %s but our rev %s, skip ...",
-			nsName, rev, r.env.ConfigRevs())
+			nsName, rev, r.env.IstioRev())
 	} else if isFenceCreatedByController(sf) && (svc == nil || !r.isServiceFenced(ctx, svc)) {
 		if err := r.Client.Delete(ctx, sf); err != nil {
 			log.Errorf("delete fence %s failed, %+v", nsName, err)
