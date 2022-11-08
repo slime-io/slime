@@ -322,6 +322,7 @@ spec:
                       prefix: /
                     route:
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      timeout: 0s
               {{- end }}
           request_headers_to_add:
             - header:
@@ -364,6 +365,7 @@ spec:
                     prefix: /
                   route:
                     cluster: PassthroughCluster
+                    timeout: 0s
     {{- end }}
 {{- end }}
 {{- if (eq $g.misc.metricSourceType "accesslog") }}
