@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+
 	networking "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -57,7 +58,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	}
 
 	var sets []*networking.Subset
-	// var host string
+
 	if !params.gw {
 		key, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 		if !ok {
@@ -70,10 +71,11 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	}
 
 	sets = append(sets, &networking.Subset{Name: util.WellknownBaseSet})
-	svcSelector := generateServiceSelector(r, params)
-	if len(svcSelector) == 0 {
-		log.Info("get empty svc selector base on %v", params)
-		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+
+	svcSelector, err := generateServiceSelector(r, params)
+	if err != nil {
+		log.Errorf("get svc selector err base on %v", params)
+		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, err
 	}
 
 	for _, set := range sets {
@@ -133,14 +135,14 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 }
 
 func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networking.EnvoyFilter {
-	ef := &networking.EnvoyFilter{
-		WorkloadSelector: &networking.WorkloadSelector{
-			Labels: labels,
-		},
-	}
+	ef := &networking.EnvoyFilter{}
 	ef.ConfigPatches = make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	globalDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
 	localDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
+
+	if len(labels) > 0 {
+		ef.WorkloadSelector = &networking.WorkloadSelector{Labels: labels}
+	}
 
 	// split descriptors due to different envoy plugins
 	for _, descriptor := range descriptors {
@@ -206,32 +208,26 @@ func descriptorsToGlobalRateLimit(descriptors []*microservicev1alpha2.SmartLimit
 	return generateGlobalRateLimitDescriptor(globalDescriptors, loc)
 }
 
-func generateServiceSelector(r *SmartLimiterReconciler, spec *LimiterSpec) map[string]string {
+func generateServiceSelector(r *SmartLimiterReconciler, spec *LimiterSpec) (map[string]string, error) {
 	// service selector
 	var labels map[string]string
+	var err error
+	var istioSvc *slime_serviceregistry.Service
 
-	if len(spec.labels) > 0 {
-		labels = spec.labels
-		return labels
+	if spec.gw || len(spec.labels) > 0 {
+		return spec.labels, nil
 	}
 
-	// if spec.host is not empty
+	// gen workload selector for mesh service
 	if spec.host != "" {
-		istioSvc, err := getIstioService(r, types.NamespacedName{Namespace: spec.loc.Namespace, Name: spec.host})
-		if err != nil {
-			log.Errorf("getIstioService err, %s", err)
-		} else {
+		istioSvc, err = getIstioService(r, types.NamespacedName{Namespace: spec.loc.Namespace, Name: spec.host})
+		if err == nil {
 			labels = formatLabels(getIstioServiceLabels(istioSvc))
 		}
-		return labels
+	} else {
+		labels, err = getK8sServiceLabels(r, spec)
 	}
-
-	// default
-	labels, err := getK8sServiceLabels(r, spec)
-	if err != nil {
-		log.Errorf("getK8sServiceLabels err, %s", err)
-	}
-	return labels
+	return labels, err
 }
 
 // get svc labels base on framework
