@@ -15,9 +15,9 @@ type RateLimitConfig struct {
 }
 
 type Descriptor struct {
-	Key       string     `yaml:"key,omitempty"`
-	Value     string     `yaml:"value,omitempty"`
-	RateLimit *RateLimit `yaml:"rate_limit,omitempty"`
+	Key         string       `yaml:"key,omitempty"`
+	Value       string       `yaml:"value,omitempty"`
+	RateLimit   *RateLimit   `yaml:"rate_limit,omitempty"`
 	Descriptors []Descriptor `yaml:"descriptors,omitempty"`
 }
 
