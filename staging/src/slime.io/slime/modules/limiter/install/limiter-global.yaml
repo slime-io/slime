@@ -1,0 +1,29 @@
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: limiter
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-limiter
+    tag: v0.5.0_linux_amd64
+  module:
+    - name: limiter
+      kind: limiter
+      enable: true
+      general:
+        disableGlobalRateLimit: false
+        disableAdaptive: true
+        disableInsertGlobalRateLimit: false
+        rlsConfigMap:
+          name: rate-limit-config
+          namespace: istio-system
+        rls:
+          service: rate-limit.istio-system.svc.cluster.local
+          port: 18081
+      global:
+        log:
+          logLevel: info
+        configSources:
+          - address: ss:// 
