@@ -22,11 +22,11 @@
 
 ### 安装Limiter模块
 
-前提：在部署limiter模块前需要安装`CRD`和`deployment/slime-boot`, 参考[slime-boot 安装](https://raw.githubusercontent.com/slime-io/slime/master/doc/zh/slime-boot.md) 指引安装`slime-boot`
+前提：在部署limiter模块前需要安装`CRD`和`deployment/slime-boot`, 参考[slime-boot 安装](https://raw.githubusercontent.com/slime-io/slime/master/doc/zh/slime-boot.md) 指引安装安装`SlimeBoot CRD`和`deployment/slime-boot`
 
-在`CRD`和`deployment/slime-boot`安装成功后，用户可手动应用以下yaml清单，安装limiter模块 [limiter](../install/limiter.yaml)， 在该份部署清单中我们只提供了的单机限流和均分限流
+在`CRD`和`deployment/slime-boot`安装成功后，用户可手动应用以下yaml清单，安装支持单机和均分limiter模块 [limiter](../install/limiter.yaml)， 在该份部署清单中我们只提供了的单机限流和均分限流
 
-如需支持全局共享限流，请阅读[安装 Rls & Redis](#安装-RLS-&-Redis), [安装 configmap](#安装 configmap)
+**如需支持全局共享限流**，请阅读[安装 Rls & Redis](#安装-RLS-&-Redis), 以及安装支持全局、单机、均分限流的limiter模块，[limiter-global](../install/limiter-global.yaml)
 
 如需要支持自适应限流，请阅读[安装 Prometheus](#安装-prometheus)
 

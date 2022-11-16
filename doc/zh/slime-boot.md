@@ -247,6 +247,7 @@ spec:
   - global: `limiter`依赖的一些全局参数，global具体参数可参考 [Config.global](#configglobal)
 
 ```yaml
+apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
   name: limiter
