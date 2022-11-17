@@ -6,6 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"sync"
+
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -14,14 +18,12 @@ import (
 	"k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"os"
-	"strings"
-	"sync"
-
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model/pkg/leaderelection"
 	"slime.io/slime/framework/util"
 )
 
@@ -43,7 +45,24 @@ type Module interface {
 	Kind() string
 	Config() proto.Message
 	InitScheme(scheme *runtime.Scheme) error
-	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs InitCallbacks) error
+	// Init initialize the module according to the environment context.
+	// It is not recommended to execute business logic or start resident
+	// services at this stage, and it is forbidden to start resident
+	// services that require a single instance to run at this stage.
+	Init(env bootstrap.Environment) error
+	// SetupWithInitCallbacks registers init callbacks that supports
+	// concurrent execution, and notifies exit through `Context`, and
+	// the callback must be non-blocking.
+	SetupWithInitCallbacks(cbs InitCallbacks) error
+	// SetupWithManager registers `Reconciler` with `Manager` to build a `Controller`
+	SetupWithManager(mgr manager.Manager) error
+	// SetupWithLeaderElection registers callbacks that require a single
+	// instance to run.
+	// Generally, resident services that run concurrently and trigger the
+	// creation and update of resources in the cluster may involve race
+	// conditions and cause system exceptions. The startup of these services
+	// must be controlled through an election mechanism.
+	SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error
 	Clone() Module
 }
 
@@ -217,12 +236,13 @@ func Main(bundle string, modules []Module) {
 		log.Infof("set burst: %d, qps %f based on user-specified value in client config", conf.Burst, conf.QPS)
 	}
 
+	le := leaderelection.NewKubeLeaderElector(conf, "", bundle)
+
 	mgr, err := ctrl.NewManager(conf, ctrl.Options{
 		Scheme:             scheme,
 		MetricsBindAddress: config.Global.Misc["metrics-addr"],
 		Port:               9443,
-		LeaderElection:     config.Global.Misc["enable-leader-election"] == "on",
-		LeaderElectionID:   bundle,
+		LeaderElection:     false,
 	})
 	if err != nil {
 		log.Errorf("unable to start manager %s, %+v", bundle, err)
@@ -348,9 +368,21 @@ func Main(bundle string, modules []Module) {
 			},
 			Stop: ctx.Done(),
 		}
+		if err := mc.module.Init(env); err != nil {
+			log.Errorf("mod %s Init met err %v", modCfg.Name, err)
+			fatal()
+		}
+		if err := mc.module.SetupWithInitCallbacks(cbs); err != nil {
+			log.Errorf("mod %s SetupWithInitCallbacks met err %v", modCfg.Name, err)
+			fatal()
+		}
+		if err := mc.module.SetupWithManager(mgr); err != nil {
+			log.Errorf("mod %s SetupWithManager met err %v", modCfg.Name, err)
+			fatal()
+		}
 
-		if err := mc.module.InitManager(mgr, env, cbs); err != nil {
-			log.Errorf("mod %s InitManager met err %v", modCfg.Name, err)
+		if err := mc.module.SetupWithLeaderElection(le); err != nil {
+			log.Errorf("mod %s SetupWithLeaderElection met err %v", modCfg.Name, err)
 			fatal()
 		}
 	}
@@ -364,9 +396,18 @@ func Main(bundle string, modules []Module) {
 		startup(ctx)
 	}
 
-	log.Infof("starting manager bundle %s with modules %v", bundle, modKinds)
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		log.Errorf("problem running manager, %+v", err)
+	le.AddOnStartedLeading(func(ctx context.Context) {
+		go func() {
+			log.Infof("starting controller manager", bundle, modKinds)
+			if err := mgr.Start(ctx); err != nil {
+				log.Errorf("problem running manager, %+v", err)
+			}
+		}()
+	})
+
+	log.Infof("starting bundle %s with modules %v", bundle, modKinds)
+	if err := le.Run(ctrl.SetupSignalHandler()); err != nil {
+		log.Errorf("problem running, %+v", err)
 		stop <- struct{}{}
 		os.Exit(1)
 	}
