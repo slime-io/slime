@@ -1,3 +1,11 @@
+- [slime 镜像构建](#slime-镜像构建)
+  - [子模块单独构建镜像](#子模块单独构建镜像)
+    - [构建amd64镜像](#构建amd64镜像)
+    - [构建多架构镜像](#构建多架构镜像)
+  - [构建包含全部功能的slime镜像](#构建包含全部功能的slime镜像)
+    - [构建amd64镜像](#构建amd64镜像-1)
+    - [构建多架构镜像](#构建多架构镜像-1)
+
 # slime 镜像构建
 
 slime 支持子模块单独构建镜像,也支持构建一个包含全部功能的bundle镜像, 以下分两个部分介绍slime镜像构建
@@ -9,6 +17,8 @@ slime 支持子模块单独构建镜像,也支持构建一个包含全部功能�
 ### 构建amd64镜像
 
 切换至子模块所在目录,如限流模块所在目录 `slime/staging/src/slime.io/slime/modules/limiter`
+
+note: 对于 global-sidecar, 需要切换至`slime/staging/src/slime.io/slime/modules/lazyload/cmd/proxy`
 
 运行以下命令构建amd64镜像
 
