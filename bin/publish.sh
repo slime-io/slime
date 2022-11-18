@@ -11,6 +11,8 @@ first_hub=$(echo $HUB | awk -F " " '{print $1}')
 TARGET_GOARCH=${TARGET_GOARCH:-${GOARCH:-amd64}}
 TARGET_GOOS=${TARGET_GOOS:-${GOOS:-linux}}
 CGO_ENABLED=${CGO_ENABLED:-0}
+BASE_IMAGE=${BASE_IMAGE-"ubuntu:bionic"}
+
 export GO111MODULE=on
 
 function fatal() {
@@ -99,7 +101,7 @@ for action in $actions; do
     ;;
   image)
     echo "build docker image: ${image}" >&2
-    docker buildx build --platform ${TARGET_GOOS}/${TARGET_GOARCH} --load -t ${image} .
+    docker buildx build --platform ${TARGET_GOOS}/${TARGET_GOARCH} --load --build-arg BASE_IMAGE=$BASE_IMAGE -t ${image} .
     ;;
   image-push)
     for push_hub in ${PUSH_HUBS}; do

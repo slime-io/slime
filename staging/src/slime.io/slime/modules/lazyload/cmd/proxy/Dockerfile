@@ -1,6 +1,8 @@
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
-FROM ubuntu:bionic
+ARG BASE_IMAGE=ubuntu:bionic
+FROM ${BASE_IMAGE}
+
 WORKDIR /
 
 COPY manager.exe ./proxy-app

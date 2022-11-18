@@ -57,7 +57,7 @@ if [[ "$1" == "copy" ]]; then
       arr+=("$to_arch")
     done
 
-   ../slime/bin/multiarch.sh --push "$to" "${arr[@]}"
+   $0 --push "$to" "${arr[@]}"
   }
 
   exit
