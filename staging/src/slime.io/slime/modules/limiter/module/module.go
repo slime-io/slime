@@ -3,19 +3,20 @@ package module
 import (
 	"os"
 
-	"slime.io/slime/framework/model/module"
-	"slime.io/slime/modules/limiter/model"
-
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	istioapi "slime.io/slime/framework/apis"
 	"slime.io/slime/framework/bootstrap"
 	istiocontroller "slime.io/slime/framework/controllers"
+	"slime.io/slime/framework/model/module"
+	"slime.io/slime/framework/model/pkg/leaderelection"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/controllers"
+	"slime.io/slime/modules/limiter/model"
 )
 
 type Module struct {
@@ -68,5 +69,21 @@ func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs
 	}
 
 	log.Infof("init manager successful")
+	return nil
+}
+
+func (m *Module) Init(env bootstrap.Environment) error {
+	return nil
+}
+
+func (m *Module) SetupWithInitCallbacks(cbs module.InitCallbacks) error {
+	return nil
+}
+
+func (m *Module) SetupWithManager(mgr manager.Manager) error {
+	return nil
+}
+
+func (m *Module) SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
 	return nil
 }
