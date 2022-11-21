@@ -7,8 +7,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
+	"unsafe"
 
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
@@ -16,10 +18,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	ctrl "sigs.k8s.io/controller-runtime"
+	ctrlleaderelection "sigs.k8s.io/controller-runtime/pkg/leaderelection"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/recorder"
 
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
@@ -211,6 +217,8 @@ func Main(bundle string, modules []Module) {
 	var (
 		scheme   = runtime.NewScheme()
 		modKinds []string
+		le       leaderelection.LeaderElector
+		mgrOpts  ctrl.Options
 	)
 	for _, mc := range mcs {
 		modKinds = append(modKinds, mc.module.Kind())
@@ -236,19 +244,27 @@ func Main(bundle string, modules []Module) {
 		log.Infof("set burst: %d, qps %f based on user-specified value in client config", conf.Burst, conf.QPS)
 	}
 
-	le := leaderelection.NewKubeLeaderElector(conf, "", bundle)
-
-	mgr, err := ctrl.NewManager(conf, ctrl.Options{
-		Scheme:             scheme,
-		MetricsBindAddress: config.Global.Misc["metrics-addr"],
-		Port:               9443,
-		LeaderElection:     false,
-	})
-	if err != nil {
-		log.Errorf("unable to start manager %s, %+v", bundle, err)
-		fatal()
+	// setup for leaderelection
+	if config.Global.Misc["enable-leader-election"] == "on" {
+		rl, err := leaderelection.NewKubeResourceLock(conf, "", bundle)
+		if err != nil {
+			log.Errorf("create kube reource lock failed: %v", err)
+			fatal()
+		}
+		le = leaderelection.NewKubeLeaderElector(rl)
+		mgrOpts = mgrOptionsWithLeaderElection(mgrOpts, rl)
+	} else {
+		le = leaderelection.NewAlwaysLeader()
 	}
 
+	mgrOpts.Scheme = scheme
+	mgrOpts.MetricsBindAddress = config.Global.Misc["metrics-addr"]
+	mgrOpts.Port = 9443
+	mgr, err := ctrl.NewManager(conf, mgrOpts)
+	if err != nil {
+		log.Errorf("unable to create manager %s, %+v", bundle, err)
+		fatal()
+	}
 	clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("create a new clientSet failed, %+v", err)
@@ -267,8 +283,6 @@ func Main(bundle string, modules []Module) {
 			startups = append(startups, f)
 		},
 	}
-
-	ctx := context.Background()
 
 	// parse pathRedirect param
 	pathRedirects := make(map[string]string)
@@ -290,13 +304,13 @@ func Main(bundle string, modules []Module) {
 	readyMgr := &moduleReadyManager{moduleReadyCheckers: map[string][]readyChecker{}}
 
 	// init configController if configSource field is used
-	stop := make(chan struct{})
 	cc, err := bootstrap.NewConfigController(config, mgr.GetConfig())
 	if err != nil {
 		log.Errorf("start ConfigController error: %+v", err)
 		os.Exit(1)
 	}
 
+	ctx := ctrl.SetupSignalHandler()
 	// init modules
 	for _, mc := range mcs {
 		modCfg, modGeneralJson := mc.config.config, mc.config.generalJson
@@ -387,6 +401,7 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
+	var wg sync.WaitGroup
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
 		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects, readyMgr.check)
@@ -396,21 +411,25 @@ func Main(bundle string, modules []Module) {
 		startup(ctx)
 	}
 
-	le.AddOnStartedLeading(func(ctx context.Context) {
-		go func() {
-			log.Infof("starting controller manager", bundle, modKinds)
-			if err := mgr.Start(ctx); err != nil {
-				log.Errorf("problem running manager, %+v", err)
-			}
-		}()
-	})
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		log.Infof("starting bundle %s with modules %v", bundle, modKinds)
+		if err := le.Run(ctx); err != nil {
+			log.Errorf("problem running, %+v", err)
+		}
+	}()
 
-	log.Infof("starting bundle %s with modules %v", bundle, modKinds)
-	if err := le.Run(ctrl.SetupSignalHandler()); err != nil {
-		log.Errorf("problem running, %+v", err)
-		stop <- struct{}{}
-		os.Exit(1)
-	}
+	go func() {
+		wg.Add(1)
+		defer wg.Done()
+		log.Infof("starting manager with modules %v", modKinds)
+		if err := mgr.Start(ctx); err != nil {
+			log.Errorf("problem running, %+v", err)
+		}
+	}()
+
+	wg.Wait()
 }
 
 // Merge The content of dst will not be changed, return a new instance with merged result
@@ -418,4 +437,24 @@ func merge(dst, src proto.Message) proto.Message {
 	ret := proto.Clone(dst)
 	proto.Merge(ret, src)
 	return ret
+}
+
+// mgrOptionsWithLeaderElection uses reflect to set the manager's resourcelock
+// instead of creating by it yourself. This way we keep the election state of
+// ctrl manager and slime leader selector in sync.
+func mgrOptionsWithLeaderElection(opts ctrl.Options, rl resourcelock.Interface) ctrl.Options {
+	opts.LeaderElection = true
+	f := func(_ *rest.Config, _ recorder.Provider, _ ctrlleaderelection.Options) (resourcelock.Interface, error) {
+		return rl, nil
+	}
+	v := reflect.ValueOf(&opts).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Name != "newResourceLock" {
+			continue
+		}
+		vf := v.Field(i)
+		vf = reflect.NewAt(vf.Type(), unsafe.Pointer(vf.UnsafeAddr())).Elem()
+		vf.Set(reflect.ValueOf(f))
+	}
+	return opts
 }

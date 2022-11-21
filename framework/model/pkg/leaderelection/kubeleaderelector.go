@@ -24,38 +24,29 @@ var _ LeaderElector = &KubeLeaderElector{}
 // leader. More information can be obtained from:
 //
 //	https://github.com/kubernetes/client-go/blob/master/tools/leaderelection/leaderelection.go
-//  
+//
 // NOTE:
 // KubeLeaderElector does not strictly implement the LeaderElector, and
-// the behavior differences are as follows: 
-//   1. The onStartedLeading callbacks are packaged and called asynchronously,
-//      and executed synchronously in order in the asynchronous logic.
-//   2. The onStoppedLeading callbacks will be executed when exiting,
-//      even without being a leader.
+// the behavior differences are as follows:
+//  1. The onStartedLeading callbacks are packaged and called asynchronously,
+//     and executed synchronously in order in the asynchronous logic.
+//  2. The onStoppedLeading callbacks will be executed when exiting,
+//     even without being a leader.
 type KubeLeaderElector struct {
 	startCbLock               sync.RWMutex
 	onStartedLeadingCallbacks []func(context.Context)
 	stopCbLock                sync.RWMutex
-	onStopLeadingCallbacks    []func()
+	onStoppedLeadingCallbacks []func()
 
-	id        string
-	name      string
-	namespace string
-
-	// config is the rest.config used to talk to the apiserver.
-	config *rest.Config
-
-	le *leaderelection.LeaderElector
+	id   string
+	lock resourcelock.Interface
+	le   *leaderelection.LeaderElector
 }
 
-func NewKubeLeaderElector(config *rest.Config, namespace, name string) *KubeLeaderElector {
-	workload, _ := os.Hostname()
-	id := workload + "_" + uuid.New().String()
+func NewKubeLeaderElector(lock resourcelock.Interface) *KubeLeaderElector {
 	return &KubeLeaderElector{
-		id:        id,
-		namespace: namespace,
-		name:      name,
-		config:    config,
+		id:   lock.Identity(),
+		lock: lock,
 	}
 }
 
@@ -67,40 +58,16 @@ func (k *KubeLeaderElector) AddOnStartedLeading(cb func(context.Context)) {
 
 func (k *KubeLeaderElector) AddOnStoppedLeading(cb func()) {
 	k.stopCbLock.Lock()
-	k.onStopLeadingCallbacks = append(k.onStopLeadingCallbacks, cb)
+	k.onStoppedLeadingCallbacks = append(k.onStoppedLeadingCallbacks, cb)
 	k.stopCbLock.Unlock()
 }
 
 func (k *KubeLeaderElector) Run(ctx context.Context) error {
 	if k.le == nil {
-		if k.config == nil {
-			// try in-cluster config
-			config, err := rest.InClusterConfig()
-			if err != nil {
-				return fmt.Errorf("kube elector %s is without custom config, try to get in-cluster config failed: %s", k.id, err)
-			}
-			k.config = config
-		}
-
-		client, err := kubernetes.NewForConfig(k.config)
-		if err != nil {
-			return fmt.Errorf("kube elector %s init kube client failed: %s ", k.id, err)
-		}
-
-		lock, err := resourcelock.New(
-			resourcelock.ConfigMapsLeasesResourceLock,
-			k.namespace,
-			k.name,
-			client.CoreV1(),
-			client.CoordinationV1(),
-			resourcelock.ResourceLockConfig{
-				Identity: k.id,
-			})
-		if err != nil {
-			return fmt.Errorf("kube elector %s create resourcelock failed: %s ", k.id, err)
-		}
+		var err error
 		k.le, err = leaderelection.NewLeaderElector(leaderelection.LeaderElectionConfig{
-			Lock:            lock,
+			Lock: k.lock,
+			// from: https://github.com/kubernetes/component-base/blob/master/config/v1alpha1/defaults.go
 			LeaseDuration:   15 * time.Second,
 			RenewDeadline:   10 * time.Second,
 			RetryPeriod:     2 * time.Second,
@@ -108,17 +75,21 @@ func (k *KubeLeaderElector) Run(ctx context.Context) error {
 			Callbacks: leaderelection.LeaderCallbacks{
 				OnStartedLeading: func(ctx context.Context) {
 					k.startCbLock.RLock()
-					for _, f := range k.onStartedLeadingCallbacks {
+					cbs := make([]func(context.Context), len(k.onStartedLeadingCallbacks))
+					copy(cbs, k.onStartedLeadingCallbacks)
+					k.startCbLock.RUnlock()
+					for _, f := range cbs {
 						f(ctx)
 					}
-					k.startCbLock.Unlock()
 				},
 				OnStoppedLeading: func() {
 					k.stopCbLock.RLock()
-					for _, f := range k.onStopLeadingCallbacks {
+					cbs := make([]func(), len(k.onStoppedLeadingCallbacks))
+					copy(cbs, k.onStoppedLeadingCallbacks)
+					k.stopCbLock.Unlock()
+					for _, f := range cbs {
 						f()
 					}
-					k.stopCbLock.Unlock()
 				},
 			},
 		})
@@ -134,4 +105,62 @@ func (k *KubeLeaderElector) Run(ctx context.Context) error {
 		}
 		k.le.Run(ctx)
 	}
+}
+
+// NewKubeResourceLock create a new kube resourcelock.
+// Do not accept a finished client, we can customize some configurations
+// based on the basic cfg to create a client that is more suitable for
+// election scenarios.
+func NewKubeResourceLock(config *rest.Config, namespace, name string) (resourcelock.Interface, error) {
+	if config == nil {
+		return nil, fmt.Errorf("can not create kube resourcelock with empty config")
+	}
+	cfg := rest.CopyConfig(config)
+	client, err := kubernetes.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("init kube client with config %v failed: %s ", cfg, err)
+	}
+	workload, _ := os.Hostname()
+	id := workload + "_" + uuid.New().String()
+	lock, err := resourcelock.New(
+		resourcelock.ConfigMapsLeasesResourceLock,
+		namespace,
+		name,
+		client.CoreV1(),
+		client.CoordinationV1(),
+		resourcelock.ResourceLockConfig{
+			Identity: id,
+		})
+	if err != nil {
+		return nil, fmt.Errorf("create kube resourcelock %s failed: %s ", id, err)
+	}
+	return &resourcelockWrapper{
+		Interface: lock,
+	}, nil
+}
+
+type resourcelockWrapper struct {
+	sync.Mutex
+	resourcelock.Interface
+}
+
+func (l *resourcelockWrapper) Create(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
+	l.Lock()
+	defer l.Unlock()
+	if _, _, err := l.Interface.Get(ctx); err == nil {
+		return l.Interface.Update(ctx, ler)
+	}
+	return l.Interface.Create(ctx, ler)
+}
+
+func (l *resourcelockWrapper) Update(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
+	l.Lock()
+	defer l.Unlock()
+	return l.Interface.Update(ctx, ler)
+}
+
+func (l *resourcelockWrapper) RecordEvent(event string) {
+	l.Lock()
+	l.Interface.RecordEvent(event)
+	l.Unlock()
 }
