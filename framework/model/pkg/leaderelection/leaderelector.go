@@ -2,6 +2,7 @@ package leaderelection
 
 import (
 	"context"
+	"sync"
 )
 
 // LeaderCallbacks is used to register callback functions
@@ -38,4 +39,50 @@ type LeaderElector interface {
 	//      OnStoppedLeading callbacks can be executed synchronously in order;
 	//   4. When serving as a leader, if the `Context` is closed, follow `3`.
 	Run(context.Context) error
+}
+
+var _ LeaderElector = &AlwaysLeader{}
+
+type AlwaysLeader struct {
+	startCbLock               sync.RWMutex
+	onStartedLeadingCallbacks []func(context.Context)
+	stopCbLock                sync.RWMutex
+	onStoppedLeadingCallbacks []func()
+}
+
+func NewAlwaysLeader() *AlwaysLeader {
+	return &AlwaysLeader{}
+}
+
+func (al *AlwaysLeader) AddOnStartedLeading(cb func(context.Context)) {
+	al.startCbLock.Lock()
+	al.onStartedLeadingCallbacks = append(al.onStartedLeadingCallbacks, cb)
+	al.startCbLock.Unlock()
+}
+
+func (al *AlwaysLeader) AddOnStoppedLeading(cb func()) {
+	al.stopCbLock.Lock()
+	al.onStoppedLeadingCallbacks = append(al.onStoppedLeadingCallbacks, cb)
+	al.stopCbLock.Unlock()
+}
+
+func (al *AlwaysLeader) Run(ctx context.Context) error {
+	defer func() {
+		al.stopCbLock.RLock()
+		cbs := make([]func(), len(al.onStoppedLeadingCallbacks))
+		copy(cbs, al.onStoppedLeadingCallbacks)
+		al.stopCbLock.Unlock()
+		for _, f := range cbs {
+			f()
+		}
+	}()
+	al.startCbLock.RLock()
+	cbs := make([]func(context.Context), len(al.onStartedLeadingCallbacks))
+	copy(cbs, al.onStartedLeadingCallbacks)
+	al.startCbLock.RUnlock()
+	for _, f := range cbs {
+		f(ctx)
+	}
+	<-ctx.Done()
+	return nil
 }
