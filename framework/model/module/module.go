@@ -72,6 +72,11 @@ type Module interface {
 	Clone() Module
 }
 
+// LegcyModule represents a legacy module with InitManager method.
+type LegcyModule interface {
+	InitManager(mgr manager.Manager, env bootstrap.Environment, cbs InitCallbacks) error
+}
+
 type readyChecker struct {
 	name    string
 	checker func() error
@@ -382,26 +387,32 @@ func Main(bundle string, modules []Module) {
 			},
 			Stop: ctx.Done(),
 		}
-		if err := mc.module.Init(env); err != nil {
-			log.Errorf("mod %s Init met err %v", modCfg.Name, err)
-			fatal()
-		}
-		if err := mc.module.SetupWithInitCallbacks(cbs); err != nil {
-			log.Errorf("mod %s SetupWithInitCallbacks met err %v", modCfg.Name, err)
-			fatal()
-		}
-		if err := mc.module.SetupWithManager(mgr); err != nil {
-			log.Errorf("mod %s SetupWithManager met err %v", modCfg.Name, err)
-			fatal()
-		}
+		if lm, ok := mc.module.(LegcyModule); ok {
+			if err := lm.InitManager(mgr, env, cbs); err != nil {
+				log.Errorf("mod %s InitManager met err %v", modCfg.Name, err)
+				fatal()
+			}
+		} else {
+			if err := mc.module.Init(env); err != nil {
+				log.Errorf("mod %s Init met err %v", modCfg.Name, err)
+				fatal()
+			}
+			if err := mc.module.SetupWithInitCallbacks(cbs); err != nil {
+				log.Errorf("mod %s SetupWithInitCallbacks met err %v", modCfg.Name, err)
+				fatal()
+			}
+			if err := mc.module.SetupWithManager(mgr); err != nil {
+				log.Errorf("mod %s SetupWithManager met err %v", modCfg.Name, err)
+				fatal()
+			}
 
-		if err := mc.module.SetupWithLeaderElection(le); err != nil {
-			log.Errorf("mod %s SetupWithLeaderElection met err %v", modCfg.Name, err)
-			fatal()
+			if err := mc.module.SetupWithLeaderElection(le); err != nil {
+				log.Errorf("mod %s SetupWithLeaderElection met err %v", modCfg.Name, err)
+				fatal()
+			}
 		}
 	}
 
-	var wg sync.WaitGroup
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
 		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects, readyMgr.check)
@@ -411,6 +422,7 @@ func Main(bundle string, modules []Module) {
 		startup(ctx)
 	}
 
+	var wg sync.WaitGroup
 	go func() {
 		wg.Add(1)
 		defer wg.Done()
