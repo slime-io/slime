@@ -6,28 +6,19 @@ import (
 	"strings"
 	"time"
 
-	watchtools "k8s.io/client-go/tools/watch"
-
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
 )
 
-func (r *ServicefenceReconciler) startSvcCache() {
+func (r *ServicefenceReconciler) StartSvcCache(ctx context.Context) {
 	clientSet := r.env.K8SClient
-	wormholePort := r.cfg.WormholePort
-
 	log := log.WithField("function", "newSvcCache")
-	nsSvcCache := &NsSvcCache{Data: map[string]map[string]struct{}{}}
-	labelSvcCache := &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}}
-	portProtocolCache := &PortProtocolCache{Data: map[int32]map[Protocol]uint{}}
-
 	// init service watcher
 	servicesClient := clientSet.CoreV1().Services("")
-	ctx := context.Background()
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return servicesClient.List(ctx, options)
@@ -36,132 +27,137 @@ func (r *ServicefenceReconciler) startSvcCache() {
 			return servicesClient.Watch(ctx, options)
 		},
 	}
-	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Service{})
-
+	_, cacheSync, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Service{})
+	r.svcSynced = cacheSync.HasSynced
 	go func() {
+		// wait for svc cache synced
+		cache.WaitForCacheSync(ctx.Done(), r.svcSynced)
 		log.Infof("Service cacher is running")
 		for {
-			e, ok := <-watcher.ResultChan()
-			if !ok {
-				log.Warningf("a result chan of service watcher is closed, break process loop")
+			select {
+			case <-ctx.Done():
+				log.Infof("context is closed, break process loop")
 				return
-			}
-
-			service, ok := e.Object.(*v1.Service)
-			if !ok {
-				log.Errorf("invalid type of object in service watcher event")
-				continue
-			}
-			ns := service.GetNamespace()
-			name := service.GetName()
-			eventSvc := ns + "/" + name
-			// delete eventSvc from labelSvcCache to ensure final consistency
-			labelSvcCache.Lock()
-			for label, m := range labelSvcCache.Data {
-				delete(m, eventSvc)
-				if len(m) == 0 {
-					delete(labelSvcCache.Data, label)
+			case e, ok := <-watcher.ResultChan():
+				if !ok {
+					log.Warningf("a result chan of service watcher is closed, break process loop")
+					return
 				}
-			}
-			labelSvcCache.Unlock()
 
-			// TODO delete eventSvcPort from portProtocolCache
-
-			// delete event
-			// delete eventSvc from ns->svc map
-			if e.Type == watch.Deleted {
-				nsSvcCache.Lock()
-				delete(nsSvcCache.Data[ns], eventSvc)
-				nsSvcCache.Unlock()
-				// labelSvcCache already deleted, skip
-				continue
-			}
-
-			// add, update event
-			// add eventSvc to nsSvcCache
-			nsSvcCache.Lock()
-			if nsSvcCache.Data[ns] == nil {
-				nsSvcCache.Data[ns] = make(map[string]struct{})
-			}
-			nsSvcCache.Data[ns][eventSvc] = struct{}{}
-			nsSvcCache.Unlock()
-			// add eventSvc to labelSvcCache again
-			labelSvcCache.Lock()
-			for k, v := range service.GetLabels() {
-				label := LabelItem{
-					Name:  k,
-					Value: v,
+				service, ok := e.Object.(*corev1.Service)
+				if !ok {
+					log.Errorf("invalid type of object in service watcher event")
+					continue
 				}
-				if labelSvcCache.Data[label] == nil {
-					labelSvcCache.Data[label] = make(map[string]struct{})
-				}
-				labelSvcCache.Data[label][eventSvc] = struct{}{}
-			}
-			labelSvcCache.Unlock()
-
-			// add eventSvc ports to portProtocolCache again
-			if ns != r.env.Config.Global.IstioNamespace {
-				portProtocolCache.Lock()
-				for _, port := range service.Spec.Ports {
-					p := port.Port
-					portProtos := portProtocolCache.Data[p]
-					if portProtos == nil {
-						portProtos = make(map[Protocol]uint)
-						portProtocolCache.Data[p] = portProtos
+				ns := service.GetNamespace()
+				name := service.GetName()
+				eventSvc := ns + "/" + name
+				// delete eventSvc from labelSvcCache to ensure final consistency
+				r.labelSvcCache.Lock()
+				for label, m := range r.labelSvcCache.Data {
+					delete(m, eventSvc)
+					if len(m) == 0 {
+						delete(r.labelSvcCache.Data, label)
 					}
-					proto := getProtocol(port)
-					portProtos[proto]++
 				}
-				portProtocolCache.Unlock()
-			}
+				r.labelSvcCache.Unlock()
 
+				// TODO delete eventSvcPort from portProtocolCache
+
+				// delete event
+				// delete eventSvc from ns->svc map
+				if e.Type == watch.Deleted {
+					r.nsSvcCache.Lock()
+					delete(r.nsSvcCache.Data[ns], eventSvc)
+					r.nsSvcCache.Unlock()
+					// labelSvcCache already deleted, skip
+					continue
+				}
+
+				// add, update event
+				// add eventSvc to nsSvcCache
+				r.nsSvcCache.Lock()
+				if r.nsSvcCache.Data[ns] == nil {
+					r.nsSvcCache.Data[ns] = make(map[string]struct{})
+				}
+				r.nsSvcCache.Data[ns][eventSvc] = struct{}{}
+				r.nsSvcCache.Unlock()
+				// add eventSvc to labelSvcCache again
+				r.labelSvcCache.Lock()
+				for k, v := range service.GetLabels() {
+					label := LabelItem{
+						Name:  k,
+						Value: v,
+					}
+					if r.labelSvcCache.Data[label] == nil {
+						r.labelSvcCache.Data[label] = make(map[string]struct{})
+					}
+					r.labelSvcCache.Data[label][eventSvc] = struct{}{}
+				}
+				r.labelSvcCache.Unlock()
+
+				// add eventSvc ports to portProtocolCache again
+				if ns != r.env.Config.Global.IstioNamespace {
+					r.portProtocolCache.Lock()
+					for _, port := range service.Spec.Ports {
+						p := port.Port
+						portProtos := r.portProtocolCache.Data[p]
+						if portProtos == nil {
+							portProtos = make(map[Protocol]uint)
+							r.portProtocolCache.Data[p] = portProtos
+						}
+						proto := getProtocol(port)
+						portProtos[proto]++
+					}
+					r.portProtocolCache.Unlock()
+				}
+			}
 		}
 	}()
+}
 
+func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
+	log := log.WithField("function", "StartAutoPort")
+	wormholePort := r.cfg.WormholePort
 	needUpdate, successUpdate := false, true
-
-	if r.cfg.AutoPort {
-        // Todo: need leader election
+	go func() {
+		// wait for svc cache synced
+		cache.WaitForCacheSync(ctx.Done(), r.svcSynced)
 		log.Infof("Lazyload port auto management is running")
-		go func() {
-			// polling request
-			pollTicker := time.NewTicker(10 * time.Second)
-			// init and retry request
-			retryCh := time.After(1 * time.Second)
-			for {
-				select {
-				case <-pollTicker.C:
-				case <-retryCh:
-					retryCh = nil
-				}
-
-				// update wormholePort
-				log.Debugf("got timer event for updating wormholePort")
-
-				wormholePort, needUpdate = updateWormholePort(wormholePort, portProtocolCache)
-				if needUpdate || !successUpdate {
-					log.Debugf("need to update resources")
-					successUpdate = updateResources(wormholePort, &r.env)
-					if !successUpdate {
-						log.Infof("retry to update resources")
-						retryCh = time.After(1 * time.Second)
-					}
-				} else {
-					log.Debugf("no need to update resources")
-				}
+		// polling request
+		pollTicker := time.NewTicker(10 * time.Second)
+		// init and retry request
+		retryCh := time.After(5 * time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				log.Infof("Lazyload port auto management is terminated")
+				return
+			case <-pollTicker.C:
+			case <-retryCh:
+				retryCh = nil
 			}
-		}()
-	}
 
-	r.nsSvcCache = nsSvcCache
-	r.labelSvcCache = labelSvcCache
-	r.portProtocolCache = portProtocolCache
+			// update wormholePort
+			log.Debugf("got timer event for updating wormholePort")
 
-	return
+			wormholePort, needUpdate = updateWormholePort(wormholePort, r.portProtocolCache)
+			if needUpdate || !successUpdate {
+				log.Debugf("need to update resources")
+				successUpdate = updateResources(wormholePort, &r.env)
+				if !successUpdate {
+					log.Infof("retry to update resources")
+					retryCh = time.After(1 * time.Second)
+				}
+			} else {
+				log.Debugf("no need to update resources")
+			}
+		}
+	}()
 }
 
 // find protocol of service port
-func getProtocol(port v1.ServicePort) Protocol {
+func getProtocol(port corev1.ServicePort) Protocol {
 	if port.Protocol != "TCP" {
 		return ProtocolUnknown
 	}

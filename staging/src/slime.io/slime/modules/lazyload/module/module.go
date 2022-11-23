@@ -1,18 +1,18 @@
 package module
 
 import (
-	"os"
+	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	istioapi "slime.io/slime/framework/apis"
-	"slime.io/slime/framework/bootstrap"
 	basecontroller "slime.io/slime/framework/controllers"
+	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/module"
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	"slime.io/slime/modules/lazyload/controllers"
@@ -51,15 +51,31 @@ func (mo *Module) Clone() module.Module {
 	return &ret
 }
 
-func (mo *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
-	cfg := &mo.config
+func (m *Module) Setup(opts module.ModuleOptions) error {
 
-	sfReconciler := controllers.NewReconciler(cfg, mgr, env)
+	env, mgr := opts.Env, opts.Manager
+
+	pc, err := controllers.NewProducerConfig(env)
+	if err != nil {
+		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
+	}
+	sfReconciler := controllers.NewReconciler(
+		controllers.ReconcilerWithCfg(&m.config),
+		controllers.ReconcilerWithEnv(env),
+		controllers.ReconcilerWithProducerConfig(pc),
+	)
+	sfReconciler.Client = mgr.GetClient()
+	sfReconciler.Scheme = mgr.GetScheme()
+
+	opts.InitCbs.AddStartup(func(ctx context.Context) {
+		// start service related cache
+		sfReconciler.StartSvcCache(ctx)
+	})
 
 	var builder basecontroller.ObjectReconcilerBuilder
 
 	// auto generate ServiceFence or not
-	if cfg == nil || cfg.AutoFence {
+	if m.config.AutoFence {
 		builder = builder.Add(basecontroller.ObjectReconcileItem{
 			Name:    "Namespace",
 			ApiType: &corev1.Namespace{},
@@ -84,13 +100,29 @@ func (mo *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cb
 	})
 
 	if err := builder.Build(mgr); err != nil {
-		log.Errorf("unable to create controller,%+v", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create controller,%+v", err)
 	}
 
-	return nil
-}
+	le := opts.LeaderElectionCbs
+	le.AddOnStartedLeading(func(_ context.Context) {
+		log.Infof("producers starts")
+		metric.NewProducer(pc)
+	})
+	if m.config.AutoPort {
+		le.AddOnStartedLeading(func(ctx context.Context) {
+			sfReconciler.StartAutoPort(ctx)
+		})
+	}
 
-func (m *Module) Setup(opts module.ModuleOptions) error {
+	if env.Config.Metric != nil ||
+		env.Config.Global.Misc["metricSourceType"] == controllers.MetricSourceTypeAccesslog {
+		le.AddOnStartedLeading(func(ctx context.Context) {
+			go sfReconciler.WatchMetric(ctx)
+		})
+	} else {
+		log.Warningf("watching metric is not running")
+	}
+
+	le.AddOnStoppedLeading(sfReconciler.Clear)
 	return nil
 }

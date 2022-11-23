@@ -4,7 +4,6 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
-	watchtools "k8s.io/client-go/tools/watch"
 	"net"
 	"strconv"
 	"strings"
@@ -16,7 +15,6 @@ import (
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -24,6 +22,8 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
+	watchtools "k8s.io/client-go/tools/watch"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/metric"
@@ -115,7 +115,7 @@ func generateHandler(name, namespace, pName string, pHandler *v1alpha1.Prometheu
 	return metric.Handler{Name: pName, Query: query}
 }
 
-func newProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error) {
+func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error) {
 	// init metric source
 	var enablePrometheusSource bool
 	var prometheusSourceConfig metric.PrometheusSourceConfig
@@ -449,7 +449,7 @@ func newIpToSvcCache(clientSet *kubernetes.Clientset) (map[string]string, map[st
 				return
 			}
 
-			ep, ok := e.Object.(*v1.Endpoints)
+			ep, ok := e.Object.(*corev1.Endpoints)
 			if !ok {
 				log.Errorf("invalid type of object in endpoint watcher event")
 				continue

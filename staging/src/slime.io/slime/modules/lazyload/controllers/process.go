@@ -11,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
@@ -25,12 +26,15 @@ const (
 	CreatedByFenceController = "fence-controller"
 )
 
-func (r *ServicefenceReconciler) WatchMetric() {
+func (r *ServicefenceReconciler) WatchMetric(ctx context.Context) {
 	log := log.WithField("reporter", "ServicefenceReconciler").WithField("function", "WatchMetric")
 	log.Infof("start watching metric")
 
 	for {
 		select {
+		case <-ctx.Done():
+			log.Infof("context is done, break process loop")
+			return
 		case metric, ok := <-r.watcherMetricChan:
 			if !ok {
 				log.Warningf("watcher mertic channel closed, break process loop")

@@ -25,26 +25,23 @@ import (
 	"sync"
 	"time"
 
-	"slime.io/slime/framework/model"
-	"slime.io/slime/framework/model/metric"
-
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
+	"slime.io/slime/framework/model"
+	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/util"
-
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	modmodel "slime.io/slime/modules/lazyload/model"
 )
@@ -62,6 +59,7 @@ type ServicefenceReconciler struct {
 	reconcileLock        sync.RWMutex
 	staleNamespaces      map[string]bool
 	enabledNamespaces    map[string]bool
+	svcSynced            func() bool
 	nsSvcCache           *NsSvcCache
 	labelSvcCache        *LabelSvcCache
 	portProtocolCache    *PortProtocolCache
@@ -69,50 +67,59 @@ type ServicefenceReconciler struct {
 	doAliasRules         []*domainAliasRule
 }
 
+type ReconcilerOpts func(*ServicefenceReconciler)
+
+func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
+	return func(sr *ServicefenceReconciler) {
+		sr.env = env
+		sr.defaultAddNamespaces = append(sr.defaultAddNamespaces, env.Config.Global.IstioNamespace, env.Config.Global.SlimeNamespace)
+	}
+}
+
+func ReconcilerWithCfg(cfg *lazyloadv1alpha1.Fence) ReconcilerOpts {
+	return func(sr *ServicefenceReconciler) {
+		sr.cfg = cfg
+		sr.doAliasRules = newDomainAliasRules(cfg.DomainAliases)
+	}
+}
+
+func ReconcilerWithProducerConfig(pc *metric.ProducerConfig) ReconcilerOpts {
+	return func(sr *ServicefenceReconciler) {
+		sr.watcherMetricChan = pc.WatcherProducerConfig.MetricChan
+		sr.tickerMetricChan = pc.TickerProducerConfig.MetricChan
+		// reconciler defines producer metric handler
+		pc.WatcherProducerConfig.NeedUpdateMetricHandler = sr.handleWatcherEvent
+		pc.TickerProducerConfig.NeedUpdateMetricHandler = sr.handleTickerEvent
+	}
+}
+
 // NewReconciler returns a new reconcile.Reconciler
-func NewReconciler(cfg *lazyloadv1alpha1.Fence, mgr manager.Manager, env bootstrap.Environment) *ServicefenceReconciler {
-	log := modmodel.ModuleLog.WithField(model.LogFieldKeyFunction, "NewReconciler")
-
-	// generate producer config
-	pc, err := newProducerConfig(env)
-	if err != nil {
-		log.Errorf("%v", err)
-		return nil
-	}
-
+func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 	r := &ServicefenceReconciler{
-		Client:               mgr.GetClient(),
-		Scheme:               mgr.GetScheme(),
-		env:                  env,
-		interestMeta:         map[string]bool{},
-		interestMetaCopy:     map[string]bool{},
-		watcherMetricChan:    pc.WatcherProducerConfig.MetricChan,
-		tickerMetricChan:     pc.TickerProducerConfig.MetricChan,
-		staleNamespaces:      map[string]bool{},
-		enabledNamespaces:    map[string]bool{},
-		defaultAddNamespaces: []string{env.Config.Global.IstioNamespace, env.Config.Global.SlimeNamespace},
-		doAliasRules:         newDomainAliasRules(cfg.DomainAliases),
-		cfg:                  cfg,
+		interestMeta:      map[string]bool{},
+		interestMetaCopy:  map[string]bool{},
+		staleNamespaces:   map[string]bool{},
+		enabledNamespaces: map[string]bool{},
+		nsSvcCache:        &NsSvcCache{Data: map[string]map[string]struct{}{}},
+		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
+		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
 	}
-
-	// start service related cache
-	r.startSvcCache()
-
-	// reconciler defines producer metric handler
-	pc.WatcherProducerConfig.NeedUpdateMetricHandler = r.handleWatcherEvent
-	pc.TickerProducerConfig.NeedUpdateMetricHandler = r.handleTickerEvent
-
-	// start producer
-	metric.NewProducer(pc)
-	log.Infof("producers starts")
-
-	if env.Config.Metric != nil || env.Config.Global.Misc["metricSourceType"] == MetricSourceTypeAccesslog {
-		go r.WatchMetric()
-	} else {
-		log.Warningf("watching metric is not running")
+	for _, opt := range opts {
+		opt(r)
 	}
-
 	return r
+}
+
+// Clear do anything since releading is not supported by framework
+func (r *ServicefenceReconciler) Clear() {
+	// r.reconcileLock.Lock()
+	// defer r.reconcileLock.Unlock()
+	//
+	// reset cache
+	// r.interestMeta = map[string]bool{}
+	// r.interestMetaCopy = map[string]bool{}
+	// r.staleNamespaces = map[string]bool{}
+	// r.enabledNamespaces = map[string]bool{}
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete
