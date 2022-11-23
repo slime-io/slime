@@ -423,8 +423,8 @@ func Main(bundle string, modules []Module) {
 	}
 
 	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		log.Infof("starting bundle %s with modules %v", bundle, modKinds)
 		if err := le.Run(ctx); err != nil {
@@ -432,8 +432,8 @@ func Main(bundle string, modules []Module) {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
-		wg.Add(1)
 		defer wg.Done()
 		log.Infof("starting manager with modules %v", modKinds)
 		if err := mgr.Start(ctx); err != nil {
