@@ -251,7 +251,8 @@ func Main(bundle string, modules []Module) {
 
 	// setup for leaderelection
 	if config.Global.Misc["enable-leader-election"] == "on" {
-		rl, err := leaderelection.NewKubeResourceLock(conf, "", bundle)
+		// create a resource lock in the same namespace as the workload instance
+		rl, err := leaderelection.NewKubeResourceLock(conf, os.Getenv("WATCH_NAMESPACE"), bundle)
 		if err != nil {
 			log.Errorf("create kube reource lock failed: %v", err)
 			fatal()
