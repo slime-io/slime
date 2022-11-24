@@ -6,10 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
-	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
 	pluginapiv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 	"slime.io/slime/modules/plugin/controllers"
@@ -48,10 +45,12 @@ func (m *Module) Clone() module.Module {
 	return &ret
 }
 
-func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
+func (m *Module) Setup(opts module.ModuleOptions) error {
 	cfg := &m.config
-
 	_ = cfg // unused until now
+
+	env := opts.Env
+	mgr := opts.Manager
 
 	var err error
 	if err = controllers.NewPluginManagerReconciler(env, mgr.GetClient(), mgr.GetScheme()).SetupWithManager(mgr); err != nil {
@@ -67,9 +66,5 @@ func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs
 		os.Exit(1)
 	}
 
-	return nil
-}
-
-func (m *Module) Setup(opts module.ModuleOptions) error {
 	return nil
 }
