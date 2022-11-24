@@ -52,6 +52,7 @@ type PluginManagerReconciler struct {
 	secretWatchers       map[types.NamespacedName]map[types.NamespacedName]struct{}
 	changeSecrets        map[types.NamespacedName]struct{}
 	changeSecretNotifyCh chan struct{}
+	leaderCtx            context.Context
 }
 
 func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client, scheme *runtime.Scheme) *PluginManagerReconciler {
@@ -191,8 +192,21 @@ func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *PluginManagerReconciler) notifySecretChange(nn types.NamespacedName) {
 	r.mut.Lock()
-	r.changeSecrets[nn] = struct{}{}
+	leaderCtx := r.leaderCtx
+	if nn != emptyNN {
+		r.changeSecrets[nn] = struct{}{}
+	}
 	r.mut.Unlock()
+
+	// check if leader
+	if leaderCtx == nil {
+		return
+	}
+	select {
+	case <-leaderCtx.Done():
+		return
+	default:
+	}
 
 	select {
 	case r.changeSecretNotifyCh <- struct{}{}:
@@ -253,6 +267,15 @@ func (r *PluginManagerReconciler) updateWatchSecrets(nn types.NamespacedName, se
 			r.secretWatchers[secretNn] = map[types.NamespacedName]struct{}{nn: {}}
 		}
 	}
+}
+
+func (r *PluginManagerReconciler) OnStartLeading(ctx context.Context) {
+	r.mut.Lock()
+	r.leaderCtx = ctx
+	r.mut.Unlock()
+
+	// resync
+	r.notifySecretChange(emptyNN)
 }
 
 func getPluginManagerWatchSecrets(ns string, in *microserviceslimeiov1alpha1types.PluginManager) map[types.NamespacedName]struct{} {

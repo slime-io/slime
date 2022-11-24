@@ -1,8 +1,7 @@
 package module
 
 import (
-	"os"
-
+	"fmt"
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -53,17 +52,19 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	mgr := opts.Manager
 
 	var err error
-	if err = controllers.NewPluginManagerReconciler(env, mgr.GetClient(), mgr.GetScheme()).SetupWithManager(mgr); err != nil {
-		log.Errorf("unable to create pluginManager controller, %+v", err)
-		os.Exit(1)
+	pmr := controllers.NewPluginManagerReconciler(env, mgr.GetClient(), mgr.GetScheme())
+	if opts.LeaderElectionCbs != nil {
+		opts.LeaderElectionCbs.AddOnStartedLeading(pmr.OnStartLeading)
+	}
+	if err = pmr.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create pluginManager controller, %+v", err)
 	}
 	if err = (&controllers.EnvoyPluginReconciler{
 		Env:    &env,
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
-		log.Errorf("unable to create EnvoyPlugin controller, %+v", err)
-		os.Exit(1)
+		return fmt.Errorf("unable to create EnvoyPlugin controller, %+v", err)
 	}
 
 	return nil
