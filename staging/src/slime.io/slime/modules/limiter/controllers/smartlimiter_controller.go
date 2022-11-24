@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -49,9 +48,8 @@ type SmartLimiterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	cfg    *microservicev1alpha2.Limiter
-	env    bootstrap.Environment
-	scheme *runtime.Scheme
+	cfg *microservicev1alpha2.Limiter
+	env bootstrap.Environment
 	// key is limiter's namespace and name
 	// value is the host
 	// use service.ns.svc.cluster.local as default if host not specified
@@ -130,34 +128,25 @@ func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func NewReconciler(mgr ctrl.Manager, env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) *SmartLimiterReconciler {
+// NewReconciler returns a new reconcile.Reconciler
+func NewReconciler(opts ...ReconcilerOpts) *SmartLimiterReconciler {
 	r := &SmartLimiterReconciler{
-		cfg:                  cfg,
-		Client:               mgr.GetClient(),
-		scheme:               mgr.GetScheme(),
 		metricInfo:           cmap.New(),
 		interest:             cmap.New(),
-		env:                  env,
 		lastUpdatePolicyLock: &sync.RWMutex{},
 	}
-
-	pc, err := newProducerConfig(env, cfg)
-	if err != nil {
-		log.Errorf("new producer config err, %v", err)
-		os.Exit(1)
+	for _, opt := range opts {
+		opt(r)
 	}
-	r.watcherMetricChan = pc.WatcherProducerConfig.MetricChan
-	r.tickerMetricChan = pc.TickerProducerConfig.MetricChan
-	pc.WatcherProducerConfig.NeedUpdateMetricHandler = r.handleWatcherEvent
-	pc.TickerProducerConfig.NeedUpdateMetricHandler = r.handleTickerEvent
-	metric.NewProducer(pc)
-	log.Infof("producers starts")
-
-	go r.WatchMetric()
 	return r
 }
 
-func newProducerConfig(env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) (*metric.ProducerConfig, error) {
+func (r *SmartLimiterReconciler) Clear() {
+	r.interest.Clear()
+	r.metricInfo.Clear()
+}
+
+func NewProducerConfig(env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) (*metric.ProducerConfig, error) {
 	pc := &metric.ProducerConfig{
 		EnableWatcherProducer: false,
 		WatcherProducerConfig: metric.WatcherProducerConfig{
@@ -286,4 +275,28 @@ func buildHost(instance *microservicev1alpha2.SmartLimiter, out bool) string {
 		host = instance.Spec.Host
 	}
 	return host
+}
+
+type ReconcilerOpts func(reconciler *SmartLimiterReconciler)
+
+func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
+	return func(sr *SmartLimiterReconciler) {
+		sr.env = env
+	}
+}
+
+func ReconcilerWithCfg(cfg *microservicev1alpha2.Limiter) ReconcilerOpts {
+	return func(sr *SmartLimiterReconciler) {
+		sr.cfg = cfg
+	}
+}
+
+func ReconcilerWithProducerConfig(pc *metric.ProducerConfig) ReconcilerOpts {
+	return func(sr *SmartLimiterReconciler) {
+		sr.watcherMetricChan = pc.WatcherProducerConfig.MetricChan
+		sr.tickerMetricChan = pc.TickerProducerConfig.MetricChan
+		// reconciler defines producer metric handler
+		pc.WatcherProducerConfig.NeedUpdateMetricHandler = sr.handleWatcherEvent
+		pc.TickerProducerConfig.NeedUpdateMetricHandler = sr.handleTickerEvent
+	}
 }
