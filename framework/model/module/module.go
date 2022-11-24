@@ -18,7 +18,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	restclient "k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
@@ -47,28 +46,39 @@ type configH struct {
 	generalJson []byte
 }
 
-type Module interface {
-	Kind() string
-	Config() proto.Message
-	InitScheme(scheme *runtime.Scheme) error
-	// Init initialize the module according to the environment context.
-	// It is not recommended to execute business logic or start resident
-	// services at this stage, and it is forbidden to start resident
-	// services that require a single instance to run at this stage.
-	Init(env bootstrap.Environment) error
-	// SetupWithInitCallbacks registers init callbacks that supports
-	// concurrent execution, and notifies exit through `Context`, and
-	// the callback must be non-blocking.
-	SetupWithInitCallbacks(cbs InitCallbacks) error
-	// SetupWithManager registers `Reconciler` with `Manager` to build a `Controller`
-	SetupWithManager(mgr manager.Manager) error
-	// SetupWithLeaderElection registers callbacks that require a single
-	// instance to run.
+// ModuleOptions carries the framework context for setting a module.
+// For fields marked with REQUIRED, the framework will ensure their existence,
+// and the module can be used directly.
+type ModuleOptions struct {
+	// Env is the common environment context used by the module.
+	// REQUIRED
+	Env bootstrap.Environment
+
+	// InitCbs is used to register callback functions that support concurrent
+	// execution. The callback must be non-blocking and can get state via ctx.
+	// REQUIRED
+	InitCbs InitCallbacks
+
+	// Manager is used to manager controller.
+	// Registers `Reconciler` with Manager to build a controller.
+	// REQUIRED
+	Manager manager.Manager
+
+	// LeaderElectionCbs is used to registers callbacks that require
+	// a single instance to run.
 	// Generally, resident services that run concurrently and trigger the
 	// creation and update of resources in the cluster may involve race
 	// conditions and cause system exceptions. The startup of these services
 	// must be controlled through an election mechanism.
-	SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error
+	// REQUIRED
+	LeaderElectionCbs leaderelection.LeaderCallbacks
+}
+
+type Module interface {
+	Kind() string
+	Config() proto.Message
+	InitScheme(scheme *runtime.Scheme) error
+	Setup(opts ModuleOptions) error
 	Clone() Module
 }
 
@@ -394,21 +404,13 @@ func Main(bundle string, modules []Module) {
 				fatal()
 			}
 		} else {
-			if err := mc.module.Init(env); err != nil {
-				log.Errorf("mod %s Init met err %v", modCfg.Name, err)
-				fatal()
-			}
-			if err := mc.module.SetupWithInitCallbacks(cbs); err != nil {
-				log.Errorf("mod %s SetupWithInitCallbacks met err %v", modCfg.Name, err)
-				fatal()
-			}
-			if err := mc.module.SetupWithManager(mgr); err != nil {
-				log.Errorf("mod %s SetupWithManager met err %v", modCfg.Name, err)
-				fatal()
-			}
-
-			if err := mc.module.SetupWithLeaderElection(le); err != nil {
-				log.Errorf("mod %s SetupWithLeaderElection met err %v", modCfg.Name, err)
+			if err := mc.module.Setup(ModuleOptions{
+				Env:               env,
+				InitCbs:           cbs,
+				Manager:           mgr,
+				LeaderElectionCbs: le,
+			}); err != nil {
+				log.Errorf("mod %s Setup met err %v", modCfg.Name, err)
 				fatal()
 			}
 		}
@@ -457,7 +459,7 @@ func merge(dst, src proto.Message) proto.Message {
 // ctrl manager and slime leader selector in sync.
 func mgrOptionsWithLeaderElection(opts ctrl.Options, rl resourcelock.Interface) ctrl.Options {
 	opts.LeaderElection = true
-	f := func(_ *rest.Config, _ recorder.Provider, _ ctrlleaderelection.Options) (resourcelock.Interface, error) {
+	f := func(_ *restclient.Config, _ recorder.Provider, _ ctrlleaderelection.Options) (resourcelock.Interface, error) {
 		return rl, nil
 	}
 	v := reflect.ValueOf(&opts).Elem()

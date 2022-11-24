@@ -14,7 +14,6 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	basecontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/module"
-	"slime.io/slime/framework/model/pkg/leaderelection"
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	"slime.io/slime/modules/lazyload/controllers"
 	modmodel "slime.io/slime/modules/lazyload/model"
@@ -92,18 +91,6 @@ func (mo *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cb
 	return nil
 }
 
-func (m *Module) Init(env bootstrap.Environment) error {
-	return nil
-}
-
-func (m *Module) SetupWithInitCallbacks(cbs module.InitCallbacks) error {
-	return nil
-}
-
-func (m *Module) SetupWithManager(mgr manager.Manager) error {
-	return nil
-}
-
-func (m *Module) SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
+func (m *Module) Setup(opts module.ModuleOptions) error {
 	return nil
 }
