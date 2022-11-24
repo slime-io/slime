@@ -11,7 +11,6 @@ import (
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
-	"slime.io/slime/framework/model/pkg/leaderelection"
 	pluginapiv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 	"slime.io/slime/modules/plugin/controllers"
 	"slime.io/slime/modules/plugin/model"
@@ -71,18 +70,6 @@ func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs
 	return nil
 }
 
-func (m *Module) Init(env bootstrap.Environment) error {
-	return nil
-}
-
-func (m *Module) SetupWithInitCallbacks(cbs module.InitCallbacks) error {
-	return nil
-}
-
-func (m *Module) SetupWithManager(mgr manager.Manager) error {
-	return nil
-}
-
-func (m *Module) SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
+func (m *Module) Setup(opts module.ModuleOptions) error {
 	return nil
 }
