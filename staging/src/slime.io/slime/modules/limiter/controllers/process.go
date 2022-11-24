@@ -29,12 +29,15 @@ import (
 )
 
 // WatchMetric consume metric from chan, which is produced by producer
-func (r *SmartLimiterReconciler) WatchMetric() {
+func (r *SmartLimiterReconciler) WatchMetric(ctx context.Context) {
 	log := log.WithField("reporter", "SmartLimiterReconciler").WithField("function", "WatchMetric")
 	log.Infof("start watching metric")
 
 	for {
 		select {
+		case <-ctx.Done():
+			log.Infof("context is closed, break process loop")
+			return
 		case metric, ok := <-r.watcherMetricChan:
 			if !ok {
 				log.Warningf("watcher mertic channel closed, break process loop")
@@ -239,7 +242,7 @@ func (r *SmartLimiterReconciler) getMaterial(loc types.NamespacedName) map[strin
 }
 
 func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLimiterReconciler, obj *v1alpha3.EnvoyFilter) (reconcile.Result, error) {
-	if err := controllerutil.SetControllerReference(instance, obj, r.scheme); err != nil {
+	if err := controllerutil.SetControllerReference(instance, obj, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
 	loc := types.NamespacedName{Name: obj.Name, Namespace: instance.Namespace}

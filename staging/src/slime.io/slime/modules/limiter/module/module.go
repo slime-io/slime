@@ -1,7 +1,9 @@
 package module
 
 import (
-	"os"
+	"context"
+	"fmt"
+	"slime.io/slime/framework/model/metric"
 
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -11,8 +13,8 @@ import (
 
 	istioapi "slime.io/slime/framework/apis"
 	"slime.io/slime/framework/bootstrap"
-	istiocontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/module"
+	"slime.io/slime/framework/model/pkg/leaderelection"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/controllers"
 	"slime.io/slime/modules/limiter/model"
@@ -20,6 +22,9 @@ import (
 
 type Module struct {
 	config microservicev1alpha2.Limiter
+	env    bootstrap.Environment
+	pc     *metric.ProducerConfig
+	sr     *controllers.SmartLimiterReconciler
 }
 
 func (m *Module) Kind() string {
@@ -47,30 +52,55 @@ func (m *Module) Clone() module.Module {
 	ret := *m
 	return &ret
 }
-
-func (m *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cbs module.InitCallbacks) error {
-	log.Infof("get limiter cfg %v", m.config)
-	cfg := &m.config
-	reconciler := controllers.NewReconciler(mgr, env, cfg)
-	if err := reconciler.SetupWithManager(mgr); err != nil {
-		log.Errorf("unable to create controller SmartLimiter, %+v", err)
-		os.Exit(1)
+func (m *Module) Setup(opts module.ModuleOptions) error {
+	if err := m.init(opts.Env); err != nil {
+		return err
 	}
 
-	// add dr reconcile
-	if err := (&istiocontroller.DestinationRuleReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Env:    &env,
-	}).SetupWithManager(mgr); err != nil {
-		log.Errorf("unable to create controller DestinationRule, %+v", err)
-		os.Exit(1)
+	if err := m.setupWithManager(opts.Manager); err != nil {
+		return err
 	}
 
-	log.Infof("init manager successful")
+	if err := m.setupWithLeaderElection(opts.LeaderElectionCbs); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (m *Module) Setup(opts module.ModuleOptions) error {
+func (m *Module) init(env bootstrap.Environment) error {
+
+	m.env = env
+	pc, err := controllers.NewProducerConfig(m.env, &m.config)
+	if err != nil {
+		return err
+	}
+	m.pc = pc
+	m.sr = controllers.NewReconciler(
+		controllers.ReconcilerWithCfg(&m.config),
+		controllers.ReconcilerWithEnv(m.env),
+		controllers.ReconcilerWithProducerConfig(m.pc),
+	)
+	return nil
+}
+
+func (m *Module) setupWithManager(mgr manager.Manager) error {
+	m.sr.Client = mgr.GetClient()
+	m.sr.Scheme = mgr.GetScheme()
+
+	if err := m.sr.SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create controller SmartLimiter, %+v", err)
+	}
+	return nil
+}
+
+func (m *Module) setupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
+
+	le.AddOnStartedLeading(func(ctx context.Context) {
+		log.Infof("producers starts")
+		metric.NewProducer(m.pc)
+		go m.sr.WatchMetric(ctx)
+	})
+
+	le.AddOnStoppedLeading(m.sr.Clear)
 	return nil
 }
