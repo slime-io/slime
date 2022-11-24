@@ -1,22 +1,25 @@
 package controllers
 
 import (
+	"context"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
 	"slime.io/slime/framework/bootstrap"
-	modapi "slime.io/slime/modules/example/api/v1alpha1"
+	"slime.io/slime/modules/example/api/config"
 )
 
 // ExampleReconciler reconciles a ... object
 type ExampleReconciler struct {
-	Cfg *modapi.General
+	Cfg *config.Example
 	client.Client
 	Scheme *runtime.Scheme
 	Env    *bootstrap.Environment
 }
 
-func (r *ExampleReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
+func (r *ExampleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 

@@ -1,0 +1,10 @@
+syntax = "proto3";
+package slime.microservice.example.config;
+
+option go_package = "slime.io/slime/modules/example/api/config";
+
+
+// Example config of example module
+message Example {
+  string foo = 1;
+}

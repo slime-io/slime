@@ -1,0 +1,41 @@
+FROM golang:1.16.15-bullseye
+
+WORKDIR /workspaces
+
+RUN apt-get update && apt-get install -y \
+    unzip && \
+    apt-get clean
+
+# version of toolchains
+ENV CONTROLLER_GEN_VERSION=v0.7.0
+ENV ISTIO_TOOLS_VERSION=1.12.0
+ENV GOGO_PROTOBUF_VERSION=1.3.2
+ENV PROTOC_VERSION=3.20.1
+
+# install controller-gen
+RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
+
+# install istio code-generator
+RUN go install istio.io/tools/cmd/protoc-gen-jsonshim@${ISTIO_TOOLS_VERSION} && \
+    go install istio.io/tools/cmd/protoc-gen-deepcopy@${ISTIO_TOOLS_VERSION}
+
+# install gogo protobuf
+RUN go install github.com/gogo/protobuf/protoc-gen-gogo@v${GOGO_PROTOBUF_VERSION} && \
+    curl -LO https://github.com/gogo/protobuf/archive/refs/tags/v${GOGO_PROTOBUF_VERSION}.zip && \
+    mkdir -p ${GOPATH}/src/github.com/gogo && \
+    unzip v${GOGO_PROTOBUF_VERSION}.zip -d ${GOPATH}/src/github.com/gogo && \
+    mv ${GOPATH}/src/github.com/gogo/protobuf-${GOGO_PROTOBUF_VERSION} ${GOPATH}/src/github.com/gogo/protobuf && \
+    rm v${GOGO_PROTOBUF_VERSION}.zip
+
+# install protocol compiler
+RUN export PB_REL="https://github.com/protocolbuffers/protobuf/releases"; \
+    export ARCH=x86_64; \
+    if [ $(uname -m) != "x86_64" ]; then \
+        export ARCH=aarch_64; \
+    fi; \
+    curl -LO $PB_REL/download/v${PROTOC_VERSION}/protoc-${PROTOC_VERSION}-linux-${ARCH}.zip; \
+    unzip protoc-${PROTOC_VERSION}-linux-${ARCH}.zip -d /usr/local; \
+    rm protoc-${PROTOC_VERSION}-linux-${ARCH}.zip
+
+ENV GOCACHE ${GOPATH}/.cache
+RUN chmod -R 777 "$GOPATH"

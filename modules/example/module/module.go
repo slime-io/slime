@@ -3,24 +3,25 @@ package module
 import (
 	"os"
 
-	"slime.io/slime/modules/example/api/v1alpha1"
-
-	"slime.io/slime/framework/model/module"
-	"slime.io/slime/modules/example/model"
-
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model/module"
+	"slime.io/slime/framework/model/pkg/leaderelection"
+	"slime.io/slime/modules/example/api/config"
+	v1alpha1 "slime.io/slime/modules/example/api/v1alpha1"
 	"slime.io/slime/modules/example/controllers"
+	"slime.io/slime/modules/example/model"
 )
 
 var log = model.ModuleLog
 
 type Module struct {
-	config v1alpha1.General
+	config config.Example
 }
 
 func (mo *Module) Kind() string {
@@ -60,5 +61,21 @@ func (mo *Module) InitManager(mgr manager.Manager, env bootstrap.Environment, cb
 		os.Exit(1)
 	}
 
+	return nil
+}
+
+func (m *Module) Init(env bootstrap.Environment) error {
+	return nil
+}
+
+func (m *Module) SetupWithInitCallbacks(cbs module.InitCallbacks) error {
+	return nil
+}
+
+func (m *Module) SetupWithManager(mgr manager.Manager) error {
+	return nil
+}
+
+func (m *Module) SetupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
 	return nil
 }
