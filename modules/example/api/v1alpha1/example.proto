@@ -1,0 +1,20 @@
+syntax = "proto3";
+package slime.microservice.example.v1alpha1;
+
+option go_package = "slime.io/slime/modules/example/api/v1alpha1";
+
+
+// ExampleSpec defines the desired state of Example
+message ExampleSpec {
+  // Foo is an example field of Example.
+  string foo = 1;
+
+  // Foo2 is an example field of Example.
+  string foo2 = 2;
+}
+
+// ExampleStatus defines the observed state of Example
+message ExampleStatus {
+  // Bar is an example field of ExampleStatus.
+  string bar = 1;
+}

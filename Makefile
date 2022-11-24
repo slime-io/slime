@@ -1,34 +1,87 @@
+SHELL=/bin/bash
 
-# Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
-ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
+IN_CONTAINER ?= 0
+IMG ?= docker.io/slimeio/build-tools
+
+root_dir = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+GO_HEADER_FILE := $(root_dir)/boilerplate.go.txt
+
+MODULES_ROOT ?= ./staging/src/slime.io/slime/modules
+MODULES ?= lazyload limiter plugin
+
+.PHONY: modules-api-gen
+ifneq ($(MODULES_ROOT),)
+ifneq ($(MODULES),)
+API_PROTOS := $(foreach module,$(MODULES),$(shell find $(MODULES_ROOT)/$(module) -name "*.proto" ))
 else
-GOBIN=$(shell go env GOBIN)
+API_PROTOS := $(shell find $(MODULES_ROOT) -name "*.proto")
+endif
+.PHONY: $(API_PROTOS)
+$(API_PROTOS):
+	$(eval input_dir := $(shell dirname $@))
+	@echo "generate proto api for $(notdir $@)"
+	@protoc -I=$(input_dir) \
+		-I=$(shell go env GOPATH)/src \
+		--gogo_out=$(input_dir) \
+		--gogo_opt=paths=source_relative \
+		--gogo_opt=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types \
+		--gogo_opt=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types \
+		--gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
+		--deepcopy_out=$(input_dir) \
+		--deepcopy_opt=paths=source_relative \
+		$@
+modules-api-gen: $(API_PROTOS)
+else
+modules-api-gen:
 endif
 
-CRD_OPTIONS ?= "crd:trivialVersions=true"
-
-manifests: controller-gen
-        $(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-
-
-# Generate code
-generate: controller-gen
-	$(CONTROLLER_GEN) object paths="./..."
-
-# find or download controller-gen
-# download controller-gen if necessary
-controller-gen:
-ifeq (, $(shell which controller-gen))
-	@{ \
-	set -e ;\
-	CONTROLLER_GEN_TMP_DIR=$$(mktemp -d) ;\
-	cd $$CONTROLLER_GEN_TMP_DIR ;\
-	go mod init tmp ;\
-	go get sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.0 ;\
-	rm -rf $$CONTROLLER_GEN_TMP_DIR ;\
-	}
-CONTROLLER_GEN=$(GOBIN)/controller-gen
+.PHONY: modules-k8s-gen
+ifneq ($(MODULES_ROOT),)
+ifneq ($(MODULES),)
+MODULE_ROOTS := $(foreach module,$(MODULES),$(MODULES_ROOT)/$(module))
 else
-CONTROLLER_GEN=$(shell which controller-gen)
+MODULE_ROOTS := $(shell find $(MODULES_ROOT) -name "go.mod" -exec dirname {} \;)
+endif
+.PHONY: $(MODULE_ROOTS)
+$(MODULE_ROOTS):
+	@echo "generate k8s object for module $(notdir $@)"
+	@pushd $@ 1>/dev/null 2>&1; \
+	controller-gen object:headerFile="$(GO_HEADER_FILE)" paths="./api/..."; \
+	popd 1>/dev/null 2>&1
+modules-k8s-gen: $(MODULE_ROOTS)
+else
+modules-k8s-gen:
+endif
+
+# Generate module code
+.PHONY: generate-module
+ifeq ($(IN_CONTAINER),1)
+generate-module: modules-api-gen modules-k8s-gen
+else
+generate-module:
+	@docker run --rm \
+		--env IN_CONTAINER=1 \
+		--env MODULES_ROOT=$(MODULES_ROOT) \
+		--env MODULES=$(MODULES) \
+		-v $(root_dir):/workspaces/slime \
+		--workdir /workspaces/slime \
+		--user $(shell id -u):$(shell id -g) \
+		$(IMG)  \
+		make $@
+endif
+
+
+.PHONY: shell
+ifeq ($(IN_CONTAINER),1)
+shell:
+	@echo "already in a container"
+else
+shell:
+	@docker run --rm -ti \
+		--env IN_CONTAINER=1 \
+		-v $(root_dir):/workspaces/slime \
+		--workdir /workspaces/slime \
+		--user $(shell id -u):$(shell id -g) \
+		$(IMG)  \
+		bash
 endif

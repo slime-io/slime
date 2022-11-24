@@ -1,0 +1,16 @@
+domain: slime.io
+layout:
+- go.kubebuilder.io/v3
+projectName: example
+repo: slime.io/slime/modules/example
+resources:
+- api:
+    crdVersion: v1alpha1
+    namespaced: true
+  controller: true
+  domain: slime.io
+  group: microservice
+  kind: Example
+  path: slime.io/slime/modules/example/api/v1alpha1
+  version: v1alpha1
+version: "3"
