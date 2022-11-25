@@ -49,6 +49,11 @@ type configH struct {
 // ModuleOptions carries the framework context for setting a module.
 // For fields marked with REQUIRED, the framework will ensure their existence,
 // and the module can be used directly.
+// NOTE: the Manager and the LeaderElectionCbs share the election status.
+// When switching from leader to candidate, the Manager will exit.
+// The framework will close the LeaderElection and ends the process after
+// the Manager exits. Therefore, when implementing a module, the scenario of
+// becoming the leader again may not be considered.
 type ModuleOptions struct {
 	// Env is the common environment context used by the module.
 	// REQUIRED
@@ -70,6 +75,9 @@ type ModuleOptions struct {
 	// creation and update of resources in the cluster may involve race
 	// conditions and cause system exceptions. The startup of these services
 	// must be controlled through an election mechanism.
+	// Currently, only the following state transfers are supported:
+	//   1. START -> candidate -> leader -> EXIT
+	//   2. START -> candidate -> EXIT
 	// REQUIRED
 	LeaderElectionCbs leaderelection.LeaderCallbacks
 }
@@ -326,7 +334,9 @@ func Main(bundle string, modules []Module) {
 		os.Exit(1)
 	}
 
-	ctx := ctrl.SetupSignalHandler()
+	var once sync.Once
+	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+
 	// init modules
 	for _, mc := range mcs {
 		modCfg, modGeneralJson := mc.config.config, mc.config.generalJson
@@ -429,6 +439,7 @@ func Main(bundle string, modules []Module) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer once.Do(cancel)
 		log.Infof("starting bundle %s with modules %v", bundle, modKinds)
 		if err := le.Run(ctx); err != nil {
 			log.Errorf("problem running, %+v", err)
@@ -438,6 +449,7 @@ func Main(bundle string, modules []Module) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer once.Do(cancel)
 		log.Infof("starting manager with modules %v", modKinds)
 		if err := mgr.Start(ctx); err != nil {
 			log.Errorf("problem running, %+v", err)
