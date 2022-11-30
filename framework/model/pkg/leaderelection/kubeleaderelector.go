@@ -86,7 +86,7 @@ func (k *KubeLeaderElector) Run(ctx context.Context) error {
 					k.stopCbLock.RLock()
 					cbs := make([]func(), len(k.onStoppedLeadingCallbacks))
 					copy(cbs, k.onStoppedLeadingCallbacks)
-					k.stopCbLock.Unlock()
+					k.stopCbLock.RUnlock()
 					for _, f := range cbs {
 						f()
 					}
@@ -142,6 +142,12 @@ func NewKubeResourceLock(config *rest.Config, namespace, name string) (resourcel
 type resourcelockWrapper struct {
 	sync.Mutex
 	resourcelock.Interface
+}
+
+func (l *resourcelockWrapper) Get(ctx context.Context) (*resourcelock.LeaderElectionRecord, []byte, error) {
+	l.Lock()
+	defer l.Unlock()
+	return l.Interface.Get(ctx)
 }
 
 func (l *resourcelockWrapper) Create(ctx context.Context, ler resourcelock.LeaderElectionRecord) error {
