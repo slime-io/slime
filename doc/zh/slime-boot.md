@@ -347,6 +347,8 @@ spec:
           globalSidecarMode: cluster # the mode of global-sidecar
           metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
+        log:
+          logLevel: info
     - name: limiter
       kind: limiter
       enable: true

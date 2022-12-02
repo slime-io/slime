@@ -626,7 +626,7 @@ Prometheus 是一款广泛应用的监控系统，本服务依赖prometheus采�
 为此我们提供了一个简单的Prometheus安装清单，使用以下命令进行安装。
 
 ```
-kubectl apply -f "https://raw.githubusercontent.com/slime-io/limiter/master/install/prometheus.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/install/prometheus.yaml"
 ```
 
 ### 安装 RLS & Redis
@@ -638,7 +638,7 @@ RLS服务即 Rate Limit Service [RLS](https://github.com/envoyproxy/ratelimit) ,
 为此我们提供了一个简单的 RLS&Redis 安装清单，使用以下命令进行安装。
 
 ~~~shell
-kubectl apply -f "https://raw.githubusercontent.com/slime-io/limiter/master/install/rls.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/install/rls.yaml"
 ~~~
 
 如果是网关场景，需要修改以上资源，并部署到网关所处的ns
