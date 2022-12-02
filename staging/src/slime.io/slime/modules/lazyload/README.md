@@ -12,6 +12,8 @@
 
 # Lazyload Overview
 
+## NOTE: en document is out of date
+
 [中文](./README_zh.md)
 
 ## Features

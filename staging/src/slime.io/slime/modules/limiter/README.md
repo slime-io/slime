@@ -8,6 +8,8 @@
   - [Dependencies](#dependencies)
 # Overview
 
+## NOTE: en document is out of date
+
 [中文](./README_ZH.md)
 
 ## Background

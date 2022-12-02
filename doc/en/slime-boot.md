@@ -9,6 +9,10 @@
   - [Replacement Method](#replacement-method)
     - [Example](#example)
 
+## NOTE: en document is out of date
+
+---
+
 ## How to Use Slime
 
 ### Install Slime-boot

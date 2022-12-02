@@ -4,9 +4,6 @@
 
 replicaCount: 1
 
-args:
-  - --enable-leader-election
-
 image:
   #repository: docker.io/slimeio/slime
   pullPolicy: Always
