@@ -1,0 +1,14 @@
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: example
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-example
+    tag: latest
+  module:
+    - name: example
+      kind: example
+      enable: true
