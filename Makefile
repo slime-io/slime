@@ -85,3 +85,8 @@ shell:
 		$(IMG)  \
 		bash
 endif
+
+MODULE_NAME?=
+.PHONY: new-module
+new-module:
+	bash bin/gen_module.sh $(MODULE_NAME)
