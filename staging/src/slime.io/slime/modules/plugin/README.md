@@ -13,8 +13,6 @@
 
 # Http Plugin Management
 
-## NOTE: en document is out of date
-
 ## Install & Use
 
 Use the following configuration to install the HTTP plugin management module:

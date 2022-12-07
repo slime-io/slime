@@ -47,19 +47,19 @@
 
 1. 部署Lazyload模块，自动创建global-sidecar应用，Istiod会为global-sidecar应用添加标准sidecar（envoy）
 
-3. 为服务A启用懒加载
+2. 为服务A启用懒加载
 
-   3.1 创建ServiceFence A
+   2.1 创建ServiceFence A
 
-   3.2 创建Sidecar（Istio CRD）A，根据静态配置（ServiceFence.spec）初始化
+   2.2 创建Sidecar（Istio CRD）A，根据静态配置（ServiceFence.spec）初始化
 
-   3.3 ApiServer感知到Sidecar A创建
+   2.3 ApiServer感知到Sidecar A创建
 
-4. Istiod从ApiServer获取Sidecar A的内容
+3. Istiod从ApiServer获取Sidecar A的内容
 
-5. Istiod下发Sidecar A限定范围内的配置给Service A的sidecar
+4. Istiod下发Sidecar A限定范围内的配置给Service A的sidecar
 
-6. Service A发起访问Service B，由于Service A没有Service B的配置信息，请求发到global-sidecar的sidecar
+5. Service A发起访问Service B，由于Service A没有Service B的配置信息，请求发到global-sidecar的sidecar
 
 6. global-sidecar处理
 

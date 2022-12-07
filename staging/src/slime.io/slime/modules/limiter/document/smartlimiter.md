@@ -1,134 +1,45 @@
-- [Adaptive rate limiting](#adaptive-rate-limiting)
-  - [Installation and Usage](#installation-and-usage)
-    - [Installing Prometheus](#installing-prometheus)
-    - [Installing Rls & Redis](#installing-rls--redis)
-    - [Install Limiter](#install-limiter)
-  - [SmartLimiter](#smartlimiter)
-    - [Single Ratelimit](#single-ratelimit)
-    - [Global Average Ratelimit](#global-average-ratelimit)
-    - [Global Shared Ratelimit](#global-shared-ratelimit)
-  - [Example](#example)
-    - [global average ratelimit](#global-average-ratelimit-1)
-    - [global shared ratelimit](#global-shared-ratelimit-1)
-  - [Troubleshooting](#troubleshooting)
-# Adaptive rate limiting
+- [smartlimiter](#smartlimiter)
+  - [Installation and use](#installation-and-use)
+    - [Installing the Limiter module](#installing-the-limiter-module)
+  - [SmartLimiter](#smartlimiter-1)
+    - [single smartlimiter in mesh](#single-smartlimiter-in-mesh)
+    - [global average smartlimiter in mesh](#global-average-smartlimiter-in-mesh)
+    - [global share smartlimiter in mesh](#global-share-smartlimiter-in-mesh)
+    - [single smartlimiter in gw](#single-smartlimiter-in-gw)
+    - [global share smartlimiter in gw](#global-share-smartlimiter-in-gw)
+  - [Practices](#practices)
+    - [Practice 1: global average smartlimiter in mesh](#practice-1-global-average-smartlimiter-in-mesh)
+    - [Practice 2: global share smartlimiter in mesh](#practice-2-global-share-smartlimiter-in-mesh)
+  - [Dependencies](#dependencies)
+    - [install Prometheus](#install-prometheus)
+    - [install RLS](#install-rls)
 
-## Installation and Usage
 
-Please read the Installing [Prometheus](#installing-prometheus) and Installing [RLS & Redis](#installing-rls--redis) subsections before installing the service
+# smartlimiter
 
-### Installing Prometheus 
+## Installation and use
 
-Prometheus is a widely used monitoring system and limiter relies on prometheus to collect metrics.
+### Installing the Limiter module
 
-A simple Prometheus installation checklist is provided for this purpose, use the following command to install it.
+Prerequisite: `CRD` and `deployment/slime-boot` need to be installed before deploying the limiter module, refer to [slime-boot installation](../../../../../../../doc/en/slime-boot.md#Preparation) for instructions on installing the `SlimeBoot CRD` and `deployment/slime-boot`.
 
-```
-kubectl apply -f "https://raw.githubusercontent.com/slime-io/limiter/master/install/prometheus.yaml"
-```
+After `CRD` and `deployment/slime-boot` are successfully installed, users can manually apply the following yaml manifest to install the limiter module which supporting single and average [limiter](./install/limiter.yaml)
 
-### Installing RLS & Redis
+**global shared rate limit**, please read [install Rls & Redis](#install-rls), and install the limiter module [limiter-global](../install/limiter-global.yaml)
 
-RLS service is Rate Limit Service [RLS](https://github.com/envoyproxy/ratelimit), we use it to support global shared rate limiting, if you confirm that the service does not need to support global rate limiting you can choose not to install RLS, skip this section.
+If you need to support adaptive flow limiting, please read [install Prometheus](#install-prometheus)
 
-A brief introduction to the RLS service is that it is a GO-developed gRPC service that leverages Redis to support fully restricted streaming. After you have configured the SmartLimiter, the resource list will first be transformed into EnvoyFilter, and Istio will send rate limiting restriction rules to the corresponding envoy based on the EnvoyFilter content. 
+## SmartLimiter
 
-A simple RLS & Redis installation checklist is provided for this purpose, using the following command
+For smarlimiter definition see [proto](https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/api/v1alpha2/smart_limiter.proto)
 
-~~~
-kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/master/install/rls.yaml"
-~~~
+**Note**: In the mesh, only one SmartLimiter resource can be created per service, whose name and namespace correspond to the name and namespace of the service's service
 
-### Install Limiter
+### single smartlimiter in mesh
 
-Please first follow the [slime-boot installation](https://raw.githubusercontent.com/slime-io/slime/master/doc/en/slime-boot.md) guidelines to install slime-boot which is a bootloader for slime. After installation, users can install different slime modules by submitting SlimeBoot resources.
+- A->B, the request is rate limiting in B
 
-The user can manually submit the following yaml file to install the limiter module, which SlimeBoot can specify the limiter image version and the specific metrics to be queried.
-
-A simple SlimeBoot installation checklist is provided for this purpose, using the following command.
-
-```
-kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime-io/limiter/master/install/limiter.yaml"
-```
-
-The details of the list are as follows
-
-```yaml
-apiVersion: config.netease.com/v1alpha1
-kind: SlimeBoot
-metadata:
-  name: smartlimiter
-  namespace: mesh-operator
-spec:
-  image:
-    pullPolicy: Always
-    repository: docker.io/slimeio/slime-limiter
-    tag: v0.2.0_linux_amd64
-  module:
-    - name: limiter # custom value
-      kind: limiter # should be "limiter"
-      enable: true
-      general: # replace previous "limiter" field
-        backend: 1
-      metric:
-        prometheus:
-          address: http://prometheus.istio-system:9090
-          handlers:
-            cpu.sum:
-              query: |
-                sum(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            cpu.max:
-              query: |
-                max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-            rt99:
-              query: |
-                histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-        k8s:
-          handlers:
-            - pod # inline
-```
-
-In the above list, we have configured prometheus as the monitoring source by default. prometheus.handlers defines the monitoring metrics that we want to get from prometheus , which can be used as thresholds for some adaptive algorithms to achieve adaptive rate limiting.
-
- The user can also define the metrics that the limiter module needs to get according to their needs, the following are some of the commonly used statements that can be used to get monitoring metrics.
-
-```
-cpu:
-总和：
-sum(rate(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""} [5m])) by（container_name）
-最大值：
-max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-limit:
-container_spec_cpu_quota{pod=~"$pod_name"}
-
-内存：
-总和：
-sum(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""} [5m])
-最大值：
-max(container_memory_usage_bytes{namespace="$namespace",pod=~"$pod_name",image=""})
-limit:
-sum(container_spec_memory_limit_bytes{pod=~"$pod_name"})
-
-请求时延：
-90值：
-histogram_quantile(0.90, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-95值：
-histogram_quantile(0.95, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-99值：
-histogram_quantile(0.99, sum(rate(istio_request_duration_milliseconds_bucket{kubernetes_pod_name=~"$pod_name"}[2m]))by(le))
-```
-
-## SmartLimiter 
-
-Definition in [proto](https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/master/api/v1alpha2/smart_limiter.proto)
-
-Note that each service can only create one SmartLimiter resource, whose name and namespace corresponds to the service's name and namespace
-
-### Single Ratelimit
-
-The single  rate limiting feature sets a fixed rate limiting value for each pod of the service, which relies on the rate limiting capability provided by the envoy plugin envoy.filters.http.local_ratelimit, [Local Ratelimit Plugin](https://www.envoyproxy.io/ docs/envoy/latest/configuration/http/http_filters/local_rate_limit_filter).
-
-A simple example is that we limit reviews service's request, based on the value of the condition field to determine whether to rate limit, here we directly set true, so that it will perform the rate limit permanently, also the user can set a dynamic value, the limiter will calculate the results, execute dynamic rate limit. fill_interval specifies the flow limit interval to 60s, quota specifies the number of limits 10, strategy identifies the limit is a single limit , target field specifies port 9080.
+The following smartlimiter indicates that the inbound direction of the reviews service is restricted to port 9080, and the restriction rule is 100 times/60 seconds
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -138,26 +49,81 @@ metadata:
   namespace: default
 spec:
   sets:
-    _base:   # _base match the service
+    _base: 
       descriptor:   
-      - action:    
+      - action: 
           fill_interval:
             seconds: 60
-          quota: '10'
+          quota: '100'
           strategy: 'single'  
-        condition: 'true' 
-        #condition: '{{._base.cpu.sum}}>100'
+        condition: 'true'
         target:
           port: 9080
 ```
 
-### Global Average Ratelimit
+- A->B, the request is rate limiting in A
 
-The global average ratelimit feature is based on the total number of ratelimits set by the user and then distributed equally to each pod, relying on the ratelimit capability provided by the envoy plugin envoy.filters.http.local_ratelimit [Local Ratelimit Plugin](https://www. envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/local_rate_limit_filter).
+The following smartlimiter indicates that outbound direction of the reviewsis restricted, that is, and the restriction rule is 2 times/10 seconds
 
-For a simple example, let's limit the request to reviews service's .
+```yaml
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: productpage
+  namespace: default
+spec:
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 10
+          quota: "2"
+          strategy: single
+        condition: "true"
+        target:
+          direction: outbound
+          route:
+          - reviews.default.svc.cluster.local:80/default
+```
 
-Here we set true directly to make it permanent, the user can set a dynamic value and the limiter will calculate the result and limit the flow dynamically. fill_interval specifies a limit interval of 60s and quota specifies a limit number of 100/{{. _base.pod}}, The value of {{{._base.pod}} is calculated by the limiter module based on the metric, if the service has 2  pods, then the value of quota is 100/2=50, the strategy field specify to average.
+- smartlimiter with match in mesh
+
+The following smartlimiter means that for the productpage service in default, port 9080
+
+if the header of the request contains foo=bar, then the request is limited, and the restriction rule is 5 times/60s
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: productpage
+  namespace: default
+spec:
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "5"
+          strategy: "single"
+        condition: "true"
+        target:
+          port: 9080
+        match:
+         - name: foo
+           exact_match: bar
+```
+
+in addition to support Header's exact match, but also support regular match, prefix match, suffix match, existence and other，refer to[SmartLimitDescriptor](../api/v1alpha2/smart_limiter.proto)
+
+
+### global average smartlimiter in mesh
+
+The following smartlimiter indicates that for port 9080 of the reviews service in default
+
+the request is limited to a total of 100 times/60s, if review has two pods, the restriction rule is 50 times/60s per pod
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -179,15 +145,9 @@ spec:
           port: 9080
 ```
 
-### Global Shared Ratelimit
+### global share smartlimiter in mesh
 
-The global shared ratelimit feature maintains a global counter for all pods of the service, relying on the rate limiting capability provided by the envoy plugin nvoy.filters.http.ratelimit [Ratelimit Plugin](https://www.envoyproxy.io/docs/envoy/ latest/configuration/http/http_filters/rate_limit_filter) and the global count capability [RLS](https://github.com/envoyproxy/ratelimit) provided by the RLS service.
-
-When a global shared rate limiting SmartLimiter is submitted, the limiter module generates EnvoyFilter and a ConfigMap named slime-rate-limit-config based on its contents. EnvoyFilter is watched by Istio and sended  to envoy. ConfigMap is mounted to the RLS service, which generates a global shared counter based on the ConfigMap content.
-
-For a simple example, we execute rate limiting on reviews service, and the meaning of the fields can be found in the above document. The main difference is that the strategy is specified to global and RLS address is speccified, if field rls not specified then the default is outbound|18081||rate-limit.istio-system.svc.cluster.local, which corresponds to the default installed RLS.
-
- note: due to the requirements of the RLS feature seconds only supports 1, 60, 3600, 86400, i.e. 1 second, 1 minute, 1 hour, 1 day
+All pods of the service, share a global counter
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -209,17 +169,97 @@ spec:
           port: 9080            
 ```
 
-## Example
+### single smartlimiter in gw
 
-Enable rate limiting for bookinfo's productpage service.
+outbound is valid in gw
 
-Note that each service can only create one SmartLimiter resource, whose name and namespace corresponds to the service's name and namespace
+the following smartlimiter indicates: pods with lables `gw_cluster: prod-gateway` will apply restriction rules
 
-Install istio (1.8+)
+request to route a.test.com:80/r1 is 1 time/60s
 
-### global average ratelimit
+```yaml
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: prod-gateway-1
+  namespace: gateway-system
+spec:
+  gateway: true 
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60 
+          quota: "1"     
+          strategy: single
+        condition: "true"
+        target:
+          direction: outbound
+          route:
+          - a.test.com:80/r1 
+  workloadSelector:
+    gw_cluster: prod-gateway  
+```
 
-First, submit a global average SmartLimiter resources to the cluster,  which means to limit the productpage service to 10/min
+```yaml
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: prod-gateway-2
+  namespace: gateway-system
+spec:
+  gateway: true
+  workloadSelector:
+    gw_cluster: prod-gateway
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: '2'
+          strategy: 'single'
+        condition: 'true'
+        target:
+          direction: outbound
+          port: 80
+          host:
+          - b.test.com
+```
+
+### global share smartlimiter in gw
+
+
+```yaml
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  name: prod-gateway-3
+  namespace: gateway-system
+spec:
+  gateway: true
+  workloadSelector:
+    gw_cluster: prod-gateway 
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "10"
+          strategy: global
+        condition: "true"
+        match:
+        target:
+          direction: outbound
+          route:
+          - a.test.com:80/default
+```
+
+## Practices
+
+### Practice 1: global average smartlimiter in mesh 
 
 ~~~yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -241,48 +281,13 @@ spec:
           port: 9080
 ~~~
 
-Then we qeury the submitted SmartLimiter resource (below, part of the content is removed), in the queried SmartLimiter, there will be more metricStatus and ratelimitStatus contents, which represent the metric obtained from prometheus at this moment, and the currently effective The ratelimit rule is currently in effect. You can see that since the number of pod of the productpage is only 1, the value of all quotas is 10/1 = 10.
-
-~~~yaml
-apiVersion: microservice.slime.io/v1alpha2
-kind: SmartLimiter
-metadata:
-  name: productpage
-  namespace: default
-spec:
-  sets:
-    _base:
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 60
-          quota: 10/{{._base.pod}}
-          strategy: average
-        condition: "true"
-        target:
-          port: 9080
-status:
-  metricStatus:
-    _base.cpu.max: "531.8215157"
-    _base.pod: "1"
-  ratelimitStatus:
-    _base:
-      descriptor:
-      - action:
-          fill_interval:
-            seconds: 60
-          quota: "10"
-          strategy: average
-        target:
-          port: 9080
-~~~
-
-Finally, we accessed the productpage service by way of curl, and on the 11th visit '429 Too Many Requests' appeared, which means that the service was restricted, which confirms the validity of the service.
+result:
 
 ~~~
 ...
 ...
-... 
+... 省略
+
 node@ratings-v1-85b8d86597-smv5m:/opt/microservices$ curl -I http://productpage:9080/productpage
 HTTP/1.1 200 OK
 content-type: text/html; charset=utf-8
@@ -300,9 +305,7 @@ server: envoy
 x-envoy-upstream-service-time: 10
 ~~~
 
-The following explains the lower level details against the generated EnvoyFilter manifest.
-
-EnvoyFilter manifest contains 3 patch parts, which are generating genericKey for traffic, enabling envoy.filters.http.local_ratelimit plugin function, and set bucket.
+envoyfilter is like:
 
 ~~~yaml
 apiVersion: networking.istio.io/v1alpha3
@@ -396,9 +399,7 @@ spec:
       app: productpage
 ~~~
 
-### global shared ratelimit
-
-First, submit a global shared SmartLimiter resource to the cluster, and restrict the productpage service to a total of 10 flows per minute.
+### Practice 2: global share smartlimiter in mesh
 
 ~~~yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -420,7 +421,7 @@ spec:
           port: 9080       
 ~~~
 
-there will be more metricStatus and ratelimitStatus contents, which represent the metric obtained from prometheus at this moment, and the currently effective The ratelimit rule is currently in effect. 
+and smarlimiter will covert like this:
 
 ~~~yaml
 kind: SmartLimiter
@@ -455,7 +456,7 @@ status:
           port: 9080
 ~~~
 
-Finally, we accessed the productpage service by way of curl, and on the 11th visit '429 Too Many Requests' appeared, which means that the service was restricted, which confirms the validity of the service.
+result:
 
 ~~~
 ...
@@ -479,11 +480,9 @@ x-envoy-upstream-service-time: 1
 transfer-encoding: chunked
 ~~~
 
-The following explains the lower level details against the generated EnvoyFilter manifest.
+envoyfilter is like:
 
-EnvoyFilter contains two patches, one is to generate a genericKey for the traffic, the other is to set the RLS service address outbound|18081||rate-limit.istio-system.svc.cluster.local
-
-~~~
+~~~yaml
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
@@ -541,9 +540,8 @@ spec:
       app: productpage
 ~~~
 
-The ConfigMap content contains a config.yaml that will be mounted to the /data/ratelimit/config directory of the RLS and will limit the traffic with Service[productpage.default]-User[none]-Id[2970232041] to Limit the traffic 10/min.
-
-~~~
+configmap is like:
+~~~yaml
 apiVersion: v1
 data:
   config.yaml: |
@@ -556,16 +554,20 @@ data:
         unit: MINUTE
 kind: ConfigMap
 metadata:
-  name: slime-rate-limit-config
+  name: rate-limit-config
   namespace: istio-system
 ~~~
 
-## Troubleshooting
+## Dependencies
 
-If the rate limiting does not take effect, you can troubleshoot along the following lines
+### install Prometheus
 
-1. whether the Limiter log is abnormal
-2. whether EnvoyFilter or ConfigMap is generated normally 
-3. use config dump command to see if the envoy rate limit configuration is really in effect
-4. whether there is any relevant ConfigMap in the /data/ratelimit/config directory of RLS service (global shared ratelimit)
+```
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/install/prometheus.yaml"
+```
 
+### install RLS
+
+~~~shell
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/master/staging/src/slime.io/slime/modules/limiter/install/rls.yaml"
+~~~
