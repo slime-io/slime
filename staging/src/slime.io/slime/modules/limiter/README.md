@@ -8,8 +8,6 @@
   - [Dependencies](#dependencies)
 # Overview
 
-## NOTE: en document is out of date
-
 [中文](./README_ZH.md)
 
 ## Background
@@ -20,7 +18,7 @@ In Service Mesh, in order to configure rate limit for a service, users have to f
 
 1. easy to use, just submit `SmartLimiter` to achieve the purpose of service rate limit.
 2. adaptive rate limit, dynamic triggering of rate limit rules according to `metric`. 
-3. Cover many scenarios, support global shared rate limit, global average rate limit, and single rate limit.
+3. cover many scenarios, support global shared rate limit, global average rate limit, and single rate limit.
 
 ## Function
 1. single rate limit, each load of the service will have its own rate limit counter. 
@@ -40,7 +38,7 @@ The main architecture of adaptive rate limit is divided into two parts, one part
 
 ## Sample
 
-When the total amount of `cpu` consumed by all loads of the `reviews` service is greater than 10, trigger a rate limit so that each load's port 9080 can only handle 10 requests per second, see [example](./document/smartlimiter.md#example)
+For example, in the following example, a restriction rule of 10 times/s is set for port 9080 of the review service
 
 ~~~yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -50,16 +48,16 @@ metadata:
   namespace: default
 spec:
   sets:
-    _base:
+    v1:
       descriptor:
-      - action:
-          fill_interval:
-            seconds: 1
-          quota: "10"
-          strategy: "single"
-        condition: "{{._base.cpu.sum}}>10"
-        target:
-          port: 9080
+        - action:
+            fill_interval:
+              seconds: 1
+            quota: "10"
+            strategy: "single"
+          condition: "true"
+          target:
+            port: 9080
 ~~~
 
 ## Dependencies
@@ -67,3 +65,4 @@ spec:
 1. In order to complete the adaptive function, we need to get the basic metrics of the service, so this service depends on `prometheus`, for details on how to build a simple `prometheus`, see [prometheus](./document/smartlimiter.md#installing-prometheus)
 2. In order to complete the global shared rate limitation, we need a global counter, we introduced `RLS`, about `RLS` see [RLS](./document/smartlimiter.md#installing-rls--redis)
 
+More details can be found in [limiter](./document/smartlimiter.md#adaptive-rate-limiting)

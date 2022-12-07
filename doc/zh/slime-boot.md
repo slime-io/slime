@@ -25,7 +25,7 @@
 1. 对于k8s v1.22以及之后版本，需要手动安装[v1版本](../../install/init/crds-v1.yaml),而之前版本可手动安装[v1版本](../../install/init/crds-v1.yaml)或者[v1beta1版本](../../install/init/crds.yaml)
 2. 手动安装 [deployment/slime-boot](../../install/init/deployment_slime-boot.yaml)
 
-或者执行以下命令安装`CRD`和`deployment/slime-boot`
+或者执行以下命令安装`CRD`和`deployment/slime-boot`, 需要注意的是如果网络无法访问，你可以在以下目录知道相关文档 `slime/install/init/`
 
 - k8s version >= v1.22
 ```shell

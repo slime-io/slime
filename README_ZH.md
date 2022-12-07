@@ -61,6 +61,8 @@ Slime支持聚合打包，可以将任意模块聚合成一个镜像。所以，
 
 ## 教程
 
+[slime网站](https://slime-io.github.io/)
+
 [Slime镜像信息](https://github.com/slime-io/slime/wiki/Slime-Project-Tag-and-Image-Tag-Mapping-Table)
 
 [Slime-boot安装](./doc/zh/slime-boot.md)
