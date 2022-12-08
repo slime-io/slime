@@ -38,6 +38,8 @@ Slime 内部采用了模块化的架构。目前包含了三个非常实用的�
 
 [自适应限流](./staging/src/slime.io/slime/modules/limiter)：实现了本地限流，同时可以结合监控信息自动调整限流策略，填补了 Istio 限流功能的短板。
 
+[网格（服务）仓库](./staging/src/slime.io/slime/modules/meshregistry)：帮助istio快速集成各种服务注册中心。
+
 后续我们会开源更多的功能模块。
 
 
@@ -72,6 +74,7 @@ Slime-module
 - [懒加载使用](./staging/src/slime.io/slime/modules/lazyload/README_zh.md)
 - [插件管理使用](./staging/src/slime.io/slime/modules/plugin/README_zh.md)
 - [自适应限流使用](./staging/src/slime.io/slime/modules/limiter/README_ZH.md)
+- [网格仓库使用](./staging/src/slime.io/slime/modules/meshregistry/README_zh.md)
 
 [E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 

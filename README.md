@@ -37,6 +37,7 @@ Slime adopts a modular architecture inside. It contains three useful modules now
 
 [Adaptive Ratelimit](./staging/src/slime.io/slime/modules/limiter): It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
 
+[Mesh(Service) Registry](./staging/src/slime.io/slime/modules/meshregistry): Helps istio quickly integrate various service registries.
 
 
 
@@ -70,6 +71,7 @@ Slime-module
 - [Lazyload Usage](./staging/src/slime.io/slime/modules/lazyload/README.md)
 - [PluginManager Usage](./staging/src/slime.io/slime/modules/plugin/README.md)
 - [SmartLimiter Usage](./staging/src/slime.io/slime/modules/limiter/README.md)
+- [MeshRegistry Usage](./staging/src/slime.io/slime/modules/meshregistry/README.md)
 
 [E2E Test Tutorials](./doc/en/slime_e2e_test.md)
 
