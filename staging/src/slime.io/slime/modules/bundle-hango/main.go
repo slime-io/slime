@@ -19,6 +19,7 @@ package main
 import (
 	"slime.io/slime/framework/model/module"
 	limitermod "slime.io/slime/modules/limiter/module"
+	meshregistrymod "slime.io/slime/modules/meshregistry/module"
 	pluginmod "slime.io/slime/modules/plugin/module"
 )
 
@@ -26,5 +27,6 @@ func main() {
 	module.Main("bundle_example", []module.Module{
 		&limitermod.Module{},
 		&pluginmod.Module{},
+		&meshregistrymod.Module{},
 	})
 }
