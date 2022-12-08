@@ -1,0 +1,7 @@
+syntax = "proto3";
+package slime.microservice.meshregistry.v1alpha1;
+
+option go_package = "slime.io/slime/modules/meshregistry/api/v1alpha1";
+
+message MeshRegistryModule {
+}
