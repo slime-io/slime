@@ -1,0 +1,14 @@
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: meshregistry
+  namespace: mesh-operator
+spec:
+  module:
+    - name: meshregistry # custom value
+      kind: meshregistry # should be "meshregistry"
+      enable: true
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-meshregistry
+    tag: v0.2.0_linux_amd64
