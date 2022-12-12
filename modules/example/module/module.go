@@ -1,8 +1,6 @@
 package module
 
 import (
-	"os"
-
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -54,10 +52,10 @@ func (mo *Module) Setup(opts module.ModuleOptions) error {
 
 	var err error
 	if err = (&controllers.ExampleReconciler{
-		Cfg: cfg, Env: &env,
+		Cfg: cfg, Env: &env, Scheme: mgr.GetScheme(), Client: mgr.GetClient(),
 	}).SetupWithManager(mgr); err != nil {
 		log.Errorf("unable to create example controller, %+v", err)
-		os.Exit(1)
+		return err
 	}
 
 	return nil

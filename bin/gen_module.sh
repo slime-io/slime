@@ -40,7 +40,7 @@ function replace_example() {
 
 function rename_file(){
   src=$1
-  if grep "example" $src;then
+  if echo "$src" | grep "example";then
     dst="${src/example/"${module_name}"}"
     mv $src $dst
   fi

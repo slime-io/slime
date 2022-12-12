@@ -14,7 +14,7 @@ In general, we encourage you to make communication as simple and easy as possibl
 
 
 
-For more formal and definite communication content, such as bug reports, feature suggestions, etc., we recommend using [issue](https://github.com/slime-io/slime/issues/new/choose). For others, such as usage issues, feature questions, etc., a more flexible communication method is recommended, see [Community](./README.md#Community).
+For more formal and definite communication content, such as bug reports, feature suggestions, etc., we recommend using [issue](https://github.com/slime-io/slime/issues/new/choose). For others, such as usage issues, feature questions, etc., a more flexible communication method is recommended, see [Community](./README_EN.md#Community).
 
 
 

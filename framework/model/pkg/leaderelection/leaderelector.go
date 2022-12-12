@@ -71,7 +71,7 @@ func (al *AlwaysLeader) Run(ctx context.Context) error {
 		al.stopCbLock.RLock()
 		cbs := make([]func(), len(al.onStoppedLeadingCallbacks))
 		copy(cbs, al.onStoppedLeadingCallbacks)
-		al.stopCbLock.Unlock()
+		al.stopCbLock.RUnlock()
 		for _, f := range cbs {
 			f()
 		}
