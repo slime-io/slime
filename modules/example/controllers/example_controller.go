@@ -9,6 +9,7 @@ import (
 
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/example/api/config"
+	examplev1alpha1 "slime.io/slime/modules/example/api/v1alpha1"
 )
 
 // ExampleReconciler reconciles a ... object
@@ -25,6 +26,6 @@ func (r *ExampleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 func (r *ExampleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(nil).
+		For(&examplev1alpha1.Example{}).
 		Complete(r)
 }

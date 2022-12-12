@@ -1,44 +1,82 @@
-- [Overview](#overview)
-  - [Background](#background)
-  - [Features](#features)
-  - [Function](#function)
-  - [Thinking](#thinking)
-  - [Architecture](#architecture)
-  - [Sample](#sample)
-  - [Dependencies](#dependencies)
-# Overview
 
-[中文](./README_ZH.md)
+- [自适应限流概述](#自适应限流概述)
+  - [背景](#背景)
+  - [特点](#特点)
+  - [功能](#功能)
+  - [架构](#架构)
+  - [样例](#样例)
+  - [依赖](#依赖)
+# 自适应限流概述
 
-## Background
+[EN](./README_EN.md)
 
-In Service Mesh, in order to configure rate limit for a service, users have to face an unusually complex `EnvoyFilter` rate limit configuration. To solve this problem, this project introduces `SmartLimiter`, which can automatically convert user-submitted `SmartLimiter` into `EnvoyFilter`. [Installation and Use](./document/smartlimiter.md#installation-and-usage)
+## 背景
 
-## Features
+服务限流的目的是为了保护服务不被大量请求击垮，通过限制请求速率保护服务正常运行，在服务网格体系中，需要下发复杂的的EnvoyFilter才能完成限流。为了减轻用户使用难度，我们们推出了限流组件slime/limiter，用户只需提交贴近用户语义的SmartLimiter资源，即可完成限流规则的下发。
 
-1. easy to use, just submit `SmartLimiter` to achieve the purpose of service rate limit.
-2. adaptive rate limit, dynamic triggering of rate limit rules according to `metric`. 
-3. cover many scenarios, support global shared rate limit, global average rate limit, and single rate limit.
+## 特点
 
-## Function
-1. single rate limit, each load of the service will have its own rate limit counter. 
-2. global shared rate limit, all loads of a service share a single rate limit counter. 
-3. global average rate limit, which distributes the rate limit counters equally among all loads.
-see [function](./document/smartlimiter.md#smartlimiter)
+1. 方便使用，只需提交`SmartLimiter`资源即可达到服务限流的目的。
+2. 自适应限流，根据`pod`的资源使用量动态的触发限流规则。
+3. 覆盖场景多，网格入口流量限流，网关出口流量限流
+4. 支持功能多，支持全局共享限流，全局均分限流，单机限流。
 
-## Thinking
+## 实现
+slime/limiter 组件监听smartlimiter资源，自动生成包含限流规则的envoyfilter。
+- 对于网格场景，envoyfilter会下发给作为sidecar的envoy,在envoy的入口进行限流判断。
+- 对于网关场景，envoyfilter被下发给作为router的envoy，在envoy的出口进行限流判断。
 
-To get users out of the tedious `EnvoyFilter` configuration, we define an easy `API` using `kubernetes` `CRD` mechanism, the `SmartLimiter` resource within `kubernetes`. After a user submits a `SmartLimiter` to a `kubernetes` cluster, the `SmartLimiter Controler` generates an `EnvoyFilter` in conjunction with the `SmartLimiter` spec and service metrics.
 
-## Architecture
+## 功能
 
-The main architecture of adaptive rate limit is divided into two parts, one part includes the logical transformation of `SmartLimiter` to `EnvoyFilter`, and the other part includes the acquisition of monitoring data within the cluster, including service metrics such as `CPU`, `Memory`, `POD` counts, etc., as detailed in [architecture]()
+目前slime/limiter模块支持以下几个类型的限流：
+
+网格场景下：
+
+1. 支持单机限流：对于指定的服务的每一个pod,都有一个固定的限流数值，使用的限流插件是http.local_ratelimit（限流计数器在本地), 详见[单机限流](./document/smartlimiter_zh.md#网格场景单机限流)
+2. 支持全局均分限流：服务的所有pod，平均分配限流数，使用的限流插件是http.local_ratelimit（限流计数器在本地, 详见[全局均分限流](./document/smartlimiter_zh.md#网格场景全局均分限流)
+3. 支持全局共享限流：服务的所有pod, 共享一个限流计数器，使用的限流插件是http.ratelimit（限流计数器在远端, 详见[全局共享限流](./document/smartlimiter_zh.md#网格场景全局共享限流)
+
+网关场景下：
+1. 支持单机限流，详见[单机限流](./document/smartlimiter_zh.md#网关场景单机限流)
+2. 支持全局共享限流，详见[全局共享限流](./document/smartlimiter_zh.md#网关场景单机限流)
+
+
+
+网格网关场景下支持限流类型如下
+
+|      | 单机限流 | 全局均分限流 | 全局共享 |
+| ---- | -------- | ------------ | -------- |
+| 网格 | 支持     | 支持         | 支持     |
+| 网关 | 支持     | -            | 支持     |
+
+网格网关场景下支持限流方向如下
+
+|      | 入方向限流 | 出方向限流               |
+| ---- | ---------- | ------------------------ |
+| 网格 | 支持       | 部分支持（单机限流） |
+| 网关 | -          | 支持                     |
+
+网格网关场景下一些功能的差异如下
+
+|      | headerMatch | host限流 | serviceEntry |
+| ---- | ---------------- | ---------- | ------------ |
+| 网格 | 支持             | -          | 支持         |
+| 网关 | 支持             | 支持       | -            |
+
+
+
+## 架构
+
+自适应限流的主体架构分为两个部分，一部分包括`SmartLimiter`到`EnvoyFilter`的逻辑转化，另一部分包括集群内监控数据的获取，包括服务的`CPU`, `Memory`,`POD`数量等数据。
 
 <img src="./media/SmartLimiter.png" style="zoom:80%;" />
 
-## Sample
+## 样例
 
-For example, in the following example, a restriction rule of 10 times/s is set for port 9080 of the review service
+`SmartLimiter`的CRD定义的比较接近自然语义
+
+例如，以下样例中，对review服务的9080端口设置限流规则 10次/s [实践](./document/smartlimiter_zh.md#实践)
 
 ~~~yaml
 apiVersion: microservice.slime.io/v1alpha2
@@ -50,19 +88,19 @@ spec:
   sets:
     v1:
       descriptor:
-        - action:
-            fill_interval:
-              seconds: 1
-            quota: "10"
-            strategy: "single"
-          condition: "true"
-          target:
-            port: 9080
+      - action:
+          fill_interval:
+            seconds: 1
+          quota: "10"
+          strategy: "single"
+        condition: "true"
+        target:
+          port: 9080
 ~~~
 
-## Dependencies
+## 依赖
+1. 依赖 `Prometheus`可选,如果不需支持自适应限流，无需安装， [prometheus安装](./document/smartlimiter_zh.md#安装-prometheus)
+2. 依赖 `RLS`，可选，如果不需要支持全局共享限流，无需安装，[RLS安装](./document/smartlimiter_zh.md#安装-rls--redis)
 
-1. In order to complete the adaptive function, we need to get the basic metrics of the service, so this service depends on `prometheus`, for details on how to build a simple `prometheus`, see [prometheus](./document/smartlimiter.md#installing-prometheus)
-2. In order to complete the global shared rate limitation, we need a global counter, we introduced `RLS`, about `RLS` see [RLS](./document/smartlimiter.md#installing-rls--redis)
 
-More details can be found in [limiter](./document/smartlimiter.md#adaptive-rate-limiting)
+更多详细信息可以参考 [limiter](./document/smartlimiter_zh.md#自适应限流模块)

@@ -1,21 +1,21 @@
-- [HTTP插件管理](#http插件管理)
-  - [安装和使用](#安装和使用)
+- [Http Plugin Management](#http-plugin-management)
+  - [Install & Use](#install--use)
   - [PluginManager](#pluginmanager)
-    - [内建插件的打开/停用](#内建插件的打开停用)
-    - [全局配置](#全局配置)
-    - [PluginManager样例](#pluginmanager样例)
+    - [Enable/Disable Inline Plugin](#enabledisable-inline-plugin)
+    - [Global configuration](#global-configuration)
+    - [PluginManager Example](#pluginmanager-example)
   - [EnvoyPlugin](#envoyplugin)
-    - [EnvoyPlugin 样例](#envoyplugin-样例)
-      - [使用 EnvoyPlugin 配置 RDS typedPerFilterConfig 设置 http filter](#使用-envoyplugin-配置-rds-typedperfilterconfig-设置-http-filter)
-      - [使用 EnvoyPlugin 配置非 typedPerFilterConfig 字段设置流量治理规则](#使用-envoyplugin-配置非-typedperfilterconfig-字段设置流量治理规则)
+    - [EnvoyPlugin Example](#envoyplugin-example)
+      - [Use EnvoyPlugin to configure RDS typedPerFilterConfig to set http filters](#use-envoyplugin-to-configure-rds-typedperfilterconfig-to-set-http-filters)
+      - [Use EnvoyPlugin to configure non-typedPerFilterConfig fields to set traffic management rules](#use-envoyplugin-to-configure-non-typedperfilterconfig-fields-to-set-traffic-management-rules)
 
-[English](./README.md) 
+[中文](./README.md) 
 
-# HTTP插件管理
+# Http Plugin Management
 
-## 安装和使用
+## Install & Use
 
-使用如下配置安装HTTP插件管理模块：
+Use the following configuration to install the HTTP plugin management module:
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -34,17 +34,17 @@ spec:
     tag: {{your_plugin_tag}}
 ```
 
-[完整样例](./install/samples/plugin/slimeboot_plugin.yaml)
+[Example](./install/samples/plugin/slimeboot_plugin.yaml)
 
-pluginmanager 和 envoyplugin 是平级关系。pluginmanager 作用于 LDS 对象，用于自动生成针对 HTTP 链接管理器（HCM）的路由过滤器（envoy.filters.http.router）的 envoyfilter。envoyplugin 作用于 RDS 对象，用于自动生成针对虚拟主机（config.route.v3.VirtualHost）和路由（config.route.v3.Route）的 envoyfilter。
+PluginManager and EnvoyPlugin are at the same level. Pluginmanager acts on the LDS object and is used to automate the generation of envoyfilter for HTTP_Connect_Management(HCM)'s http route filter(envoy.filters.http.router). Envoyplugin acts on the RDS object to automate the generation of envoyfilter for vhosts (config.route.v3.VirtualHost) and routes (config.route.v3.Route).
 
 ## PluginManager
 
-### 内建插件的打开/停用
+### Enable/Disable Inline Plugin
 
-> **注意:** envoy 的二进制需支持扩展插件
+>**Note:** Envoy binary needs to support extension plugins
 
-按如下格式配置PluginManager，即可打开内建插件：
+Configure PluginManager in the following format to open the built-in plugin:
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -53,7 +53,7 @@ metadata:
   name: reviews-pm
   namespace: default
 spec:
-  workloadLabels:
+  workload_labels:
     app: reviews
   plugin:
   - enable: true
@@ -63,11 +63,11 @@ spec:
     name: {{plugin-N}}
 ```
 
-其中，`{{plugin-N}}` 为插件名称，PluginManager 中的排序为插件执行顺序。将 enable 字段设置为 false 即可停用插件。
+`{{plugin-N}}` is the name of the plugin, and the sort in PluginManager is the execution order of the plug-in. Set the enable field to false to disable the plugin.
 
-### 全局配置
+### Global configuration
 
-全局配置对应LDS中的插件配置，按如下格式设置全局配置：
+The global configuration corresponds to the plug-in configuration in LDS. Set the global configuration in the following format:
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -76,22 +76,22 @@ metadata:
   name: my-plugin
   namespace: default
 spec:
-  workloadLabels:
+  workload_labels:
     app: my-app
   plugin:
-  - enable: true            # switch
+  - enable: true          # switch
     name: {{plugin-1}}      # plugin name
     inline:
       settings:
-        {{plugin_settings}} # plugin settings
+        {{plugin settings}} # plugin settings
   # ...
   - enable: true
     name: {{plugin-N}}
 ```
 
-### PluginManager样例
+### PluginManager Example
 
-按如下格式配置 PluginManager，启用 reviews-ep：
+Use the yaml file below to create plugin manager, and enable the plugin reviews-ep
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -100,7 +100,7 @@ metadata:
   name: reviews-pm
   namespace: default
 spec:
-  workloadLabels:
+  workload_labels:
     app: reviews
   plugin:
   - enable: true
@@ -120,7 +120,7 @@ spec:
           stage: 0
 ```
 
-生成EnvoyFilter如下：
+And you will get the envoyfilter
 
 ```yaml
 apiVersion: networking.istio.io/v1alpha3
@@ -176,7 +176,7 @@ spec:
 
 ## EnvoyPlugin
 
-EnvoyPlugin 通过配置 envoy RDS api 的 `typedPerFilterConfig` 可以启用并设置指定的 http filter。同时，对在 `typedPerFilterConfig` 之外的流量治理接口，如 `rate_limits(config.route.v3.RateLimit)`、`cors(config.route.v3.CorsPolicy)` 等，EnvoyPlugin 提供了 DirectPatch 模式用于设置这类配置。可按照如下格式配置：
+EnvoyPlugin enables and sets the specified http filter by configuring `typedPerFilterConfig` of the envoy RDS api. Also, for traffic management interfaces outside of `typedPerFilterConfig`, such as `rate_limits(config.route.v3.RateLimit)`, `cors(config.route.v3.CorsPolicy)`, EnvoyPlugin provides DirectPatch mode for setting such interfaces. It can be configured in the following format.
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -205,13 +205,13 @@ spec:
         {{api_settings}}
 ```
 
-其中，`{{api_settings}}` 为 RDS api 对象中非 typedPerFilterConfig 字段的设置。
+`{{api_settings}}` is the setting for the non-typedPerFilterConfig field in the RDS api object.
 
-### EnvoyPlugin 样例
+### EnvoyPlugin Example
 
-#### 使用 EnvoyPlugin 配置 RDS typedPerFilterConfig 设置 http filter
+#### Use EnvoyPlugin to configure RDS typedPerFilterConfig to set http filters
 
-以配置禁用 `envoy.filters.http.buffer` 为例，按如下格式配置 EnvoyPlugin：
+To disable `envoy.filters.http.buffer`, use the yaml file below to create envoy plugin
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -230,7 +230,7 @@ spec:
     name: envoy.filters.http.buffer
 ```
 
-生成的envoyfilter如下：
+And you will get the envoyfilter
 
 ```yaml
 apiVersion: networking.istio.io/v1alpha3
@@ -265,9 +265,11 @@ spec:
               disabled: true
 ```
 
-#### 使用 EnvoyPlugin 配置非 typedPerFilterConfig 字段设置流量治理规则
+#### Use EnvoyPlugin to configure non-typedPerFilterConfig fields to set traffic management rules
 
-以配置 `rate_limits` 和 `cors` 为例，按如下格式配置 EnvoyPlugin：
+The envoy RDS api provides some specialized interfaces for configuring traffic management rules in addition to `typedPerFilterConfig`, such as `rate_limits(config.route.v3.RateLimit)`, `cors(config.route.v3. CorsPolicy)`, etc. Such configurations can be set using EnvoyPlugin DirectPatch mode.
+
+Take the configuration of `rate_limits` and `cors` as an example, use the yaml file below to create envoy plugin
 
 ```yaml
 apiVersion: microservice.slime.io/v1alpha1
@@ -311,7 +313,7 @@ spec:
                 regex: www.163.com|
 ```
 
-生成的envoyfilter如下：
+And you will get the envoyfilter
 
 ```yaml
 apiVersion: networking.istio.io/v1alpha3

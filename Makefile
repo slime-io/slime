@@ -47,6 +47,7 @@ $(MODULE_ROOTS):
 	@echo "generate k8s object for module $(notdir $@)"
 	@pushd $@ 1>/dev/null 2>&1; \
 	controller-gen object:headerFile="$(GO_HEADER_FILE)" paths="./api/..."; \
+	controller-gen crd paths="./api/..." output:crd:dir="./charts/crds"; \
 	popd 1>/dev/null 2>&1
 modules-k8s-gen: $(MODULE_ROOTS)
 else
