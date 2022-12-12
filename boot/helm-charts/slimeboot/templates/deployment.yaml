@@ -1,5 +1,7 @@
 {{ range .Values.module }}
-{{- if .enable }}
+  {{- if .enable }}
+  {{- if not (eq (default "" .mode) "BundleItem") }}
+
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -14,11 +16,11 @@ data:
   {{- if not .bundle }}
   cfg_{{ .name }}: |
     {{ . | toJson }}
+  {{- end }}
   {{ end }}
   {{ end }}
-  {{ end }}
+
 ---
-{{- if not (eq (default "" .mode) "BundleItem") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -125,7 +127,7 @@ spec:
       tolerations:
   {{- toYaml . | nindent 8 }}
   {{- end }}
-{{ end }}
+
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -139,6 +141,7 @@ roleRef:
   kind: ClusterRole
   name: cluster-admin
   apiGroup: rbac.authorization.k8s.io
+
 ---
   {{- if $.Values.serviceAccount.create -}}
 apiVersion: v1
@@ -150,6 +153,7 @@ metadata:
     app: {{ .name }}
   {{- end }}
 ---
+
 apiVersion: v1
 kind: Service
 metadata:
@@ -174,5 +178,7 @@ spec:
       name: log-source-port
   selector:
     app: {{.name}}
-  {{end}}
-  {{end}}
+  {{- end }}
+  {{- end }}
+  {{- end }}
+
