@@ -1,4 +1,6 @@
-{{- if and .Values.component .Values.component.globalSidecar .Values.component.globalSidecar.enable }}
+{{ if .Values.component }}
+  {{ if .Values.component.globalSidecar }}
+  {{ if .Values.component.globalSidecar.enable }}
   {{ $gs := .Values.component.globalSidecar }}
   {{ $gsPort := $gs.port | default 80 }}
   {{- range $.Values.module }}
@@ -457,3 +459,5 @@ Now that we've rendered all the resources for the global-sidecar, restore the in
   {{- end }}
 {{- end }}
 
+{{- end }}
+{{- end }}
