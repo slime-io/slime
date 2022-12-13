@@ -6,8 +6,8 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 
 	cmap "github.com/orcaman/concurrent-map"
-	"istio.io/istio/pkg/config/schema/collection"
-	"istio.io/istio/pkg/config/schema/resource"
+	"istio.io/libistio/pkg/config/schema/collection"
+	"istio.io/libistio/pkg/config/schema/resource"
 	"istio.io/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

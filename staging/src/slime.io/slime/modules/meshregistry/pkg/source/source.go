@@ -6,9 +6,9 @@ import (
 	"time"
 
 	resource2 "istio.io/istio-mcp/pkg/config/schema/resource"
-	"istio.io/istio/pkg/config/resource"
-	"istio.io/istio/pkg/config/schema/collection"
-	"istio.io/istio/pkg/config/schema/collections"
+	"istio.io/libistio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/schema/collection"
+	"istio.io/libistio/pkg/config/schema/collections"
 )
 
 var (

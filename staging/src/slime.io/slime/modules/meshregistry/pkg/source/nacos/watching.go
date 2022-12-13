@@ -14,7 +14,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/event"
+	"istio.io/libistio/pkg/config/event"
 )
 
 func newNamingClient(addresses []string, namespace string, header map[string]string) (iClient naming_client.INamingClient, err error) {

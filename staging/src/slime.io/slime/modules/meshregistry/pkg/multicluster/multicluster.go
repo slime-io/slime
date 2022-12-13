@@ -21,8 +21,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 
-	"istio.io/istio/galley/pkg/config/source/kube"
-	"istio.io/istio/galley/pkg/config/source/kube/rt"
+	"istio.io/libistio/galley/pkg/config/source/kube"
+	"istio.io/libistio/galley/pkg/config/source/kube/rt"
 	"istio.io/pkg/log"
 )
 

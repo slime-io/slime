@@ -15,14 +15,14 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/source"
 
 	"istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/resource"
-	"istio.io/istio/pkg/config/schema/collections"
+	"istio.io/libistio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/schema/collections"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 
 	"github.com/go-zookeeper/zk"
 	cmap "github.com/orcaman/concurrent-map"
-	"istio.io/istio/pkg/config/event"
-	"istio.io/istio/pkg/config/schema/collection"
+	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/pkg/log"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )

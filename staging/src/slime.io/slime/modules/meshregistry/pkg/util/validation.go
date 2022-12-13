@@ -11,7 +11,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util/cache"
 
 	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/resource"
 	"istio.io/pkg/log"
 )
 

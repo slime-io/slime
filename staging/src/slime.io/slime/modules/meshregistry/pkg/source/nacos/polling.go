@@ -5,7 +5,7 @@ import (
 	"time"
 
 	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/event"
+	"istio.io/libistio/pkg/config/event"
 )
 
 func (s *Source) Polling() {
