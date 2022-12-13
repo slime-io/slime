@@ -233,7 +233,7 @@ spec:
 
 ### limiter安装样例
 
-安装支持单机限流功能的限流模块，成功后会在`mesh-operator`命名空间下部署名为`limiter`的`deployment`
+安装支持单机限流和全局均分限流功能的限流模块，成功后会在`mesh-operator`命名空间下部署名为`limiter`的`deployment`
 
 - image: 指定`limiter`的镜像,包括策略，仓库，tag
 - module: 指定`limiter`部署的相关参数
@@ -241,9 +241,12 @@ spec:
   - kind：模块类别，目前只支持 lazyload/plugin/limiter
   - enable: 是否开启该模块
   - general: `limiter`启动相关参数
-    - disableGlobalRateLimit：禁用全局共享限流
-    - disableAdaptive: 禁用自适应限流
-    - disableInsertGlobalRateLimit: 禁止模块插入全局限流相关的插件
+    - disableGlobalRateLimit： 是否关闭全局共享限流功能
+    - disableAdaptive： 是否关闭自适应限流能力
+    - disableInsertGlobalRateLimit： 是否关闭插入全局limiter插件
+    - disableInsertLocalRateLimit: 是否关闭插入本地limiter插件
+    - rlsConfigMap： 全局共享限流依赖的configmap信息
+    - rls： 全局共享限流依赖的rate limit service服务信息
   - global: `limiter`依赖的一些全局参数，global具体参数可参考 [Config.global](#configglobal)
 
 ```yaml
@@ -272,7 +275,11 @@ spec:
           - address: ss:// 
 ```
 
-### plugin 安装样例
+对于全部功能的limiter的安装可以参考 [limiter安装](../../staging/src/slime.io/slime/modules/limiter/document/smartlimiter_zh.md#安装Limiter模块)
+
+
+
+### plugin安装样例
 
 安装plugin模块
 

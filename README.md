@@ -74,6 +74,10 @@ Slime支持聚合打包，可以将任意模块聚合成一个镜像。所以，
 
 [Slime-boot安装](./doc/zh/slime-boot.md)
 
+[开发者指南](./doc/zh/slime-developers-guide.md)
+
+[framework基础能力](./doc/zh/slime-framework-introduction.md)
+
 Slime-module
 
 - [懒加载使用](./staging/src/slime.io/slime/modules/lazyload/README.md)
