@@ -13,8 +13,8 @@ require (
 	google.golang.org/grpc v1.48.0
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
-	istio.io/istio v0.0.0-00010101000000-000000000000
 	istio.io/istio-mcp v0.0.0
+	istio.io/libistio v0.0.0-00010101000000-000000000000
 	istio.io/pkg v0.0.0-20200807181912-d97bc429be20
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
@@ -35,8 +35,8 @@ replace (
 	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20220815024955-60853abc02f4
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
-	istio.io/istio => github.com/slime-io/istio v0.0.0-20221206095013-731766b8cb10
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20221025054010-d76433980485
+	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855
 
 	slime.io/slime/framework => ../../../../../../framework
 )

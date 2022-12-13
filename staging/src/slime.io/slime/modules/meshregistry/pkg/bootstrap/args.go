@@ -6,8 +6,8 @@
 package bootstrap
 
 import (
-	"istio.io/istio/galley/pkg/config/util/kuberesource"
-	"istio.io/istio/pkg/config/schema/snapshots"
+	"istio.io/libistio/galley/pkg/config/util/kuberesource"
+	"istio.io/libistio/pkg/config/schema/snapshots"
 	"istio.io/pkg/env"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"

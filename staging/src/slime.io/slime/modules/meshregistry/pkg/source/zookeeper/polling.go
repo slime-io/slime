@@ -8,8 +8,8 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map"
 	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/event"
-	"istio.io/istio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/resource"
 )
 
 func (s *Source) Polling() {

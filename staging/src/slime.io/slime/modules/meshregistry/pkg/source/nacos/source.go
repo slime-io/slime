@@ -15,9 +15,9 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 
 	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/istio/pkg/config/event"
-	"istio.io/istio/pkg/config/resource"
-	"istio.io/istio/pkg/config/schema/collections"
+	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/schema/collections"
 	"istio.io/pkg/log"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 )
