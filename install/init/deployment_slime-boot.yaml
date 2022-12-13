@@ -29,20 +29,6 @@ spec:
             - name: OPERATOR_NAME
               value: "slime-boot"
 ---
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: slime-boot
-  namespace: mesh-operator
-subjects:
-  - kind: ServiceAccount
-    name: slime-boot
-    namespace: mesh-operator
-roleRef:
-  kind: Role
-  name: slime-boot
-  apiGroup: rbac.authorization.k8s.io
----
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -59,5 +45,34 @@ subjects:
     namespace: mesh-operator
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: slime
   apiGroup: rbac.authorization.k8s.io
+
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: slime
+rules:
+  - apiGroups: ["networking.istio.io"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["microservice.slime.io","config.netease.com"]
+    resources: ["*"]
+    verbs: ["*"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["configmaps", "services", "secrets","serviceaccounts"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "endpoints", "namespaces", "nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["rolebindings","clusterrolebindings"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles","roles"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete", "bind"]

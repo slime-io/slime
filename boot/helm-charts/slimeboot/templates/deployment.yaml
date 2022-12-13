@@ -139,7 +139,7 @@ subjects:
     namespace: {{ $.Values.namespace}}
 roleRef:
   kind: ClusterRole
-  name: cluster-admin
+  name: slime
   apiGroup: rbac.authorization.k8s.io
 
 ---
