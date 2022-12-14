@@ -401,7 +401,7 @@ spec:
                     prefix: /
                   route:
                     cluster: PassthroughCluster
-                    timout: 0s
+                    timeout: 0s
     {{- end }}
 {{- end }}
 {{- if (eq $g.misc.metricSourceType "accesslog") }}
