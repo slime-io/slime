@@ -85,13 +85,6 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 		}
 	}
 
-	// if rev not in scope, skip
-	if foundRev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(foundRev) {
-		log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-			req.NamespacedName, foundRev, r.env.IstioRev())
-		return ctrl.Result{}, nil
-	}
-
 	if sf == nil {
 		log.Info("ServiceFence Not Found, skip")
 		return reconcile.Result{}, nil
