@@ -10,21 +10,21 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
-
-	"slime.io/slime/modules/meshregistry/pkg/source"
-
-	"istio.io/api/networking/v1alpha3"
-	"istio.io/libistio/pkg/config/resource"
-	"istio.io/libistio/pkg/config/schema/collections"
-	"slime.io/slime/modules/meshregistry/pkg/util"
 
 	"github.com/go-zookeeper/zk"
 	cmap "github.com/orcaman/concurrent-map"
+	"istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collection"
+	"istio.io/libistio/pkg/config/schema/collections"
 	"istio.io/pkg/log"
+
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/source"
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
 var scope = log.RegisterScope("zk", "zk debugging", 0)
@@ -55,18 +55,18 @@ type Source struct {
 	patchLabel                  bool
 	ignoreLabels                map[string]string
 	watchingRoot                bool
+	watchingWorkerCount         int
 
 	serviceCache         map[string]*ServiceEntryWithMeta
 	cache                cmap.ConcurrentMap
 	pollingCache         cmap.ConcurrentMap
-	watchPath            cmap.ConcurrentMap
 	sidecarCache         map[resource.FullName]SidecarWithMeta
 	dubboCallModels      map[string]DubboCallModel
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
 	changedApps          map[string]struct{}
 	appSidecarUpdateTime map[string]time.Time
 
-	Con            *zk.Conn
+	Con            *atomic.Value // store *zk.Conn
 	handlers       []event.Handler
 	initedCallback func(string)
 	mut            sync.RWMutex
@@ -90,6 +90,7 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 		timeout:                     time.Duration(args.ConnectionTimeout),
 		refreshPeriod:               time.Duration(args.RefreshPeriod),
 		mode:                        args.Mode,
+		watchingWorkerCount:         args.WatchingWorkerCount,
 		patchLabel:                  args.LabelPatch,
 		RegisterRootNode:            args.RegistryRootNode,
 		ApplicationRegisterRootNode: args.ApplicationRegisterRootNode,
@@ -100,7 +101,6 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 
 		cache:                cmap.New(),
 		pollingCache:         cmap.New(),
-		watchPath:            cmap.New(),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
 		appSidecarUpdateTime: map[string]time.Time{},
 
@@ -108,6 +108,8 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 		stop:                   make(chan struct{}),
 		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
+
+		Con: &atomic.Value{},
 	}
 	ret.handlers = append(ret.handlers, event.HandlerFromFn(ret.refreshSidecarHandler))
 
@@ -126,25 +128,19 @@ func (s *Source) reConFunc(event zk.Event) {
 	case zk.EventDisconnected:
 		// rewatch
 		if !s.watchingRoot {
-			s.Con.Close()
+			s.Con.Load().(*zk.Conn).Close()
 			for {
 				con, _, err := zk.Connect(s.addresses, s.timeout)
 				if err != nil {
-					log.Infof("re connect zk error %v", err)
+					scope.Infof("re connect zk error %v", err)
 					continue
 				}
-				s.Con = con
+				// replace the connection
+				s.Con.Store(con)
 				zk.WithEventCallback(s.reConFunc)(con)
-				s.watchPath = cmap.New()
 				break
 			}
-
-			if !s.isPollingMode() {
-				s.Watch(s.RegisterRootNode, s.ServiceNodeUpdate, nil, s.zkGatewayModel)
-			}
 		}
-	case zk.EventNodeDeleted:
-		s.watchPath.Remove(event.Path)
 	}
 }
 
@@ -205,11 +201,11 @@ func (s *Source) Start() {
 		for {
 			con, _, err := zk.Connect(s.addresses, s.timeout)
 			if err != nil {
-				log.Errorf("zk conn %s %v met err %v", s.addresses, s.timeout, err)
+				scope.Errorf("zk conn %s %v met err %v", s.addresses, s.timeout, err)
 				time.Sleep(time.Second)
 				continue
 			}
-			s.Con = con
+			s.Con.Store(con)
 			zk.WithEventCallback(s.reConFunc)(con)
 			break
 		}
@@ -256,7 +252,7 @@ func (s *Source) Start() {
 					}
 				}
 
-				log.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
+				scope.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
 				waitRefresh = 0
 				s.refreshSidecar(false)
 				waitCh = time.After(time.Second)
@@ -315,14 +311,6 @@ func (s *Source) cacheSummary() map[string]interface{} {
 
 	info["count-iface"] = count
 	return info
-}
-
-func (s *Source) initPush() {
-	for _, schema := range s.exceptedResources {
-		for _, h := range s.handlers {
-			h.Handle(event.FullSyncFor(schema))
-		}
-	}
 }
 
 func (s *Source) Stop() {

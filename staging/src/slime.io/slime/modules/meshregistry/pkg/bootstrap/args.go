@@ -6,14 +6,16 @@
 package bootstrap
 
 import (
+	"time"
+
 	"istio.io/libistio/galley/pkg/config/util/kuberesource"
 	"istio.io/libistio/pkg/config/schema/snapshots"
 	"istio.io/pkg/env"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/util"
-	"time"
 )
 
 const (
@@ -118,7 +120,8 @@ type ZookeeperSourceArgs struct {
 	RegistryRootNode            string
 	ApplicationRegisterRootNode string
 	// zk mode for get zk info
-	Mode string
+	Mode                string
+	WatchingWorkerCount int
 
 	// dubbo configs
 
@@ -220,6 +223,7 @@ func NewRegistryArgs() *RegistryArgs {
 			},
 			IgnoreLabel:                 []string{"pid", "timestamp", "dubbo"},
 			Mode:                        "polling",
+			WatchingWorkerCount:         10,
 			ConnectionTimeout:           util.Duration(30 * time.Second),
 			RegistryRootNode:            "/dubbo",
 			ApplicationRegisterRootNode: "/services",

@@ -1,15 +1,16 @@
 package zookeeper
 
 import (
-	"istio.io/pkg/log"
 	"reflect"
 	"strconv"
 	"time"
 
+	"github.com/go-zookeeper/zk"
 	cmap "github.com/orcaman/concurrent-map"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
+	"istio.io/pkg/log"
 )
 
 func (s *Source) Polling() {
@@ -48,7 +49,7 @@ func (s *Source) markServiceEntryInitDone() {
 
 func (s *Source) refresh() {
 	scope.Infof("zk refresh start : %d", time.Now().UnixNano())
-	children, _, err := s.Con.Children(s.RegisterRootNode)
+	children, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode)
 	if err != nil {
 		scope.Errorf("zk path %s get child error: %s", s.RegisterRootNode, err.Error())
 		return
@@ -62,7 +63,7 @@ func (s *Source) refresh() {
 }
 
 func (s *Source) iface(service string) {
-	providerChild, _, err := s.Con.Children(s.RegisterRootNode + "/" + service + "/" + ProviderNode)
+	providerChild, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ProviderNode)
 	if err != nil {
 		scope.Errorf("zk %s get provider error: %s", service, err.Error())
 		return
@@ -72,16 +73,16 @@ func (s *Source) iface(service string) {
 	if s.zkGatewayModel {
 		consumerChild = make([]string, 0)
 	} else {
-		consumerChild, _, err = s.Con.Children(s.RegisterRootNode + "/" + service + "/" + ConsumerNode)
+		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ConsumerNode)
 		if err != nil {
 			scope.Errorf("zk %s get consumer error: %s", service, err.Error())
 		}
 	}
 
-	s.handleServiceData(s.pollingCache, providerChild, consumerChild, service, service)
+	s.handleServiceData(s.pollingCache, providerChild, consumerChild, service)
 }
 
-func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, service, path string) {
+func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, service string) {
 	if _, ok := cacheInUse.Get(service); !ok {
 		cacheInUse.Set(service, cmap.New())
 	}
