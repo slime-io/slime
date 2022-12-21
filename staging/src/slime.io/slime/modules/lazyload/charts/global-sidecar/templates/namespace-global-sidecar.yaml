@@ -302,7 +302,8 @@ spec:
             {{- if $f.dispatches }}
               {{- $svcPort := . }}
               {{- range $f.dispatches }}
-              - domains: {{ toYaml .domains | nindent 12 }}
+              - domains:
+              {{- toYaml .domains | nindent 14 }}
                 name: {{ .name }}
                 routes:
                   - match:
@@ -315,7 +316,7 @@ spec:
                       # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
                       {{- end }}
               {{- end }}
-              {{ else }}
+              {{- else }}
               - domains:
                   - '*'
                 name: to_global_sidecar
