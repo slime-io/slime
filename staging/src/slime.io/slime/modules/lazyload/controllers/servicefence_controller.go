@@ -72,7 +72,10 @@ type ReconcilerOpts func(*ServicefenceReconciler)
 func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
 	return func(sr *ServicefenceReconciler) {
 		sr.env = env
-		sr.defaultAddNamespaces = append(sr.defaultAddNamespaces, env.Config.Global.IstioNamespace, env.Config.Global.SlimeNamespace)
+		sr.defaultAddNamespaces = append(sr.defaultAddNamespaces, env.Config.Global.IstioNamespace)
+		if env.Config.Global.IstioNamespace != env.Config.Global.SlimeNamespace {
+			sr.defaultAddNamespaces = append(sr.defaultAddNamespaces, env.Config.Global.SlimeNamespace)
+		}
 	}
 }
 
