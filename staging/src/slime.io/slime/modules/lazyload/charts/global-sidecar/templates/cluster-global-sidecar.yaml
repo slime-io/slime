@@ -470,7 +470,7 @@ data:
                 "endpoint": {
                   "address": {
                     "socket_address": {
-                      "address": "{{ .name }}.{{ $.Values.namespace }}",
+                      "address": "{{ .name }}.{{ $g.slimeNamespace }}",
                       "port_value": {{ $.Values.service.logSourcePort }}
                     }
                   }
