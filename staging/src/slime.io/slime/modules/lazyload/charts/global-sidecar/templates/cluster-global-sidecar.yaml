@@ -16,6 +16,7 @@
           {{ $gsSvcPorts := list }}
           {{ $hasGsPort := false }}
           {{ $autoPort := .general.autoPort }}
+          {{ $clusterGsNamespace := .general.clusterGsNamespace | default $.Values.namespace }}
           {{- range $f.wormholePort }}
              {{- if eq (int .) (int $gsPort) }}
                  {{ $hasGsPort = true }}
@@ -35,7 +36,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
   labels:
     app: global-sidecar
     service: global-sidecar
@@ -58,7 +59,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
   labels:
     account: global-sidecar
 ---
@@ -66,7 +67,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 rules:
 - apiGroups:
   - ""
@@ -81,7 +82,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -89,14 +90,14 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 {{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
   labels:
     lazyload.slime.io/config: global-sidecar
 data:
@@ -111,7 +112,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: global-sidecar
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
   labels:
     app: global-sidecar
 spec:
@@ -218,7 +219,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: global-sidecar-metadata-exchange-remove
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 spec:
   configPatches:
     - applyTo: HTTP_FILTER
@@ -302,7 +303,7 @@ spec:
                     prefix: /
                   route:
                     {{- if eq .cluster "_GLOBAL_SIDECAR" }}
-                    cluster: outbound|{{$svcPort}}||global-sidecar.{{ $.Values.namespace }}.svc.cluster.local
+                    cluster: outbound|{{$svcPort}}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
                     {{- else }}
                     cluster: {{ tpl .cluster $ }}
               # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
@@ -316,7 +317,7 @@ spec:
                 - match:
                     prefix: /
                   route:
-                    cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $.Values.namespace }}.svc.cluster.local
+                    cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
                     timeout: 0s
             {{- end }}
           request_headers_to_add:
@@ -410,7 +411,7 @@ apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
   name: global-sidecar-accesslog
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 spec:
   workloadSelector:
     labels:
@@ -441,9 +442,6 @@ spec:
                     transport_api_version: "V3"
                     grpc_service:
                       envoy_grpc:
-{{- /*
-                        cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
-*/}}
                         cluster_name: lazyload-accesslog-source
 {{- end }}
 ---
@@ -452,7 +450,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: lazyload-accesslog-source
-  namespace: {{ $.Values.namespace }}
+  namespace: {{ $clusterGsNamespace }}
 data:
   custom_bootstrap.json: |
     {
