@@ -580,8 +580,15 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 
 	// check whether using namespace global-sidecar
 	// if so, init config of sidecar will adds */global-sidecar.${svf.ns}.svc.cluster.local
+	var globalSidecarNs string
 	if env.Config.Global.Misc["globalSidecarMode"] == "namespace" {
-		hosts = append(hosts, fmt.Sprintf("*/global-sidecar.%s.svc.cluster.local", sf.Namespace))
+		globalSidecarNs = sf.Namespace
+	} else if clusterGsNamespace := r.cfg.GetClusterGsNamespace(); clusterGsNamespace != env.Config.Global.SlimeNamespace {
+		// all service in slime ns have been added
+		globalSidecarNs = clusterGsNamespace
+	}
+	if globalSidecarNs != "" {
+		hosts = append(hosts, fmt.Sprintf("*/global-sidecar.%s.svc.cluster.local", globalSidecarNs))
 	}
 
 	// remove duplicated hosts

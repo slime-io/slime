@@ -26,6 +26,8 @@ message Fence {
   // whether enable http service port auto management
   // default value is false
   bool autoPort = 7;
+  // specify the ns of global-siecar, same as slimeNamespace by default
+  string clusterGsNamespace = 8;
 }
 
 // The general idea is to assign different default traffic to different targets

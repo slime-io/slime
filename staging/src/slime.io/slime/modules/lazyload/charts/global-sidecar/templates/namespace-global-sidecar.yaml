@@ -408,9 +408,6 @@ spec:
                     transport_api_version: "V3"
                     grpc_service:
                       envoy_grpc:
-{{- /*
-                        cluster_name: outbound|{{$.Values.service.logSourcePort}}||{{$.Values.name}}.{{$.Values.namespace}}.svc.cluster.local
-*/}}
                         cluster_name: lazyload-accesslog-source
 {{- end }}
 {{- if (eq $g.misc.metricSourceType "accesslog") }}
