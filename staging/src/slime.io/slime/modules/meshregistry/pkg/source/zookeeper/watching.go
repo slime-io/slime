@@ -141,7 +141,7 @@ func (ew *EndpointWatcher) Exit() {
 func (ew *EndpointWatcher) watchProviderOnly(ctx context.Context) {
 	defer close(ew.exit)
 
-    // Try to initialize, but it is not required to be completed,
+	// Try to initialize, but it is not required to be completed,
 	// because the service may have been deleted or for others.
 	// todo: There is a get request and a watch request at startup,
 	// if use the returns of the watch request to initialize, the
@@ -207,10 +207,11 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan []string) {
 
 		select {
 		case ch <- paths:
-		default:
-		}
-
-		select {
+			select {
+			case <-ew.exit:
+				return
+			case <-eventCh:
+			}
 		case <-ew.exit:
 			return
 		case <-eventCh:
