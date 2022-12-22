@@ -158,12 +158,14 @@ func startListenAndServe(wormholePorts map[int]struct{}) {
 		}
 	}
 
-	for whPort, srv := range servers {
-		if _, exist := wormholePorts[whPort]; !exist {
-			delete(servers, whPort)
-			go shutdownServer(srv)
-		}
-	}
+	// ports will only be automatically increased when auto managing.
+	// more info can be found at: https://github.com/slime-io/slime/pull/157
+	// for whPort, srv := range servers {
+	// 	if _, exist := wormholePorts[whPort]; !exist {
+	// 		delete(servers, whPort)
+	// 		go shutdownServer(srv)
+	// 	}
+	// }
 }
 
 func startServer(srv *http.Server) {
