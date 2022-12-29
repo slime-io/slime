@@ -133,7 +133,7 @@ message SmartLimitDescriptor {
         string quota = 1;  // 配额
         Duration fill_interval = 2; // 时间
         string strategy= 3; // 策略
-        map<string, string> headers_to_add = 4; // 增添的请求头
+        repeated Header headers_to_add = 4; // 增添的请求头
     }
 
     string condition = 1;
@@ -175,5 +175,10 @@ message Target {
     int32 port = 2;
     repeated string route = 3;
     repeated string host = 4;
+}
+
+message Header {
+    string key = 1;
+    string value = 2;
 }
 

@@ -105,6 +105,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 									Quota:        fmt.Sprintf("%d", rateLimitValue),
 									FillInterval: des.Action.FillInterval,
 									Strategy:     des.Action.Strategy,
+									HeadersToAdd: generateHeadersToAdd(des),
 								},
 								Match:  des.Match,
 								Target: des.Target,
@@ -279,4 +280,15 @@ func formatLabels(selector map[string]string) map[string]string {
 		}
 	}
 	return labels
+}
+
+func generateHeadersToAdd(des *microservicev1alpha2.SmartLimitDescriptor) []*microservicev1alpha2.Header {
+	headers := make([]*microservicev1alpha2.Header, 0)
+	for _, item := range des.Action.HeadersToAdd {
+		headers = append(headers, &microservicev1alpha2.Header{
+			Key:   item.GetKey(),
+			Value: item.GetValue(),
+		})
+	}
+	return headers
 }
