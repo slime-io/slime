@@ -10,7 +10,7 @@ require (
 )
 
 replace (
-	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20220815024955-60853abc02f4
+	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20220815023449-add01187ad4f
 	github.com/prometheus/common => github.com/prometheus/common v0.26.0
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
