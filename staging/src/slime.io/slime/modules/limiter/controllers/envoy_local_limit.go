@@ -515,11 +515,11 @@ func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPerce
 func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescriptor) []*envoy_core_v3.HeaderValueOption {
 	headers := make([]*envoy_core_v3.HeaderValueOption, 0)
 	for _, item := range items {
-		for key, value := range item.Action.HeadersToAdd {
+		for _, item := range item.Action.HeadersToAdd {
 			headers = append(headers, &envoy_core_v3.HeaderValueOption{
 				Header: &envoy_core_v3.HeaderValue{
-					Key:   key,
-					Value: value,
+					Key:   item.GetKey(),
+					Value: item.GetValue(),
 				},
 				Append: &wrappers.BoolValue{
 					Value: true,
