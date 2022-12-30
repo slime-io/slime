@@ -47,7 +47,7 @@ package slime.microservice.plugin.v1alpha1;
 
 option go_package = "slime.io/slime/modules/plugin/api/v1alpha1";
 
-message PluginManager {
+message PluginManagerSpec {
     // Zero or more labels that indicate a specific set of pods/VMs whose
     // proxies should be configured to use these additional filters.  The
     // scope of label search is platform dependent. On Kubernetes, for

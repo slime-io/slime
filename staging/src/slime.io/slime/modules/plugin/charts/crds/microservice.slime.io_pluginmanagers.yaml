@@ -1,0 +1,95 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: pluginmanagers.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    kind: PluginManager
+    listKind: PluginManagerList
+    plural: pluginmanagers
+    singular: pluginmanager
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: PluginManager is the Schema for the PluginManager API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            properties:
+              gateways:
+                description: Names of gateways where the rule should be applied to.
+                  Gateway names at the top of the VirtualService (if any) are overridden.
+                  The gateway match is independent of sourceLabels.
+                items:
+                  type: string
+                type: array
+              plugin:
+                items:
+                  properties:
+                    enable:
+                      type: boolean
+                    listenerType:
+                      format: int32
+                      type: integer
+                    name:
+                      type: string
+                    port:
+                      format: int32
+                      type: integer
+                    settings:
+                      description: Deprecated
+                      properties:
+                        fields:
+                          additionalProperties:
+                            description: "`Value` represents a dynamically typed value
+                              which can be either null, a number, a string, a boolean,
+                              a recursive struct value, or a list of values. A producer
+                              of value is expected to set one of that variants, absence
+                              of any variant indicates an error. \n The JSON representation
+                              for `Value` is JSON value."
+                            type: object
+                          description: Unordered map of dynamically typed values.
+                          type: object
+                      type: object
+                    type_url:
+                      type: string
+                  type: object
+                type: array
+              workload_labels:
+                additionalProperties:
+                  type: string
+                description: Zero or more labels that indicate a specific set of pods/VMs
+                  whose proxies should be configured to use these additional filters.  The
+                  scope of label search is platform dependent. On Kubernetes, for
+                  example, the scope includes pods running in all reachable namespaces.
+                  Omitting the selector applies the filter to all proxies in the mesh.
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

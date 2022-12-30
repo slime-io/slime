@@ -1,0 +1,196 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: servicefences.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    kind: ServiceFence
+    listKind: ServiceFenceList
+    plural: servicefences
+    singular: servicefence
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: ServiceFence is the Schema for the servicefences API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: 'Spec Example   spec:    enable: true    host:      reviews.default.svc.cluster.local:
+              # static dependency of reviews.default service        stable:      test/*:
+              {} # static dependency of all services in namespace ''test''    namespaceSelector:
+              # Match namespace names, multiple namespaces are ''or'' relations, static
+              dependency      - foo      - bar    labelSelector: # Match service label,
+              multiple selectors are ''or'' relationship, static dependency      -
+              selector:          project: back      - selector: # labels in same selector
+              are ''and'' relationship          project: front          group: web    workloadSelector:      labels:        group:
+              foo        zone: hz      fromService: false'
+            properties:
+              enable:
+                description: Switch to render servicefence as sidecar
+                type: boolean
+              host:
+                additionalProperties:
+                  properties:
+                    RecentlyCalled:
+                      properties:
+                        nanos:
+                          description: Non-negative fractions of a second at nanosecond
+                            resolution. Negative second values with fractions must
+                            still have non-negative nanos values that count forward
+                            in time. Must be from 0 to 999,999,999 inclusive.
+                          format: int32
+                          type: integer
+                        seconds:
+                          description: Represents seconds of UTC time since Unix epoch
+                            1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z
+                            to 9999-12-31T23:59:59Z inclusive.
+                          format: int64
+                          type: integer
+                      type: object
+                    auto:
+                      description: Deprecated
+                      properties:
+                        duration:
+                          properties:
+                            nanos:
+                              description: Non-negative fractions of a second at nanosecond
+                                resolution. Negative second values with fractions
+                                must still have non-negative nanos values that count
+                                forward in time. Must be from 0 to 999,999,999 inclusive.
+                              format: int32
+                              type: integer
+                            seconds:
+                              description: Represents seconds of UTC time since Unix
+                                epoch 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z
+                                to 9999-12-31T23:59:59Z inclusive.
+                              format: int64
+                              type: integer
+                          type: object
+                      type: object
+                    deadline:
+                      description: Configurations that expire after expiration
+                      properties:
+                        expire:
+                          properties:
+                            nanos:
+                              description: Non-negative fractions of a second at nanosecond
+                                resolution. Negative second values with fractions
+                                must still have non-negative nanos values that count
+                                forward in time. Must be from 0 to 999,999,999 inclusive.
+                              format: int32
+                              type: integer
+                            seconds:
+                              description: Represents seconds of UTC time since Unix
+                                epoch 1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z
+                                to 9999-12-31T23:59:59Z inclusive.
+                              format: int64
+                              type: integer
+                          type: object
+                      type: object
+                    stable:
+                      description: Configuration that will not be cleaned up
+                      type: object
+                  type: object
+                type: object
+              labelSelector:
+                description: services match one selector of the label selector are
+                  all static dependency, will not expire
+                items:
+                  properties:
+                    selector:
+                      additionalProperties:
+                        type: string
+                      type: object
+                  type: object
+                type: array
+              namespaceSelector:
+                description: services in these namespaces are all static dependency,
+                  will not expire
+                items:
+                  type: string
+                type: array
+              workloadSelector:
+                properties:
+                  fromService:
+                    description: 'take effect when labels is empty true: sidecar.workloadSelector.labels
+                      = svc.spec.selector false: sidecar.workloadSelector.labels =
+                      map[string]string{env.config.global.service: svc.name}'
+                    type: boolean
+                  labels:
+                    additionalProperties:
+                      type: string
+                    description: top priority, if labels is not empty, sidecar.workloadSelector.labels
+                      = sf.spec.workloadSelector.labels
+                    type: object
+                type: object
+            type: object
+          status:
+            properties:
+              domains:
+                additionalProperties:
+                  properties:
+                    RecentlyCalled:
+                      description: Deprecated
+                      properties:
+                        nanos:
+                          description: Non-negative fractions of a second at nanosecond
+                            resolution. Negative second values with fractions must
+                            still have non-negative nanos values that count forward
+                            in time. Must be from 0 to 999,999,999 inclusive.
+                          format: int32
+                          type: integer
+                        seconds:
+                          description: Represents seconds of UTC time since Unix epoch
+                            1970-01-01T00:00:00Z. Must be from 0001-01-01T00:00:00Z
+                            to 9999-12-31T23:59:59Z inclusive.
+                          format: int64
+                          type: integer
+                      type: object
+                    hosts:
+                      items:
+                        type: string
+                      type: array
+                    status:
+                      format: int32
+                      type: integer
+                  type: object
+                type: object
+              metricStatus:
+                additionalProperties:
+                  type: string
+                type: object
+              visitor:
+                additionalProperties:
+                  type: boolean
+                type: object
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

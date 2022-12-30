@@ -1,0 +1,12 @@
+/*
+* @Author: wangchenyu
+* @Date: 2022/2/23
+*/
+
+syntax = "proto3";
+package slime.microservice.plugin.config;
+
+option go_package = "slime.io/slime/modules/plugin/api/config";
+
+message PluginModule {
+}

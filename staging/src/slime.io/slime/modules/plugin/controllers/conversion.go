@@ -7,26 +7,24 @@ package controllers
 
 import (
 	"fmt"
-	gogojsonpb "github.com/golang/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/wrappers"
-	"google.golang.org/protobuf/types/known/durationpb"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/url"
 	"strings"
 	"time"
-
-	"slime.io/slime/framework/util"
-	"slime.io/slime/modules/plugin/api/v1alpha1"
-	microserviceslimeiov1alpha1types "slime.io/slime/modules/plugin/api/v1alpha1"
-	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
 
 	envoyconfigcorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
 	envoyextensionswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	"github.com/gogo/protobuf/types"
+	gogojsonpb "github.com/golang/protobuf/jsonpb"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/types/known/durationpb"
 	istio "istio.io/api/networking/v1alpha3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
 const (
@@ -45,8 +43,8 @@ const (
 
 // genGatewayCfps is a custom func to handle EnvoyPlugin gateway
 // default is nil, ignore gateway
-var genGatewayCfps func(in *microserviceslimeiov1alpha1types.EnvoyPlugin, namespace string, t target, patchCtx istio.EnvoyFilter_PatchContext,
-	p *microserviceslimeiov1alpha1types.Plugin, m *v1alpha1.Plugin_Inline) []*istio.EnvoyFilter_EnvoyConfigObjectPatch
+var genGatewayCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx istio.EnvoyFilter_PatchContext,
+	p *v1alpha1.Plugin, m *v1alpha1.Plugin_Inline) []*istio.EnvoyFilter_EnvoyConfigObjectPatch
 
 type target struct {
 	applyTo     istio.EnvoyFilter_ApplyTo
@@ -134,13 +132,8 @@ func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *
 	return patch
 }
 
-func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
-	pb, err := util.FromJSONMap("slime.microservice.plugin.v1alpha1.EnvoyPlugin", cr.Spec)
-	if err != nil {
-		log.Errorf("unable to convert envoyPlugin to envoyFilter,%+v", err)
-		return
-	}
-	in := pb.(*microserviceslimeiov1alpha1types.EnvoyPlugin)
+func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
+	in := cr.Spec.DeepCopy()
 
 	if in.WorkloadSelector != nil {
 		out.WorkloadSelector = &istio.WorkloadSelector{
@@ -219,7 +212,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *microserviceslimeiov1al
 }
 
 func generateCfp(t target, patchCtx istio.EnvoyFilter_PatchContext, vhost *istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch,
-	p *microserviceslimeiov1alpha1types.Plugin, m *v1alpha1.Plugin_Inline) *istio.EnvoyFilter_EnvoyConfigObjectPatch {
+	p *v1alpha1.Plugin, m *v1alpha1.Plugin_Inline) *istio.EnvoyFilter_EnvoyConfigObjectPatch {
 	cfp := &istio.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: t.applyTo,
 		Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
@@ -245,7 +238,7 @@ func generateCfp(t target, patchCtx istio.EnvoyFilter_PatchContext, vhost *istio
 }
 
 // translate PluginManager
-func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.PluginManager, out *istio.EnvoyFilter) {
+func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec, out *istio.EnvoyFilter) {
 	out.WorkloadSelector = &istio.WorkloadSelector{
 		Labels: in.WorkloadLabels,
 	}
@@ -264,7 +257,7 @@ func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta,
 	}
 }
 
-func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) ([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, in *v1alpha1.Plugin) ([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, error) {
 	listener := &istio.EnvoyFilter_ListenerMatch{
 		FilterChain: &istio.EnvoyFilter_ListenerMatch_FilterChainMatch{
 			Filter: &istio.EnvoyFilter_ListenerMatch_FilterMatch{
@@ -315,7 +308,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	applyConfigDiscoveryPlugin := func(
 		resourceName, pluginTypeURL string,
-		converter func(name string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error)) error {
+		converter func(name string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error)) error {
 		fullResourceName := fmt.Sprintf("%s.%s", meta.Namespace, resourceName)
 		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, out.Patch.Value); err != nil {
 			return err
@@ -331,7 +324,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error) {
 			wasmFilterConfig, err := r.convertWasmFilterConfig(resourceName, meta, in)
 			if err != nil {
 				return nil, err
@@ -431,10 +424,10 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, valu
 	return nil
 }
 
-func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
+func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
 	var (
 		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
-		pluginWasm = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Wasm)
+		pluginWasm = in.PluginSettings.(*v1alpha1.Plugin_Wasm)
 	)
 
 	datasource, err := convertDataSource(pluginWasm.Wasm.Url, pluginWasm.Wasm.Sha256)
@@ -506,9 +499,9 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
 }
 
-func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *microserviceslimeiov1alpha1types.Plugin) (*types.Struct, error) {
+func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error) {
 	var (
-		pluginRider            = in.PluginSettings.(*microserviceslimeiov1alpha1types.Plugin_Rider)
+		pluginRider            = in.PluginSettings.(*v1alpha1.Plugin_Rider)
 		imagePullSecretContent string
 		err                    error
 	)

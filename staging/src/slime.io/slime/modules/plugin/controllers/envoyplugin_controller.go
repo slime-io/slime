@@ -33,7 +33,7 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/util"
-	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
+	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
 // EnvoyPluginReconciler reconciles a EnvoyPlugin object

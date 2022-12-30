@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"sync"
+
 	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -28,15 +30,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sync"
 
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/util"
-	microserviceslimeiov1alpha1types "slime.io/slime/modules/plugin/api/v1alpha1"
-	"slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
-	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1/wrapper"
+	"slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
 // PluginManagerReconciler reconciles a PluginManager object
@@ -76,7 +75,7 @@ func (r *PluginManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.NamespacedName) (ctrl.Result, error) {
 	// Fetch the PluginManager instance
-	instance := &wrapper.PluginManager{}
+	instance := &v1alpha1.PluginManager{}
 	err := r.client.Get(ctx, nn, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -95,7 +94,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	}
 
 	// 资源更新
-	pluginManager := &microserviceslimeiov1alpha1types.PluginManager{}
+	pluginManager := &v1alpha1.PluginManagerSpec{}
 	if err = util.FromJSONMapToMessage(instance.Spec, pluginManager); err != nil {
 		log.Errorf("unable to convert pluginManager to envoyFilter, %+v", err)
 		// 由于配置错误导致的，因此直接返回nil，避免reconcile重试
@@ -150,7 +149,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	return ctrl.Result{}, nil
 }
 
-func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *wrapper.PluginManager, pluginManager *microserviceslimeiov1alpha1types.PluginManager) *v1alpha3.EnvoyFilter {
+func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alpha1.PluginManager, pluginManager *v1alpha1.PluginManagerSpec) *v1alpha3.EnvoyFilter {
 	envoyFilter := &istio.EnvoyFilter{}
 	r.translatePluginManager(cr.ObjectMeta, pluginManager, envoyFilter)
 
@@ -186,7 +185,7 @@ func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	go r.handleSecretChange()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&microserviceslimeiov1alpha1.PluginManager{}).
+		For(&v1alpha1.PluginManager{}).
 		Complete(r)
 }
 
@@ -278,7 +277,7 @@ func (r *PluginManagerReconciler) OnStartLeading(ctx context.Context) {
 	r.notifySecretChange(emptyNN)
 }
 
-func getPluginManagerWatchSecrets(ns string, in *microserviceslimeiov1alpha1types.PluginManager) map[types.NamespacedName]struct{} {
+func getPluginManagerWatchSecrets(ns string, in *v1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {
 	ret := map[types.NamespacedName]struct{}{}
 	for _, p := range in.GetPlugin() {
 		wasm := p.GetWasm()

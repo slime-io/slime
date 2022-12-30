@@ -13,12 +13,13 @@ import (
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/util"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
+	 "slime.io/slime/modules/limiter/api/config"
 	"slime.io/slime/modules/limiter/model"
 )
 
 // LimiterSpec info come from config and SmartLimiterSpec
 type LimiterSpec struct {
-	rls                          *microservicev1alpha2.RateLimitService
+	rls                          *config.RateLimitService
 	gw                           bool
 	labels                       map[string]string
 	loc                          types.NamespacedName
@@ -32,7 +33,7 @@ type LimiterSpec struct {
 	target *microservicev1alpha2.Target
 
 	domain       string
-	rlsConfigmap *microservicev1alpha2.RlsConfigMap
+	rlsConfigmap *config.RlsConfigMap
 }
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,

@@ -3,6 +3,7 @@ package module
 import (
 	"context"
 	"fmt"
+
 	"slime.io/slime/framework/model/metric"
 
 	"github.com/golang/protobuf/proto"
@@ -15,13 +16,14 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/model/pkg/leaderelection"
+	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/controllers"
 	"slime.io/slime/modules/limiter/model"
 )
 
 type Module struct {
-	config microservicev1alpha2.Limiter
+	config config.Limiter
 	env    bootstrap.Environment
 	pc     *metric.ProducerConfig
 	sr     *controllers.SmartLimiterReconciler

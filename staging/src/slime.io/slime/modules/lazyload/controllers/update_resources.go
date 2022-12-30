@@ -19,7 +19,7 @@ import (
 
 	config "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
-	"slime.io/slime/modules/lazyload/api/v1alpha1"
+	lazyloadconfig "slime.io/slime/modules/lazyload/api/config"
 	"slime.io/slime/modules/lazyload/charts"
 	"slime.io/slime/modules/lazyload/pkg/helm"
 	"slime.io/slime/modules/lazyload/pkg/kube"
@@ -115,16 +115,16 @@ type Image struct {
 }
 
 type Module struct {
-	Plugin  *config.Plugin     `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	Limiter *config.Limiter    `protobuf:"bytes,2,opt,name=limiter,proto3" json:"limiter,omitempty"`
-	Global  *config.Global     `protobuf:"bytes,3,opt,name=global,proto3" json:"global,omitempty"`
-	Fence   *config.Fence      `protobuf:"bytes,4,opt,name=fence,proto3" json:"fence,omitempty"`
-	Metric  *config.Metric     `protobuf:"bytes,6,opt,name=metric,proto3" json:"metric,omitempty"`
-	Name    string             `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
-	Enable  bool               `protobuf:"varint,7,opt,name=enable,proto3" json:"enable,omitempty"`
-	General *v1alpha1.Fence    `protobuf:"bytes,8,opt,name=general,proto3" json:"general,omitempty"`
-	Bundle  *config.Bundle     `protobuf:"bytes,9,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	Mode    config.Config_Mode `protobuf:"varint,10,opt,name=mode,proto3,enum=slime.config.v1alpha1.Config_Mode" json:"mode,omitempty"`
+	Plugin  *config.Plugin        `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
+	Limiter *config.Limiter       `protobuf:"bytes,2,opt,name=limiter,proto3" json:"limiter,omitempty"`
+	Global  *config.Global        `protobuf:"bytes,3,opt,name=global,proto3" json:"global,omitempty"`
+	Fence   *config.Fence         `protobuf:"bytes,4,opt,name=fence,proto3" json:"fence,omitempty"`
+	Metric  *config.Metric        `protobuf:"bytes,6,opt,name=metric,proto3" json:"metric,omitempty"`
+	Name    string                `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
+	Enable  bool                  `protobuf:"varint,7,opt,name=enable,proto3" json:"enable,omitempty"`
+	General *lazyloadconfig.Fence `protobuf:"bytes,8,opt,name=general,proto3" json:"general,omitempty"`
+	Bundle  *config.Bundle        `protobuf:"bytes,9,opt,name=bundle,proto3" json:"bundle,omitempty"`
+	Mode    config.Config_Mode    `protobuf:"varint,10,opt,name=mode,proto3,enum=slime.config.v1alpha1.Config_Mode" json:"mode,omitempty"`
 	// like bundle item kind, necessary if not bundle
 	Kind string `protobuf:"bytes,11,opt,name=kind,proto3" json:"kind,omitempty"`
 }

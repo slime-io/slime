@@ -3,10 +3,11 @@ package controllers
 import (
 	"regexp"
 
+	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 )
 
-func newDomainAliasRules(domainAlias []*lazyloadv1alpha1.DomainAlias) []*domainAliasRule {
+func newDomainAliasRules(domainAlias []*config.DomainAlias) []*domainAliasRule {
 	var rules []*domainAliasRule
 	if domainAlias == nil {
 		return nil

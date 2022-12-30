@@ -42,6 +42,7 @@ import (
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	modmodel "slime.io/slime/modules/lazyload/model"
 )
@@ -50,7 +51,7 @@ import (
 type ServicefenceReconciler struct {
 	client.Client
 	Scheme               *runtime.Scheme
-	cfg                  *lazyloadv1alpha1.Fence
+	cfg                  *config.Fence
 	env                  bootstrap.Environment
 	interestMeta         map[string]bool
 	interestMetaCopy     map[string]bool // for outside read
@@ -79,7 +80,7 @@ func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
 	}
 }
 
-func ReconcilerWithCfg(cfg *lazyloadv1alpha1.Fence) ReconcilerOpts {
+func ReconcilerWithCfg(cfg *config.Fence) ReconcilerOpts {
 	return func(sr *ServicefenceReconciler) {
 		sr.cfg = cfg
 		sr.doAliasRules = newDomainAliasRules(cfg.DomainAliases)

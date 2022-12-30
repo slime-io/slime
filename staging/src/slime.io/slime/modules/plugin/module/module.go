@@ -2,11 +2,14 @@ package module
 
 import (
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
+	"slime.io/slime/modules/plugin/api/config"
 	pluginapiv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 	"slime.io/slime/modules/plugin/controllers"
 	"slime.io/slime/modules/plugin/model"
@@ -15,7 +18,7 @@ import (
 var log = model.ModuleLog
 
 type Module struct {
-	config pluginapiv1alpha1.PluginModule
+	config config.PluginModule
 }
 
 func (m *Module) Kind() string {
