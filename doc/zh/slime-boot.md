@@ -6,26 +6,29 @@
     - [lazyload安装样例](#lazyload安装样例)
     - [limiter安装样例](#limiter安装样例)
     - [plugin 安装样例](#plugin-安装样例)
+    - [meshregistry 安装样例](#meshregistry-安装样例)
     - [bundle模式安装样例](#bundle模式安装样例)
+    - [多副本样例](#多副本样例)
     - [Config.global](#configglobal)
+
 
 
 # SlimeBoot 介绍与使用
 
 ## 介绍
 
-本文将介绍`SlimeBoot`的使用方式，并给出使用样例，指引用户安装并使用`slime`组件。`slime-boot`可以理解成一个`Controller`, 它会一直监听`SlimeBoot CR`, 当用户提交一份`SlimeBoot CR`后，`slime-boot Controller`会根据`CR`的内容渲染`slime`相关的部署材料。
+本文将介绍`SlimeBoot`的使用方式，并给出使用样例，指引用户安装并使用`slime`组件。`slime-boot`可以理解成一个`Controller`，它会一直监听`SlimeBoot CR`，当用户提交一份`SlimeBoot CR`后，`slime-boot Controller`会根据`CR`的内容渲染`slime`相关的部署材料。
 
 ## 准备
 
 在安装`slime`组件前，需要安装`SlimeBoot CRD`和`deployment/slime-boot`
 
-**注意**：在k8s v1.22以及之后的版本中，只支持`apiextensions.k8s.io/v1`版本的`CRD`，不再支持`apiextensions.k8s.io/v1beta1`版本`CRD`，详见[k8s官方文档](https://kubernetes.io/docs/reference/using-api/deprecation-guide/#customresourcedefinition-v122),而 k8s v1.16~v1.21 两个版本都能用
+**注意**：在k8s v1.22以及之后的版本中，只支持`apiextensions.k8s.io/v1`版本的`CRD`，不再支持`apiextensions.k8s.io/v1beta1`版本`CRD`，详见[k8s官方文档](https://kubernetes.io/docs/reference/using-api/deprecation-guide/#customresourcedefinition-v122)，而 k8s v1.16~v1.21 两个版本都能用
 
-1. 对于k8s v1.22以及之后版本，需要手动安装[v1版本](../../install/init/crds-v1.yaml),而之前版本可手动安装[v1版本](../../install/init/crds-v1.yaml)或者[v1beta1版本](../../install/init/crds.yaml)
+1. 对于k8s v1.22以及之后版本，需要手动安装[v1版本](../../install/init/crds-v1.yaml)，而之前版本可手动安装[v1版本](../../install/init/crds-v1.yaml)或者[v1beta1版本](../../install/init/crds.yaml)
 2. 手动安装 [deployment/slime-boot](../../install/init/deployment_slime-boot.yaml)
 
-或者执行以下命令安装`CRD`和`deployment/slime-boot`, 需要注意的是如果网络无法访问，你可以在以下目录知道相关文档 `slime/install/init/`
+或者执行以下命令安装`CRD`和`deployment/slime-boot`，需要注意的是如果网络无法访问，你可以在以下目录发现相关文档 `slime/install/init/`
 
 - k8s version >= v1.22
 ```shell
@@ -52,15 +55,15 @@ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commi
 ```
 
 ## 参数介绍
-根据之前的章节，我们知道用户通过下发`SlimeBoot`的方式，安装`slime`组件, 在正常使用过程中，用户使用的`SlimeBoot CR`主要包含以下几项
+根据之前的章节，我们知道用户通过下发`SlimeBoot`的方式，安装`slime`组件，在正常使用过程中，用户使用的`SlimeBoot CR`主要包含以下几项
 
 - image: 定义镜像相关的参数
 - resources： 定义容器资源
 - module: 定义需要启动的模块，以及对应的参数
   - name: 模块名称
-  - kind：模块类别，目前只支持 lazyload/plugin/limiter
+  - kind：模块类别，目前只支持 lazyload/plugin/limiter/meshregistry
   - enable: 是否开启模块
-  - global: 模块依赖的一些全局参数, 一些详细信息可以参考 [Config.global](#configglobal)
+  - global: 模块依赖的一些全局参数，一些详细信息可以参考 [Config.global](#configglobal)
   - general: 模块启动时需要的一些参数
 
 样例如下：
@@ -113,9 +116,9 @@ spec:
           logLevel: info
 ```
 
-- bundle部署：只需部署一份`deployment`, 该`deployment`包含多个组件功能
+- bundle部署：只需部署一份`deployment`，该`deployment`包含多个组件功能
 
-以下yaml是一个bundle模式不完整样例, 其中module的第一个对象定义了这个服务拥有limiter和plugin功能，mudule中后两个对象分别对应limiter和plugin子模块的具体参数
+以下yaml是一个bundle模式不完整样例，其中module的第一个对象定义了这个服务拥有limiter和plugin功能，mudule中后两个对象分别对应limiter和plugin子模块的具体参数
 
 ```yaml
 apiVersion: config.netease.com/v1alpha1
@@ -127,7 +130,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.5.0_linux_amd64
+    tag: v0.6.0_linux_amd64
   module:
     - name: bundle
       enable: true
@@ -150,7 +153,7 @@ spec:
 ```
 
 
-下面将以模块方式安装`lazyload`,`limiter`和`plugin`模块以及用`bundle`模式安装`bundle`模块
+下面将以模块方式安装`lazyload`，`limiter`和`plugin`模块以及用`bundle`模式安装`bundle`模块
 
 
 ###  lazyload安装样例
@@ -160,7 +163,7 @@ spec:
 - istioNamespace：用户集群中，`istio`部署的`ns`
 - module: 指定`lazyload`部署的相关参数
   - name: 模块名称
-  - kind：模块类别，目前只支持 lazyload/plugin/limiter
+  - kind：模块类别，目前只支持 lazyload/plugin/limiter/meshregistry
   - enable: 是否开启该模块
   - general: `lazyload`启动相关参数
   - global: `lazyload`依赖的一些全局参数，global具体参数可参考 [Config.global](#configglobal)
@@ -177,7 +180,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.5.0_linux_amd64
+    tag: v0.6.0_linux_amd64
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -227,7 +230,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.6.0_linux_amd64
       probePort: 20000
 ```
 
@@ -235,10 +238,10 @@ spec:
 
 安装支持单机限流功能的限流模块，成功后会在`mesh-operator`命名空间下部署名为`limiter`的`deployment`
 
-- image: 指定`limiter`的镜像,包括策略，仓库，tag
+- image: 指定`limiter`的镜像，包括策略，仓库，tag
 - module: 指定`limiter`部署的相关参数
   - name: 模块名称
-  - kind：模块类别，目前只支持 lazyload/plugin/limiter
+  - kind：模块类别，目前只支持 lazyload/plugin/limiter/meshregistry
   - enable: 是否开启该模块
   - general: `limiter`启动相关参数
     - disableGlobalRateLimit：禁用全局共享限流
@@ -256,7 +259,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.5.0_linux_amd64
+    tag: v0.6.0_linux_amd64
   module:
     - name: limiter
       kind: limiter
@@ -276,10 +279,10 @@ spec:
 
 安装plugin模块
 
-- image: 指定`limiter`的镜像,包括策略，仓库，tag
-- module: 指定`limiter`部署的相关参数
+- image: 指定`plugin`的镜像，包括策略，仓库，tag
+- module: 指定`plugin`部署的相关参数
   - name: 模块名称
-  - kind：模块类别，目前只支持 lazyload/plugin/limiter
+  - kind：模块类别，目前只支持 lazyload/plugin/limiter/meshregistry
   - enable: 是否开启该模块
   - global: `plugin`依赖的一些全局参数，global具体参数可参考 [Config.global](#configglobal)
 
@@ -287,13 +290,13 @@ spec:
 apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
-  name: limiter
+  name: plugin
   namespace: mesh-operator
 spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.5.0_linux_amd64
+    tag: v0.6.0_linux_amd64
   module:
     - name: plugin
       kind: plugin
@@ -301,6 +304,62 @@ spec:
       global:
         log:
           logLevel: info
+```
+
+### meshregistry安装样例
+
+安装对接多注册中心的meshregistry模块
+
+- image: 指定`meshregistry`的镜像，包括策略，仓库，tag
+- module: 指定`meshregistry`部署的相关参数
+  - name: 模块名称
+  - kind：模块类别，目前只支持 lazyload/plugin/limiter/meshregistry
+  - enable: 是否开启该模块
+  - general: `meshregistry`启动相关参数，支持配置K8SSource、EurekaSource、NacosSource、ZookeeperSource
+  - global: `meshregistry`依赖的一些全局参数，global具体参数可参考 [Config.global](#configglobal)
+
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: meshregistry
+  namespace: mesh-operator
+spec:
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-meshregistry
+    tag: v0.6.0_linux_amd64
+  module:
+    - name: meshregistry
+      kind: meshregistry
+      enable: true
+      global:
+        log:
+          logLevel: info
+      general:
+        LEGACY:
+          MeshConfigFile: ""
+          RevCrds: ""
+          Mcp: {}
+          K8SSource:
+            Enabled: false
+#          EurekaSource:
+#            Enabled: true
+#            Address:
+#              - "http://test/eureka"
+#            RefreshPeriod: 15s
+#            SvcPort: 80
+#          NacosSource:
+#            Enabled: true
+#            Address:
+#              - "http://test.com"
+#            Mode: polling
+#          ZookeeperSource:
+#            Enabled: true
+#            RefreshPeriod: 30s
+#            WaitTime: 10s
+#            Address:
+#              - zookeeper.test.svc.cluster.local:2181
 ```
 
 ### bundle模式安装样例
@@ -317,22 +376,26 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.5.0_linux_amd64
+    tag: v0.6.0_linux_amd64
   module:
     - name: bundle
       enable: true
       bundle:
         modules:
-          - name: lazyload
+          - name: bundle
             kind: lazyload
           - name: limiter
             kind: limiter
           - name: plugin
-            kind: plugin            
+            kind: plugin
+          - name: meshregistry
+            kind: meshregistry
       global:
         log:
           logLevel: info
-    - name: lazyload
+        configSources:
+        - address: ss://
+    - name: bundle #与上面的name一致TODO
       kind: lazyload
       enable: true
       mode: BundleItem
@@ -347,8 +410,6 @@ spec:
           globalSidecarMode: cluster # the mode of global-sidecar
           metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
-        log:
-          logLevel: info
     - name: limiter
       kind: limiter
       enable: true
@@ -357,39 +418,80 @@ spec:
         disableGlobalRateLimit: true
         disableAdaptive: true
         disableInsertGlobalRateLimit: true
-      global:
-        configSources:
-          - address: ss://
     - name: plugin
       kind: plugin
       enable: true
+      mode: BundleItem   
+    - name: meshregistry
+      kind: meshregistry
+      enable: true
       mode: BundleItem
+      general:
+        LEGACY:
+          MeshConfigFile: ""
+          RevCrds: ""
+          Mcp: {}
+          K8SSource:
+            Enabled: false   
   component:
     globalSidecar:
       replicas: 1
       enable: true
       sidecarInject:
         enable: true # should be true
-        # mode definition:
-        # "pod": sidecar auto-inject on pod level, need provide labels for injection
-        # "namespace": sidecar auto-inject on namespace level, no need to provide labels for injection
-        # if globalSidecarMode is cluster, global-sidecar will be deployed in slime namespace, which does not enable auto-inject on namespace level, mode can only be "pod".
-        # if globalSidecarMode is namespace, depending on the namespace definition, mode can be "pod" or "namespace".
         mode: pod
+        labels: # optional, used for sidecarInject.mode = pod
+          sidecar.istio.io/inject: "true"
       resources:
-        limits:
-          cpu: 2000m
-          memory: 2048Mi
         requests:
-          cpu: 1000m
-          memory: 1024Mi
+          cpu: 200m
+          memory: 200Mi
+        limits:
+          cpu: 400m
+          memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.6.0_linux_amd64
       probePort: 20000 # health probe port
       port: 80 # global-sidecar default svc port
       legacyFilterName: true
 ```
+
+### 多副本样例
+
+以limiter为例，安装带有两个副本的limiter模块。
+
+我们需要设置`enable-leader-election: "on"`以及`replicaCount: 2` 可开启多副本模式。
+
+```yaml
+apiVersion: config.netease.com/v1alpha1
+kind: SlimeBoot
+metadata:
+  name: limiter
+  namespace: mesh-operator
+spec:
+  replicaCount: 2   #多副本
+  image:
+    pullPolicy: Always
+    repository: docker.io/slimeio/slime-limiter
+    tag: v0.6.0_linux_amd64
+  module:
+    - name: limiter
+      kind: limiter
+      enable: true
+      general:
+        disableGlobalRateLimit: true
+        disableAdaptive: true
+        disableInsertGlobalRateLimit: true
+      global:
+        log:
+          logLevel: info
+        configSources:
+          - address: ss:// 
+        misc:
+          enable-leader-election: "on"  #多副本
+```
+
 
 ### Config.global
 
@@ -412,3 +514,4 @@ spec:
 | seLabelSelectorKeys            | app                                                                                                                                        | 默认应用标识，se 涉及                                                                                                                                                                                                                                                                                                                   |        |
 | xdsSourceEnableIncPush         | true                                                                                                                                       | 是否进行xds增量推送                                                                                                                                                                                                                                                                                                                    |
 | pathRedirect                   | ""                                                                                                                                         | path从定向映射表                                                                                                                                                                                                                                                                                                                     |
+

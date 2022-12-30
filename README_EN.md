@@ -16,31 +16,37 @@
 Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
 
 
-
-
-
 ## Why Slime
 
-As new generation architecture of micro-service, service mesh uses Istio+Envoy to achieve the decouple of business logic and micro-service control logic. Thus it can decrease the budget of devlopment and operation.
+As a new generation of microservice architecture, Service mesh realizes the decoupling of business logic and microservice governance logic, and reduces the development and operation and maintenance costs of microservices. However, in the process of helping business teams to use Service mesh and implement it in production, we found that there are still many problems with the existing Service mesh.
 
-Istio has many functions, such as multi-version control, grayscale release, load balancer. However, it is not perfect in high-level features of microservice governance, like local rate limit, black and white list, downgrade. Mixer is born to solve these problem by aggregating these data plane functions to Mixer Adapter. Although this solves the problem of function expansion, the centralized architecture has been questioned by many followers about its performance. Then Istio abandoned Mixer in the new version. This makes the expansion of high-level functions a piece of void in the current version.
+- Some functions are missing or the threshold for use is too high, resulting in unsuccessful business access.
+- many stability risks in large-scale business cluster scenarios.
+- Difficulties in management and operation and maintenance of the service mesh by administrators: the service mesh base framework needs to be modified to solve the problem. This will change the original logic of the base framework, which cannot be merged into the community version and creates a lot of difficulties for developers to maintain the service mesh in the long term.
 
-Another problem is Pilot config is full push. This means massive configurations need to be pushed in large-scale grid scenarios. Users have to figure out the dependencies between services and create SidecarScope in advance. This undoubtedly increases the burden on operation and maintenance personnel.
+For this reason, we have developed a number of Service mesh peripheral modules to solve these problems and ensure that the enterprise business running on top of the Service mesh can run smoothly, and designed extension mechanisms do not need to invade the native code of the framework. In order to give back to the community, we systematically compiled core modules to solve common problems and open source them, which led to the Slime project.
 
-In order to solving the current shortcomings of Istio, we make Slime project. It is based on Kubernetes operator. As a CRD controller of Istio, Slime can **seamlessly using with Istio without any customization**.
+The project is based on the k8s-operator implementation, **which seamlessly interfaces with Istio without any customization**.
 
-Slime adopts a modular architecture inside. It contains three useful modules now.
+Slime core capabilities include intelligent traffic management, intelligent operation and maintenance management, intelligent extension management.
 
-[Configuration Lazy Loading](./staging/src/slime.io/slime/modules/lazyload): No need to configure SidecarScope, automatically load configuration on demand, solving full push problem. The source of the service relationship supports Prometheus or Accesslog.
+- **Intelligent Traffic Management**: Upgrades Service mesh traffic governance capabilities through feature content in business traffic to provide more granular and timely governance capabilities for business --
+  - [Adaptive Rate Limiting](./staging/src/slime.io/slime/modules/limiter): realizes local rate limiting, and at the same time can automatically adjust the rate limiting policy in conjunction with monitoring information, filling the shortcomings of the traditional service mesh flow limiting function
+  - Intelligent degradation
+  - Traffic mark
 
-[Http Plugin Management](./staging/src/slime.io/slime/modules/plugin): Use the new CRD pluginmanager/envoyplugin to wrap readability , The poor maintainability of envoyfilter makes plug-in extension more convenient.
+- **Intelligent O&M Management**: Combining the components and business features under the Service mesh architecture to provide more accurate and visualized O&M capabilities and performance stability enhancement --
+  - [configure lazy loading](./staging/src/slime.io/slime/modules/lazyload): no need to configure SidecarScope, automatically load configuration and service discovery information on demand, solving the problem of full volume push. The source of the service call relationship supports Prometheus or Accesslog
+  - [mesh(service) repository](./staging/src/slime.io/slime/modules/meshregistry): helps istio to quickly integrate various service registries
+  - File distribution management (filemanager, to be provided later)
+  - Command line interaction (i9s)
+  - Patrol (patrol)
+  - Troubleshooting tools (tracetio)
 
-[Adaptive Ratelimit](./staging/src/slime.io/slime/modules/limiter): It can be automatically combined with adaptive ratelimit strategy based on metrics, solving rate limit problem.
+- **Intelligent plugin management**: for the lack of efficient plugin management tools for the service mesh, to provide bulk plugin management capabilities to simplify the difficulty of managing plug-ins on the data surface of the service mesh
+  - [Http plugin management](./staging/src/slime.io/slime/modules/plugin): using the new CRD pluginmanager/envoyplugin wraps the poor readability and maintainability envoyfilter, making it easier to extend the plugin.
 
-[Mesh(Service) Registry](./staging/src/slime.io/slime/modules/meshregistry): Helps istio quickly integrate various service registries.
-
-
-
+  
 ## Architecture
 
 The Slime architecture is mainly divided into three parts:
@@ -53,13 +59,9 @@ The Slime architecture is mainly divided into three parts:
 
 Slime supports aggregated packaging, allowing any module to be aggregated into a single image. So Slime can be deployed as a single deployment, avoiding too many components.
 
-
-
-
-
 ## Tutorials
 
-[slime website](https://slime-io.github.io/)
+[Slime Website](https://slime-io.github.io/)
 
 [Slime Image Info](https://github.com/slime-io/slime/wiki/Slime-Project-Tag-and-Image-Tag-Mapping-Table)
 
@@ -70,8 +72,11 @@ Slime-module
 - [Lazyload Usage](./staging/src/slime.io/slime/modules/lazyload/README_EN.md)
 - [PluginManager Usage](./staging/src/slime.io/slime/modules/plugin/README_EN.md)
 - [SmartLimiter Usage](./staging/src/slime.io/slime/modules/limiter/README_EN.md)
-- [MeshRegistry Usage](./staging/src/slime.io/slime/modules/meshregistry/README.md)
+- [MeshRegistry Usage](./staging/src/slime.io/slime/modules/meshregistry/README_EN.md)
 
+
+
+[E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 
 
 
@@ -83,10 +88,6 @@ Slime-module
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - email: slimedotio@gmail.com
 - You'll find many other useful documents on our official web [Slime-Home](https://slime-io.github.io/)
-
-
-
-
 
 ## License
 
