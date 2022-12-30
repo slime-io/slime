@@ -35,10 +35,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
 	"slime.io/slime/framework/bootstrap"
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
+	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
 )
@@ -48,7 +50,7 @@ type SmartLimiterReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 
-	cfg *microservicev1alpha2.Limiter
+	cfg *config.Limiter
 	env bootstrap.Environment
 	// key is limiter's namespace and name
 	// value is the host
@@ -146,7 +148,7 @@ func (r *SmartLimiterReconciler) Clear() {
 	r.metricInfo.Clear()
 }
 
-func NewProducerConfig(env bootstrap.Environment, cfg *microservicev1alpha2.Limiter) (*metric.ProducerConfig, error) {
+func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.ProducerConfig, error) {
 	pc := &metric.ProducerConfig{
 		EnableWatcherProducer: false,
 		WatcherProducerConfig: metric.WatcherProducerConfig{
@@ -285,7 +287,7 @@ func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
 	}
 }
 
-func ReconcilerWithCfg(cfg *microservicev1alpha2.Limiter) ReconcilerOpts {
+func ReconcilerWithCfg(cfg *config.Limiter) ReconcilerOpts {
 	return func(sr *SmartLimiterReconciler) {
 		sr.cfg = cfg
 	}

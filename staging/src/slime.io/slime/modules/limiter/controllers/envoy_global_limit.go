@@ -19,7 +19,9 @@ import (
 	structpb "github.com/gogo/protobuf/types"
 	networking "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
+
 	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
 )
@@ -176,7 +178,7 @@ func calculateQuotaPerUnit(descriptor *microservicev1alpha2.SmartLimitDescriptor
 	return quota, unit, nil
 }
 
-func getRateLimiterService(service *microservicev1alpha2.RateLimitService) (string, error) {
+func getRateLimiterService(service *config.RateLimitService) (string, error) {
 	var svc string
 	var port int32
 	if service != nil {
@@ -200,7 +202,7 @@ func getDomain(str string) string {
 	return model.Domain
 }
 
-func getConfigMapNamespaceName(cm *microservicev1alpha2.RlsConfigMap) (types.NamespacedName, error) {
+func getConfigMapNamespaceName(cm *config.RlsConfigMap) (types.NamespacedName, error) {
 	loc := types.NamespacedName{
 		Namespace: cm.Namespace,
 		Name:      cm.Name,

@@ -12,6 +12,7 @@ require (
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
+	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	k8s.io/api v0.22.2

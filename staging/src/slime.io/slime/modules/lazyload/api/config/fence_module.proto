@@ -4,9 +4,9 @@
 */
 
 syntax = "proto3";
-package slime.microservice.lazyload.v1alpha1;
+package slime.microservice.lazyload.config;
 
-option go_package = "slime.io/slime/modules/lazyload/api/v1alpha1";
+option go_package = "slime.io/slime/modules/lazyload/api/config";
 
 message Fence {
   // service ports enable lazyload

@@ -4,12 +4,12 @@
 */
 
 syntax = "proto3";
-package slime.microservice.limiter.v1alpha2;
+package slime.microservice.limiter.config;
 
 import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 
-option go_package = "slime.io/slime/modules/limiter/api/v1alpha2";
+option go_package = "slime.io/slime/modules/limiter/api/config";
 
 message Limiter {
   enum RateLimitBackend {

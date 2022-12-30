@@ -29,6 +29,8 @@ $(API_PROTOS):
 		--gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
 		--deepcopy_out=$(input_dir) \
 		--deepcopy_opt=paths=source_relative \
+		--jsonshim_out=$(input_dir) \
+		--jsonshim_opt=paths=source_relative \
 		$@
 modules-api-gen: $(API_PROTOS)
 else
@@ -47,7 +49,7 @@ $(MODULE_ROOTS):
 	@echo "generate k8s object for module $(notdir $@)"
 	@pushd $@ 1>/dev/null 2>&1; \
 	controller-gen object:headerFile="$(GO_HEADER_FILE)" paths="./api/..."; \
-	controller-gen crd paths="./api/..." output:crd:dir="./charts/crds"; \
+	controller-gen crd paths="./api/..." output:crd:dir="./charts/crds" 1>/dev/null 2>&1; \
 	popd 1>/dev/null 2>&1
 modules-k8s-gen: $(MODULE_ROOTS)
 else
@@ -63,7 +65,7 @@ generate-module:
 	@docker run --rm \
 		--env IN_CONTAINER=1 \
 		--env MODULES_ROOT=$(MODULES_ROOT) \
-		--env MODULES=$(MODULES) \
+		--env MODULES="$(MODULES)" \
 		-v $(root_dir):/workspaces/slime \
 		--workdir /workspaces/slime \
 		--user $(shell id -u):$(shell id -g) \

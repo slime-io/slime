@@ -14,6 +14,7 @@ import (
 	basecontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/module"
+	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	"slime.io/slime/modules/lazyload/controllers"
 	modmodel "slime.io/slime/modules/lazyload/model"
@@ -22,7 +23,7 @@ import (
 var log = modmodel.ModuleLog
 
 type Module struct {
-	config lazyloadapiv1alpha1.Fence
+	config config.Fence
 }
 
 func (mo *Module) Kind() string {
