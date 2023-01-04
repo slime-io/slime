@@ -328,10 +328,16 @@ func Main(bundle string, modules []Module) {
 	readyMgr := &moduleReadyManager{moduleReadyCheckers: map[string][]readyChecker{}}
 
 	// init configController if configSource field is used
-	cc, err := bootstrap.NewConfigController(config, mgr.GetConfig())
+	configController, err := bootstrap.NewConfigController(config, mgr.GetConfig())
 	if err != nil {
 		log.Errorf("start ConfigController error: %+v", err)
 		os.Exit(1)
+	}
+
+	istioConfigController, err := bootstrap.NewIstioConfigController(config)
+	if err != nil {
+		log.Warnf("start IstioConfigController error: %+v", err)
+		istioConfigController = nil
 	}
 
 	var once sync.Once
@@ -393,10 +399,11 @@ func Main(bundle string, modules []Module) {
 		}
 
 		env := bootstrap.Environment{
-			Config:           modCfg,
-			ConfigController: cc,
-			K8SClient:        clientSet,
-			DynamicClient:    dynamicClient,
+			Config:                modCfg,
+			ConfigController:      configController,
+			IstioConfigController: istioConfigController,
+			K8SClient:             clientSet,
+			DynamicClient:         dynamicClient,
 			ReadyManager: bootstrap.ReadyManagerFunc(func(moduleName string) func(name string, checker func() error) {
 				return func(name string, checker func() error) {
 					readyMgr.addReadyChecker(moduleName, name, checker)
