@@ -85,28 +85,33 @@ func (cr *configStore) Get(gvk resource.GroupVersionKind, name, namespace string
 func (cr *configStore) List(kind resource.GroupVersionKind, namespace string) ([]resource.Config, error) {
 	cr.mutex.RLock()
 	defer cr.mutex.RUnlock()
-	data, exists := cr.data[kind]
-	if !exists {
-		return nil, nil
+	data := cr.data
+	if kind != resource.AllGroupVersionKind {
+		kindData, exists := cr.data[kind]
+		if !exists {
+			return nil, nil
+		}
+		data = map[resource.GroupVersionKind]map[string]*sync.Map{kind: kindData}
 	}
+
 	out := make([]resource.Config, 0, len(cr.data[kind]))
-	if namespace == "" {
-		for _, ns := range data {
-			ns.Range(func(key, value interface{}) bool {
+	for _, kindData := range data {
+		if namespace != "" {
+			nsData, exist := kindData[namespace]
+			if !exist {
+				continue
+			}
+			kindData = map[string]*sync.Map{namespace: nsData}
+		}
+
+		for _, nsData := range kindData {
+			nsData.Range(func(key, value interface{}) bool {
 				out = append(out, value.(resource.Config))
 				return true
 			})
 		}
-	} else {
-		ns, exists := data[namespace]
-		if !exists {
-			return nil, nil
-		}
-		ns.Range(func(key, value interface{}) bool {
-			out = append(out, value.(resource.Config))
-			return true
-		})
 	}
+
 	return out, nil
 }
 

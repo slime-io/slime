@@ -56,26 +56,38 @@ func (vs *viewerStore) Get(gvk resource.GroupVersionKind, name, namespace string
 
 // List all configs in the stores.
 func (vs *viewerStore) List(gvk resource.GroupVersionKind, namespace string) ([]resource.Config, error) {
-	if len(vs.stores[gvk]) == 0 {
-		return nil, nil
+	storesToSearch := vs.stores
+	if gvk != resource.AllGroupVersionKind {
+		store, ok := vs.stores[gvk]
+		if !ok {
+			return nil, nil
+		}
+		storesToSearch = map[resource.GroupVersionKind][]ConfigStore{gvk: store}
 	}
+
 	var errs *multierror.Error
 	var configs []resource.Config
 	// Used to remove duplicated config
-	configMap := make(map[string]struct{})
+	type mapKey struct {
+		gvk      resource.GroupVersionKind
+		ns, name string
+	}
+	configMap := make(map[mapKey]struct{})
 
-	for _, store := range vs.stores[gvk] {
-		storeConfigs, err := store.List(gvk, namespace)
-		if err != nil {
-			errs = multierror.Append(errs, err)
-		}
-		for _, config := range storeConfigs {
-			key := config.GroupVersionKind.Kind + config.Namespace + config.Name
-			if _, exist := configMap[key]; exist {
-				continue
+	for gvk, stores := range storesToSearch {
+		for _, store := range stores {
+			storeConfigs, err := store.List(gvk, namespace)
+			if err != nil {
+				errs = multierror.Append(errs, err)
 			}
-			configs = append(configs, config)
-			configMap[key] = struct{}{}
+			for _, config := range storeConfigs {
+				key := mapKey{gvk: config.GroupVersionKind, name: config.Name, ns: config.Namespace}
+				if _, exist := configMap[key]; exist {
+					continue
+				}
+				configs = append(configs, config)
+				configMap[key] = struct{}{}
+			}
 		}
 	}
 	return configs, errs.ErrorOrNil()
