@@ -343,6 +343,15 @@ func Main(bundle string, modules []Module) {
 	var once sync.Once
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 
+	env := bootstrap.Environment{
+		ConfigController:      configController,
+		IstioConfigController: istioConfigController,
+		K8SClient:             clientSet,
+		DynamicClient:         dynamicClient,
+		HttpPathHandler:       ph,
+		Stop:                  ctx.Done(),
+	}
+
 	// init modules
 	for _, mc := range mcs {
 		modCfg, modGeneralJson := mc.config.config, mc.config.generalJson
@@ -398,7 +407,7 @@ func Main(bundle string, modules []Module) {
 
 		}
 
-		env := bootstrap.Environment{
+		moduleEnv := bootstrap.Environment{
 			Config:                modCfg,
 			ConfigController:      configController,
 			IstioConfigController: istioConfigController,
@@ -416,13 +425,13 @@ func Main(bundle string, modules []Module) {
 			Stop: ctx.Done(),
 		}
 		if lm, ok := mc.module.(LegcyModule); ok {
-			if err := lm.InitManager(mgr, env, cbs); err != nil {
+			if err := lm.InitManager(mgr, moduleEnv, cbs); err != nil {
 				log.Errorf("mod %s InitManager met err %v", modCfg.Name, err)
 				fatal()
 			}
 		} else {
 			if err := mc.module.Setup(ModuleOptions{
-				Env:               env,
+				Env:               moduleEnv,
 				InitCbs:           cbs,
 				Manager:           mgr,
 				LeaderElectionCbs: le,
@@ -435,7 +444,7 @@ func Main(bundle string, modules []Module) {
 
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
-		bootstrap.AuxiliaryHttpServerStart(ph, auxAddr, pathRedirects, readyMgr.check)
+		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check)
 	}()
 
 	for _, startup := range startups {
