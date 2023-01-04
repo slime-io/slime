@@ -1,9 +1,11 @@
 package bootstrap
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
+	"slime.io/slime/framework/bootstrap/resource"
 	"strconv"
 	"sync"
 
@@ -99,16 +101,53 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
-func AuxiliaryHttpServerStart(ph *PathHandler, addr string, pathRedirects map[string]string, readyChecker func() error) {
+func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pathRedirects map[string]string, readyChecker func() error) {
 	// register
 	HealthCheckRegister(ph, readyChecker)
 	PprofRegister(ph)
 	LogLevelRegister(ph)
+	ConfigStoreRegister(env, ph)
 
 	log.Infof("aux server is starting to listen %s", addr)
 	if err := http.ListenAndServe(addr, ph.mux); err != nil {
 		log.Errorf("aux server starts error, %+v", err)
 	}
+}
+
+func ConfigStoreRegister(env Environment, ph *PathHandler) {
+	ph.Handle("/configStore", configStoreHandler(env.ConfigController))
+	ph.Handle("/istioConfigStore", configStoreHandler(env.IstioConfigController))
+}
+
+func configStoreHandler(controller ConfigController) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if controller == nil {
+			http.Error(w, "config store nil", http.StatusInternalServerError)
+			return
+		}
+
+		ns := r.URL.Query().Get("ns")
+		gvkStr := r.URL.Query().Get("gvk")
+		gvk, err := resource.ParseGroupVersionKind(gvkStr)
+		if err != nil {
+			http.Error(w, "invalid gvk", http.StatusBadRequest)
+			return
+		}
+
+		configs, err := controller.List(gvk, ns)
+		if err != nil {
+			http.Error(w, "List met err "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		bs, err := json.Marshal(configs)
+		if err != nil {
+			http.Error(w, "Marshal met err "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		_, _ = w.Write(bs)
+	})
 }
 
 func HealthCheckRegister(ph *PathHandler, readyChecker func() error) {
