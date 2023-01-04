@@ -193,6 +193,8 @@ type Environment struct {
 	ReadyManager     ReadyManager
 	Stop             <-chan struct{}
 	ConfigController ConfigController
+	// a mirror of relevant istiod internal configs
+	IstioConfigController ConfigController
 }
 
 func (env *Environment) IstioRev() string {

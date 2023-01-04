@@ -43,6 +43,63 @@ type configController struct {
 	stop               chan<- struct{}
 }
 
+func NewIstioConfigController(config *bootconfig.Config) (ConfigController, error) {
+	// XXX merge with NewIstioConfigController
+
+	configSource := config.Global.IstioConfigSource
+	if configSource == nil {
+		return nil, nil
+	}
+
+	var cc *configController
+	stopCh := make(chan struct{})
+	var mcs []*monitorController
+
+	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
+
+	// init all monitorControllers
+	imc, err := initIstioMonitorController()
+	if err != nil {
+		return nil, err
+	} else {
+		mcs = append(mcs, imc)
+	}
+
+	if strings.HasPrefix(configSource.Address, McpOverXdsConfigSourcePrefix) {
+		if mc, err := initXdsMonitorController(configSource); err != nil {
+			return nil, err
+		} else {
+			mcs = append(mcs, mc)
+		}
+	}
+
+	vs, err := makeViewerStore(mcs)
+	if err != nil {
+		return nil, err
+	}
+
+	cc = &configController{
+		viewerStore:        vs,
+		monitorControllers: mcs,
+		stop:               stopCh,
+	}
+
+	go cc.Run(stopCh)
+
+	for _, mc := range mcs {
+		switch mc.kind {
+		case McpOverXds:
+			if err = startXdsMonitorController(mc, "", xdsSourceEnableIncPush); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	log.Infof("start IstioConfigController successfully")
+
+	return cc, nil
+}
+
 func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigController, error) {
 	var cc *configController
 	stopCh := make(chan struct{})
