@@ -140,7 +140,7 @@ func configStoreHandler(controller ConfigController) http.Handler {
 			return
 		}
 
-		bs, err := json.Marshal(configs)
+		bs, err := json.MarshalIndent(configs, "", "  ")
 		if err != nil {
 			http.Error(w, "Marshal met err "+err.Error(), http.StatusInternalServerError)
 			return
