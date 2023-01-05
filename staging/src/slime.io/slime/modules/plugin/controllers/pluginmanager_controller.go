@@ -217,10 +217,8 @@ func (r *PluginManagerReconciler) handleSecretChange() {
 	for {
 		<-r.changeSecretNotifyCh
 
-		var (
-			resourceToReconcile map[types.NamespacedName]struct{}
-			changedSecrets      map[types.NamespacedName]struct{}
-		)
+		var changedSecrets map[types.NamespacedName]struct{}
+
 		r.mut.Lock()
 		changedSecrets = r.changeSecrets
 		if len(changedSecrets) > 0 {
@@ -233,6 +231,7 @@ func (r *PluginManagerReconciler) handleSecretChange() {
 		}
 
 		log.Infof("handle changed secrets %+v", changedSecrets)
+		resourceToReconcile := map[types.NamespacedName]struct{}{}
 		r.mut.RLock()
 		for secretNn := range changedSecrets {
 			for w := range r.secretWatchers[secretNn] {
