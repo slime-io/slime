@@ -21,7 +21,7 @@ require (
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.10-0.20210907150352-cf90f659a021
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20220711081451-575e86a9da6e
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230105060927-109703897996
 
 	slime.io/slime/framework => ../../../../../../framework
 )

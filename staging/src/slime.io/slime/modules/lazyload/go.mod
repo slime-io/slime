@@ -24,7 +24,7 @@ require (
 
 replace (
 	istio.io/api => istio.io/api v0.0.0-20200807181912-0e773b04cfc7
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20220711081451-575e86a9da6e
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230105060927-109703897996
 
 	slime.io/slime/framework => ../../../../../../framework
 )
