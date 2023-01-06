@@ -2,15 +2,10 @@ package bootstrap
 
 import (
 	"fmt"
-	"net/url"
-	"slime.io/slime/framework/bootstrap/viewstore"
-	"strconv"
-	"strings"
-	"time"
-
 	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
+	"net/url"
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap/adsc"
 	"slime.io/slime/framework/bootstrap/collections"
@@ -18,6 +13,9 @@ import (
 	"slime.io/slime/framework/bootstrap/serviceregistry/kube"
 	"slime.io/slime/framework/bootstrap/serviceregistry/model"
 	"slime.io/slime/framework/bootstrap/serviceregistry/serviceentry"
+	"slime.io/slime/framework/bootstrap/viewstore"
+	"strconv"
+	"strings"
 
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	mcpresource "istio.io/istio-mcp/pkg/config/schema/resource"
@@ -553,20 +551,11 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 		},
 	})
 
-	if err = xdsMCP.Run(); err != nil {
-		return fmt.Errorf("failed to init client for xds config source %s, err: %+v", mc.configSource.Address, err)
-	}
-
-	// check xds cache synced or not
-	log.Infof("syncing data of xds config source [%s]", mc.configSource.Address)
-	for {
-		if xdsMCP.HasSynced() {
-			break
+	go func() {
+		err := xdsMCP.Run()
+		if err != nil {
+			log.Errorf("MCP: failed running %v", err)
 		}
-		log.Debugf("waiting for syncing data of xds config source [%s]...", mc.configSource.Address)
-		time.Sleep(1 * time.Second)
-	}
-
-	log.Infof("init xds config source [%s] successfully", mc.configSource.Address)
+	}()
 	return nil
 }
