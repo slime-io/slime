@@ -10,16 +10,15 @@ import (
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	cmap "github.com/orcaman/concurrent-map"
-
-	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
-	"slime.io/slime/modules/meshregistry/pkg/util"
-
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
 	"istio.io/pkg/log"
+
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/source"
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
 type serviceEntryNameWapper struct {
@@ -32,6 +31,10 @@ func (s *serviceEntryNameWapper) Name() string {
 		return s.nacosService + "." + s.ns
 	}
 	return s.nacosService
+}
+
+func (s serviceEntryNameWapper) MarshalText() (text []byte, err error) {
+	return []byte(s.Name()), nil
 }
 
 type Source struct {
@@ -104,7 +107,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		namingClient, err := newNamingClient(nacoesArgs.Address, nacoesArgs.Namespace, headers)
 		if err != nil {
 			return nil, nil, Error{
-				msg: fmt.Sprint("init nacos client failed: %s", err.Error()),
+				msg: fmt.Sprintf("init nacos client failed: %s", err.Error()),
 			}
 		}
 		source.namingClient = namingClient
@@ -115,7 +118,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	b, err := json.MarshalIndent(s.cache, "", "  ")
 	if err != nil {
-		_, _ = fmt.Fprintf(w, "unable to marshal eureka se cache: %v", err)
+		_, _ = fmt.Fprintf(w, "unable to marshal nacos se cache: %v", err)
 		return
 	}
 	_, _ = w.Write(b)
