@@ -12,14 +12,14 @@ MODULES ?= lazyload limiter plugin
 .PHONY: modules-api-gen
 ifneq ($(MODULES_ROOT),)
 ifneq ($(MODULES),)
-API_PROTOS := $(foreach module,$(MODULES),$(shell find $(MODULES_ROOT)/$(module) -name "*.proto" ))
+MODULES_API_PROTOS := $(foreach module,$(MODULES),$(shell find $(MODULES_ROOT)/$(module) -name "*.proto"))
 else
-API_PROTOS := $(shell find $(MODULES_ROOT) -name "*.proto")
+MODULES_API_PROTOS := $(shell find $(MODULES_ROOT) -name "*.proto")
 endif
-.PHONY: $(API_PROTOS)
-$(API_PROTOS):
+.PHONY: $(MODULES_API_PROTOS)
+$(MODULES_API_PROTOS):
 	$(eval input_dir := $(shell dirname $@))
-	@echo "generate proto api for $(notdir $@)"
+	@echo "generate module proto api from $@"
 	@protoc -I=$(input_dir) \
 		-I=$(shell go env GOPATH)/src \
 		--gogo_out=$(input_dir) \
@@ -32,7 +32,7 @@ $(API_PROTOS):
 		--jsonshim_out=$(input_dir) \
 		--jsonshim_opt=paths=source_relative \
 		$@
-modules-api-gen: $(API_PROTOS)
+modules-api-gen: $(MODULES_API_PROTOS)
 else
 modules-api-gen:
 endif
@@ -56,10 +56,28 @@ else
 modules-k8s-gen:
 endif
 
-# Generate module code
-.PHONY: generate-module
+.PHONY: framework-api-gen
+FRAMEWORK_API_PROTOS := $(shell find ./framework -name "*.proto")
+.PHONY: $(FRAMEWORK_API_PROTOS)
+$(FRAMEWORK_API_PROTOS):
+	$(eval input_dir := $(shell dirname $@))
+	@echo "generate framework proto api from $@"
+	@protoc -I=$(input_dir) \
+		-I=$(shell go env GOPATH)/src \
+		--gogo_out=$(input_dir) \
+		--gogo_opt=paths=source_relative \
+		--gogo_opt=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types \
+		--gogo_opt=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types \
+		--gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
+		$@
+framework-api-gen: $(FRAMEWORK_API_PROTOS)
+
+# Generate code
+.PHONY: generate-module generate-framework
 ifeq ($(IN_CONTAINER),1)
 generate-module: modules-api-gen modules-k8s-gen
+generate-framework: framework-api-gen
+generate-all: generate-module generate-framework
 else
 generate-module:
 	@docker run --rm \
@@ -71,8 +89,27 @@ generate-module:
 		--user $(shell id -u):$(shell id -g) \
 		$(IMG)  \
 		make $@
-endif
 
+generate-framework:
+	@docker run --rm \
+		--env IN_CONTAINER=1 \
+		-v $(root_dir):/workspaces/slime \
+		--workdir /workspaces/slime \
+		--user $(shell id -u):$(shell id -g) \
+		$(IMG)  \
+		make $@
+
+generate-all:
+	@docker run --rm \
+		--env IN_CONTAINER=1 \
+		--env MODULES_ROOT=$(MODULES_ROOT) \
+		--env MODULES="$(MODULES)" \
+		-v $(root_dir):/workspaces/slime \
+		--workdir /workspaces/slime \
+		--user $(shell id -u):$(shell id -g) \
+		$(IMG)  \
+		make $@
+endif
 
 .PHONY: shell
 ifeq ($(IN_CONTAINER),1)
