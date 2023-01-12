@@ -136,9 +136,13 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 
 	values := r.URL.Query()
 	ns := values.Get("ns")
+	name := values.Get("name")
 	res := values.Get("res")
 	if res == "" {
 		res = values.Get("typeUrl")
+	}
+	if res == "" {
+		res = values.Get("gvk")
 	}
 	ver := values.Get("ver")
 	if v := values.Get("layout"); v != "" {
@@ -156,7 +160,7 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 
 	gvk := resource.AllGvk
 	if res != "" {
-		resource.TypeUrlToGvk(res)
+		gvk = resource.TypeUrlToGvk(res)
 	}
 
 	var k8sRsc bool
@@ -209,10 +213,22 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 		return items
 	}
 
-	configs, _, err := c.configStore.List(gvk, ns, ver)
+	var (
+		configs []mcpmodel.Config
+		config  *mcpmodel.Config
+		err     error
+	)
+	if name == "" {
+		configs, _, err = c.configStore.List(gvk, ns, ver)
+	} else {
+		config, err = c.configStore.Get(gvk, ns, name)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+	if config != nil {
+		configs = append(configs, *config)
 	}
 
 	var (
