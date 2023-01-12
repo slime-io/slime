@@ -80,15 +80,15 @@ type EndpointWatcherOpts struct {
 	conn                *atomic.Value
 	endpointUpdateFunc  func(providers, consumers []string, serverPath string)
 	serviceDeleteFunc   func(path string)
-	gatewatModel        bool
+	gatewayMode         bool
 	initCallbackFactory func() func()
 }
 
 func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointWatcher {
 	ew := &EndpointWatcher{
-		conn:         opts.conn,
-		servicePath:  servicePath,
-		gatewatModel: opts.gatewatModel,
+		conn:        opts.conn,
+		servicePath: servicePath,
+		gatewayMode: opts.gatewayMode,
 		handler: func(providers, consumers []string) {
 			opts.endpointUpdateFunc(providers, consumers, servicePath)
 		},
@@ -115,17 +115,17 @@ type EndpointWatcher struct {
 
 	serviceDeleteHandler func()
 
-	gatewatModel bool
+	gatewayMode bool
 
 	signalExit, exit chan struct{}
 
 	initCallback func()
 }
 
-// non block
+// Start should not block
 func (ew *EndpointWatcher) Start(ctx context.Context) {
 	scope.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
-	if !ew.gatewatModel {
+	if !ew.gatewayMode {
 		go ew.watchBoth(ctx)
 	} else {
 		go ew.watchProviderOnly(ctx)
@@ -185,11 +185,20 @@ func (ew *EndpointWatcher) watchProviderOnly(ctx context.Context) {
 	}
 }
 
-func (ew *EndpointWatcher) simpleWatch(path string, ch chan []string) {
-	b := backoff.Backoff{
-		Min: 500 * time.Millisecond,
-		Max: time.Minute,
-	}
+type simpleWatchItem struct {
+	data []string
+	err  error
+}
+
+func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
+	var (
+		b = backoff.Backoff{
+			Min: 500 * time.Millisecond,
+			Max: time.Minute,
+		}
+		first = true
+	)
+
 	for {
 		select {
 		case <-ew.exit:
@@ -199,14 +208,21 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan []string) {
 
 		paths, _, eventCh, err := ew.conn.Load().(*zk.Conn).ChildrenW(path)
 		if err != nil {
-			scope.Debugf("endpointWatcher %q watch %q falied: %v", ew.servicePath, path, err)
-			time.Sleep(b.Duration())
-			continue
+			scope.Debugf("endpointWatcher %q watch %q failed: %v", ew.servicePath, path, err)
+			if !first {
+				time.Sleep(b.Duration())
+				continue
+			}
+		} else {
+			b.Reset()
 		}
-		b.Reset()
 
 		select {
-		case ch <- paths:
+		case ch <- simpleWatchItem{
+			data: paths,
+			err:  err,
+		}:
+			first = false
 			select {
 			case <-ew.exit:
 				return
@@ -214,35 +230,34 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan []string) {
 			}
 		case <-ew.exit:
 			return
-		case <-eventCh:
+		case <-eventCh: // frequent change may delay the data(`paths`) distribute
 		}
 	}
 }
 
 func (ew *EndpointWatcher) watchBoth(ctx context.Context) {
-	defer close(ew.exit)
 
-	var providerCache, consumerCache []string
+	var (
+		providerCache, consumerCache []string
+		// Try to initialize, but it is not required to be completed,
+		// because the service may have been deleted or for others.
+		// So we consider both either valid data or fetch-err as init-done.
+		providerInit, consumerInit       bool
+		initCallBack                     = ew.initCallback
+		providerEventCh, consumerEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem)
+	)
 
-	// Try to initialize, but it is not required to be completed,
-	// because the service may have been deleted or for others.
-	// todo: There is a get request and a watch request at startup,
-	// if use the returns of the watch request to initialize, the
-	// requests at startup can be halved.
-	providers, _, err := ew.conn.Load().(*zk.Conn).Children(ew.servicePath + providerPathSuffix)
-	if err == nil {
-		// ignore errors when getting consumer fails
-		consumers, _, _ := ew.conn.Load().(*zk.Conn).Children(ew.servicePath + consumerPathSuffix)
-		providerCache, consumerCache = providers, consumers
-		ew.handler(providerCache, consumerCache)
-	}
-	ew.initCallback()
+	defer func() {
+		if initCallBack != nil {
+			initCallBack()
+		}
+		close(ew.exit)
+	}()
 
-	providerEventCh, consumerEventCh := make(chan []string), make(chan []string)
 	go ew.simpleWatch(ew.servicePath+providerPathSuffix, providerEventCh)
 	go ew.simpleWatch(ew.servicePath+consumerPathSuffix, consumerEventCh)
 	for {
-		// Delete event highest priority
+		// Delete event has the highest priority
 		select {
 		case <-ew.signalExit:
 			ew.serviceDeleteHandler()
@@ -260,12 +275,25 @@ func (ew *EndpointWatcher) watchBoth(ctx context.Context) {
 
 		// todo: If `<-ew.signalExit` or `<-ctx.Done()` happens, we don't know it immediately
 		select {
-		case providers := <-providerEventCh:
-			providerCache = providers
-		case consumers := <-consumerEventCh:
-			consumerCache = consumers
+		case item := <-providerEventCh:
+			providerInit = true
+			if item.err == nil {
+				providerCache = item.data
+			}
+		case item := <-consumerEventCh:
+			consumerInit = true
+			if item.err == nil {
+				consumerCache = item.data
+			}
 		}
-		ew.handler(providerCache, consumerCache)
+
+		if providerInit && consumerInit {
+			ew.handler(providerCache, consumerCache)
+			if initCallBack != nil { // not-init -> init
+				initCallBack()
+				initCallBack = nil
+			}
+		}
 	}
 }
 
@@ -317,7 +345,7 @@ func NewServiceWorker(conn *atomic.Value,
 			conn:                conn,
 			endpointUpdateFunc:  endpointUpdateFunc,
 			serviceDeleteFunc:   serviceDeleteFunc,
-			gatewatModel:        gatewatModel,
+			gatewayMode:         gatewatModel,
 			initCallbackFactory: initCallbackFactory,
 		},
 	}
