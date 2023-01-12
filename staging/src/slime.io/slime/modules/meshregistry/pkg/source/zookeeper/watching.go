@@ -125,64 +125,17 @@ type EndpointWatcher struct {
 // Start should not block
 func (ew *EndpointWatcher) Start(ctx context.Context) {
 	scope.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
-	if !ew.gatewayMode {
-		go ew.watchBoth(ctx)
-	} else {
-		go ew.watchProviderOnly(ctx)
+	providerPath, consumerPath := providerPathSuffix, consumerPathSuffix
+	if ew.gatewayMode {
+		consumerPath = "" // gw does not need consumer data
 	}
+	go ew.watchService(ctx, providerPath, consumerPath)
 }
 
 func (ew *EndpointWatcher) Exit() {
 	close(ew.signalExit)
 	// wait for exit
 	<-ew.exit
-}
-
-func (ew *EndpointWatcher) watchProviderOnly(ctx context.Context) {
-	defer close(ew.exit)
-
-	// Try to initialize, but it is not required to be completed,
-	// because the service may have been deleted or for others.
-	// todo: There is a get request and a watch request at startup,
-	// if use the returns of the watch request to initialize, the
-	// requests at startup can be halved.
-	providers, _, err := ew.conn.Load().(*zk.Conn).Children(ew.servicePath + providerPathSuffix)
-	if err == nil {
-		ew.handler(providers, nil)
-	}
-	ew.initCallback()
-
-	b := backoff.Backoff{
-		Min: 500 * time.Millisecond,
-		Max: time.Minute,
-	}
-	for {
-		select {
-		case <-ew.signalExit:
-			ew.serviceDeleteHandler()
-			scope.Infof("endpointWatcher %q's providerOnlyWatching exit due to service deleted", ew.servicePath)
-			return
-		default:
-		}
-
-		select {
-		case <-ctx.Done():
-			scope.Debugf("endpointWatcher %q's providerOnlyWatching exit due to context close", ew.servicePath)
-			return
-		default:
-		}
-
-		providers, _, eventCh, err := ew.conn.Load().(*zk.Conn).ChildrenW(ew.servicePath + providerPathSuffix)
-		if err != nil {
-			scope.Warnf("endpointWatcher %q's providerOnlyWatching watch provider failed: %v", ew.servicePath, err)
-			time.Sleep(b.Duration())
-			continue
-		}
-		b.Reset()
-		ew.handler(providers, nil)
-		// todo: If `<-ew.signalExit` or `<-ctx.Done()` happens, we don't know it immediately
-		<-eventCh
-	}
 }
 
 type simpleWatchItem struct {
@@ -235,14 +188,14 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 	}
 }
 
-func (ew *EndpointWatcher) watchBoth(ctx context.Context) {
-
+// watchService empty path means ignore ...
+func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consumerPath string) {
 	var (
 		providerCache, consumerCache []string
 		// Try to initialize, but it is not required to be completed,
 		// because the service may have been deleted or for others.
 		// So we consider both either valid data or fetch-err as init-done.
-		providerInit, consumerInit       bool
+		providerInit, consumerInit       = providerPath == "", consumerPath == ""
 		initCallBack                     = ew.initCallback
 		providerEventCh, consumerEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem)
 	)
@@ -254,8 +207,13 @@ func (ew *EndpointWatcher) watchBoth(ctx context.Context) {
 		close(ew.exit)
 	}()
 
-	go ew.simpleWatch(ew.servicePath+providerPathSuffix, providerEventCh)
-	go ew.simpleWatch(ew.servicePath+consumerPathSuffix, consumerEventCh)
+	if providerPath != "" {
+		go ew.simpleWatch(ew.servicePath+providerPath, providerEventCh)
+	}
+	if consumerPath != "" {
+		go ew.simpleWatch(ew.servicePath+consumerPath, consumerEventCh)
+	}
+
 	for {
 		// Delete event has the highest priority
 		select {
