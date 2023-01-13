@@ -245,9 +245,11 @@ func NewRegistryArgs() *RegistryArgs {
 		},
 		NacosSource: NacosSourceArgs{
 			SourceArgs: SourceArgs{
-				RefreshPeriod: util.Duration(30 * time.Second),
-				LabelPatch:    true,
-				SvcPort:       80,
+				RefreshPeriod:    util.Duration(30 * time.Second),
+				LabelPatch:       true,
+				SvcPort:          80,
+				DefaultServiceNs: "",
+				ResourceNs:       "nacos",
 			},
 			Mode:            "watching",
 			K8sDomainSuffix: true,

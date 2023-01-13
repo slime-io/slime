@@ -175,10 +175,10 @@ func (s *Source) updateNacosService() {
 
 func (s *Source) deleteService(serviceName string) {
 	for service, oldEntry := range s.cache {
-		if service.nacosService == serviceName {
+		if service == serviceName {
 			// DELETE, set ep size to zero
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-			if event, err := buildEvent(event.Updated, oldEntry, service.Name()); err == nil {
+			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handler {
 					h.Handle(event)
@@ -188,12 +188,12 @@ func (s *Source) deleteService(serviceName string) {
 	}
 }
 
-func (s *Source) updateService(newServiceEntryMap map[serviceEntryNameWapper]*networking.ServiceEntry) {
+func (s *Source) updateService(newServiceEntryMap map[string]*networking.ServiceEntry) {
 	for service, newEntry := range newServiceEntryMap {
 		if oldEntry, ok := s.cache[service]; !ok {
 			// ADD
 			s.cache[service] = newEntry
-			if event, err := buildEvent(event.Added, newEntry, service.Name()); err == nil {
+			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handler {
 					h.Handle(event)
@@ -203,7 +203,7 @@ func (s *Source) updateService(newServiceEntryMap map[serviceEntryNameWapper]*ne
 			if !reflect.DeepEqual(oldEntry, newEntry) {
 				// UPDATE
 				s.cache[service] = newEntry
-				if event, err := buildEvent(event.Updated, newEntry, service.Name()); err == nil {
+				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
 					Scope.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handler {
 						h.Handle(event)

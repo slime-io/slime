@@ -21,43 +21,41 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-type serviceEntryNameWapper struct {
-	nacosService string
-	ns           string
-}
-
-func (s *serviceEntryNameWapper) Name() string {
-	if s.ns != "" {
-		return s.nacosService + "." + s.ns
-	}
-	return s.nacosService
-}
-
-func (s serviceEntryNameWapper) MarshalText() (text []byte, err error) {
-	return []byte(s.Name()), nil
-}
-
 type Source struct {
-	namespace         string
-	group             string
-	delay             time.Duration
-	cache             map[serviceEntryNameWapper]*networking.ServiceEntry
-	client            Client
-	namingClient      naming_client.INamingClient
+	// nacos client
+	client       Client
+	namingClient naming_client.INamingClient
+	namespace    string
+	group        string
+
+	// common configs
+	patchLabel      bool
+	gatewayModel    bool
+	nsHost          bool
+	k8sDomainSuffix bool
+	svcPort         uint32
+	mode            string
+	delay           time.Duration
+	refreshPeriod   time.Duration
+
+	// waching configs
+	svcNameWithNs bool
+
+	// polling configs
+	defaultSvcNs string
+	resourceNs   string
+
+	// source cache
+	cache             map[string]*networking.ServiceEntry
 	namingServiceList cmap.ConcurrentMap
 	handler           []event.Handler
-	refreshPeriod     time.Duration
-	mode              string
-	svcNameWithNs     bool
-	started           bool
-	gatewayModel      bool
-	patchLabel        bool
-	svcPort           uint32
-	nsHost            bool
-	k8sDomainSuffix   bool
-	stop              chan struct{}
-	firstInited       bool
-	initedCallback    func(string)
+
+	// source status
+	started     bool
+	firstInited bool
+	stop        chan struct{}
+
+	initedCallback func(string)
 }
 
 var Scope = log.RegisterScope("nacos", "nacos debugging", 0)
@@ -75,7 +73,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		namespace:         nacoesArgs.Namespace,
 		group:             nacoesArgs.Group,
 		delay:             delay,
-		cache:             make(map[serviceEntryNameWapper]*networking.ServiceEntry),
+		cache:             make(map[string]*networking.ServiceEntry),
 		namingServiceList: cmap.New(),
 		refreshPeriod:     time.Duration(nacoesArgs.RefreshPeriod),
 		mode:              nacoesArgs.Mode,
@@ -89,6 +87,8 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		stop:              make(chan struct{}),
 		firstInited:       false,
 		initedCallback:    readyCallback,
+		defaultSvcNs:      nacoesArgs.DefaultServiceNs,
+		resourceNs:        nacoesArgs.ResourceNs,
 	}
 
 	headers := make(map[string]string)
@@ -124,10 +124,10 @@ func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func buildEvent(kind event.Kind, item *networking.ServiceEntry, service string) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
 	se := util.CopySe(item)
 	items := strings.Split(service, ".")
-	ns := service
+	ns := resourceNs
 	if len(items) > 1 {
 		ns = items[1]
 	}
