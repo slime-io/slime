@@ -29,6 +29,10 @@ type Module struct {
 	sr     *controllers.SmartLimiterReconciler
 }
 
+func (m *Module) Init(env bootstrap.Environment) error {
+	return nil
+}
+
 func (m *Module) Kind() string {
 	return model.ModuleName
 }

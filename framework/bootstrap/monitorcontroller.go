@@ -4,8 +4,8 @@ import (
 	"errors"
 	log "github.com/sirupsen/logrus"
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
-
 	"slime.io/slime/framework/bootstrap/resource"
+	"sync"
 )
 
 type monitorController struct {
@@ -13,6 +13,8 @@ type monitorController struct {
 	configStore  ConfigStore
 	kind         monitorControllerKind
 	configSource *bootconfig.ConfigSource
+	ready        bool
+	sync.RWMutex
 }
 
 type monitorControllerKind int
@@ -31,8 +33,21 @@ func newMonitorController(cs ConfigStore) *monitorController {
 	return out
 }
 
+func (c *monitorController) SetReady() {
+	c.Lock()
+	c.ready = true
+	c.Unlock()
+}
+
 func (c *monitorController) RegisterEventHandler(kind resource.GroupVersionKind, f func(resource.Config, resource.Config, Event)) {
 	c.monitor.AppendEventHandler(kind, f)
+}
+
+func (c *monitorController) InitReady() bool {
+	c.RLock()
+	ready := c.ready
+	c.RUnlock()
+	return ready
 }
 
 func (c *monitorController) Run(stop <-chan struct{}) {

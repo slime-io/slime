@@ -39,6 +39,7 @@ type InitCallbacks struct {
 type moduleConfig struct {
 	module Module
 	config configH
+	env    bootstrap.Environment
 }
 
 type configH struct {
@@ -83,6 +84,7 @@ type ModuleOptions struct {
 }
 
 type Module interface {
+	Init(env bootstrap.Environment) error
 	Kind() string
 	Config() proto.Message
 	InitScheme(scheme *runtime.Scheme) error
@@ -327,29 +329,26 @@ func Main(bundle string, modules []Module) {
 
 	readyMgr := &moduleReadyManager{moduleReadyCheckers: map[string][]readyChecker{}}
 
-	// init configController if configSource field is used
-	configController, err := bootstrap.NewConfigController(config, mgr.GetConfig())
-	if err != nil {
-		log.Errorf("start ConfigController error: %+v", err)
-		os.Exit(1)
-	}
-
-	istioConfigController, err := bootstrap.NewIstioConfigController(config)
-	if err != nil {
-		log.Warnf("start IstioConfigController error: %+v", err)
-		istioConfigController = nil
-	}
-
 	var once sync.Once
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
 
-	env := bootstrap.Environment{
-		ConfigController:      configController,
-		IstioConfigController: istioConfigController,
-		K8SClient:             clientSet,
-		DynamicClient:         dynamicClient,
-		HttpPathHandler:       ph,
-		Stop:                  ctx.Done(),
+	// init ConfigController
+	var configController, istioConfigController bootstrap.ConfigController
+
+	if config.GetGlobal() != nil && len(config.GetGlobal().GetConfigSources()) > 0 {
+		configController, err = bootstrap.NewConfigController(config.GetGlobal().GetConfigSources(), ctx.Done())
+		if err != nil {
+			log.Errorf("new ConfigController failed: %+v", err)
+			configController = nil
+		}
+	}
+
+	if config.GetGlobal() != nil && config.GetGlobal().IstioConfigSource != nil {
+		istioConfigController, err = bootstrap.NewConfigController([]*bootconfig.ConfigSource{config.GetGlobal().IstioConfigSource}, ctx.Done())
+		if err != nil {
+			log.Warnf("new IstioConfigController error: %+v", err)
+			istioConfigController = nil
+		}
 	}
 
 	// init modules
@@ -404,10 +403,9 @@ func Main(bundle string, modules []Module) {
 					}
 				}
 			}
-
 		}
 
-		moduleEnv := bootstrap.Environment{
+		env := bootstrap.Environment{
 			Config:                modCfg,
 			ConfigController:      configController,
 			IstioConfigController: istioConfigController,
@@ -424,19 +422,55 @@ func Main(bundle string, modules []Module) {
 			},
 			Stop: ctx.Done(),
 		}
+
+		mc.env = env
+		if err := mc.module.Init(env); err != nil {
+			log.Errorf("mod %s init met err %v", mc.env.Config.Name, err)
+			fatal()
+		}
+	}
+
+	// run ConfigController
+	if configController != nil {
+		configController, err = bootstrap.RunController(configController, config, mgr.GetConfig())
+		if err != nil {
+			log.Errorf("run config controller failed: %s", err)
+			return
+		}
+	}
+
+	if istioConfigController != nil {
+		istioConfigController, err = bootstrap.RunIstioController(istioConfigController, config)
+		if err != nil {
+			log.Errorf("run config controller failed: %s", err)
+			return
+		}
+	}
+
+	env := bootstrap.Environment{
+		ConfigController:      configController,
+		IstioConfigController: istioConfigController,
+		K8SClient:             clientSet,
+		DynamicClient:         dynamicClient,
+		HttpPathHandler:       ph,
+		Stop:                  ctx.Done(),
+	}
+
+	// Setup modules
+	for _, mc := range mcs {
 		if lm, ok := mc.module.(LegcyModule); ok {
-			if err := lm.InitManager(mgr, moduleEnv, cbs); err != nil {
-				log.Errorf("mod %s InitManager met err %v", modCfg.Name, err)
+			if err := lm.InitManager(mgr, mc.env, cbs); err != nil {
+				log.Errorf("mod %s InitManager met err %v", mc.env.Config.Name, err)
 				fatal()
 			}
 		} else {
 			if err := mc.module.Setup(ModuleOptions{
-				Env:               moduleEnv,
+				Env:               mc.env,
 				InitCbs:           cbs,
 				Manager:           mgr,
 				LeaderElectionCbs: le,
 			}); err != nil {
-				log.Errorf("mod %s Setup met err %v", modCfg.Name, err)
+				log.Errorf("mod %s Setup met err %v", mc.env.Config.Name, err)
 				fatal()
 			}
 		}

@@ -4,6 +4,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"slime.io/slime/framework/bootstrap"
 
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
@@ -17,6 +18,10 @@ var log = model.ModuleLog
 
 type Module struct {
 	config config.Example
+}
+
+func (mo *Module) Init(env bootstrap.Environment) error {
+	return nil
 }
 
 func (mo *Module) Kind() string {

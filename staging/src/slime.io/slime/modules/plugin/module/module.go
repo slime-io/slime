@@ -2,6 +2,7 @@ package module
 
 import (
 	"fmt"
+	"slime.io/slime/framework/bootstrap"
 
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -19,6 +20,10 @@ var log = model.ModuleLog
 
 type Module struct {
 	config config.PluginModule
+}
+
+func (m *Module) Init(env bootstrap.Environment) error {
+	return nil
 }
 
 func (m *Module) Kind() string {

@@ -3,6 +3,7 @@ package module
 import (
 	"context"
 	"fmt"
+	"slime.io/slime/framework/bootstrap"
 
 	"github.com/golang/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +25,10 @@ var log = modmodel.ModuleLog
 
 type Module struct {
 	config config.Fence
+}
+
+func (mo *Module) Init(env bootstrap.Environment) error {
+	return nil
 }
 
 func (mo *Module) Kind() string {
