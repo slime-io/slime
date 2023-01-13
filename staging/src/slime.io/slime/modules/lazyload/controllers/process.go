@@ -94,6 +94,11 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 		return reconcile.Result{}, nil
 	}
 
+	log.Debugf("refresh with servicefence %s metricstatus old: %v, new: %v", req.NamespacedName, sf.Status.MetricStatus, value)
+	// skip refresh when metric result has not changed
+	if mapStrStrEqual(sf.Status.MetricStatus, value) {
+		return reconcile.Result{}, nil
+	}
 	// use updateVisitedHostStatus to update svf.spec and svf.status
 	sf.Status.MetricStatus = value
 	diff := r.updateVisitedHostStatus(sf)
@@ -107,6 +112,22 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func mapStrStrEqual(m1, m2 map[string]string) bool {
+	if len(m1) != len(m2) {
+		return false
+	}
+	for k, v1 := range m1 {
+		v2, exist := m2[k]
+		if !exist {
+			return false
+		}
+		if v2 != v1 {
+			return false
+		}
+	}
+	return true
 }
 
 func (r *ServicefenceReconciler) isNsFenced(ns *corev1.Namespace) bool {
