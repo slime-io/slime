@@ -6,19 +6,18 @@ import (
 	"strings"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
-
 	networking "istio.io/api/networking/v1alpha3"
+
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-func ConvertServiceEntryMapForNacos(service string, instances []model.Instance, svcNameWithNs bool, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[serviceEntryNameWapper]*networking.ServiceEntry, error) {
-	seMap := make(map[serviceEntryNameWapper]*networking.ServiceEntry, 0)
+func ConvertServiceEntryMapForNacos(service string, instances []model.Instance, svcNameWithNs bool, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[string]*networking.ServiceEntry, error) {
+	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	if gatewayModel {
-		sen := serviceEntryNameWapper{nacosService: service}
-		seMap[sen] = convertServiceEntryForNacos(service, instances, nsHost, patchLabel)
+		seMap[service] = convertServiceEntryForNacos(service, instances, nsHost, patchLabel)
 	} else {
 		for k, v := range convertServiceEntryWithNsForNacos(service, instances, svcPort, nsHost, k8sDomainSuffix, svcNameWithNs, patchLabel) {
 			seMap[k] = v
@@ -88,11 +87,12 @@ func convertEndpointsForNacos(service string, instances []model.Instance, patchL
 
 // -------- for sidecar mode --------
 func convertServiceEntryWithNsForNacos(service string, instances []model.Instance, svcPort uint32, nsHost bool,
-	k8sDomainSuffix bool, svcNameWithNs bool, patchLabel bool) map[serviceEntryNameWapper]*networking.ServiceEntry {
+	k8sDomainSuffix bool, svcNameWithNs bool, patchLabel bool) map[string]*networking.ServiceEntry {
 	endpointMap, portMap, useDNSMap := convertEndpointsWithNsForNacos(service, instances, svcPort, svcNameWithNs, patchLabel)
 	if len(endpointMap) > 0 {
-		ses := make(map[serviceEntryNameWapper]*networking.ServiceEntry, len(endpointMap))
+		ses := make(map[string]*networking.ServiceEntry, len(endpointMap))
 		for ns, endpoints := range endpointMap {
+			seName := service
 			nsSuffix := ""
 			if !svcNameWithNs {
 				if nsHost {
@@ -108,13 +108,10 @@ func convertServiceEntryWithNsForNacos(service string, instances []model.Instanc
 			if useDNSMap[ns] {
 				resolution = networking.ServiceEntry_DNS
 			}
-			sen := serviceEntryNameWapper{
-				nacosService: service,
+			if !svcNameWithNs && ns != "" {
+				seName = seName + "." + ns
 			}
-			if !svcNameWithNs {
-				sen.ns = ns
-			}
-			ses[sen] = &networking.ServiceEntry{
+			ses[seName] = &networking.ServiceEntry{
 				Hosts:      []string{service + nsSuffix},
 				Resolution: resolution,
 				Endpoints:  endpoints,

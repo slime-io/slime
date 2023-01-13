@@ -47,7 +47,7 @@ func (s *Source) updateServiceInfo() {
 		Scope.Errorf("get nacos instances failed: " + err.Error())
 		return
 	}
-	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel)
+	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel)
 	if err != nil {
 		Scope.Errorf("convert nacos servceentry map failed: " + err.Error())
 		return
@@ -57,7 +57,7 @@ func (s *Source) updateServiceInfo() {
 			// DELETE, set ep size to zero
 			delete(s.cache, service)
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-			if event, err := buildEvent(event.Updated, oldEntry, service.Name()); err == nil {
+			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handler {
 					h.Handle(event)
@@ -70,7 +70,7 @@ func (s *Source) updateServiceInfo() {
 		if oldEntry, ok := s.cache[service]; !ok {
 			// ADD
 			s.cache[service] = newEntry
-			if event, err := buildEvent(event.Added, newEntry, service.Name()); err == nil {
+			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handler {
 					h.Handle(event)
@@ -80,7 +80,7 @@ func (s *Source) updateServiceInfo() {
 			if !reflect.DeepEqual(oldEntry, newEntry) {
 				// UPDATE
 				s.cache[service] = newEntry
-				if event, err := buildEvent(event.Updated, newEntry, service.Name()); err == nil {
+				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
 					Scope.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handler {
 						h.Handle(event)

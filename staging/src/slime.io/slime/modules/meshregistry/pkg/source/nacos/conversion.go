@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	networking "istio.io/api/networking/v1alpha3"
+
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -18,17 +19,16 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(instances []*instanceResp, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[serviceEntryNameWapper]*networking.ServiceEntry, error) {
-	seMap := make(map[serviceEntryNameWapper]*networking.ServiceEntry, 0)
+func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[string]*networking.ServiceEntry, error) {
+	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
 		if gatewayModel {
-			sen := serviceEntryNameWapper{nacosService: ins.Dom}
-			seMap[sen] = convertServiceEntry(ins, nsHost, patchLabel)
+			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel)
 		} else {
-			for k, v := range convertServiceEntryWithNs(ins, svcPort, nsHost, k8sDomainSuffix, patchLabel) {
+			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel) {
 				seMap[k] = v
 			}
 		}
@@ -115,33 +115,33 @@ func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.Wor
 	return endpoints, ports, address, hasNonIPEpAddr
 }
 
-// -------- for sidecar mode --------
-func convertServiceEntryWithNs(instanceResp *instanceResp, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) map[serviceEntryNameWapper]*networking.ServiceEntry {
-	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, svcPort, patchLabel)
+func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) map[string]*networking.ServiceEntry {
+	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel)
 	if len(endpointMap) == 0 {
 		return nil
 	}
 
-	ses := make(map[serviceEntryNameWapper]*networking.ServiceEntry, len(endpointMap))
+	// todo: why transform to lowercase?
+	svcShortName := strings.ToLower(instanceResp.Dom)
+	ses := make(map[string]*networking.ServiceEntry, len(endpointMap))
 	for ns, endpoints := range endpointMap {
-		nsSuffix := ""
-		if nsHost {
-			nsSuffix = "." + ns
-		}
-		if k8sDomainSuffix {
-			nsSuffix = nsSuffix + ".svc.cluster.local"
+		var (
+			host   = svcShortName
+			seName = svcShortName
+		)
+		if nsHost && ns != "" {
+			seName += "." + ns
+			host += "." + ns
+			if k8sDomainSuffix {
+				host += ".svc.cluster.local"
+			}
 		}
 		resolution := networking.ServiceEntry_STATIC
 		if useDNSMap[ns] {
 			resolution = networking.ServiceEntry_DNS
 		}
-		snw := serviceEntryNameWapper{
-			// todo: why transform to lowercase?
-			nacosService: strings.ToLower(instanceResp.Dom),
-			ns:           ns,
-		}
-		ses[snw] = &networking.ServiceEntry{
-			Hosts:      []string{strings.ToLower(instanceResp.Dom) + nsSuffix},
+		ses[seName] = &networking.ServiceEntry{
+			Hosts:      []string{host},
 			Resolution: resolution,
 			Endpoints:  endpoints,
 			Ports:      portMap[ns],
@@ -150,7 +150,7 @@ func convertServiceEntryWithNs(instanceResp *instanceResp, svcPort uint32, nsHos
 	return ses
 }
 
-func convertEndpointsWithNs(instances []*instance, svcPort uint32, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
+func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
 	portsMap := make(map[string][]*networking.Port, 0)
 	useDNSMap := make(map[string]bool, 0)
@@ -165,9 +165,13 @@ func convertEndpointsWithNs(instances []*instance, svcPort uint32, patchLabel bo
 		metadata := ins.Metadata
 		convertInstanceId(metadata)
 
-		ns, exist := metadata["k8sNs"]
-		if !exist {
-			ns = "nacos"
+		var ns string
+		if nsHost {
+			if v, ok := metadata["k8sNs"]; ok {
+				ns = v
+			} else {
+				ns = defaultNs // "nacos" in old impl
+			}
 		}
 
 		var (
