@@ -61,6 +61,8 @@ message Global {
   string selfResourceRev = 13;
   // specify the istio-config-source from which we can get a configs-mirror of relevant istiod.
   ConfigSource istioConfigSource = 14;
+  // specify label key and alias to generate sf
+  string fenceLabelKeyAlias = 15;
 }
 
 message Log {
