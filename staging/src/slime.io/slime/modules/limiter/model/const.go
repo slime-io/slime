@@ -9,6 +9,8 @@ const (
 
 	HeaderValueMatch = "header_match"
 
+	QueryMatch = "query_match"
+
 	Domain = "slime"
 
 	Inbound = "inbound"

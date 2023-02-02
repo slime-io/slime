@@ -133,6 +133,10 @@ spec:
                                   description: '* The suffix *abcd* matches the value
                                     *xyzabcd*, but not for *xyzbcd*.'
                                   type: string
+                                useQueryMatch:
+                                  description: if query_match is true, ues query match
+                                    instead of header match
+                                  type: boolean
                               type: object
                             type: array
                           target:
@@ -274,6 +278,10 @@ spec:
                                   description: '* The suffix *abcd* matches the value
                                     *xyzabcd*, but not for *xyzbcd*.'
                                   type: string
+                                useQueryMatch:
+                                  description: if query_match is true, ues query match
+                                    instead of header match
+                                  type: boolean
                               type: object
                             type: array
                           target:

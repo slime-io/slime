@@ -315,63 +315,64 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 // 这里之前打算在pb声明为oneof,但是用kubebuilder生成api的过程中无法识别相关interface{}
 */
 func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_config_route_v3.RateLimit_Action {
-	action := &envoy_config_route_v3.RateLimit_Action{}
+	actions := make([]*envoy_config_route_v3.RateLimit_Action, 0)
+
 	if descriptor.CustomKey != "" && descriptor.CustomValue != "" {
 		log.Infof("customKey/customValue is not empty, users should apply a envoyplugin with same customKey/customValue")
 		return nil
 	} else if len(descriptor.Match) == 0 {
+		// no match specified in smartLimiter, gen DescriptorValue as normal
+		action := &envoy_config_route_v3.RateLimit_Action{}
 		action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_GenericKey_{
 			GenericKey: &envoy_config_route_v3.RateLimit_Action_GenericKey{
 				DescriptorValue: generateDescriptorValue(descriptor, loc),
 			},
 		}
+		return []*envoy_config_route_v3.RateLimit_Action{action}
 	} else {
+		// match is specified in smartLimiter
 		headers := make([]*envoy_config_route_v3.HeaderMatcher, 0)
+		queries := make([]*envoy_config_route_v3.QueryParameterMatcher, 0)
+
 		for _, match := range descriptor.Match {
-			header := &envoy_config_route_v3.HeaderMatcher{}
-			header.Name = match.Name
-			header.InvertMatch = generateInvertMatch(match)
-			switch {
-			case match.RegexMatch != "":
-				header.HeaderMatchSpecifier = generateSafeRegexMatch(match)
-			case match.ExactMatch != "":
-				header.HeaderMatchSpecifier = generateExactMatch(match)
-			case match.PrefixMatch != "":
-				header.HeaderMatchSpecifier = generatePrefixMatch(match)
-			case match.SuffixMatch != "":
-				header.HeaderMatchSpecifier = generateSuffixMatch(match)
-			default:
-				if match.IsExactMatchEmpty {
-					header.HeaderMatchSpecifier = generateExactMatch(match)
-				} else if match.PresentMatch {
-					header.HeaderMatchSpecifier = generatePresentMatch(match)
-				} else if match.PresentMatchSeparate {
-					action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_RequestHeaders_{
-						RequestHeaders: &envoy_config_route_v3.RateLimit_Action_RequestHeaders{
-							HeaderName:    match.Name,
-							DescriptorKey: generateDescriptorKey(descriptor, loc),
-						},
-					}
-					generic := &envoy_config_route_v3.RateLimit_Action{}
-					generic.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_GenericKey_{
-						GenericKey: &envoy_config_route_v3.RateLimit_Action_GenericKey{
-							DescriptorValue: generateDescriptorValue(descriptor, loc),
-						},
-					}
-					return []*envoy_config_route_v3.RateLimit_Action{generic, action}
+			if match.UseQueryMatch {
+				if query, err := generateQueryMatchAction(match); err == nil {
+					queries = append(queries, query)
+				}
+			} else if match.PresentMatchSeparate {
+				// Special cases to generate requestHeader and headerMatch,
+				log.Debugf("PresentMatchSeparate is specifed in smartLimiter")
+				return generatePresentMatchSeparate(match, descriptor, loc)
+			} else {
+				if header, err := generateHeaderMatchAction(match); err == nil {
+					headers = append(headers, header)
 				}
 			}
-			headers = append(headers, header)
 		}
 
-		action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch_{
-			HeaderValueMatch: &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch{
-				DescriptorValue: generateDescriptorValue(descriptor, loc),
-				Headers:         headers,
-			},
+		if len(queries) > 0 {
+			queryAction := &envoy_config_route_v3.RateLimit_Action{}
+			queryAction.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_QueryParameterValueMatch_{
+				QueryParameterValueMatch: &envoy_config_route_v3.RateLimit_Action_QueryParameterValueMatch{
+					DescriptorValue: generateDescriptorValue(descriptor, loc),
+					QueryParameters: queries,
+				},
+			}
+			actions = append(actions, queryAction)
+		}
+
+		if len(headers) > 0 {
+			headerAction := &envoy_config_route_v3.RateLimit_Action{}
+			headerAction.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch_{
+				HeaderValueMatch: &envoy_config_route_v3.RateLimit_Action_HeaderValueMatch{
+					DescriptorValue: generateDescriptorValue(descriptor, loc),
+					Headers:         headers,
+				},
+			}
+			actions = append(actions, headerAction)
 		}
 	}
-	return []*envoy_config_route_v3.RateLimit_Action{action}
+	return actions
 }
 
 func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.LocalRateLimitDescriptor {
@@ -387,19 +388,44 @@ func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.Smart
 	return localRateLimitDescriptors
 }
 
-func generateLocalRateLimitDescriptorEntries(item *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.RateLimitDescriptor_Entry {
+// generateLocalRateLimitDescriptorEntries gen entries like above
+func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.RateLimitDescriptor_Entry {
+
 	entry := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
-	if item.CustomKey != "" && item.CustomValue != "" {
-		entry.Key = item.CustomKey
-		entry.Value = item.CustomValue
-	} else if len(item.Match) == 0 {
+	entries := make([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, 0)
+	if des.CustomKey != "" && des.CustomValue != "" {
+		entry.Key = des.CustomKey
+		entry.Value = des.CustomValue
+		entries = append(entries, entry)
+	} else if len(des.Match) == 0 {
 		entry.Key = model.GenericKey
-		entry.Value = generateDescriptorValue(item, loc)
+		entry.Value = generateDescriptorValue(des, loc)
+		entries = append(entries, entry)
 	} else {
-		entry.Key = model.HeaderValueMatch
-		entry.Value = generateDescriptorValue(item, loc)
+
+		var useQuery, useHeader bool
+		for _, match := range des.Match {
+			if match.UseQueryMatch {
+				useQuery = true
+			} else {
+				useHeader = true
+			}
+		}
+		if useQuery {
+			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
+			item.Key = model.QueryMatch
+			item.Value = generateDescriptorValue(des, loc)
+			entries = append(entries, item)
+		}
+
+		if useHeader {
+			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
+			item.Key = model.HeaderValueMatch
+			item.Value = generateDescriptorValue(des, loc)
+			entries = append(entries, item)
+		}
 	}
-	return []*envoy_ratelimit_v3.RateLimitDescriptor_Entry{entry}
+	return entries
 }
 
 func generateTokenBucket(item *microservicev1alpha2.SmartLimitDescriptor) *envoy_type_v3.TokenBucket {
@@ -555,4 +581,109 @@ func generatePerFilterPatch(local *structpb.Struct) *networking.EnvoyFilter_Patc
 			},
 		},
 	}
+}
+
+// generateQueryMatchAction	gen query match in rateLimit action
+func generateQueryMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) (*envoy_config_route_v3.QueryParameterMatcher, error) {
+	var err error
+	query := &envoy_config_route_v3.QueryParameterMatcher{}
+
+	query.Name = match.Name
+	switch {
+	case match.RegexMatch != "":
+		query.QueryParameterMatchSpecifier = generateQuerySafeRegexMatch(match)
+	case match.ExactMatch != "":
+		query.QueryParameterMatchSpecifier = generateQueryExactMatch(match)
+	case match.PrefixMatch != "":
+		query.QueryParameterMatchSpecifier = generateQueryPrefixMatch(match)
+	case match.SuffixMatch != "":
+		query.QueryParameterMatchSpecifier = generateQuerySuffixMatch(match)
+	default:
+		err = fmt.Errorf("unknown query match type %s", query.Name)
+	}
+	return query, err
+}
+
+// generateHeaderMatchAction gen header match in rateLimit action
+func generateHeaderMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) (*envoy_config_route_v3.HeaderMatcher, error) {
+	var err error
+	header := &envoy_config_route_v3.HeaderMatcher{}
+
+	header.Name = match.Name
+	header.InvertMatch = generateInvertMatch(match)
+	switch {
+	case match.RegexMatch != "":
+		header.HeaderMatchSpecifier = generateSafeRegexMatch(match)
+	case match.ExactMatch != "":
+		header.HeaderMatchSpecifier = generateExactMatch(match)
+	case match.PrefixMatch != "":
+		header.HeaderMatchSpecifier = generatePrefixMatch(match)
+	case match.SuffixMatch != "":
+		header.HeaderMatchSpecifier = generateSuffixMatch(match)
+	case match.IsExactMatchEmpty:
+		header.HeaderMatchSpecifier = generateExactMatch(match)
+	case match.PresentMatch:
+		header.HeaderMatchSpecifier = generatePresentMatch(match)
+	default:
+		err = fmt.Errorf("unknown query match type %s", header.Name)
+	}
+	return header, err
+}
+
+func generateQuerySafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
+		StringMatch: &envoy_match_v3.StringMatcher{
+			MatchPattern: &envoy_match_v3.StringMatcher_SafeRegex{SafeRegex: &envoy_match_v3.RegexMatcher{
+				EngineType: &envoy_match_v3.RegexMatcher_GoogleRe2{
+					GoogleRe2: &envoy_match_v3.RegexMatcher_GoogleRE2{},
+				},
+				Regex: match.RegexMatch,
+			}},
+		},
+	}
+}
+
+func generateQueryPrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
+		StringMatch: &envoy_match_v3.StringMatcher{
+			MatchPattern: &envoy_match_v3.StringMatcher_Prefix{Prefix: match.PrefixMatch},
+		},
+	}
+}
+
+func generateQuerySuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
+		StringMatch: &envoy_match_v3.StringMatcher{
+			MatchPattern: &envoy_match_v3.StringMatcher_Suffix{Suffix: match.SuffixMatch},
+		},
+	}
+}
+
+func generateQueryExactMatch(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
+		StringMatch: &envoy_match_v3.StringMatcher{
+			MatchPattern: &envoy_match_v3.StringMatcher_Exact{Exact: match.ExactMatch},
+		},
+	}
+}
+
+// global support PresentMatchSeparate
+func generatePresentMatchSeparate(match *microservicev1alpha2.SmartLimitDescriptor_HeaderMatcher,
+	descriptor *microservicev1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName) []*envoy_config_route_v3.RateLimit_Action {
+
+	action := &envoy_config_route_v3.RateLimit_Action{}
+	action.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_RequestHeaders_{
+		RequestHeaders: &envoy_config_route_v3.RateLimit_Action_RequestHeaders{
+			HeaderName:    match.Name,
+			DescriptorKey: generateDescriptorKey(descriptor, loc),
+		},
+	}
+	generic := &envoy_config_route_v3.RateLimit_Action{}
+	generic.ActionSpecifier = &envoy_config_route_v3.RateLimit_Action_GenericKey_{
+		GenericKey: &envoy_config_route_v3.RateLimit_Action_GenericKey{
+			DescriptorValue: generateDescriptorValue(descriptor, loc),
+		},
+	}
+	return []*envoy_config_route_v3.RateLimit_Action{generic, action}
 }
