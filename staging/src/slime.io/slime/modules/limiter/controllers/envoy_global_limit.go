@@ -19,7 +19,6 @@ import (
 	structpb "github.com/gogo/protobuf/types"
 	networking "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
-
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
@@ -131,27 +130,61 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 			Unit:            unit,
 		}
 
-		item := &model.Descriptor{}
-
 		if len(descriptor.Match) == 0 {
+			item := &model.Descriptor{}
 			item.Key = model.GenericKey
 			item.RateLimit = ratelimit
 			item.Value = generateDescriptorValue(descriptor, loc)
+			desc = append(desc, item)
+
 		} else if containsHeaderRequest(descriptors) {
-			// item.Key = generateDescriptorKey(descriptor, loc)
-			// item.RateLimit = ratelimit
+			item := &model.Descriptor{}
 			item.Key = model.GenericKey
 			item.Value = generateDescriptorValue(descriptor, loc)
 			item.Descriptors = append(item.Descriptors, model.Descriptor{
 				Key:       generateDescriptorKey(descriptor, loc),
 				RateLimit: ratelimit,
 			})
+			desc = append(desc, item)
+
 		} else {
-			item.Key = model.HeaderValueMatch
-			item.RateLimit = ratelimit
-			item.Value = generateDescriptorValue(descriptor, loc)
+
+			var useQuery, useHeader bool
+			for _, match := range descriptor.Match {
+				if match.UseQueryMatch {
+					useQuery = true
+				} else {
+					useHeader = true
+				}
+			}
+
+			if useHeader && useQuery {
+				headerItem := &model.Descriptor{}
+				headerItem.Key = model.HeaderValueMatch
+				headerItem.Value = generateDescriptorValue(descriptor, loc)
+				headerItem.Descriptors = []model.Descriptor{
+					model.Descriptor{
+						Key:         model.QueryMatch,
+						Value:       generateDescriptorValue(descriptor, loc),
+						RateLimit:   ratelimit,
+						Descriptors: nil,
+					},
+				}
+				desc = append(desc, headerItem)
+			} else if useHeader {
+				headerItem := &model.Descriptor{}
+				headerItem.Key = model.HeaderValueMatch
+				headerItem.RateLimit = ratelimit
+				headerItem.Value = generateDescriptorValue(descriptor, loc)
+				desc = append(desc, headerItem)
+			} else if useQuery {
+				queryItem := &model.Descriptor{}
+				queryItem.Key = model.QueryMatch
+				queryItem.RateLimit = ratelimit
+				queryItem.Value = generateDescriptorValue(descriptor, loc)
+				desc = append(desc, queryItem)
+			}
 		}
-		desc = append(desc, item)
 	}
 	return desc
 }

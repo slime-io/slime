@@ -125,6 +125,8 @@ message SmartLimitDescriptor {
         // while present_match shares token
         // it only works in envoy.filters.http.ratelimit (global)
         bool present_match_separate = 9;
+        // if query_match is true, ues query match instead of header match
+        bool useQueryMatch = 10;
     }
 
     message Action {
