@@ -1,6 +1,6 @@
 module slime.io/slime/modules/limiter
 
-go 1.18
+go 1.17
 
 require (
 	github.com/envoyproxy/go-control-plane v0.11.0
@@ -68,7 +68,7 @@ require (
 	github.com/prometheus/procfs v0.6.0 // indirect
 	github.com/spf13/cobra v1.1.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.opencensus.io v0.22.3 // indirect
+	go.opencensus.io v0.22.4 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
