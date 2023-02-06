@@ -28,6 +28,8 @@ message Fence {
   bool autoPort = 7;
   // specify the ns of global-siecar, same as slimeNamespace by default
   string clusterGsNamespace = 8;
+  // specify label key and alias to generate sf
+  string fenceLabelKeyAlias = 9;
 }
 
 // The general idea is to assign different default traffic to different targets
