@@ -195,8 +195,8 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 	ns := &corev1.Namespace{}
 	err = r.Client.Get(ctx, req.NamespacedName, ns)
 
-	if ns.Name == r.env.Config.Global.IstioNamespace || ns.Name == r.env.Config.Global.SlimeNamespace {
-		log.Debugf("auto fence does not apply to istio and slime namespace, skip")
+	if ns.Name == r.env.Config.Global.IstioNamespace || ns.Name == r.env.Config.Global.SlimeNamespace || ns.Name == "kube-system" {
+		log.Debugf("auto fence does not apply to istio/slime and kube-system namespace, skip")
 		return reconcile.Result{}, nil
 	}
 

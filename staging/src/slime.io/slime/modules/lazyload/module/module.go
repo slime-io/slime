@@ -67,6 +67,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
 		sfReconciler.StartSvcCache(ctx)
+		sfReconciler.IpToSvcCache(ctx)
 	})
 
 	var builder basecontroller.ObjectReconcilerBuilder
