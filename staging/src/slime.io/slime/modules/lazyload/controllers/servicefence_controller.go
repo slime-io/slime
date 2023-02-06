@@ -50,6 +50,7 @@ import (
 // ServicefenceReconciler reconciles a Servicefence object
 type ServicefenceReconciler struct {
 	client.Client
+
 	Scheme                     *runtime.Scheme
 	cfg                        *config.Fence
 	env                        bootstrap.Environment
@@ -70,6 +71,8 @@ type ServicefenceReconciler struct {
 	fenceToIp                  *FenceToIp
 	workloadFenceLabelKey      string
 	workloadFenceLabelKeyAlias string
+	ipToSvcCache               *IpToSvcCache
+	svcToIpsCache              *SvcToIpsCache
 }
 
 type ReconcilerOpts func(*ServicefenceReconciler)
@@ -98,6 +101,10 @@ func ReconcilerWithProducerConfig(pc *metric.ProducerConfig) ReconcilerOpts {
 		// reconciler defines producer metric handler
 		pc.WatcherProducerConfig.NeedUpdateMetricHandler = sr.handleWatcherEvent
 		pc.TickerProducerConfig.NeedUpdateMetricHandler = sr.handleTickerEvent
+
+		if len(pc.AccessLogSourceConfig.AccessLogConvertorConfigs) > 0 {
+			pc.AccessLogSourceConfig.AccessLogConvertorConfigs[0].Handler = sr.LogHandler
+		}
 	}
 }
 
@@ -111,8 +118,10 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 		nsSvcCache:        &NsSvcCache{Data: map[string]map[string]struct{}{}},
 		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
 		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
-		ipTofence:         &IpTofence{Data: map[string]string{}},
-		fenceToIp:         &FenceToIp{Data: map[string][]string{}},
+		ipTofence:         &IpTofence{Data: map[string]types.NamespacedName{}},
+		fenceToIp:         &FenceToIp{Data: map[string]map[string]struct{}{}},
+		ipToSvcCache:      &IpToSvcCache{Data: map[string]string{}},
+		svcToIpsCache:     &SvcToIpsCache{Data: map[string][]string{}},
 	}
 	for _, opt := range opts {
 		opt(r)

@@ -6,11 +6,10 @@
 package controllers
 
 import (
-	"regexp"
-	"sync"
-
 	"k8s.io/apimachinery/pkg/types"
+	"regexp"
 	"slime.io/slime/framework/model"
+	"sync"
 
 	modmodel "slime.io/slime/modules/lazyload/model"
 )
@@ -51,6 +50,16 @@ type IpTofence struct {
 type FenceToIp struct {
 	// namespacedname -> ips
 	Data map[string]map[string]struct{}
+	sync.RWMutex
+}
+
+type IpToSvcCache struct {
+	Data map[string]string
+	sync.RWMutex
+}
+
+type SvcToIpsCache struct {
+	Data map[string][]string
 	sync.RWMutex
 }
 

@@ -199,3 +199,109 @@ func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCa
 	wormholePort = append(wormholePort, add...)
 	return wormholePort, len(add) > 0
 }
+
+func (r *ServicefenceReconciler) IpToSvcCache(ctx context.Context) {
+
+	log := log.WithField("reporter", "newIpToSvcCache").WithField("function", "newIpToSvcCache")
+
+	clientSet := r.env.K8SClient
+	ipToSvcCache := r.ipToSvcCache
+	svcToIpsCache := r.svcToIpsCache
+	// init svcToIps
+	eps, err := clientSet.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{})
+	if err != nil {
+		log.Errorf("list ep error, %+v", err)
+		return
+	}
+
+	for _, ep := range eps.Items {
+		svc := ep.GetNamespace() + "/" + ep.GetName()
+		var addresses []string
+		ipToSvcCache.Lock()
+		for _, subset := range ep.Subsets {
+			for _, address := range subset.Addresses {
+				addresses = append(addresses, address.IP)
+				ipToSvcCache.Data[address.IP] = svc
+			}
+		}
+		ipToSvcCache.Unlock()
+		svcToIpsCache.Lock()
+		svcToIpsCache.Data[svc] = addresses
+		svcToIpsCache.Unlock()
+	}
+
+	// init endpoint watcher
+	epsClient := clientSet.CoreV1().Endpoints("")
+
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return epsClient.List(ctx, options)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return epsClient.Watch(ctx, options)
+		},
+	}
+	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Endpoints{})
+
+	go func() {
+		log.Infof("Endpoint cacher is running")
+		for {
+			e, ok := <-watcher.ResultChan()
+			if !ok {
+				log.Warningf("a result chan of endpoint watcher is closed, break process loop")
+				return
+			}
+
+			ep, ok := e.Object.(*corev1.Endpoints)
+			if !ok {
+				log.Errorf("invalid type of object in endpoint watcher event")
+				continue
+			}
+
+			svc := ep.GetNamespace() + "/" + ep.GetName()
+			// delete event
+			if e.Type == watch.Deleted {
+				svcToIpsCache.Lock()
+				ips := svcToIpsCache.Data[svc]
+				delete(svcToIpsCache.Data, svc)
+				svcToIpsCache.Unlock()
+
+				ipToSvcCache.Lock()
+				for _, ip := range ips {
+					delete(ipToSvcCache.Data, ip)
+				}
+				ipToSvcCache.Unlock()
+				continue
+			}
+
+			// add, update event
+			ep, err := clientSet.CoreV1().Endpoints(ep.GetNamespace()).Get(ctx, ep.GetName(), metav1.GetOptions{})
+			if err != nil {
+				continue
+			}
+
+			// delete previous key, value
+			svcToIpsCache.RLock()
+			ips := svcToIpsCache.Data[svc]
+			svcToIpsCache.RUnlock()
+
+			ipToSvcCache.Lock()
+			for _, ip := range ips {
+				delete(ipToSvcCache.Data, ip)
+			}
+
+			// add new key, value
+			var addresses []string
+			for _, subset := range ep.Subsets {
+				for _, address := range subset.Addresses {
+					addresses = append(addresses, address.IP)
+					ipToSvcCache.Data[address.IP] = svc
+				}
+			}
+			ipToSvcCache.Unlock()
+			svcToIpsCache.Lock()
+			svcToIpsCache.Data[svc] = addresses
+			svcToIpsCache.Unlock()
+		}
+	}()
+}

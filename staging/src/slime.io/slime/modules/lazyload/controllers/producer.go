@@ -4,26 +4,19 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	envoy_config_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/watch"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	watchtools "k8s.io/client-go/tools/watch"
-
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/metric"
@@ -142,20 +135,21 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 		log.Debugf("initCache is %+v", initCache)
 
 		// make preparation for handler
-		ipToSvcCache, svcToIpsCache, cacheLock, err := newIpToSvcCache(env.K8SClient)
-		if err != nil {
-			return nil, err
-		}
+		//ipToSvcCache, svcToIpsCache, cacheLock, err := newIpToSvcCache(env.K8SClient)
+		//if err != nil {
+		//	return nil, err
+		//}
 
 		// init accessLog source config
 		accessLogSourceConfig = metric.AccessLogSourceConfig{
 			ServePort: port,
 			AccessLogConvertorConfigs: []metric.AccessLogConvertorConfig{
 				{
-					Name: AccessLogConvertorName,
-					Handler: func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
-						return accessLogHandler(logEntry, ipToSvcCache, svcToIpsCache, cacheLock)
-					},
+					Name:    AccessLogConvertorName,
+					Handler: nil,
+					//Handler: func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
+					//	return accessLogHandler(logEntry, , svcToIpsCache, cacheLock)
+					//},
 					InitCache: initCache,
 				},
 			},
@@ -200,6 +194,10 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 	}
 
 	return pc, nil
+}
+
+func (r *ServicefenceReconciler) LogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
+	return accessLogHandler(logEntry, r.ipToSvcCache, r.svcToIpsCache, r.ipTofence, r.fenceToIp)
 }
 
 func newPrometheusSourceConfig(env bootstrap.Environment) (metric.PrometheusSourceConfig, error) {
@@ -257,13 +255,14 @@ func newInitCache(env bootstrap.Environment) (map[string]map[string]string, erro
 	return result, nil
 }
 
-func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCache map[string]string,
-	svcToIpsCache map[string][]string, cacheLock *sync.RWMutex,
+func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCache *IpToSvcCache,
+	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, fenceToIpCache *FenceToIp,
 ) (map[string]map[string]string, error) {
-	log := log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
-	result := make(map[string]map[string]string)
 
+	log = log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
+	result := make(map[string]map[string]string)
 	tmpResult := make(map[string]map[string]int)
+
 	for _, entry := range logEntry {
 		// tmpValue := make(map[string]int)
 
@@ -277,30 +276,47 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 		}
 
 		// fetch sourceSvcMeta
-		sourceSvc, err := spliceSourceSvc(sourceIp, ipToSvcCache, cacheLock)
+		sourceSvc, err := spliceSourceSvc(sourceIp, ipToSvcCache)
 		if err != nil {
 			return nil, err
 		}
-		if sourceSvc == "" {
-			continue
+
+		fenceNN, err := spliceSourcefence(sourceIp, ipTofenceCache)
+		if err != nil {
+			fenceNN = nil
+			return nil, err
 		}
 
+		if sourceSvc == "" || fenceNN == nil {
+			continue
+		}
+		log.Debugf("source svc is %s, %s", sourceSvc, fenceNN)
+
 		// fetch destinationSvcMeta
-		destinationSvc := spliceDestinationSvc(entry, sourceSvc, svcToIpsCache, cacheLock)
-		if destinationSvc == "" {
+		destinationSvcs := spliceDestinationSvc(entry, sourceSvc, svcToIpsCache)
+		if len(destinationSvcs) == 0 {
 			continue
 		}
 
 		// push result
-		if dstSvcMappings, ok := tmpResult[sourceSvc]; !ok {
-			tmpValue := make(map[string]int)
-			tmpValue[destinationSvc] = 1
-			tmpResult[sourceSvc] = tmpValue
-		} else {
-			dstSvcMappings[destinationSvc] += 1
+		if sourceSvc != "" {
+			if _, ok := tmpResult[sourceSvc]; !ok {
+				tmpResult[sourceSvc] = make(map[string]int)
+			}
+			for _, dest := range destinationSvcs {
+				tmpResult[sourceSvc][dest] += 1
+			}
 		}
 
-		log.Debugf("tmpResult[%s][%s]: %d", sourceSvc, destinationSvc, tmpResult[sourceSvc][destinationSvc])
+		if fenceNN != nil {
+			nn := fmt.Sprintf("%s", fenceNN)
+			if _, ok := tmpResult[nn]; !ok {
+				tmpResult[nn] = make(map[string]int)
+			}
+			for _, dest := range destinationSvcs {
+				tmpResult[nn][dest] += 1
+			}
+		}
 	}
 
 	for sourceSvc, dstSvcMappings := range tmpResult {
@@ -330,42 +346,60 @@ func fetchSourceIp(entry *data_accesslog.HTTPAccessLogEntry) (string, error) {
 	return downstreamSock.SocketAddress.Address, nil
 }
 
-func spliceSourceSvc(sourceIp string, ipToSvcCache map[string]string, cacheLock *sync.RWMutex) (string, error) {
-	cacheLock.RLock()
-	defer cacheLock.RUnlock()
+func spliceSourceSvc(sourceIp string, ipToSvcCache *IpToSvcCache) (string, error) {
+	ipToSvcCache.RLock()
+	defer ipToSvcCache.RUnlock()
 
-	for ip, svc := range ipToSvcCache {
+	for ip, svc := range ipToSvcCache.Data {
 		if sourceIp == ip {
 			return svc, nil
 		}
 	}
-
 	return "", nil
 }
 
-func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc string, svcToIpsCache map[string][]string, cacheLock *sync.RWMutex) string {
-	log := log.WithField("reporter", "accesslog convertor").WithField("function", "spliceDestinationSvc")
-	var destSvc string
+func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.NamespacedName, error) {
+	ipTofence.RLock()
+	defer ipTofence.RUnlock()
+
+	for ip, nn := range ipTofence.Data {
+		if sourceIp == ip {
+			log.Debugf("match ipTofence, get namespacename %s", nn)
+			return &nn, nil
+		}
+	}
+	return &types.NamespacedName{}, nil
+}
+
+func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc string, svcToIpsCache *SvcToIpsCache) []string {
+	log = log.WithField("reporter", "accesslog convertor").WithField("function", "spliceDestinationSvc")
+	var destSvcs []string
+
 	upstreamCluster := entry.CommonProperties.UpstreamCluster
 	parts := strings.Split(upstreamCluster, "|")
 	if len(parts) != 4 {
 		log.Errorf("UpstreamCluster is wrong: parts number is not 4, skip")
-		return ""
+		return destSvcs
 	}
 	// only handle inbound access log
 	if parts[0] != "inbound" {
 		log.Debugf("This log is not inbound, skip")
-		return ""
+		return destSvcs
 	}
 	// get destination service info from request.authority
 	auth := entry.Request.Authority
 	dest := strings.Split(auth, ":")[0]
 
-	// check if dest is ip
+	// dest is ip address, skip
 	if net.ParseIP(dest) != nil {
 		log.Debugf("Accesslog is %s -> %s, in which the destination is not domain, skip", sourceSvc, dest)
-		return ""
+		return destSvcs
 	}
+
+	// if dest is non ns service, dest should not expand with '.svc.cluster.local'
+	// so both short name and k8s fqdn will be added as following
+	destSvcs = append(destSvcs, dest)
+	var destSvc string
 
 	destParts := strings.Split(dest, ".")
 	switch len(destParts) {
@@ -373,10 +407,10 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 		srcParts := strings.Split(sourceSvc, "/")
 		destSvc = dest + "." + srcParts[0] + ".svc.cluster.local"
 	case 2:
-		destSvc = completeDestSvcName(destParts, dest, "svc.cluster.local", svcToIpsCache, cacheLock)
+		destSvc = completeDestSvcName(destParts, dest, "svc.cluster.local", svcToIpsCache)
 	case 3:
 		if destParts[2] == "svc" {
-			destSvc = completeDestSvcName(destParts, dest, "cluster.local", svcToIpsCache, cacheLock)
+			destSvc = completeDestSvcName(destParts, dest, "cluster.local", svcToIpsCache)
 		} else {
 			destSvc = dest
 		}
@@ -384,16 +418,24 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 		destSvc = dest
 	}
 
-	log.Debugf("DestinationSvc is: %s", "{destination_service=\""+destSvc+"\"}")
-	return "{destination_service=\"" + destSvc + "\"}"
+	if destSvcs[0] != destSvc {
+		destSvcs = append(destSvcs, destSvc)
+	}
+
+	result := make([]string, 0)
+	for _, svc := range destSvcs {
+		result = append(result, fmt.Sprintf("\"{destination_service=\"%s\"}\"", svc))
+	}
+	log.Debugf("DestinationSvc is: %+v", result)
+	return result
 }
 
-func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache map[string][]string, cacheLock *sync.RWMutex) (destSvc string) {
-	cacheLock.RLock()
-	defer cacheLock.RUnlock()
+func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache *SvcToIpsCache) (destSvc string) {
+	svcToIpsCache.RLock()
+	defer svcToIpsCache.RUnlock()
 
 	svc := destParts[1] + "/" + destParts[0]
-	if _, ok := svcToIpsCache[svc]; ok {
+	if _, ok := svcToIpsCache.Data[svc]; ok {
 		// dest is abbreviation of service, add suffix
 		destSvc = dest + "." + suffix
 	} else {
@@ -401,95 +443,4 @@ func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache 
 		destSvc = dest
 	}
 	return
-}
-
-func newIpToSvcCache(clientSet *kubernetes.Clientset) (map[string]string, map[string][]string, *sync.RWMutex, error) {
-	log := log.WithField("reporter", "AccessLogConvertor").WithField("function", "generateSvcToIpsCache")
-	ipToSvcCache := make(map[string]string)
-	svcToIpsCache := make(map[string][]string)
-	var cacheLock sync.RWMutex
-
-	// init svcToIps
-	eps, err := clientSet.CoreV1().Endpoints("").List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		return nil, nil, nil, stderrors.New("failed to get endpoints list")
-	}
-
-	for _, ep := range eps.Items {
-		svc := ep.GetNamespace() + "/" + ep.GetName()
-		var addresses []string
-		for _, subset := range ep.Subsets {
-			for _, address := range subset.Addresses {
-				addresses = append(addresses, address.IP)
-				ipToSvcCache[address.IP] = svc
-			}
-		}
-		svcToIpsCache[svc] = addresses
-	}
-
-	// init endpoint watcher
-	epsClient := clientSet.CoreV1().Endpoints("")
-	ctx := context.Background()
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return epsClient.List(ctx, options)
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return epsClient.Watch(ctx, options)
-		},
-	}
-	_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Endpoints{})
-
-	go func() {
-		log.Infof("Endpoint cacher is running")
-		for {
-			e, ok := <-watcher.ResultChan()
-			if !ok {
-				log.Warningf("a result chan of endpoint watcher is closed, break process loop")
-				return
-			}
-
-			ep, ok := e.Object.(*corev1.Endpoints)
-			if !ok {
-				log.Errorf("invalid type of object in endpoint watcher event")
-				continue
-			}
-
-			svc := ep.GetNamespace() + "/" + ep.GetName()
-			// delete event
-			if e.Type == watch.Deleted {
-				cacheLock.Lock()
-				for _, ip := range svcToIpsCache[svc] {
-					delete(ipToSvcCache, ip)
-				}
-				delete(svcToIpsCache, svc)
-				cacheLock.Unlock()
-				continue
-			}
-
-			// add, update event
-			ep, err := clientSet.CoreV1().Endpoints(ep.GetNamespace()).Get(ctx, ep.GetName(), metav1.GetOptions{})
-			if err != nil {
-				continue
-			}
-			// delete previous key, value
-			cacheLock.Lock()
-			for _, ip := range svcToIpsCache[svc] {
-				delete(ipToSvcCache, ip)
-			}
-			// add new key, value
-			var addresses []string
-			for _, subset := range ep.Subsets {
-				for _, address := range subset.Addresses {
-					addresses = append(addresses, address.IP)
-					ipToSvcCache[address.IP] = svc
-				}
-			}
-			svcToIpsCache[svc] = addresses
-			cacheLock.Unlock()
-
-		}
-	}()
-
-	return ipToSvcCache, svcToIpsCache, &cacheLock, nil
 }
