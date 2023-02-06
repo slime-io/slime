@@ -1,9 +1,24 @@
-FROM golang:1.16.15-bullseye
+FROM golang:1.17.13-bullseye
 
 WORKDIR /workspaces
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    lsb-release \
+    software-properties-common \
+    jq \
     unzip && \
+    apt-get clean
+
+# install docker
+ENV DOCKER_VERSION=5:23.0.0-1~debian.11~bullseye
+ENV CONTAINERD_VERSION=1.6.16-1
+ADD https://download.docker.com/linux/debian/gpg /etc/apt/keyrings/docker.gpg
+RUN apt-key add /etc/apt/keyrings/docker.gpg && \
+    add-apt-repository "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    docker-ce="${DOCKER_VERSION}" \
+    docker-ce-cli="${DOCKER_VERSION}" \
+    containerd.io="${CONTAINERD_VERSION}" && \
     apt-get clean
 
 # version of toolchains
