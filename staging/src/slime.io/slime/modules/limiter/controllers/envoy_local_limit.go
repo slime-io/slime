@@ -283,11 +283,12 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		// build token bucket
 		localRateLimitDescriptors := generateLocalRateLimitDescriptors(desc, params.loc)
 		localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
-			TokenBucket:    generateCustomTokenBucket(100000, 100000, 1),
-			Descriptors:    localRateLimitDescriptors,
-			StatPrefix:     util.StructEnvoyLocalRateLimitLimiter,
-			FilterEnabled:  generateEnvoyLocalRateLimitEnabled(),
-			FilterEnforced: generateEnvoyLocalRateLimitEnforced(),
+			TokenBucket:          generateCustomTokenBucket(100000, 100000, 1),
+			Descriptors:          localRateLimitDescriptors,
+			StatPrefix:           util.StructEnvoyLocalRateLimitLimiter,
+			FilterEnabled:        generateEnvoyLocalRateLimitEnabled(),
+			FilterEnforced:       generateEnvoyLocalRateLimitEnforced(),
+			ResponseHeadersToAdd: generateResponseHeaderToAdd(desc),
 		}
 		local, err := util.MessageToStruct(localRateLimit)
 		if err != nil {
@@ -509,6 +510,24 @@ func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPerce
 			Denominator: envoy_type_v3.FractionalPercent_HUNDRED,
 		},
 	}
+}
+
+func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescriptor) []*envoy_core_v3.HeaderValueOption {
+	headers := make([]*envoy_core_v3.HeaderValueOption, 0)
+	for _, item := range items {
+		for key, value := range item.Action.HeadersToAdd {
+			headers = append(headers, &envoy_core_v3.HeaderValueOption{
+				Header: &envoy_core_v3.HeaderValue{
+					Key:   key,
+					Value: value,
+				},
+				Append: &wrappers.BoolValue{
+					Value: true,
+				},
+			})
+		}
+	}
+	return headers
 }
 
 func generateEnvoyVhostMatch(rc *routeConfig) *networking.EnvoyFilter_EnvoyConfigObjectMatch {

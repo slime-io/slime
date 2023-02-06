@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.11.1
   creationTimestamp: null
   name: smartlimiters.microservice.slime.io
 spec:
@@ -74,6 +73,10 @@ spec:
                                       days/year * 10000 years'
                                     format: int64
                                     type: integer
+                                type: object
+                              headers_to_add:
+                                additionalProperties:
+                                  type: string
                                 type: object
                               quota:
                                 type: string
@@ -220,6 +223,10 @@ spec:
                                     format: int64
                                     type: integer
                                 type: object
+                              headers_to_add:
+                                additionalProperties:
+                                  type: string
+                                type: object
                               quota:
                                 type: string
                               strategy:
@@ -308,9 +315,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
