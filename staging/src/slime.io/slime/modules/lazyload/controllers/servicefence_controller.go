@@ -66,6 +66,8 @@ type ServicefenceReconciler struct {
 	portProtocolCache    *PortProtocolCache
 	defaultAddNamespaces []string
 	doAliasRules         []*domainAliasRule
+	ipTofence            *IpTofence
+	fenceToIp            *FenceToIp
 }
 
 type ReconcilerOpts func(*ServicefenceReconciler)
@@ -107,6 +109,8 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 		nsSvcCache:        &NsSvcCache{Data: map[string]map[string]struct{}{}},
 		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
 		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
+		ipTofence:         &IpTofence{Data: map[string]string{}},
+		fenceToIp:         &FenceToIp{Data: map[string][]string{}},
 	}
 	for _, opt := range opts {
 		opt(r)

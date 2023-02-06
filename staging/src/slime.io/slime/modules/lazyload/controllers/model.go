@@ -40,6 +40,16 @@ type PortProtocolCache struct {
 	sync.RWMutex
 }
 
+type IpTofence struct {
+	Data map[string]string
+	sync.RWMutex
+}
+
+type FenceToIp struct {
+	Data map[string][]string
+	sync.RWMutex
+}
+
 type domainAliasRule struct {
 	pattern   string
 	templates []string
