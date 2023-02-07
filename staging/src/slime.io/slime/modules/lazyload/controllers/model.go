@@ -9,7 +9,9 @@ import (
 	"regexp"
 	"sync"
 
+	"k8s.io/apimachinery/pkg/types"
 	"slime.io/slime/framework/model"
+
 	modmodel "slime.io/slime/modules/lazyload/model"
 )
 
@@ -41,12 +43,14 @@ type PortProtocolCache struct {
 }
 
 type IpTofence struct {
-	Data map[string]string
+	// ip->namespacedname
+	Data map[string]types.NamespacedName
 	sync.RWMutex
 }
 
 type FenceToIp struct {
-	Data map[string][]string
+	// namespacedname -> ips
+	Data map[string]map[string]struct{}
 	sync.RWMutex
 }
 
