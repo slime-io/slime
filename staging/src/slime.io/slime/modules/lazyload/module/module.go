@@ -51,7 +51,8 @@ func (m *Module) Clone() module.Module {
 }
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
-	env, mgr := opts.Env, opts.Manager
+
+	env, mgr, le := opts.Env, opts.Manager, opts.LeaderElectionCbs
 	pc, err := controllers.NewProducerConfig(env)
 	if err != nil {
 		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
@@ -81,6 +82,11 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 			ApiType: &corev1.Service{},
 			R:       reconcile.Func(sfReconciler.ReconcileService),
 		})
+		podController := sfReconciler.NewPodController(env.K8SClient, m.config.FenceLabelKeyAlias)
+		le.AddOnStartedLeading(func(ctx context.Context) {
+			podController.Run(ctx.Done())
+		})
+
 	}
 
 	builder = builder.Add(basecontroller.ObjectReconcileItem{
@@ -99,7 +105,6 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		return fmt.Errorf("unable to create controller,%+v", err)
 	}
 
-	le := opts.LeaderElectionCbs
 	le.AddOnStartedLeading(func(_ context.Context) {
 		log.Infof("producers starts")
 		metric.NewProducer(pc)

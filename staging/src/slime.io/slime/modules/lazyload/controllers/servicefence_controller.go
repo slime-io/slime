@@ -50,24 +50,26 @@ import (
 // ServicefenceReconciler reconciles a Servicefence object
 type ServicefenceReconciler struct {
 	client.Client
-	Scheme               *runtime.Scheme
-	cfg                  *config.Fence
-	env                  bootstrap.Environment
-	interestMeta         map[string]bool
-	interestMetaCopy     map[string]bool // for outside read
-	watcherMetricChan    <-chan metric.Metric
-	tickerMetricChan     <-chan metric.Metric
-	reconcileLock        sync.RWMutex
-	staleNamespaces      map[string]bool
-	enabledNamespaces    map[string]bool
-	svcSynced            func() bool
-	nsSvcCache           *NsSvcCache
-	labelSvcCache        *LabelSvcCache
-	portProtocolCache    *PortProtocolCache
-	defaultAddNamespaces []string
-	doAliasRules         []*domainAliasRule
-	ipTofence            *IpTofence
-	fenceToIp            *FenceToIp
+	Scheme                     *runtime.Scheme
+	cfg                        *config.Fence
+	env                        bootstrap.Environment
+	interestMeta               map[string]bool
+	interestMetaCopy           map[string]bool // for outside read
+	watcherMetricChan          <-chan metric.Metric
+	tickerMetricChan           <-chan metric.Metric
+	reconcileLock              sync.RWMutex
+	staleNamespaces            map[string]bool
+	enabledNamespaces          map[string]bool
+	svcSynced                  func() bool
+	nsSvcCache                 *NsSvcCache
+	labelSvcCache              *LabelSvcCache
+	portProtocolCache          *PortProtocolCache
+	defaultAddNamespaces       []string
+	doAliasRules               []*domainAliasRule
+	ipTofence                  *IpTofence
+	fenceToIp                  *FenceToIp
+	workloadFenceLabelKey      string
+	workloadFenceLabelKeyAlias string
 }
 
 type ReconcilerOpts func(*ServicefenceReconciler)
