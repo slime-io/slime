@@ -4,7 +4,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/modules/example/api/config"
@@ -17,6 +16,21 @@ var log = model.ModuleLog
 
 type Module struct {
 	config config.Example
+}
+
+func (mo *Module) Setup(opts module.ModuleOptions) error {
+	env := opts.Env
+	mgr := opts.Manager
+	cfg := &mo.config
+
+	var err error
+	if err = (&controllers.ExampleReconciler{
+		Cfg: cfg, Env: &env, Scheme: mgr.GetScheme(), Client: mgr.GetClient(),
+	}).SetupWithManager(mgr); err != nil {
+		log.Errorf("unable to create example controller, %+v", err)
+		return err
+	}
+	return nil
 }
 
 func (mo *Module) Kind() string {
@@ -43,20 +57,4 @@ func (mo *Module) InitScheme(scheme *runtime.Scheme) error {
 func (mo *Module) Clone() module.Module {
 	ret := *mo
 	return &ret
-}
-
-func (mo *Module) Setup(opts module.ModuleOptions) error {
-	env := opts.Env
-	mgr := opts.Manager
-	cfg := &mo.config
-
-	var err error
-	if err = (&controllers.ExampleReconciler{
-		Cfg: cfg, Env: &env, Scheme: mgr.GetScheme(), Client: mgr.GetClient(),
-	}).SetupWithManager(mgr); err != nil {
-		log.Errorf("unable to create example controller, %+v", err)
-		return err
-	}
-
-	return nil
 }

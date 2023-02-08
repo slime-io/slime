@@ -414,6 +414,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 	seInformerFactory.Start(stopCh)
 	cache.WaitForCacheSync(stopCh, seInformer.HasSynced)
 
+	mc.SetReady()
 	log.Infof("start K8S config source successfully")
 	return nil
 }

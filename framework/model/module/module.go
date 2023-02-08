@@ -83,10 +83,12 @@ type ModuleOptions struct {
 }
 
 type Module interface {
+	// Setup we will only register run-able functions in Setup and no actual execution will take place in Setup
+	// the module user should not add blocking run-able functions in Setup
+	Setup(opts ModuleOptions) error
 	Kind() string
 	Config() proto.Message
 	InitScheme(scheme *runtime.Scheme) error
-	Setup(opts ModuleOptions) error
 	Clone() Module
 }
 
@@ -327,21 +329,27 @@ func Main(bundle string, modules []Module) {
 
 	readyMgr := &moduleReadyManager{moduleReadyCheckers: map[string][]readyChecker{}}
 
-	// init configController if configSource field is used
-	configController, err := bootstrap.NewConfigController(config, mgr.GetConfig())
-	if err != nil {
-		log.Errorf("start ConfigController error: %+v", err)
-		os.Exit(1)
-	}
-
-	istioConfigController, err := bootstrap.NewIstioConfigController(config)
-	if err != nil {
-		log.Warnf("start IstioConfigController error: %+v", err)
-		istioConfigController = nil
-	}
-
 	var once sync.Once
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+
+	// init ConfigController
+	var configController, istioConfigController bootstrap.ConfigController
+
+	if config.GetGlobal() != nil && len(config.GetGlobal().GetConfigSources()) > 0 {
+		configController, err = bootstrap.NewConfigController(config.GetGlobal().GetConfigSources(), ctx.Done())
+		if err != nil {
+			log.Warnf("new ConfigController failed: %+v", err)
+			configController = nil
+		}
+	}
+
+	if config.GetGlobal() != nil && config.GetGlobal().IstioConfigSource != nil {
+		istioConfigController, err = bootstrap.NewConfigController([]*bootconfig.ConfigSource{config.GetGlobal().IstioConfigSource}, ctx.Done())
+		if err != nil {
+			log.Warnf("new IstioConfigController error: %+v", err)
+			istioConfigController = nil
+		}
+	}
 
 	env := bootstrap.Environment{
 		ConfigController:      configController,
@@ -352,7 +360,7 @@ func Main(bundle string, modules []Module) {
 		Stop:                  ctx.Done(),
 	}
 
-	// init modules
+	// setup modules
 	for _, mc := range mcs {
 		modCfg, modGeneralJson := mc.config.config, mc.config.generalJson
 		modSelfCfg := mc.module.Config()
@@ -404,7 +412,6 @@ func Main(bundle string, modules []Module) {
 					}
 				}
 			}
-
 		}
 
 		moduleEnv := bootstrap.Environment{
@@ -424,6 +431,7 @@ func Main(bundle string, modules []Module) {
 			},
 			Stop: ctx.Done(),
 		}
+
 		if lm, ok := mc.module.(LegcyModule); ok {
 			if err := lm.InitManager(mgr, moduleEnv, cbs); err != nil {
 				log.Errorf("mod %s InitManager met err %v", modCfg.Name, err)
@@ -442,11 +450,29 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
+	// run ConfigController
+	if configController != nil {
+		configController, err = bootstrap.RunController(configController, config, mgr.GetConfig())
+		if err != nil {
+			log.Errorf("run config controller failed: %s", err)
+			return
+		}
+	}
+
+	if istioConfigController != nil {
+		istioConfigController, err = bootstrap.RunIstioController(istioConfigController, config)
+		if err != nil {
+			log.Errorf("run config controller failed: %s", err)
+			return
+		}
+	}
+
 	go func() {
 		auxAddr := config.Global.Misc["aux-addr"]
 		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check)
 	}()
 
+	// Run the runable function registered by the submodule
 	for _, startup := range startups {
 		startup(ctx)
 	}

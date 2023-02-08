@@ -2,7 +2,6 @@ package module
 
 import (
 	"fmt"
-
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"

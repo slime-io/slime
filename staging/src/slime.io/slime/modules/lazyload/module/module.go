@@ -3,13 +3,11 @@ package module
 import (
 	"context"
 	"fmt"
-
 	"github.com/golang/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
 	istioapi "slime.io/slime/framework/apis"
 	basecontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/metric"
@@ -26,15 +24,15 @@ type Module struct {
 	config config.Fence
 }
 
-func (mo *Module) Kind() string {
+func (m *Module) Kind() string {
 	return modmodel.ModuleName
 }
 
-func (mo *Module) Config() proto.Message {
-	return &mo.config
+func (m *Module) Config() proto.Message {
+	return &m.config
 }
 
-func (mo *Module) InitScheme(scheme *runtime.Scheme) error {
+func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
 		lazyloadapiv1alpha1.AddToScheme,
@@ -47,15 +45,13 @@ func (mo *Module) InitScheme(scheme *runtime.Scheme) error {
 	return nil
 }
 
-func (mo *Module) Clone() module.Module {
-	ret := *mo
+func (m *Module) Clone() module.Module {
+	ret := *m
 	return &ret
 }
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
-
 	env, mgr := opts.Env, opts.Manager
-
 	pc, err := controllers.NewProducerConfig(env)
 	if err != nil {
 		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
@@ -69,7 +65,6 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	sfReconciler.Scheme = mgr.GetScheme()
 
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
-		// start service related cache
 		sfReconciler.StartSvcCache(ctx)
 	})
 

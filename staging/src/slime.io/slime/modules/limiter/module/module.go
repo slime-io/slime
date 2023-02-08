@@ -55,6 +55,7 @@ func (m *Module) Clone() module.Module {
 	return &ret
 }
 func (m *Module) Setup(opts module.ModuleOptions) error {
+
 	if err := m.init(opts.Env); err != nil {
 		return err
 	}
