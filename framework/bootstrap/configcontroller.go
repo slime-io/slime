@@ -3,6 +3,11 @@ package bootstrap
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	meshconfig "istio.io/api/mesh/v1alpha1"
+	mcpresource "istio.io/istio-mcp/pkg/config/schema/resource"
+	mcpc "istio.io/istio-mcp/pkg/mcp/client"
+	xdsc "istio.io/istio-mcp/pkg/mcp/xds/client"
+	mcpmodel "istio.io/istio-mcp/pkg/model"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"net/url"
@@ -16,12 +21,7 @@ import (
 	"slime.io/slime/framework/bootstrap/viewstore"
 	"strconv"
 	"strings"
-
-	meshconfig "istio.io/api/mesh/v1alpha1"
-	mcpresource "istio.io/istio-mcp/pkg/config/schema/resource"
-	mcpc "istio.io/istio-mcp/pkg/mcp/client"
-	xdsc "istio.io/istio-mcp/pkg/mcp/xds/client"
-	mcpmodel "istio.io/istio-mcp/pkg/model"
+	"time"
 )
 
 const (
@@ -29,82 +29,46 @@ const (
 	McpOverXdsConfigSourcePrefix = "xds://"
 )
 
+type InitReady interface {
+	InitReady() bool
+}
+
 type ConfigController interface {
 	viewstore.ViewerStore
 	RegisterEventHandler(kind resource.GroupVersionKind, handler func(resource.Config, resource.Config, Event))
 	Run(stop <-chan struct{})
+	InitReady
 }
 
 type configController struct {
 	viewerStore        viewstore.ViewerStore
 	monitorControllers []*monitorController
-	stop               chan<- struct{}
+	stop               <-chan struct{}
 }
 
-func NewIstioConfigController(config *bootconfig.Config) (ConfigController, error) {
-	// XXX merge with NewIstioConfigController
-
-	configSource := config.Global.IstioConfigSource
-	if configSource == nil {
-		return nil, nil
+func RunIstioController(c ConfigController, config *bootconfig.Config) (ConfigController, error) {
+	cc, ok := c.(*configController)
+	if !ok {
+		return c, fmt.Errorf("convert to *configController error")
 	}
-
-	var cc *configController
-	stopCh := make(chan struct{})
-	var mcs []*monitorController
-
 	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
+	stop := cc.stop
 
-	// init all monitorControllers
-	imc, err := initIstioMonitorController()
-	if err != nil {
-		return nil, err
-	} else {
-		mcs = append(mcs, imc)
-	}
-
-	if strings.HasPrefix(configSource.Address, McpOverXdsConfigSourcePrefix) {
-		if mc, err := initXdsMonitorController(configSource); err != nil {
-			return nil, err
-		} else {
-			mcs = append(mcs, mc)
-		}
-	}
-
-	vs, err := makeViewerStore(mcs)
-	if err != nil {
-		return nil, err
-	}
-
-	cc = &configController{
-		viewerStore:        vs,
-		monitorControllers: mcs,
-		stop:               stopCh,
-	}
-
-	go cc.Run(stopCh)
-
-	for _, mc := range mcs {
+	go cc.Run(stop)
+	for _, mc := range cc.monitorControllers {
 		switch mc.kind {
 		case McpOverXds:
-			if err = startXdsMonitorController(mc, "", xdsSourceEnableIncPush); err != nil {
+			if err := startXdsMonitorController(mc, "", xdsSourceEnableIncPush, stop); err != nil {
 				return nil, err
 			}
 		}
 	}
-
 	log.Infof("start IstioConfigController successfully")
-
 	return cc, nil
 }
 
-func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigController, error) {
-	var cc *configController
-	stopCh := make(chan struct{})
+func NewConfigController(configSources []*bootconfig.ConfigSource, stop <-chan struct{}) (*configController, error) {
 	var mcs []*monitorController
-
-	configRevision := config.Global.ConfigRev
-	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
 
 	// init all monitorControllers
 	imc, err := initIstioMonitorController()
@@ -113,32 +77,20 @@ func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigCon
 	} else {
 		mcs = append(mcs, imc)
 	}
+	for _, configSource := range configSources {
+		if strings.HasPrefix(configSource.Address, McpOverXdsConfigSourcePrefix) {
+			if mc, err := initXdsMonitorController(configSource); err != nil {
+				return nil, err
+			} else {
+				mcs = append(mcs, mc)
+			}
 
-	if len(config.Global.ConfigSources) > 0 {
-		for _, configSource := range config.Global.ConfigSources {
-			if strings.HasPrefix(configSource.Address, McpOverXdsConfigSourcePrefix) {
-				if mc, err := initXdsMonitorController(configSource); err != nil {
-					return nil, err
-				} else {
-					mcs = append(mcs, mc)
-				}
-				continue
+		} else if strings.HasPrefix(configSource.Address, KubernetesConfigSourcePrefix) {
+			if mc, err := initK8sMonitorController(configSource); err != nil {
+				return nil, err
+			} else {
+				mcs = append(mcs, mc)
 			}
-			if strings.HasPrefix(configSource.Address, KubernetesConfigSourcePrefix) {
-				if mc, err := initK8sMonitorController(configSource); err != nil {
-					return nil, err
-				} else {
-					mcs = append(mcs, mc)
-				}
-				continue
-			}
-		}
-	} else {
-		// init k8s for default
-		if mc, err := initK8sMonitorController(nil); err != nil {
-			return nil, err
-		} else {
-			mcs = append(mcs, mc)
 		}
 	}
 
@@ -147,13 +99,30 @@ func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigCon
 		return nil, err
 	}
 
-	seLabelSelectorKeys := config.Global.Misc["seLabelSelectorKeys"]
-
-	cc = &configController{
+	cc := &configController{
 		viewerStore:        vs,
 		monitorControllers: mcs,
-		stop:               stopCh,
+		stop:               stop,
 	}
+	return cc, nil
+}
+
+func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Config) (ConfigController, error) {
+
+	cc, ok := c.(*configController)
+	if !ok {
+		return c, fmt.Errorf("convert to *configController error")
+	}
+
+	var err error
+	imc := cc.monitorControllers[0]
+	vs := cc.viewerStore
+	stop := cc.stop
+	mcs := cc.monitorControllers
+
+	seLabelSelectorKeys := config.Global.Misc["seLabelSelectorKeys"]
+	configRevision := config.Global.ConfigRev
+	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
 
 	// use cc to register handler for istio resources
 	// TODO divide serviceEntry handler to config handler and service handler, like istio
@@ -371,24 +340,32 @@ func NewConfigController(config *bootconfig.Config, cfg *rest.Config) (ConfigCon
 	cc.RegisterEventHandler(resource.Service, svcToIstioResHandler)
 	cc.RegisterEventHandler(resource.Endpoints, epsToIstioResHandler)
 
-	go cc.Run(stopCh)
+	go cc.Run(stop)
 
 	for _, mc := range mcs {
 		switch mc.kind {
 		case Kubernetes:
-			if err = startK8sMonitorController(mc, cfg, stopCh); err != nil {
+			if err = startK8sMonitorController(mc, cfg, stop); err != nil {
 				return nil, err
 			}
 		case McpOverXds:
-			if err = startXdsMonitorController(mc, configRevision, xdsSourceEnableIncPush); err != nil {
+			if err = startXdsMonitorController(mc, configRevision, xdsSourceEnableIncPush, stop); err != nil {
 				return nil, err
 			}
 		}
 	}
 
 	log.Infof("start ConfigController successfully")
-
 	return cc, nil
+}
+
+func (c *configController) InitReady() bool {
+	for _, mc := range c.monitorControllers {
+		if !mc.InitReady() {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *configController) Schemas() resource.Schemas {
@@ -413,18 +390,19 @@ func (c *configController) RegisterEventHandler(kind resource.GroupVersionKind, 
 }
 
 func (c *configController) Run(stop <-chan struct{}) {
+
 	for i := range c.monitorControllers {
 		go c.monitorControllers[i].Run(stop)
 	}
 	<-stop
-	// stop k8s informers
-	c.stop <- struct{}{}
+	log.Infof("stop controller run")
 }
 
 func initIstioMonitorController() (*monitorController, error) {
 	ics := makeConfigStore(collections.Istio)
 	mc := newMonitorController(ics)
 	mc.kind = Istio
+	mc.SetReady()
 	return mc, nil
 }
 
@@ -437,7 +415,7 @@ func initXdsMonitorController(configSource *bootconfig.ConfigSource) (*monitorCo
 	return mc, nil
 }
 
-func startXdsMonitorController(mc *monitorController, configRevision string, xdsSourceEnableIncPush bool) error {
+func startXdsMonitorController(mc *monitorController, configRevision string, xdsSourceEnableIncPush bool, stop <-chan struct{}) error {
 
 	srcAddress, err := url.Parse(mc.configSource.Address)
 	if err != nil {
@@ -552,10 +530,31 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 	})
 
 	go func() {
+
+		log.Infof("MCP: connect xds source and wait sync in background")
 		err := xdsMCP.Run()
 		if err != nil {
 			log.Errorf("MCP: failed running %v", err)
+			return
+		}
+
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-stop:
+				log.Infof("get stop chan in XdsMonitorController")
+				return
+			case <-ticker.C:
+				if xdsMCP.HasSynced() {
+					log.Infof("sync xds config source [%s] successfully", mc.configSource.Address)
+					mc.SetReady()
+					return
+				}
+				log.Debugf("waiting for syncing data of xds config source [%s]...", mc.configSource.Address)
+			}
 		}
 	}()
+
 	return nil
 }
