@@ -53,9 +53,8 @@ type SmartLimiterReconciler struct {
 	cfg *config.Limiter
 	env bootstrap.Environment
 	// key is limiter's namespace and name
-	// value is the host
-	// use service.ns.svc.cluster.local as default if host not specified
-	// or use mock host when limiter in gw and outbound
+	// value is the SmartLimiterMeta
+	// subsequent code can get this information directly rather than through clientSet
 	interest cmap.ConcurrentMap
 	// reuse, or use another filed to store interested nn
 	// key is the interested namespace/name
@@ -197,15 +196,27 @@ func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.
 	return pc, nil
 }
 
-func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, out bool) {
-	key := FQN(req.Namespace, req.Name)
-
-	// query hostname base on instance
-	host := buildHost(instance, out)
+func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, outbound bool) {
 
 	// set interest mapping
-	r.interest.Set(key, host)
-	log.Infof("set %s/%s = %s", instance.Namespace, instance.Name, host)
+	meta := SmartLimiterMeta{}
+	meta.outbound = outbound
+	meta.workloadSelector = instance.Spec.WorkloadSelector
+	meta.seHost = instance.Spec.Host
+	meta.host = util.UnityHost(instance.Name, instance.Namespace)
+
+	key := FQN(req.Namespace, req.Name)
+	r.interest.Set(key, meta)
+	log.Infof("set %s/%s = %+v", instance.Namespace, instance.Name, meta)
+}
+
+type SmartLimiterMeta struct {
+	// outbound: mesh outbound or gateway
+	outbound bool
+	// inbound: use host or workloadSelector
+	host             string
+	seHost           string
+	workloadSelector map[string]string
 }
 
 func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
@@ -265,18 +276,6 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 
 func FQN(ns, name string) string {
 	return ns + "/" + name
-}
-
-func buildHost(instance *microservicev1alpha2.SmartLimiter, out bool) string {
-	// get name.namespaces.svc.cluster.local by default
-	host := util.UnityHost(instance.Name, instance.Namespace)
-
-	if out {
-		host = model.MockHost
-	} else if instance.Spec.Host != "" {
-		host = instance.Spec.Host
-	}
-	return host
 }
 
 type ReconcilerOpts func(reconciler *SmartLimiterReconciler)

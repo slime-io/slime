@@ -21,7 +21,6 @@ import (
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
 	"slime.io/slime/framework/util"
-	"slime.io/slime/modules/limiter/model"
 )
 
 // StaticMeta is static info and do not to query from prometheus
@@ -72,104 +71,68 @@ func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) me
 	return queryMap
 }
 
-// TODO serviceEntry
 func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.QueryMap {
 	queryMap := make(map[string][]metric.Handler, 0)
 	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 	if !ok {
-		log.Infof("%s not in interest map", loc)
+		log.Warnf("%s not in interest map", loc)
 		return queryMap
 	}
-	// no need to query service information in outbound and gateway scenario
-	host := v.(string)
-	if host == model.MockHost {
-		meta := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
-		metaInfo := meta.String()
-		queryMap[metaInfo] = []metric.Handler{}
+
+	meta, ok := v.(SmartLimiterMeta)
+	if !ok {
+		log.Error("covert to SmartLimiterMeta err")
+		return queryMap
+	}
+
+	// only single limiter is support in outbound scenario, so metric is meaningless, just record it's namespacename
+	if meta.outbound {
+		sm := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
+		queryMap[sm.String()] = []metric.Handler{}
 		return queryMap
 	}
 
 	// handle loc which is in interest map in inbound scenario
 	if !r.cfg.GetDisableAdaptive() {
-		return r.handlePrometheusEvent(host, loc)
+		return r.handlePrometheusEvent(meta, loc)
 	} else {
-		return r.handleLocalEvent(host, loc)
+		return r.handleLocalEvent(meta, loc)
 	}
 	return nil
 }
 
-func (r *SmartLimiterReconciler) handleLocalEvent(host string, loc types.NamespacedName) metric.QueryMap {
+func (r *SmartLimiterReconciler) handleLocalEvent(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
 	queryMap := make(map[string][]metric.Handler, 0)
 
-	// if it does not end with .svc.cluster.local, it means that se host is specified
-	if !strings.HasSuffix(host, util.WellknownK8sSuffix) {
-		svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
-		if err != nil {
-			log.Errorf("get empty istio service base on %s/%s, %s", loc.Namespace, host, err)
-			return queryMap
-		}
-		serviceLabels := formatLabels(getIstioServiceLabels(svc))
-		subsetInfo := make(map[string]int)
-		// if subset is existed, assign pods to subset
-		subsetInfo[util.WellknownBaseSet] = len(svc.Endpoints)
-
-		if controllers.HostSubsetMapping.Get(host) != nil {
-			if subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
-				for _, ep := range svc.Endpoints {
-					for _, sb := range subsets {
-						if util.IsContain(ep.Labels, serviceLabels) {
-							subsetInfo[sb.GetName()] = subsetInfo[sb.GetName()] + 1
-						}
-					}
-				}
-			}
-		}
-		meta := generateMeta(subsetInfo, loc)
-		metaInfo := meta.String()
-		log.Infof("get se meta info %s", metaInfo)
-		if metaInfo == "" {
-			return nil
-		}
-		queryMap[metaInfo] = []metric.Handler{}
-		return queryMap
+	if len(LimiterMeta.workloadSelector) > 0 {
+		// workloadSelector is specified
+		queryMap = r.genQuerymapWithWorkloadSelector(LimiterMeta, loc)
+	} else if host := LimiterMeta.seHost; host != "" {
+		// se host is specified
+		queryMap = r.genQuerymapWithServiceEntry(host, loc)
+	} else {
+		// otherwise, use k8s svc
+		queryMap = r.genQuerymapWithService(loc)
 	}
-
-	// otherwise, use k8s svc
-	pods, err := queryServicePods(r.env.K8SClient, loc)
-	if err != nil {
-		log.Infof("get err in queryServicePods, %+v", err.Error())
-		return nil
-	}
-	subsetsPods, err := querySubsetPods(pods, loc)
-	if err != nil {
-		log.Infof("%+v", err.Error())
-		return nil
-	}
-	sbInfo := make(map[string]int)
-	for key, item := range subsetsPods {
-		sbInfo[key] = len(item)
-	}
-	meta := generateMeta(sbInfo, loc)
-	metaInfo := meta.String()
-	if metaInfo == "" {
-		return nil
-	}
-	queryMap[metaInfo] = []metric.Handler{}
 	return queryMap
 }
 
 // handlePrometheusEvent means construct query map as following
 // example: handler is a map
 // cpu.max => max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-func (r *SmartLimiterReconciler) handlePrometheusEvent(host string, loc types.NamespacedName) metric.QueryMap {
+func (r *SmartLimiterReconciler) handlePrometheusEvent(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
 	if r.env.Config == nil || r.env.Config.Metric == nil || r.env.Config.Metric.Prometheus == nil || r.env.Config.Metric.Prometheus.Handlers == nil {
 		log.Infof("query handler is empty, skip query")
 		return nil
 	}
 	handlers := r.env.Config.Metric.Prometheus.Handlers
 
-	if !strings.HasSuffix(host, util.WellknownK8sSuffix) {
-		log.Errorf("promql is closed when se host is specified")
+	// TODO workloadSelector
+	if len(LimiterMeta.workloadSelector) > 0 {
+		log.Warnf("promql is closed when workloadSelector is specified in %s", loc)
+		return nil
+	} else if host := LimiterMeta.seHost; host != "" {
+		log.Warnf("promql is closed when se host is specified in %s", loc)
 		return nil
 	}
 
@@ -197,14 +160,19 @@ func queryServicePods(c *kubernetes.Clientset, loc types.NamespacedName) ([]v1.P
 	if err != nil {
 		return pods, fmt.Errorf("get service %+v faild, %s", loc, err.Error())
 	}
-	podList, err := c.CoreV1().Pods(loc.Namespace).List(context.TODO(), metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(service.Spec.Selector).String(),
-	})
+	return queryPodsWithWorkloadSelector(c, service.Spec.Selector, loc.Namespace)
+}
+
+func queryPodsWithWorkloadSelector(c *kubernetes.Clientset, workloadSelector map[string]string, ns string) ([]v1.Pod, error) {
+
+	pods := make([]v1.Pod, 0)
+	selector := labels.SelectorFromSet(workloadSelector).String()
+	podLists, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
 	if err != nil {
-		return pods, fmt.Errorf("query pod list faild, %+v", err.Error())
+		return pods, fmt.Errorf("list pods with selector %+v failed", selector)
 	}
 
-	for _, item := range podList.Items {
+	for _, item := range podLists.Items {
 		if item.DeletionTimestamp != nil {
 			// pod is deleted
 			continue
@@ -216,6 +184,10 @@ func queryServicePods(c *kubernetes.Clientset, loc types.NamespacedName) ([]v1.P
 		}
 		pods = append(pods, item)
 	}
+	if len(pods) == 0 {
+		return pods, fmt.Errorf("no pods match workloadSelector %+v", workloadSelector)
+	}
+
 	return pods, nil
 }
 
@@ -365,4 +337,93 @@ func newPrometheusSourceConfig(env bootstrap.Environment) (metric.PrometheusSour
 	return metric.PrometheusSourceConfig{
 		Api: prometheusV1.NewAPI(promClient),
 	}, nil
+}
+
+func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) map[string][]metric.Handler {
+	// here, there is such a semantics
+	// if it is under istioNs, it will match all the pods in cluster
+	// other it will only match the real ns in cluster
+	queryMap := make(map[string][]metric.Handler, 0)
+	ns := loc.Namespace
+	if loc.Namespace == r.env.Config.Global.IstioNamespace {
+		ns = ""
+	}
+	pods, err := queryPodsWithWorkloadSelector(r.env.K8SClient, LimiterMeta.workloadSelector, ns)
+	if err != nil {
+		log.Errorf("get err in queryServicePodsWithWorkloadSelector, %+v", err.Error())
+		return nil
+	}
+
+	subsetInfo := make(map[string]int)
+	subsetInfo[util.WellknownBaseSet] = len(pods)
+
+	meta := generateMeta(subsetInfo, loc)
+	metaInfo := meta.String()
+	log.Debugf("get workloadSelector meta info %s", metaInfo)
+	if metaInfo == "" {
+		return nil
+	}
+	queryMap[metaInfo] = []metric.Handler{}
+	return queryMap
+}
+
+func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(host string, loc types.NamespacedName) map[string][]metric.Handler {
+
+	queryMap := make(map[string][]metric.Handler, 0)
+
+	svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
+	if err != nil {
+		log.Errorf("get empty istio service base on %s/%s, %s", loc.Namespace, host, err)
+		return queryMap
+	}
+	serviceLabels := formatLabels(getIstioServiceLabels(svc))
+	subsetInfo := make(map[string]int)
+	subsetInfo[util.WellknownBaseSet] = len(svc.Endpoints)
+
+	if controllers.HostSubsetMapping.Get(host) != nil {
+		if subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
+			for _, ep := range svc.Endpoints {
+				for _, sb := range subsets {
+					if util.IsContain(ep.Labels, serviceLabels) {
+						subsetInfo[sb.GetName()] = subsetInfo[sb.GetName()] + 1
+					}
+				}
+			}
+		}
+	}
+	meta := generateMeta(subsetInfo, loc)
+	metaInfo := meta.String()
+	log.Debugf("get se meta info %s", metaInfo)
+	if metaInfo == "" {
+		return nil
+	}
+	queryMap[metaInfo] = []metric.Handler{}
+	return queryMap
+}
+
+func (r *SmartLimiterReconciler) genQuerymapWithService(loc types.NamespacedName) map[string][]metric.Handler {
+	// otherwise, use k8s svc
+	queryMap := make(map[string][]metric.Handler, 0)
+	pods, err := queryServicePods(r.env.K8SClient, loc)
+	if err != nil {
+		log.Infof("get err in queryServicePods, %+v", err.Error())
+		return nil
+	}
+
+	subsetsPods, err := querySubsetPods(pods, loc)
+	if err != nil {
+		log.Infof("%+v", err.Error())
+		return nil
+	}
+	sbInfo := make(map[string]int)
+	for key, item := range subsetsPods {
+		sbInfo[key] = len(item)
+	}
+	meta := generateMeta(sbInfo, loc)
+	metaInfo := meta.String()
+	if metaInfo == "" {
+		return nil
+	}
+	queryMap[metaInfo] = []metric.Handler{}
+	return queryMap
 }
