@@ -3,7 +3,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-
 	networking "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -12,8 +11,8 @@ import (
 	slime_serviceregistry "slime.io/slime/framework/bootstrap/serviceregistry/model"
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
-	 "slime.io/slime/modules/limiter/api/config"
 	"slime.io/slime/modules/limiter/model"
 )
 
@@ -60,12 +59,23 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 
 	var sets []*networking.Subset
 
-	if !params.gw {
-		key, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
-		if !ok {
-			return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
+	if !ok {
+		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+	}
+
+	meta, ok := v.(SmartLimiterMeta)
+	if !ok {
+		log.Error("covert meta to SmartLimiterMeta err")
+		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+	}
+
+	// subset is only queried when there is a `service` in inbound
+	if meta.outbound == false && len(meta.workloadSelector) == 0 {
+		host := meta.host
+		if meta.seHost != "" {
+			host = meta.seHost
 		}
-		host := key.(string)
 		if controllers.HostSubsetMapping.Get(host) != nil {
 			sets = controllers.HostSubsetMapping.Get(host).([]*networking.Subset)
 		}

@@ -94,7 +94,6 @@ func (r *SmartLimiterReconciler) ConsumeMetric(metricMap metric.Metric) {
 			Info[subset] = strconv.Itoa(number)
 		}
 		log.Debugf("exact metric info, %v", Info)
-
 		// use info to refresh SmartLimiter's status
 		if _, err := r.Refresh(reconcile.Request{NamespacedName: loc}, Info); err != nil {
 			log.Errorf("refresh error:%v", err)

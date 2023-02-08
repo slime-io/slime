@@ -54,6 +54,9 @@ func (p *TickerProducer) HandleTickerEvent() {
 				continue
 			}
 
+			if len(metric) == 0 {
+				continue
+			}
 			// produce metric event
 			p.MetricChan <- metric
 
