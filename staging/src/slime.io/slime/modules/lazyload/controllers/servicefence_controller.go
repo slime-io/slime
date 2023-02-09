@@ -277,6 +277,7 @@ func (r *ServicefenceReconciler) recordVisitor(sf *lazyloadv1alpha1.ServiceFence
 		delete(destSf.Status.Visitor, sf.Namespace+"/"+sf.Name)
 		_ = r.Client.Status().Update(context.TODO(), destSf)
 	}
+	log.Debugf("update dest sf %s in recordVisitor", sf.Namespace+"/"+sf.Name)
 }
 
 // prepareDestFence prepares servicefence of specified host
@@ -306,6 +307,7 @@ retry: // FIXME fix infinite loop
 			if err = r.Client.Create(context.TODO(), destSf); err != nil {
 				goto retry
 			}
+			log.Infof("create destSf %s:%s", destSf.Namespace, destSf.Name)
 		} else {
 			return nil
 		}
@@ -363,6 +365,7 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(sf *lazyloadv1alpha1.Se
 	sf.Status.Domains = domains
 
 	_ = r.Client.Status().Update(context.TODO(), sf)
+	log.Debugf("update sf status %+v in updateVisitedHostStatus", domains)
 
 	return delta
 }
@@ -581,6 +584,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	}
 
 	for k, v := range sf.Status.Domains {
+		log.Debugf("sf %s:%s has domains %s", sf.Namespace, sf.Name, k)
 		if v.Status == lazyloadv1alpha1.Destinations_ACTIVE || v.Status == lazyloadv1alpha1.Destinations_EXPIREWAIT {
 			if strings.HasSuffix(k, "/*") {
 				if !r.isDefaultAddNs(k) {
@@ -591,6 +595,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 			for _, h := range v.Hosts {
 				hosts = append(hosts, "*/"+h)
 			}
+			log.Debugf("host is %+v", hosts)
 		}
 	}
 
@@ -620,7 +625,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 
 	// sort hosts so that it follows the Equals semantics
 	sort.Strings(hosts)
-
+	log.Debugf("sort host is %+v in %s:%s", hosts, sf.Namespace, sf.Name)
 	sidecar := &istio.Sidecar{
 		WorkloadSelector: &istio.WorkloadSelector{
 			Labels: map[string]string{},

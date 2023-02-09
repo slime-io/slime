@@ -183,6 +183,11 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 
 func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
+	if r.inSpecialNs(req.Namespace) {
+		//log.Debugf("auto fence does not apply to specifical namespace: %s, skip", req.NamespacedName)
+		return ctrl.Result{}, nil
+	}
+
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
 
@@ -191,24 +196,14 @@ func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.
 
 func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ret ctrl.Result, err error) {
 
-	// Fetch the namespace instance
-	ns := &corev1.Namespace{}
-	err = r.Client.Get(ctx, req.NamespacedName, ns)
-
-	if ns.Name == r.env.Config.Global.IstioNamespace || ns.Name == r.env.Config.Global.SlimeNamespace || ns.Name == "kube-system" {
-		log.Debugf("auto fence does not apply to istio/slime and kube-system namespace, skip")
+	if r.inSpecialNs(req.Name) {
+		//log.Debugf("auto fence does not apply to specifical namespace: %s, skip", req.NamespacedName)
 		return reconcile.Result{}, nil
 	}
 
-	r.reconcileLock.Lock()
-	defer r.reconcileLock.Unlock()
-
-	defer func() {
-		if err == nil {
-			delete(r.staleNamespaces, req.Name)
-		}
-	}()
-
+	// Fetch the namespace instance
+	ns := &corev1.Namespace{}
+	err = r.Client.Get(ctx, req.NamespacedName, ns)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			ns = nil
@@ -219,6 +214,15 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 			return reconcile.Result{}, err
 		}
 	}
+
+	r.reconcileLock.Lock()
+	defer r.reconcileLock.Unlock()
+
+	defer func() {
+		if err == nil {
+			delete(r.staleNamespaces, req.Name)
+		}
+	}()
 
 	nsFenced := r.isNsFenced(ns)
 
@@ -309,6 +313,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				log.Errorf("create fence %s failed, %+v", nsName, err)
 				return reconcile.Result{}, err
 			}
+			log.Infof("create fence succeed %s:%s in refreshFenceStatusOfService", sf.Namespace, sf.Name)
 		}
 	} else if rev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(rev) {
 		// check if svc needs auto fence created
@@ -339,15 +344,22 @@ func markFenceCreatedByController(sf *lazyloadv1alpha1.ServiceFence) {
 
 var generatedWorkloadSFNameTpl = "%s-%s.workload.identity"
 
-func (sf *ServicefenceReconciler) handlePodAdd(ctx context.Context, obj interface{}) {
-	sf.handlePodUpdate(ctx, nil, obj)
+func (r *ServicefenceReconciler) handlePodAdd(ctx context.Context, obj interface{}) {
+	r.handlePodUpdate(ctx, nil, obj)
 }
 
 func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj interface{}) {
+
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		return
 	}
+
+	if r.inSpecialNs(pod.Namespace) {
+		//log.Debugf("auto fence does not apply to specifical namespace: %s, %s, skip", pod.Namespace, pod.Name)
+		return
+	}
+
 	if pod.Status.PodIP == "" {
 		return
 	}
@@ -392,6 +404,7 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 		} else {
 			r.appendIpToFence(namespacedName, pod.Status.PodIP)
 		}
+		log.Infof("create fence %s for workload selector by '%s=%s' ", namespacedName, r.workloadFenceLabelKey, v)
 	}
 }
 
@@ -482,5 +495,12 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 		return true
 	}
 	r.fenceToIp.Data[namespacedName.String()] = ips
+	return false
+}
+
+func (r *ServicefenceReconciler) inSpecialNs(ns string) bool {
+	if ns == r.env.Config.Global.IstioNamespace || ns == r.env.Config.Global.SlimeNamespace || ns == "kube-system" {
+		return true
+	}
 	return false
 }

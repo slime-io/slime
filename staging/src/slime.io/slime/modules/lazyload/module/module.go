@@ -52,6 +52,7 @@ func (m *Module) Clone() module.Module {
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
 
+	log.Debugf("lazyload setup begin")
 	env, mgr, le := opts.Env, opts.Manager, opts.LeaderElectionCbs
 	pc, err := controllers.NewProducerConfig(env)
 	if err != nil {
@@ -83,9 +84,10 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 			ApiType: &corev1.Service{},
 			R:       reconcile.Func(sfReconciler.ReconcileService),
 		})
+		log.Debugf("add podController.Run in AddOnStartedLeading")
 		podController := sfReconciler.NewPodController(env.K8SClient, m.config.FenceLabelKeyAlias)
 		le.AddOnStartedLeading(func(ctx context.Context) {
-			podController.Run(ctx.Done())
+			go podController.Run(ctx.Done())
 		})
 
 	}
@@ -105,12 +107,13 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err := builder.Build(mgr); err != nil {
 		return fmt.Errorf("unable to create controller,%+v", err)
 	}
-
+	log.Debugf("add metric.NewProducer(pc) in AddOnStartedLeading")
 	le.AddOnStartedLeading(func(_ context.Context) {
 		log.Infof("producers starts")
 		metric.NewProducer(pc)
 	})
 	if m.config.AutoPort {
+		log.Debugf("add sfReconciler.StartAutoPort(ctx) in AddOnStartedLeading")
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			sfReconciler.StartAutoPort(ctx)
 		})
@@ -118,6 +121,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	if env.Config.Metric != nil ||
 		env.Config.Global.Misc["metricSourceType"] == controllers.MetricSourceTypeAccesslog {
+		log.Debugf("add sfReconciler.WatchMetric(ctx) in AddOnStartedLeading")
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			go sfReconciler.WatchMetric(ctx)
 		})

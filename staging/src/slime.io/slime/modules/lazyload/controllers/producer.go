@@ -398,7 +398,7 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 
 	// if dest is non ns service, dest should not expand with '.svc.cluster.local'
 	// so both short name and k8s fqdn will be added as following
-	destSvcs = append(destSvcs, dest)
+	//destSvcs = append(destSvcs, dest)
 	var destSvc string
 
 	destParts := strings.Split(dest, ".")
@@ -418,13 +418,11 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 		destSvc = dest
 	}
 
-	if destSvcs[0] != destSvc {
-		destSvcs = append(destSvcs, destSvc)
-	}
+	destSvcs = append(destSvcs, destSvc)
 
 	result := make([]string, 0)
 	for _, svc := range destSvcs {
-		result = append(result, fmt.Sprintf("\"{destination_service=\"%s\"}\"", svc))
+		result = append(result, fmt.Sprintf("{destination_service=\"%s\"}", svc))
 	}
 	log.Debugf("DestinationSvc is: %+v", result)
 	return result

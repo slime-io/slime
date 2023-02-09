@@ -2,6 +2,7 @@ package leaderelection
 
 import (
 	"context"
+	log "github.com/sirupsen/logrus"
 	"sync"
 )
 
@@ -56,8 +57,11 @@ func NewAlwaysLeader() *AlwaysLeader {
 
 func (al *AlwaysLeader) AddOnStartedLeading(cb func(context.Context)) {
 	al.startCbLock.Lock()
+	log.Debugf("len al.onStartedLeadingCallbacks %d", len(al.onStartedLeadingCallbacks))
 	al.onStartedLeadingCallbacks = append(al.onStartedLeadingCallbacks, cb)
+	log.Debugf("len al.onStartedLeadingCallbacks %d", len(al.onStartedLeadingCallbacks))
 	al.startCbLock.Unlock()
+
 }
 
 func (al *AlwaysLeader) AddOnStoppedLeading(cb func()) {
@@ -76,11 +80,17 @@ func (al *AlwaysLeader) Run(ctx context.Context) error {
 			f()
 		}
 	}()
+
+	log.Debug("run always leader")
 	al.startCbLock.RLock()
 	cbs := make([]func(context.Context), len(al.onStartedLeadingCallbacks))
+	log.Debugf("has %d onStartedLeadingCallbacks func", len(al.onStartedLeadingCallbacks))
 	copy(cbs, al.onStartedLeadingCallbacks)
+	log.Debugf("has %d onStartedLeadingCallbacks func in cbs", len(al.onStartedLeadingCallbacks))
+	log.Debugf("has %d onStartedLeadingCallbacks func in cbs", len(cbs))
 	al.startCbLock.RUnlock()
 	for _, f := range cbs {
+		log.Infof("run cbs in always leader")
 		f(ctx)
 	}
 	<-ctx.Done()

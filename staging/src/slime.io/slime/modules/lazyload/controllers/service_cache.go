@@ -299,6 +299,7 @@ func (r *ServicefenceReconciler) IpToSvcCache(ctx context.Context) {
 				}
 			}
 			ipToSvcCache.Unlock()
+
 			svcToIpsCache.Lock()
 			svcToIpsCache.Data[svc] = addresses
 			svcToIpsCache.Unlock()
