@@ -3,12 +3,15 @@ package nacos
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
+	"sync/atomic"
 	"time"
-
-	"istio.io/pkg/log"
 )
+
+const defaultNacosTokenTTL = 5
 
 type serviceResp struct {
 	Doms  []string `json:"doms"`
@@ -49,20 +52,40 @@ type client struct {
 	urls    []string
 	headers map[string]string
 	index   int
+
+	// security login
+	username string
+	password string
+	token    *atomic.Value
+	tokenTTL int64
 }
 
-func NewClient(urls []string, headers map[string]string) Client {
-	return &client{
-		client:  http.Client{Timeout: 30 * time.Second},
-		headers: headers,
-		urls:    urls,
-		index:   0,
+func NewClient(urls []string, username, password string, headers map[string]string) Client {
+	c := &client{
+		client:   http.Client{Timeout: 30 * time.Second},
+		headers:  headers,
+		urls:     urls,
+		index:    0,
+		username: username,
+		password: password,
+		tokenTTL: defaultNacosTokenTTL, // defaulr TokenTTL as 5 second, if first login failed
+		token:    &atomic.Value{},
 	}
+	if c.headers == nil {
+		c.headers = make(map[string]string)
+	}
+	c.headers["Content-Type"] = "application/x-www-form-urlencoded"
+	if c.username != "" && c.password != "" {
+		c.login()
+		c.autoRefresh()
+	}
+	return c
 }
 
 const (
 	servicePath  = "/nacos/v1/ns/service/list?pageNo=1&pageSize=100000"
 	intancesPath = "/nacos/v1/ns/instance/list?serviceName="
+	loginPath    = "/nacos/v1/auth/login"
 )
 
 func (c *client) chooseURL() string {
@@ -75,8 +98,8 @@ func (c *client) chooseURL() string {
 	return url
 }
 
-func (c *client) call(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+func (c *client) call(method string, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -91,16 +114,25 @@ func (c *client) call(url string) ([]byte, error) {
 	}
 	defer resp.Body.Close() // nolint: errcheck
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code when get nacos services: %v", resp.Status)
+		errMsg, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code %q when request to nacos: %s", resp.Status, string(errMsg))
 	}
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func (c *client) Instances() ([]*instanceResp, error) {
 	url := c.chooseURL()
-	log.Debug("nacos url:" + url)
+	Scope.Debug("nacos url:" + url)
 
-	serviceData, err := c.call(url + servicePath)
+	getUrl := func(base string) string {
+		token := c.token.Load()
+		if token == nil {
+			return base
+		}
+		return base + "&accessToken=" + token.(string)
+	}
+
+	serviceData, err := c.call(http.MethodGet, getUrl(url+servicePath), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +144,7 @@ func (c *client) Instances() ([]*instanceResp, error) {
 	instanceAll := make([]*instanceResp, 0)
 	for _, serviceName := range services.Doms {
 		var instance instanceResp
-		instanceData, err := c.call(url + intancesPath + "DEFAULT_GROUP@@" + serviceName)
+		instanceData, err := c.call(http.MethodGet, getUrl(url+intancesPath+"DEFAULT_GROUP@@"+serviceName), nil)
 		if err = json.Unmarshal(instanceData, &instance); err != nil {
 			return nil, err
 		}
@@ -120,4 +152,65 @@ func (c *client) Instances() ([]*instanceResp, error) {
 		instanceAll = append(instanceAll, &instance)
 	}
 	return instanceAll, nil
+}
+
+func (c *client) login() {
+	if c.username == "" || c.password == "" {
+		return
+	}
+	needResetTTL := false
+	defer func() {
+		if needResetTTL {
+			c.tokenTTL = defaultNacosTokenTTL
+		}
+	}()
+	loginUrl := c.chooseURL() + loginPath
+	enc := url.Values{}
+	enc.Add("username", c.username)
+	enc.Add("password", c.password)
+	body := func() io.Reader {
+		enc := url.Values{}
+		enc.Add("username", c.username)
+		enc.Add("password", c.password)
+		return strings.NewReader(enc.Encode())
+	}()
+	resp, err := c.call(http.MethodPost, loginUrl, body)
+	if err != nil {
+		Scope.Warnf("login %s with user %s failed: %s", loginUrl, c.username, err)
+		needResetTTL = true
+		return
+	}
+	var result = struct {
+		AccessToken *string `json:"accessToken,omitempty"`
+		TokenTTL    *int64  `json:"tokenTtl,omitempty"`
+	}{}
+	err = json.Unmarshal(resp, &result)
+	if err != nil {
+		Scope.Warnf("parse response of login request failed: %s", err)
+		needResetTTL = true
+		return
+	}
+	if result.TokenTTL == nil {
+		needResetTTL = true
+	} else {
+		c.tokenTTL = *result.TokenTTL
+	}
+	if result.AccessToken != nil {
+		c.token.Store(*result.AccessToken)
+	}
+}
+
+// need call login() before to init the ttl of the token
+func (c *client) autoRefresh() {
+	if c.username == "" || c.password == "" {
+		return
+	}
+	go func() {
+		timer := time.NewTimer(time.Duration((c.tokenTTL - c.tokenTTL/10)) * time.Second)
+		for {
+			<-timer.C
+			c.login()
+			timer.Reset(time.Duration((c.tokenTTL - c.tokenTTL/10)) * time.Second)
+		}
+	}()
 }

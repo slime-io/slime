@@ -102,7 +102,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		}
 	}
 	if nacoesArgs.Mode == POLLING {
-		source.client = NewClient(nacoesArgs.Address, headers)
+		source.client = NewClient(nacoesArgs.Address, nacoesArgs.Username, nacoesArgs.Password, headers)
 	} else {
 		namingClient, err := newNamingClient(nacoesArgs.Address, nacoesArgs.Namespace, headers)
 		if err != nil {

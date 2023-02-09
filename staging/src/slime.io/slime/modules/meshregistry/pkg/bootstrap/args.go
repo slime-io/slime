@@ -163,6 +163,9 @@ type NacosSourceArgs struct {
 	K8sDomainSuffix bool
 	// need ns in Host
 	NsHost bool
+	// username and password for nacos auth
+	Username string
+	Password string
 }
 
 type McpArgs struct {
