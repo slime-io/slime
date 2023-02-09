@@ -639,17 +639,6 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		Namespace: sf.Namespace,
 	}
 
-	svc := &corev1.Service{}
-	if err := r.Client.Get(context.TODO(), nsName, svc); err != nil {
-		if errors.IsNotFound(err) {
-			log.Warningf("cannot find service %s for servicefence, skip sidecar generating", nsName)
-			return nil, nil
-		} else {
-			log.Errorf("get service %s error, %+v", nsName, err)
-			return nil, err
-		}
-	}
-
 	// generate sidecar.spec.workloadSelector
 	// priority: sf.spec.workloadSelector.labels > sf.spec.workloadSelector.fromService
 	if sf.Spec.WorkloadSelector != nil && len(sf.Spec.WorkloadSelector.Labels) > 0 {
@@ -659,12 +648,22 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		}
 	} else if sf.Spec.WorkloadSelector != nil && sf.Spec.WorkloadSelector.FromService {
 		// sidecar.WorkloadSelector.Labels = svc.Spec.Selector
+		svc := &corev1.Service{}
+		if err := r.Client.Get(context.TODO(), nsName, svc); err != nil {
+			if errors.IsNotFound(err) {
+				log.Warningf("cannot find service %s for servicefence, skip sidecar generating", nsName)
+				return nil, nil
+			} else {
+				log.Errorf("get service %s error, %+v", nsName, err)
+				return nil, err
+			}
+		}
 		for k, v := range svc.Spec.Selector {
 			sidecar.WorkloadSelector.Labels[k] = v
 		}
 	} else {
 		// compatible with old version lazyload
-		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = svc.Name
+		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = nsName.Name
 	}
 
 	spec, err := util.ProtoToMap(sidecar)

@@ -382,6 +382,10 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 		markFenceCreatedByController(sf)
 		model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
 		if err := r.Client.Create(ctx, sf); err != nil {
+			if errors.IsAlreadyExists(err) {
+				r.appendIpToFence(namespacedName, pod.Status.PodIP)
+				return
+			}
 			log.Errorf("create fence %s for workload selector by '%s=%s' failed: %s", namespacedName, r.workloadFenceLabelKey, v, err)
 			// Todo: need retry
 			return
