@@ -19,12 +19,14 @@ func NewProducer(config *ProducerConfig) {
 	}
 
 	if config.EnableWatcherProducer {
+		log.Debugf("lazyload: watch producer begin")
 		wp = NewWatcherProducer(config.WatcherProducerConfig, source)
 		wp.Start()
 		go wp.HandleWatcherEvent()
 	}
 
 	if config.EnableTickerProducer {
+		log.Debugf("lazyload: ticker producer begin")
 		tp = NewTickerProducer(config.TickerProducerConfig, source)
 		tp.Start()
 		go tp.HandleTickerEvent()
