@@ -54,7 +54,7 @@ type Source struct {
 	zkGatewayModel              bool
 	patchLabel                  bool
 	ignoreLabels                map[string]string
-	watchingRoot                bool
+	watchingRoot                bool // TODO useless?
 	watchingWorkerCount         int
 
 	serviceCache         map[string]*ServiceEntryWithMeta
@@ -121,25 +121,38 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
 }
 
-func (s *Source) reConFunc(event zk.Event) {
-	// TODO refactor recon logic
+func (s *Source) reConFunc(reconCh chan<- struct{}) {
+	if s.watchingRoot {
+		return // ??
+	}
 
-	switch event.Type {
-	case zk.EventDisconnected:
-		// rewatch
-		if !s.watchingRoot {
-			s.Con.Load().(*zk.Conn).Close()
-			for {
-				con, _, err := zk.Connect(s.addresses, s.timeout)
-				if err != nil {
-					scope.Infof("re connect zk error %v", err)
-					continue
-				}
-				// replace the connection
-				s.Con.Store(con)
-				zk.WithEventCallback(s.reConFunc)(con)
-				break
+	var curConn *zk.Conn
+	if v := s.Con.Load(); v != nil {
+		curConn = v.(*zk.Conn)
+	}
+	if curConn != nil {
+		curConn.Close()
+	}
+
+	for {
+		con, _, err := zk.Connect(s.addresses, s.timeout, zk.WithEventCallback(func(ev zk.Event) {
+			if ev.Type != zk.EventDisconnected {
+				return
 			}
+
+			// notify recon
+			select {
+			case reconCh <- struct{}{}:
+			default:
+			}
+		}))
+		if err != nil {
+			scope.Infof("re connect zk error %v", err)
+			time.Sleep(time.Second)
+		} else {
+			// replace the connection
+			s.Con.Store(con)
+			break
 		}
 	}
 }
@@ -197,28 +210,31 @@ func (s *Source) Start() {
 		}()
 	}
 
-	go func() {
-		for {
-			con, _, err := zk.Connect(s.addresses, s.timeout)
-			if err != nil {
-				scope.Errorf("zk conn %s %v met err %v", s.addresses, s.timeout, err)
-				time.Sleep(time.Second)
-				continue
-			}
-			s.Con.Store(con)
-			zk.WithEventCallback(s.reConFunc)(con)
-			break
-		}
+	go func() { // do recon
+		reconCh := make(chan struct{}, 1)
+		reconCh <- struct{}{}
+		starter := &sync.Once{}
 
-		// s.initPush()
-		// TODO 服务自省模式
-		// go s.doWatchAppication(s.ApplicationRegisterRootNode)
-		if s.isPollingMode() {
-			go s.Polling()
-		} else {
-			go s.Watching()
+		for {
+			select {
+			case <-s.stop:
+				return
+			case <-reconCh:
+				log.Infof("recv signal, will call reConFunc")
+				s.reConFunc(reconCh)
+				starter.Do(func() {
+					log.Infof("zk connected, will start fetch-data logic")
+					// s.initPush()
+					// TODO 服务自省模式
+					// go s.doWatchAppication(s.ApplicationRegisterRootNode)
+					if s.isPollingMode() {
+						go s.Polling()
+					} else {
+						go s.Watching()
+					}
+				})
+			}
 		}
-		<-s.stop
 	}()
 
 	if s.args.EnableDubboSidecar {
