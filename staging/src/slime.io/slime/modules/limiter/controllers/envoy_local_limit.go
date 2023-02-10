@@ -283,13 +283,17 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		// build token bucket
 		localRateLimitDescriptors := generateLocalRateLimitDescriptors(desc, params.loc)
 		localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
-			TokenBucket:          generateCustomTokenBucket(100000, 100000, 1),
-			Descriptors:          localRateLimitDescriptors,
-			StatPrefix:           util.StructEnvoyLocalRateLimitLimiter,
-			FilterEnabled:        generateEnvoyLocalRateLimitEnabled(),
-			FilterEnforced:       generateEnvoyLocalRateLimitEnforced(),
-			ResponseHeadersToAdd: generateResponseHeaderToAdd(desc),
+			TokenBucket:    generateCustomTokenBucket(100000, 100000, 1),
+			Descriptors:    localRateLimitDescriptors,
+			StatPrefix:     util.StructEnvoyLocalRateLimitLimiter,
+			FilterEnabled:  generateEnvoyLocalRateLimitEnabled(),
+			FilterEnforced: generateEnvoyLocalRateLimitEnforced(),
 		}
+		headers := generateResponseHeaderToAdd(desc)
+		if len(headers) > 0 {
+			localRateLimit.ResponseHeadersToAdd = headers
+		}
+
 		local, err := util.MessageToStruct(localRateLimit)
 		if err != nil {
 			return nil
