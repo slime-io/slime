@@ -113,7 +113,7 @@ require (
 
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
-	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20220815023449-add01187ad4f
+	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20230210055653-e5ab5bf5cb30
 	github.com/prometheus/common => github.com/prometheus/common v0.26.0
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
