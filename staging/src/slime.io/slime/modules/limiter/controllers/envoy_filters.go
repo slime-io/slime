@@ -110,16 +110,20 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 							log.Errorf("calculate quota %s err, %+v", des.Action.Quota, err.Error())
 						} else {
 							// log.Infof("after calculate, the quota %s is %d",des.Action.Quota,rateLimitValue)
-							validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, &microservicev1alpha2.SmartLimitDescriptor{
+							sd := &microservicev1alpha2.SmartLimitDescriptor{
 								Action: &microservicev1alpha2.SmartLimitDescriptor_Action{
 									Quota:        fmt.Sprintf("%d", rateLimitValue),
 									FillInterval: des.Action.FillInterval,
 									Strategy:     des.Action.Strategy,
-									HeadersToAdd: generateHeadersToAdd(des),
 								},
 								Match:  des.Match,
 								Target: des.Target,
-							})
+							}
+							headers := generateHeadersToAdd(des)
+							if len(headers) > 0 {
+								sd.Action.HeadersToAdd = headers
+							}
+							validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
 						}
 					}
 				}
