@@ -53,6 +53,7 @@ func (m *Module) Clone() module.Module {
 func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	log.Debugf("lazyload setup begin")
+
 	env, mgr, le := opts.Env, opts.Manager, opts.LeaderElectionCbs
 	pc, err := controllers.NewProducerConfig(env)
 	if err != nil {
@@ -65,6 +66,10 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	)
 	sfReconciler.Client = mgr.GetClient()
 	sfReconciler.Scheme = mgr.GetScheme()
+
+	if env.ConfigController != nil {
+		sfReconciler.RegisterSeHandler()
+	}
 
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
 		sfReconciler.StartSvcCache(ctx)
