@@ -68,7 +68,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
 		sfReconciler.StartSvcCache(ctx)
-		sfReconciler.IpToSvcCache(ctx)
+		sfReconciler.StartIpToSvcCache(ctx)
 	})
 
 	var builder basecontroller.ObjectReconcilerBuilder
@@ -84,7 +84,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 			ApiType: &corev1.Service{},
 			R:       reconcile.Func(sfReconciler.ReconcileService),
 		})
-		log.Debugf("add podController.Run in AddOnStartedLeading")
+
 		podController := sfReconciler.NewPodController(env.K8SClient, m.config.FenceLabelKeyAlias)
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			go podController.Run(ctx.Done())
@@ -107,13 +107,13 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err := builder.Build(mgr); err != nil {
 		return fmt.Errorf("unable to create controller,%+v", err)
 	}
-	log.Debugf("add metric.NewProducer(pc) in AddOnStartedLeading")
+
 	le.AddOnStartedLeading(func(_ context.Context) {
 		log.Infof("producers starts")
 		metric.NewProducer(pc)
 	})
 	if m.config.AutoPort {
-		log.Debugf("add sfReconciler.StartAutoPort(ctx) in AddOnStartedLeading")
+
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			sfReconciler.StartAutoPort(ctx)
 		})
@@ -121,7 +121,6 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	if env.Config.Metric != nil ||
 		env.Config.Global.Misc["metricSourceType"] == controllers.MetricSourceTypeAccesslog {
-		log.Debugf("add sfReconciler.WatchMetric(ctx) in AddOnStartedLeading")
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			go sfReconciler.WatchMetric(ctx)
 		})
