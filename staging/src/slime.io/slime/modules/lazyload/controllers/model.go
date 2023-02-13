@@ -54,7 +54,7 @@ type FenceToIp struct {
 }
 
 type IpToSvcCache struct {
-	Data map[string]string
+	Data map[string]map[string]struct{}
 	sync.RWMutex
 }
 

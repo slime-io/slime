@@ -134,22 +134,13 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 		}
 		log.Debugf("initCache is %+v", initCache)
 
-		// make preparation for handler
-		//ipToSvcCache, svcToIpsCache, cacheLock, err := newIpToSvcCache(env.K8SClient)
-		//if err != nil {
-		//	return nil, err
-		//}
-
 		// init accessLog source config
 		accessLogSourceConfig = metric.AccessLogSourceConfig{
 			ServePort: port,
 			AccessLogConvertorConfigs: []metric.AccessLogConvertorConfig{
 				{
-					Name:    AccessLogConvertorName,
-					Handler: nil,
-					//Handler: func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
-					//	return accessLogHandler(logEntry, , svcToIpsCache, cacheLock)
-					//},
+					Name:      AccessLogConvertorName,
+					Handler:   nil,
 					InitCache: initCache,
 				},
 			},
@@ -276,30 +267,30 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 		}
 
 		// fetch sourceSvcMeta
-		sourceSvc, err := spliceSourceSvc(sourceIp, ipToSvcCache)
+		sourceSvcs, err := spliceSourceSvc(sourceIp, ipToSvcCache)
 		if err != nil {
 			return nil, err
 		}
 
+		// fetch fence
 		fenceNN, err := spliceSourcefence(sourceIp, ipTofenceCache)
 		if err != nil {
 			fenceNN = nil
 			return nil, err
 		}
 
-		if sourceSvc == "" || fenceNN == nil {
+		if len(sourceSvcs) == 0 && fenceNN == nil {
 			continue
 		}
-		log.Debugf("source svc is %s, %s", sourceSvc, fenceNN)
 
 		// fetch destinationSvcMeta
-		destinationSvcs := spliceDestinationSvc(entry, sourceSvc, svcToIpsCache)
+		destinationSvcs := spliceDestinationSvc(entry, sourceSvcs, svcToIpsCache, fenceNN)
 		if len(destinationSvcs) == 0 {
 			continue
 		}
 
-		// push result
-		if sourceSvc != "" {
+		// tmpResult: source -> dest
+		for _, sourceSvc := range sourceSvcs {
 			if _, ok := tmpResult[sourceSvc]; !ok {
 				tmpResult[sourceSvc] = make(map[string]int)
 			}
@@ -308,8 +299,9 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 			}
 		}
 
+		// record the source to dest in fenceNN
 		if fenceNN != nil {
-			nn := fmt.Sprintf("%s", fenceNN)
+			nn := fenceNN.String()
 			if _, ok := tmpResult[nn]; !ok {
 				tmpResult[nn] = make(map[string]int)
 			}
@@ -346,16 +338,20 @@ func fetchSourceIp(entry *data_accesslog.HTTPAccessLogEntry) (string, error) {
 	return downstreamSock.SocketAddress.Address, nil
 }
 
-func spliceSourceSvc(sourceIp string, ipToSvcCache *IpToSvcCache) (string, error) {
+func spliceSourceSvc(sourceIp string, ipToSvcCache *IpToSvcCache) ([]string, error) {
 	ipToSvcCache.RLock()
 	defer ipToSvcCache.RUnlock()
 
-	for ip, svc := range ipToSvcCache.Data {
-		if sourceIp == ip {
-			return svc, nil
+	if svc, ok := ipToSvcCache.Data[sourceIp]; ok {
+		keys := make([]string, 0, len(svc))
+		for key := range svc {
+			keys = append(keys, key)
 		}
+		return keys, nil
 	}
-	return "", nil
+
+	log.Debugf("svc not found base on sourceIp %s", sourceIp)
+	return []string{}, nil
 }
 
 func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.NamespacedName, error) {
@@ -364,14 +360,14 @@ func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.Namespaced
 
 	for ip, nn := range ipTofence.Data {
 		if sourceIp == ip {
-			log.Debugf("match ipTofence, get namespacename %s", nn)
+			log.Debugf("match ipTofence, get namespacename %s", nn.String())
 			return &nn, nil
 		}
 	}
-	return &types.NamespacedName{}, nil
+	return nil, nil
 }
 
-func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc string, svcToIpsCache *SvcToIpsCache) []string {
+func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs []string, svcToIpsCache *SvcToIpsCache, fenceNN *types.NamespacedName) []string {
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "spliceDestinationSvc")
 	var destSvcs []string
 
@@ -392,20 +388,22 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 
 	// dest is ip address, skip
 	if net.ParseIP(dest) != nil {
-		log.Debugf("Accesslog is %s -> %s, in which the destination is not domain, skip", sourceSvc, dest)
+		log.Debugf("Accesslog is %+v -> %s, in which the destination is not domain, skip", sourceSvcs, dest)
 		return destSvcs
 	}
 
-	// if dest is non ns service, dest should not expand with '.svc.cluster.local'
-	// so both short name and k8s fqdn will be added as following
-	//destSvcs = append(destSvcs, dest)
-	var destSvc string
+	// both short name and k8s fqdn will be added as following
 
+	// add origin dest as step1
+	destSvcs = append(destSvcs, dest)
+
+	// expand domain as step2
+	var destSvc string
 	destParts := strings.Split(dest, ".")
+
 	switch len(destParts) {
 	case 1:
-		srcParts := strings.Split(sourceSvc, "/")
-		destSvc = dest + "." + srcParts[0] + ".svc.cluster.local"
+		destSvc = completeDestSvcWithDestName(dest, sourceSvcs, fenceNN)
 	case 2:
 		destSvc = completeDestSvcName(destParts, dest, "svc.cluster.local", svcToIpsCache)
 	case 3:
@@ -418,7 +416,9 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvc st
 		destSvc = dest
 	}
 
-	destSvcs = append(destSvcs, destSvc)
+	if destSvc != destSvcs[0] {
+		destSvcs = append(destSvcs, destSvc)
+	}
 
 	result := make([]string, 0)
 	for _, svc := range destSvcs {
@@ -438,6 +438,23 @@ func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache 
 		destSvc = dest + "." + suffix
 	} else {
 		// not abbreviation of service, no suffix
+		destSvc = dest
+	}
+	return
+}
+
+// exact dest ns from sourceSvc and fence，otherwise return the original value
+
+func completeDestSvcWithDestName(dest string, sourceSvcs []string, fenceNN *types.NamespacedName) (destSvc string) {
+
+	if len(sourceSvcs) > 0 {
+		srcParts := strings.Split(sourceSvcs[0], "/")
+		if len(srcParts) == 2 {
+			destSvc = dest + "." + srcParts[0] + ".svc.cluster.local"
+		}
+	} else if fenceNN != nil {
+		destSvc = dest + "." + fenceNN.Namespace + ".svc.cluster.local"
+	} else {
 		destSvc = dest
 	}
 	return

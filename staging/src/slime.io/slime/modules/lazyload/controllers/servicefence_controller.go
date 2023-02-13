@@ -120,7 +120,7 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
 		ipTofence:         &IpTofence{Data: map[string]types.NamespacedName{}},
 		fenceToIp:         &FenceToIp{Data: map[string]map[string]struct{}{}},
-		ipToSvcCache:      &IpToSvcCache{Data: map[string]string{}},
+		ipToSvcCache:      &IpToSvcCache{Data: map[string]map[string]struct{}{}},
 		svcToIpsCache:     &SvcToIpsCache{Data: map[string][]string{}},
 	}
 	for _, opt := range opts {
