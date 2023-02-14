@@ -59,6 +59,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err != nil {
 		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
 	}
+
 	sfReconciler := controllers.NewReconciler(
 		controllers.ReconcilerWithCfg(&m.config),
 		controllers.ReconcilerWithEnv(env),
@@ -89,12 +90,13 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 			ApiType: &corev1.Service{},
 			R:       reconcile.Func(sfReconciler.ReconcileService),
 		})
-
-		podController := sfReconciler.NewPodController(env.K8SClient, m.config.FenceLabelKeyAlias)
-		le.AddOnStartedLeading(func(ctx context.Context) {
-			go podController.Run(ctx.Done())
-		})
-
+		// use FenceLabelKeyAlias ad switch to turn on/off workload fence
+		if m.config.FenceLabelKeyAlias != "" {
+			podController := sfReconciler.NewPodController(env.K8SClient, m.config.FenceLabelKeyAlias)
+			le.AddOnStartedLeading(func(ctx context.Context) {
+				go podController.Run(ctx.Done())
+			})
+		}
 	}
 
 	builder = builder.Add(basecontroller.ObjectReconcileItem{

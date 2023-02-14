@@ -78,13 +78,12 @@ func (al *AlwaysLeader) Run(ctx context.Context) error {
 		}
 	}()
 
-	log.Debug("run always leader")
+	log.Debug("alwaysLeader run")
 	al.startCbLock.RLock()
 	cbs := make([]func(context.Context), len(al.onStartedLeadingCallbacks))
 	copy(cbs, al.onStartedLeadingCallbacks)
 	al.startCbLock.RUnlock()
 	for _, f := range cbs {
-		log.Infof("run cbs in always leader")
 		f(ctx)
 	}
 	<-ctx.Done()

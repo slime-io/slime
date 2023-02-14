@@ -91,7 +91,13 @@ func NewConfigController(configSources []*bootconfig.ConfigSource, stop <-chan s
 			} else {
 				mcs = append(mcs, mc)
 			}
+		} else {
+			log.Warnf("configsource address %s is not supported", configSource.Address)
 		}
+	}
+
+	if len(mcs) == 1 {
+		return nil, fmt.Errorf("no valid address in configSource address")
 	}
 
 	vs, err := makeViewerStore(mcs)

@@ -356,7 +356,6 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 	}
 
 	if r.inSpecialNs(pod.Namespace) {
-		//log.Debugf("auto fence does not apply to specifical namespace: %s, %s, skip", pod.Namespace, pod.Name)
 		return
 	}
 
@@ -473,12 +472,12 @@ func (r *ServicefenceReconciler) appendIpToFence(namespacedName types.Namespaced
 	r.ipTofence.Data[ip] = namespacedName
 	r.ipTofence.Unlock()
 	r.fenceToIp.Lock()
-	ips := r.fenceToIp.Data[namespacedName.String()]
+	ips := r.fenceToIp.Data[namespacedName]
 	if ips == nil {
 		ips = map[string]struct{}{}
 	}
 	ips[ip] = struct{}{}
-	r.fenceToIp.Data[namespacedName.String()] = ips
+	r.fenceToIp.Data[namespacedName] = ips
 	r.fenceToIp.Unlock()
 }
 
@@ -488,19 +487,35 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 	r.ipTofence.Unlock()
 	r.fenceToIp.Lock()
 	defer r.fenceToIp.Unlock()
-	ips := r.fenceToIp.Data[namespacedName.String()]
+	ips := r.fenceToIp.Data[namespacedName]
 	delete(ips, ip)
 	if ips == nil || len(ips) == 0 {
-		delete(r.fenceToIp.Data, namespacedName.String())
+		delete(r.fenceToIp.Data, namespacedName)
 		return true
 	}
-	r.fenceToIp.Data[namespacedName.String()] = ips
+	r.fenceToIp.Data[namespacedName] = ips
 	return false
 }
 
+// inSpecialNs slimeNamespace/istioNamespace/ClusterGsNamespace/kube-system is special, servicefence will not be generated
 func (r *ServicefenceReconciler) inSpecialNs(ns string) bool {
-	if ns == r.env.Config.Global.IstioNamespace || ns == r.env.Config.Global.SlimeNamespace || ns == "kube-system" {
+
+	if ns == "kube-system" {
 		return true
 	}
+
+	if r.env.Config != nil && r.env.Config.Global != nil {
+		if ns == r.env.Config.Global.IstioNamespace || ns == r.env.Config.Global.SlimeNamespace {
+			return true
+		}
+	}
+
+	// global-sidecar may deploy different from slimeNamespace
+	if r.cfg != nil {
+		if ns == r.cfg.ClusterGsNamespace {
+			return true
+		}
+	}
+
 	return false
 }

@@ -224,7 +224,11 @@ func (r *ServicefenceReconciler) StartIpToSvcCache(ctx context.Context) {
 }
 
 func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{}) {
-	r.handleEpUpdate(ctx, nil, obj)
+	ep, ok := obj.(*corev1.Endpoints)
+	if !ok {
+		return
+	}
+	r.addIpWithEp(ep)
 }
 
 func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj interface{}) {
@@ -233,28 +237,40 @@ func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj in
 	if !ok {
 		return
 	}
-
-	if old != nil {
-		oldEp, ok := old.(*corev1.Endpoints)
-		if !ok {
-			return
-		}
-		if reflect.DeepEqual(oldEp.Subsets, ep.Subsets) {
-			return
-		}
+	oldEp, ok := old.(*corev1.Endpoints)
+	if !ok {
+		return
 	}
 
+	if reflect.DeepEqual(oldEp.Subsets, ep.Subsets) {
+		return
+	}
+
+	r.deleteIpFromEp(oldEp)
+	r.addIpWithEp(ep)
+}
+
+func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interface{}) {
+
+	ep, ok := obj.(*corev1.Endpoints)
+	if !ok {
+		return
+	}
+	r.deleteIpFromEp(ep)
+}
+
+func (r *ServicefenceReconciler) addIpWithEp(ep *corev1.Endpoints) {
+
+	svc := ep.GetNamespace() + "/" + ep.GetName()
 	ipToSvcCache := r.ipToSvcCache
 	svcToIpsCache := r.svcToIpsCache
-	svc := ep.GetNamespace() + "/" + ep.GetName()
 
-	// add or update
 	var addresses []string
 	ipToSvcCache.Lock()
 	for _, subset := range ep.Subsets {
 		for _, address := range subset.Addresses {
 			addresses = append(addresses, address.IP)
-			if _, ok = ipToSvcCache.Data[address.IP]; !ok {
+			if _, ok := ipToSvcCache.Data[address.IP]; !ok {
 				ipToSvcCache.Data[address.IP] = make(map[string]struct{})
 			}
 			ipToSvcCache.Data[address.IP][svc] = struct{}{}
@@ -267,17 +283,11 @@ func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj in
 	svcToIpsCache.Unlock()
 }
 
-func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interface{}) {
+func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
 
-	ep, ok := obj.(*corev1.Endpoints)
-	if !ok {
-		return
-	}
+	svc := ep.GetNamespace() + "/" + ep.GetName()
 	ipToSvcCache := r.ipToSvcCache
 	svcToIpsCache := r.svcToIpsCache
-	svc := ep.GetNamespace() + "/" + ep.GetName()
-
-	//log.Debugf("get delete ep event %s", svc)
 
 	// delete svc in svcToIpsCache
 	svcToIpsCache.Lock()
@@ -288,7 +298,7 @@ func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interfa
 	// delete ips related svc
 	ipToSvcCache.Lock()
 	for _, ip := range ips {
-		delete(r.ipToSvcCache.Data[ip], svc)
+		delete(ipToSvcCache.Data, ip)
 	}
 	ipToSvcCache.Unlock()
 }

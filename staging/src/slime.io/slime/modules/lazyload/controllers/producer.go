@@ -255,7 +255,6 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 	tmpResult := make(map[string]map[string]int)
 
 	for _, entry := range logEntry {
-		// tmpValue := make(map[string]int)
 
 		// fetch sourceEp
 		sourceIp, err := fetchSourceIp(entry)
@@ -358,12 +357,10 @@ func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.Namespaced
 	ipTofence.RLock()
 	defer ipTofence.RUnlock()
 
-	for ip, nn := range ipTofence.Data {
-		if sourceIp == ip {
-			log.Debugf("match ipTofence, get namespacename %s", nn.String())
-			return &nn, nil
-		}
+	if nn, ok := ipTofence.Data[sourceIp]; ok {
+		return &nn, nil
 	}
+	log.Debugf("fence not found base on sourceIp %s", sourceIp)
 	return nil, nil
 }
 
@@ -444,9 +441,8 @@ func completeDestSvcName(destParts []string, dest, suffix string, svcToIpsCache 
 }
 
 // exact dest ns from sourceSvc and fence，otherwise return the original value
-
 func completeDestSvcWithDestName(dest string, sourceSvcs []string, fenceNN *types.NamespacedName) (destSvc string) {
-
+	destSvc = dest
 	if len(sourceSvcs) > 0 {
 		srcParts := strings.Split(sourceSvcs[0], "/")
 		if len(srcParts) == 2 {
@@ -454,8 +450,6 @@ func completeDestSvcWithDestName(dest string, sourceSvcs []string, fenceNN *type
 		}
 	} else if fenceNN != nil {
 		destSvc = dest + "." + fenceNN.Namespace + ".svc.cluster.local"
-	} else {
-		destSvc = dest
 	}
 	return
 }
