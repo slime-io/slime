@@ -49,7 +49,7 @@ type IpTofence struct {
 
 type FenceToIp struct {
 	// namespacedname -> ips
-	Data map[string]map[string]struct{}
+	Data map[types.NamespacedName]map[string]struct{}
 	sync.RWMutex
 }
 

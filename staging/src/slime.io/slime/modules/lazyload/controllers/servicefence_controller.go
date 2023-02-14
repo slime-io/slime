@@ -102,8 +102,9 @@ func ReconcilerWithProducerConfig(pc *metric.ProducerConfig) ReconcilerOpts {
 		pc.WatcherProducerConfig.NeedUpdateMetricHandler = sr.handleWatcherEvent
 		pc.TickerProducerConfig.NeedUpdateMetricHandler = sr.handleTickerEvent
 
-		if len(pc.AccessLogSourceConfig.AccessLogConvertorConfigs) > 0 {
-			pc.AccessLogSourceConfig.AccessLogConvertorConfigs[0].Handler = sr.LogHandler
+		// reconciler defines log handler
+		for i := range pc.AccessLogSourceConfig.AccessLogConvertorConfigs {
+			pc.AccessLogSourceConfig.AccessLogConvertorConfigs[i].Handler = sr.LogHandler
 		}
 	}
 }
@@ -119,7 +120,7 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
 		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
 		ipTofence:         &IpTofence{Data: map[string]types.NamespacedName{}},
-		fenceToIp:         &FenceToIp{Data: map[string]map[string]struct{}{}},
+		fenceToIp:         &FenceToIp{Data: map[types.NamespacedName]map[string]struct{}{}},
 		ipToSvcCache:      &IpToSvcCache{Data: map[string]map[string]struct{}{}},
 		svcToIpsCache:     &SvcToIpsCache{Data: map[string][]string{}},
 	}
@@ -277,7 +278,6 @@ func (r *ServicefenceReconciler) recordVisitor(sf *lazyloadv1alpha1.ServiceFence
 		delete(destSf.Status.Visitor, sf.Namespace+"/"+sf.Name)
 		_ = r.Client.Status().Update(context.TODO(), destSf)
 	}
-	log.Debugf("update dest sf %s in recordVisitor", sf.Namespace+"/"+sf.Name)
 }
 
 // prepareDestFence prepares servicefence of specified host
@@ -307,7 +307,6 @@ retry: // FIXME fix infinite loop
 			if err = r.Client.Create(context.TODO(), destSf); err != nil {
 				goto retry
 			}
-			log.Infof("create destSf %s:%s", destSf.Namespace, destSf.Name)
 		} else {
 			return nil
 		}
@@ -365,7 +364,6 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(sf *lazyloadv1alpha1.Se
 	sf.Status.Domains = domains
 
 	_ = r.Client.Status().Update(context.TODO(), sf)
-	log.Debugf("update sf status %+v in updateVisitedHostStatus", domains)
 
 	return delta
 }
@@ -584,7 +582,6 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	}
 
 	for k, v := range sf.Status.Domains {
-		log.Debugf("sf %s:%s has domains %s", sf.Namespace, sf.Name, k)
 		if v.Status == lazyloadv1alpha1.Destinations_ACTIVE || v.Status == lazyloadv1alpha1.Destinations_EXPIREWAIT {
 			if strings.HasSuffix(k, "/*") {
 				if !r.isDefaultAddNs(k) {
@@ -595,7 +592,6 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 			for _, h := range v.Hosts {
 				hosts = append(hosts, "*/"+h)
 			}
-			log.Debugf("host is %+v", hosts)
 		}
 	}
 
@@ -638,12 +634,6 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		},
 	}
 
-	// Fetch the Service instance
-	nsName := types.NamespacedName{
-		Name:      sf.Name,
-		Namespace: sf.Namespace,
-	}
-
 	// generate sidecar.spec.workloadSelector
 	// priority: sf.spec.workloadSelector.labels > sf.spec.workloadSelector.fromService
 	if sf.Spec.WorkloadSelector != nil && len(sf.Spec.WorkloadSelector.Labels) > 0 {
@@ -653,6 +643,11 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		}
 	} else if sf.Spec.WorkloadSelector != nil && sf.Spec.WorkloadSelector.FromService {
 		// sidecar.WorkloadSelector.Labels = svc.Spec.Selector
+		// Fetch the Service instance
+		nsName := types.NamespacedName{
+			Name:      sf.Name,
+			Namespace: sf.Namespace,
+		}
 		svc := &corev1.Service{}
 		if err := r.Client.Get(context.TODO(), nsName, svc); err != nil {
 			if errors.IsNotFound(err) {
@@ -668,7 +663,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		}
 	} else {
 		// compatible with old version lazyload
-		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = nsName.Name
+		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = sf.Name
 	}
 
 	spec, err := util.ProtoToMap(sidecar)

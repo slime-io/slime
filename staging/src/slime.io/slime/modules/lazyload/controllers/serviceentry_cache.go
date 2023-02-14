@@ -9,7 +9,7 @@ import (
 
 func (r *ServicefenceReconciler) RegisterSeHandler() {
 
-	// we only increase, not delete port
+	// only add, not delete
 	sePortToCache := func(old resource.Config, cfg resource.Config, e bootstrap.Event) {
 		switch e {
 		case bootstrap.EventAdd:
