@@ -23,7 +23,7 @@ func (r *ServicefenceReconciler) RegisterSeHandler() {
 	}
 	log.Infof("lazyload: register serviceEntry handler")
 
-	r.env.ConfigController.RegisterEventHandler(resource.IstioService, sePortToCache)
+	r.env.ConfigController.RegisterEventHandler(resource.ServiceEntry, sePortToCache)
 }
 
 func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
