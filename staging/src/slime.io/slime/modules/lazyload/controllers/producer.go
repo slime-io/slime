@@ -35,7 +35,7 @@ const (
 func (r *ServicefenceReconciler) handleWatcherEvent(event trigger.WatcherEvent) metric.QueryMap {
 	// check event
 	gvks := []schema.GroupVersionKind{
-		{Group: "networking.istio.io", Version: "v1beta1", Kind: "Sidecar"},
+		{Group: "networking.istio.io", Version: "v1alpha3", Kind: "Sidecar"},
 	}
 	invalidEvent := false
 	for _, gvk := range gvks {
@@ -162,7 +162,7 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 				Kinds: []schema.GroupVersionKind{
 					{
 						Group:   "networking.istio.io",
-						Version: "v1beta1",
+						Version: "v1alpha3",
 						Kind:    "Sidecar",
 					},
 				},
