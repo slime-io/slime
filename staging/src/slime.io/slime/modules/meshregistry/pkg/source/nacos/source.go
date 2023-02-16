@@ -26,7 +26,6 @@ type Source struct {
 	// nacos client
 	client       Client
 	namingClient naming_client.INamingClient
-	namespace    string
 	group        string
 
 	// common configs
@@ -34,6 +33,9 @@ type Source struct {
 	gatewayModel    bool
 	nsHost          bool
 	k8sDomainSuffix bool
+	allNamespaces   bool
+	namespace       string
+	namespaces      []string
 	svcPort         uint32
 	mode            string
 	delay           time.Duration
@@ -110,7 +112,13 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		}
 	}
 	if nacoesArgs.Mode == POLLING {
-		s.client = NewClient(nacoesArgs.Address, nacoesArgs.Username, nacoesArgs.Password, headers)
+		s.client = NewClient(nacoesArgs.Address,
+			nacoesArgs.Username,
+			nacoesArgs.Password,
+			nacoesArgs.Namespace,
+			nacoesArgs.Group,
+			nacoesArgs.AllNamespaces,
+			headers)
 	} else {
 		namingClient, err := newNamingClient(nacoesArgs.Address, nacoesArgs.Namespace, headers)
 		if err != nil {

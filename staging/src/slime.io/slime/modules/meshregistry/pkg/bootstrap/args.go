@@ -169,6 +169,8 @@ type NacosSourceArgs struct {
 	// username and password for nacos auth
 	Username string
 	Password string
+	// fetch services from all namespaces, only support Polling mode
+	AllNamespaces bool
 }
 
 type McpArgs struct {
