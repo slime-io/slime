@@ -181,6 +181,7 @@ spec:
               visitor:
                 additionalProperties:
                   type: boolean
+                description: Deprecated
                 type: object
             type: object
         type: object

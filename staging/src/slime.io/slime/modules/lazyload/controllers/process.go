@@ -106,8 +106,7 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 	}
 	// use updateVisitedHostStatus to update svf.spec and svf.status
 	sf.Status.MetricStatus = value
-	diff := r.updateVisitedHostStatus(sf)
-	r.recordVisitor(sf, diff)
+	r.updateServicefenceDomain(sf)
 
 	if sf.Spec.Enable {
 		if err := r.refreshSidecar(sf); err != nil {

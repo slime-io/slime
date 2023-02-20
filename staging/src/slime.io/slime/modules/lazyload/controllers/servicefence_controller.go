@@ -179,8 +179,8 @@ func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Infof("ServicefenceReconciler got serviceFence request, %+v", req.NamespacedName)
 
 	// 资源更新
-	diff := r.updateVisitedHostStatus(instance)
-	r.recordVisitor(instance, diff)
+	r.updateServicefenceDomain(instance)
+
 	if instance.Spec.Enable {
 		err = r.refreshSidecar(instance)
 		r.interestMeta[req.NamespacedName.String()] = true
@@ -259,89 +259,9 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	return nil
 }
 
-// recordVisitor update the dest servicefences' visitor according to src sf's visit diff
-func (r *ServicefenceReconciler) recordVisitor(sf *lazyloadv1alpha1.ServiceFence, diff Diff) {
-	for _, addHost := range diff.Added {
-		destSf := r.prepareDestFence(sf, addHost)
-		if destSf == nil {
-			continue
-		}
-		destSf.Status.Visitor[sf.Namespace+"/"+sf.Name] = true
-		_ = r.Client.Status().Update(context.TODO(), destSf)
-	}
-
-	for _, delHost := range diff.Deleted {
-		destSf := r.prepareDestFence(sf, delHost)
-		if destSf == nil {
-			continue
-		}
-		delete(destSf.Status.Visitor, sf.Namespace+"/"+sf.Name)
-		_ = r.Client.Status().Update(context.TODO(), destSf)
-	}
-}
-
-// prepareDestFence prepares servicefence of specified host
-func (r *ServicefenceReconciler) prepareDestFence(srcSf *lazyloadv1alpha1.ServiceFence, h string) *lazyloadv1alpha1.ServiceFence {
-	nsName := parseHost(srcSf.Namespace, h)
-	if nsName == nil {
-		return nil
-	}
-
-	svc := &corev1.Service{}
-	if err := r.Client.Get(context.TODO(), *nsName, svc); err != nil {
-		// XXX err handle
-		return nil
-	}
-
-	// if the destFence is missing, we create one and store caller in destFence's status
-	destSf := &lazyloadv1alpha1.ServiceFence{}
-retry: // FIXME fix infinite loop
-	err := r.Client.Get(context.TODO(), *nsName, destSf)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			// XXX maybe should not auto create
-			destSf.Name = nsName.Name
-			destSf.Namespace = nsName.Namespace
-			model.PatchIstioRevLabel(&destSf.Labels, r.env.SelfResourceRev())
-			// XXX set controlled by
-			if err = r.Client.Create(context.TODO(), destSf); err != nil {
-				goto retry
-			}
-		} else {
-			return nil
-		}
-	}
-
-	if destSf.Status.Visitor == nil {
-		destSf.Status.Visitor = make(map[string]bool)
-	}
-	return destSf
-}
-
-func parseHost(sourceNs, h string) *types.NamespacedName {
-	s := strings.Split(h, ".")
-	if len(s) == 5 || len(s) == 2 { // shortname.ns or full(shortname.ns.svc.cluster.local)
-		return &types.NamespacedName{
-			Namespace: s[1],
-			Name:      s[0],
-		}
-	}
-	if len(s) == 1 { // shortname
-		return &types.NamespacedName{
-			Namespace: sourceNs,
-			Name:      s[0],
-		}
-	}
-	return nil // unknown host format, maybe external host
-}
-
-func (r *ServicefenceReconciler) updateVisitedHostStatus(sf *lazyloadv1alpha1.ServiceFence) Diff {
+func (r *ServicefenceReconciler) updateServicefenceDomain(sf *lazyloadv1alpha1.ServiceFence) {
 	domains := r.genDomains(sf, r.doAliasRules)
 
-	delta := Diff{
-		Deleted: make([]string, 0),
-		Added:   make([]string, 0),
-	}
 	for k, dest := range sf.Status.Domains {
 		if _, ok := domains[k]; !ok {
 			if dest.Status == lazyloadv1alpha1.Destinations_ACTIVE {
@@ -350,22 +270,14 @@ func (r *ServicefenceReconciler) updateVisitedHostStatus(sf *lazyloadv1alpha1.Se
 					Hosts:  dest.Hosts,
 					Status: lazyloadv1alpha1.Destinations_EXPIREWAIT,
 				}
-			} else {
-				// pending -> delete
-				delta.Deleted = append(delta.Deleted, k)
 			}
-		}
-	}
-	for k := range domains {
-		if _, ok := sf.Status.Domains[k]; !ok {
-			delta.Added = append(delta.Added, k)
 		}
 	}
 	sf.Status.Domains = domains
 
 	_ = r.Client.Status().Update(context.TODO(), sf)
 
-	return delta
+	return
 }
 
 func (r *ServicefenceReconciler) genDomains(sf *lazyloadv1alpha1.ServiceFence, rules []*domainAliasRule) map[string]*lazyloadv1alpha1.Destinations {
