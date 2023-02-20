@@ -520,12 +520,13 @@ func (m *Destinations) GetStatus() Destinations_Status {
 }
 
 type ServiceFenceStatus struct {
-	Domains              map[string]*Destinations `protobuf:"bytes,1,rep,name=domains,proto3" json:"domains,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	MetricStatus         map[string]string        `protobuf:"bytes,3,rep,name=metricStatus,proto3" json:"metricStatus,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
-	Visitor              map[string]bool          `protobuf:"bytes,2,rep,name=visitor,proto3" json:"visitor,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
-	XXX_NoUnkeyedLiteral struct{}                 `json:"-"`
-	XXX_unrecognized     []byte                   `json:"-"`
-	XXX_sizecache        int32                    `json:"-"`
+	Domains      map[string]*Destinations `protobuf:"bytes,1,rep,name=domains,proto3" json:"domains,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	MetricStatus map[string]string        `protobuf:"bytes,3,rep,name=metricStatus,proto3" json:"metricStatus,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
+	// Deprecated
+	Visitor              map[string]bool `protobuf:"bytes,2,rep,name=visitor,proto3" json:"visitor,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"varint,2,opt,name=value,proto3"`
+	XXX_NoUnkeyedLiteral struct{}        `json:"-"`
+	XXX_unrecognized     []byte          `json:"-"`
+	XXX_sizecache        int32           `json:"-"`
 }
 
 func (m *ServiceFenceStatus) Reset()         { *m = ServiceFenceStatus{} }
