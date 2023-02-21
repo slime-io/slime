@@ -8,6 +8,7 @@ import (
 
 	networking "istio.io/api/networking/v1alpha3"
 
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -72,8 +73,11 @@ func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.Wor
 		Name:     "http",
 	}
 	ports = append(ports, port)
-
+	filter, enableInstanceFilter := instanceFilter.Load().(source.SelectHook)
 	for _, ins := range instances {
+		if enableInstanceFilter && !filter(ins.Metadata) {
+			continue
+		}
 		if !ins.Healthy {
 			continue
 		}
@@ -157,7 +161,11 @@ func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uin
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
 	})
+	filter, enableInstanceFilter := instanceFilter.Load().(source.SelectHook)
 	for _, ins := range instances {
+		if enableInstanceFilter && !filter(ins.Metadata) {
+			continue
+		}
 		if !ins.Healthy {
 			continue
 		}

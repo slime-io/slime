@@ -93,6 +93,9 @@ type SourceArgs struct {
 	// if empty, those endpoints with ns attr will be aggregated into a no-ns service like "foo"
 	DefaultServiceNs string
 	ResourceNs       string
+	// A list of selectors that specify the set of service instances to be processed,
+	// configured in the same way as the k8s label selector.
+	EndpointSelectors []*metav1.LabelSelector
 }
 
 type K8SSourceArgs struct {
