@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
@@ -58,7 +59,14 @@ type Source struct {
 	initedCallback func(string)
 }
 
-var Scope = log.RegisterScope("nacos", "nacos debugging", 0)
+var (
+	instanceFilter                       = new(atomic.Value) // source.SelectHook
+	ApplyInstanceFilter source.ApplyHook = func(sh source.SelectHook) {
+		instanceFilter.Store(sh)
+	}
+
+	Scope = log.RegisterScope("nacos", "nacos debugging", 0)
+)
 
 const (
 	SourceName       = "nacos"
@@ -69,7 +77,7 @@ const (
 )
 
 func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
-	source := &Source{
+	s := &Source{
 		namespace:         nacoesArgs.Namespace,
 		group:             nacoesArgs.Group,
 		delay:             delay,
@@ -102,7 +110,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		}
 	}
 	if nacoesArgs.Mode == POLLING {
-		source.client = NewClient(nacoesArgs.Address, nacoesArgs.Username, nacoesArgs.Password, headers)
+		s.client = NewClient(nacoesArgs.Address, nacoesArgs.Username, nacoesArgs.Password, headers)
 	} else {
 		namingClient, err := newNamingClient(nacoesArgs.Address, nacoesArgs.Namespace, headers)
 		if err != nil {
@@ -110,9 +118,10 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 				msg: fmt.Sprintf("init nacos client failed: %s", err.Error()),
 			}
 		}
-		source.namingClient = namingClient
+		s.namingClient = namingClient
 	}
-	return source, source.cacheJson, nil
+	source.UpdateSelector(nacoesArgs.EndpointSelectors, ApplyInstanceFilter)
+	return s, s.cacheJson, nil
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
