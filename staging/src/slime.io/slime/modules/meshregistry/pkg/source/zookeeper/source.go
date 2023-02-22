@@ -30,13 +30,14 @@ import (
 var scope = log.RegisterScope("zk", "zk debugging", 0)
 
 const (
-	ZK                 = "zk"
-	ZkPath             = "/zk"
-	ZkSimplePath       = "/zks"
-	DubboCallModelPath = "/dubboCallModel"
-	ConsumerNode       = "consumers"
-	ProviderNode       = "providers"
-	Polling            = "polling"
+	ZK                        = "zk"
+	ZkPath                    = "/zk"
+	ZkSimplePath              = "/zks"
+	DubboCallModelPath        = "/dubboCallModel"
+	SidecarDubboCallModelPath = "/sidecarDubboCallModel"
+	ConsumerNode              = "consumers"
+	ProviderNode              = "providers"
+	Polling                   = "polling"
 
 	AttachmentDubboCallModel = "ATTACHEMT_DUBBO_CALL_MODEL"
 )
@@ -61,7 +62,7 @@ type Source struct {
 	cache                cmap.ConcurrentMap
 	pollingCache         cmap.ConcurrentMap
 	sidecarCache         map[resource.FullName]SidecarWithMeta
-	dubboCallModels      map[string]DubboCallModel
+	dubboCallModels      map[string]DubboCallModel // can only be replaced rather than being modified
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
 	changedApps          map[string]struct{}
 	appSidecarUpdateTime map[string]time.Time

@@ -157,6 +157,7 @@ func (p *Processing) Start() (err error) {
 		p.httpServer.HandleFunc(zookeeper.ZkSimplePath, simpleHttpHandle)
 		if zkSrc, ok := zookeeperSrc.(*zookeeper.Source); ok {
 			p.httpServer.HandleFunc(zookeeper.DubboCallModelPath, zkSrc.HandleDubboCallModel)
+			p.httpServer.HandleFunc(zookeeper.SidecarDubboCallModelPath, zkSrc.HandleSidecarDubboCallModel)
 		}
 		p.httpServer.SourceRegistry(zookeeper.ZK)
 		if srcArgs.WaitTime > 0 {
