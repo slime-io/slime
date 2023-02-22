@@ -188,7 +188,7 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 }
 
 func (r *ServicefenceReconciler) LogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
-	return accessLogHandler(logEntry, r.ipToSvcCache, r.svcToIpsCache, r.ipTofence, r.fenceToIp)
+	return accessLogHandler(logEntry, r.ipToSvcCache, r.svcToIpsCache, r.ipTofence, r.fenceToIp, r.cfg.EnableShortDomain)
 }
 
 func newPrometheusSourceConfig(env bootstrap.Environment) (metric.PrometheusSourceConfig, error) {
@@ -247,7 +247,7 @@ func newInitCache(env bootstrap.Environment) (map[string]map[string]string, erro
 }
 
 func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCache *IpToSvcCache,
-	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, fenceToIpCache *FenceToIp,
+	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, fenceToIpCache *FenceToIp, enableShortDomain bool,
 ) (map[string]map[string]string, error) {
 
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
@@ -283,7 +283,7 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 		}
 
 		// fetch destinationSvcMeta
-		destinationSvcs := spliceDestinationSvc(entry, sourceSvcs, svcToIpsCache, fenceNN)
+		destinationSvcs := spliceDestinationSvc(entry, sourceSvcs, svcToIpsCache, fenceNN, enableShortDomain)
 		if len(destinationSvcs) == 0 {
 			continue
 		}
@@ -364,7 +364,7 @@ func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.Namespaced
 	return nil, nil
 }
 
-func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs []string, svcToIpsCache *SvcToIpsCache, fenceNN *types.NamespacedName) []string {
+func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs []string, svcToIpsCache *SvcToIpsCache, fenceNN *types.NamespacedName, enableShortDomain bool) []string {
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "spliceDestinationSvc")
 	var destSvcs []string
 
@@ -391,9 +391,6 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs [
 
 	// both short name and k8s fqdn will be added as following
 
-	// add origin dest as step1
-	destSvcs = append(destSvcs, dest)
-
 	// expand domain as step2
 	var destSvc string
 	destParts := strings.Split(dest, ".")
@@ -413,8 +410,13 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs [
 		destSvc = dest
 	}
 
-	if destSvc != destSvcs[0] {
-		destSvcs = append(destSvcs, destSvc)
+	destSvcs = append(destSvcs, destSvc)
+	// We don't know if it is a short domain，
+	// So we add the original dest to slice if it is not same with the parsed
+	if enableShortDomain {
+		if dest != destSvc {
+			destSvcs = append(destSvcs, dest)
+		}
 	}
 
 	result := make([]string, 0)
