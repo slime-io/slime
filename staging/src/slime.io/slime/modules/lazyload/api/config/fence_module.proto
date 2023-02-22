@@ -30,6 +30,8 @@ message Fence {
   string clusterGsNamespace = 8;
   // specify label key and alias to generate sf
   string fenceLabelKeyAlias = 9;
+  // enableShortDomain, it will generate fqdn and short domain if enabled, otherwise only fqdn is generated in svf and sidecar
+  bool enableShortDomain = 10;
 }
 
 // The general idea is to assign different default traffic to different targets
