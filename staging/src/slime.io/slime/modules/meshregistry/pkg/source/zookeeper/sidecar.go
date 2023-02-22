@@ -430,6 +430,8 @@ func convertDubboCallModelConfigToSidecar(callModel map[string]DubboCallModel, d
 }
 
 func (s *Source) HandleDubboCallModel(w http.ResponseWriter, request *http.Request) {
+	app := request.URL.Query().Get("app")
+
 	s.mut.RLock()
 	seCallModelsCopy := make(map[resource.FullName]map[string]DubboCallModel, len(s.seDubboCallModels))
 	for k, v := range s.seDubboCallModels {
@@ -437,6 +439,12 @@ func (s *Source) HandleDubboCallModel(w http.ResponseWriter, request *http.Reque
 	}
 	s.mut.RUnlock()
 	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, true)
+
+	if mergedCallModels != nil && app != "" {
+		mergedCallModels = map[string]DubboCallModel{
+			app: mergedCallModels[app],
+		}
+	}
 
 	bs, err := yaml.Marshal(mergedCallModels)
 	if err != nil {
@@ -450,9 +458,18 @@ func (s *Source) HandleDubboCallModel(w http.ResponseWriter, request *http.Reque
 }
 
 func (s *Source) HandleSidecarDubboCallModel(w http.ResponseWriter, request *http.Request) {
+	app := request.URL.Query().Get("app")
+
 	s.mut.RLock()
 	callModels := s.dubboCallModels
 	s.mut.RUnlock()
+
+	if callModels != nil && app != "" {
+		callModels = map[string]DubboCallModel{
+			app: callModels[app],
+		}
+	}
+
 	bs, err := yaml.Marshal(callModels)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
