@@ -96,7 +96,7 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 	prevCallModels := s.dubboCallModels
 	s.mut.RUnlock()
-	mergedCallModels := mergeDubboCallModels(seCallModelsCopy)
+	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, false)
 
 	diff := diffDubboCallModels(prevCallModels, mergedCallModels)
 	if len(diff) == 0 {
@@ -187,12 +187,12 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 }
 
-func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel) map[string]DubboCallModel {
+func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel, includeProvider bool) map[string]DubboCallModel {
 	ret := make(map[string]DubboCallModel, len(seCallModels))
 
 	for _, curCallModels := range seCallModels {
 		for app, callModel := range curCallModels {
-			ret[app] = mergeToDubboCallModel(callModel, ret[app])
+			ret[app] = mergeToDubboCallModel(callModel, ret[app], includeProvider)
 		}
 	}
 
@@ -294,7 +294,7 @@ func (s *Source) recordAppSidecarUpdateTime(diff map[string]DubboCallModel) {
 	}
 }
 
-func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel) DubboCallModel {
+func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvider bool) DubboCallModel {
 	if to.Application == "" {
 		to.Application = from.Application
 	}
@@ -304,6 +304,15 @@ func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel) DubboCallMode
 
 	for svc := range from.ConsumeServices {
 		to.ConsumeServices[svc] = struct{}{}
+	}
+
+	if includeProvider {
+		if to.ProvideServices == nil {
+			to.ProvideServices = map[string]struct{}{}
+		}
+		for svc := range from.ProvideServices {
+			to.ProvideServices[svc] = struct{}{}
+		}
 	}
 	return to
 }
@@ -421,6 +430,26 @@ func convertDubboCallModelConfigToSidecar(callModel map[string]DubboCallModel, d
 }
 
 func (s *Source) HandleDubboCallModel(w http.ResponseWriter, request *http.Request) {
+	s.mut.RLock()
+	seCallModelsCopy := make(map[resource.FullName]map[string]DubboCallModel, len(s.seDubboCallModels))
+	for k, v := range s.seDubboCallModels {
+		seCallModelsCopy[k] = v
+	}
+	s.mut.RUnlock()
+	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, true)
+
+	bs, err := yaml.Marshal(mergedCallModels)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintf(w, "unable to marshal push dubbo call mode config: %v, %v", err, mergedCallModels)
+		return
+	}
+	w.Header().Add("Content-Type", "text/yaml")
+
+	_, _ = w.Write(bs)
+}
+
+func (s *Source) HandleSidecarDubboCallModel(w http.ResponseWriter, request *http.Request) {
 	s.mut.RLock()
 	callModels := s.dubboCallModels
 	s.mut.RUnlock()
