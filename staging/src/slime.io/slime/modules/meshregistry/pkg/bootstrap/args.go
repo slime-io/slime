@@ -171,6 +171,8 @@ type NacosSourceArgs struct {
 	Password string
 	// fetch services from all namespaces, only support Polling mode
 	AllNamespaces bool
+	//  If set, namespace and group information will be injected into the ep's metadata using the set key.
+	MetaKeyGroup, MetaKeyNamespace string
 }
 
 type McpArgs struct {
