@@ -186,8 +186,10 @@ func (f ReadyManagerFunc) AddReadyChecker(name string, checker func() error) {
 }
 
 type Environment struct {
-	Config           *bootconfig.Config
-	K8SClient        *kubernetes.Clientset
+	Config *bootconfig.Config
+	// clientSet, not support crd
+	K8SClient *kubernetes.Clientset
+	// dynamic client, support any resource
 	DynamicClient    dynamic.Interface
 	HttpPathHandler  common.PathHandler
 	ReadyManager     ReadyManager
