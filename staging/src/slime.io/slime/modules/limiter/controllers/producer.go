@@ -4,17 +4,15 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
 
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-	"k8s.io/client-go/kubernetes"
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
@@ -136,7 +134,7 @@ func (r *SmartLimiterReconciler) handlePrometheusEvent(LimiterMeta SmartLimiterM
 		return nil
 	}
 
-	pods, err := queryServicePods(r.env.K8SClient, loc)
+	pods, err := queryServicePods(r.Client, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
 		return nil
@@ -151,25 +149,24 @@ func (r *SmartLimiterReconciler) handlePrometheusEvent(LimiterMeta SmartLimiterM
 }
 
 // QueryServicePods query pods related to service, return pods
-func queryServicePods(c *kubernetes.Clientset, loc types.NamespacedName) ([]v1.Pod, error) {
+func queryServicePods(c client.Client, loc types.NamespacedName) ([]v1.Pod, error) {
 	var err error
-	var service *v1.Service
+	service := &v1.Service{}
 	pods := make([]v1.Pod, 0)
 
-	service, err = c.CoreV1().Services(loc.Namespace).Get(context.TODO(), loc.Name, metav1.GetOptions{})
-	if err != nil {
+	if err = c.Get(context.TODO(), loc, service); err != nil {
 		return pods, fmt.Errorf("get service %+v faild, %s", loc, err.Error())
 	}
 	return queryPodsWithWorkloadSelector(c, service.Spec.Selector, loc.Namespace)
 }
 
-func queryPodsWithWorkloadSelector(c *kubernetes.Clientset, workloadSelector map[string]string, ns string) ([]v1.Pod, error) {
+func queryPodsWithWorkloadSelector(c client.Client, workloadSelector map[string]string, ns string) ([]v1.Pod, error) {
 
 	pods := make([]v1.Pod, 0)
-	selector := labels.SelectorFromSet(workloadSelector).String()
-	podLists, err := c.CoreV1().Pods(ns).List(context.TODO(), metav1.ListOptions{LabelSelector: selector})
-	if err != nil {
-		return pods, fmt.Errorf("list pods with selector %+v failed", selector)
+
+	podLists := &v1.PodList{}
+	if err := c.List(context.TODO(), podLists, client.InNamespace(ns), client.MatchingLabels(workloadSelector)); err != nil {
+		return pods, fmt.Errorf("list pods with selector %+v failed", workloadSelector)
 	}
 
 	for _, item := range podLists.Items {
@@ -348,7 +345,7 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta Sma
 	if loc.Namespace == r.env.Config.Global.IstioNamespace {
 		ns = ""
 	}
-	pods, err := queryPodsWithWorkloadSelector(r.env.K8SClient, LimiterMeta.workloadSelector, ns)
+	pods, err := queryPodsWithWorkloadSelector(r.Client, LimiterMeta.workloadSelector, ns)
 	if err != nil {
 		log.Errorf("get err in queryServicePodsWithWorkloadSelector, %+v", err.Error())
 		return nil
@@ -404,7 +401,7 @@ func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(host string, loc ty
 func (r *SmartLimiterReconciler) genQuerymapWithService(loc types.NamespacedName) map[string][]metric.Handler {
 	// otherwise, use k8s svc
 	queryMap := make(map[string][]metric.Handler, 0)
-	pods, err := queryServicePods(r.env.K8SClient, loc)
+	pods, err := queryServicePods(r.Client, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
 		return nil
