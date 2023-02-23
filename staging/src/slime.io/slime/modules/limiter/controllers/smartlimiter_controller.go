@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -64,9 +63,6 @@ type SmartLimiterReconciler struct {
 
 	metricInfoLock sync.RWMutex
 
-	lastUpdatePolicy     microservicev1alpha2.SmartLimiterSpec
-	lastUpdatePolicyLock *sync.RWMutex
-
 	watcherMetricChan <-chan metric.Metric
 	tickerMetricChan  <-chan metric.Metric
 }
@@ -87,11 +83,9 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return reconcile.Result{}, err
 		}
 	}
+
 	// deleted
 	if instance == nil {
-		r.lastUpdatePolicyLock.Lock()
-		r.lastUpdatePolicy = microservicev1alpha2.SmartLimiterSpec{}
-		r.lastUpdatePolicyLock.Unlock()
 		r.RemoveInterested(req)
 		log.Infof("%v is deleted", req)
 		return reconcile.Result{}, nil
@@ -103,21 +97,12 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
 			return ctrl.Result{}, nil
 		}
-		r.lastUpdatePolicyLock.RLock()
-		if reflect.DeepEqual(instance.Spec, r.lastUpdatePolicy) {
-			r.lastUpdatePolicyLock.RUnlock()
+
+		if out, err := r.Validate(instance); err != nil {
+			log.Errorf("invalid smartlimiter, %s", err)
 			return reconcile.Result{}, nil
 		} else {
-			if out, err := r.Validate(instance); err != nil {
-				log.Errorf("invalid smartlimiter, %s", err)
-				return reconcile.Result{}, nil
-			} else {
-				r.lastUpdatePolicyLock.RUnlock()
-				r.lastUpdatePolicyLock.Lock()
-				r.lastUpdatePolicy = instance.Spec
-				r.lastUpdatePolicyLock.Unlock()
-				r.RegisterInterest(instance, req, out)
-			}
+			r.RegisterInterest(instance, req, out)
 		}
 	}
 	return ctrl.Result{}, nil
@@ -132,9 +117,8 @@ func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(opts ...ReconcilerOpts) *SmartLimiterReconciler {
 	r := &SmartLimiterReconciler{
-		metricInfo:           cmap.New(),
-		interest:             cmap.New(),
-		lastUpdatePolicyLock: &sync.RWMutex{},
+		metricInfo: cmap.New(),
+		interest:   cmap.New(),
 	}
 	for _, opt := range opts {
 		opt(r)
