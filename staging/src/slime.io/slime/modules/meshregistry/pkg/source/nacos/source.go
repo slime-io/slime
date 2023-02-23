@@ -117,6 +117,8 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 			nacoesArgs.Password,
 			nacoesArgs.Namespace,
 			nacoesArgs.Group,
+			nacoesArgs.MetaKeyNamespace,
+			nacoesArgs.MetaKeyGroup,
 			nacoesArgs.AllNamespaces,
 			headers)
 	} else {

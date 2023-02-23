@@ -13,13 +13,9 @@ import (
 	"time"
 )
 
-const (
-	defaultNacosTokenTTL = 5
-)
+const defaultNacosTokenTTL = 5
 
-var (
-	serviceListPageSize = 1000
-)
+var serviceListPageSize = 1000
 
 type nacosNamespace struct {
 	Namespace         string `json:"namespace,omitempty"`
@@ -76,8 +72,10 @@ type client struct {
 	headers map[string]string
 
 	// fetch instances from a specific namespace and group, or from all of the namespaces.
-	namespaceId, group string // if not set which means public and DEFAULT_GROUP
-	fetchAllNamespaces bool
+	namespaceId, group             string // if not set which means public and DEFAULT_GROUP
+	metaKeyNamespace, metaKeyGroup string
+	fetchAllNamespaces             bool
+	injectNsGroupIntoMeta          bool
 
 	// security login
 	username string
@@ -88,7 +86,9 @@ type client struct {
 
 func NewClient(urls []string,
 	username, password string,
-	namespaceId, group string, allNamespaces bool,
+	namespaceId, group string,
+	metaKeyNamespace, metaKeyGroup string,
+	allNamespaces bool,
 	headers map[string]string) Client {
 	c := &client{
 		client:             http.Client{Timeout: 30 * time.Second},
@@ -96,12 +96,15 @@ func NewClient(urls []string,
 		urls:               urls,
 		namespaceId:        namespaceId,
 		group:              group,
+		metaKeyNamespace:   metaKeyNamespace,
+		metaKeyGroup:       metaKeyGroup,
 		fetchAllNamespaces: allNamespaces,
 		username:           username,
 		password:           password,
-		tokenTTL:           defaultNacosTokenTTL, // defaulr TokenTTL as 5 second, if first login failed
+		tokenTTL:           defaultNacosTokenTTL, // default TokenTTL as 5 second, if first login failed
 		token:              &atomic.Value{},
 	}
+	c.injectNsGroupIntoMeta = c.metaKeyNamespace != "" || c.metaKeyGroup != ""
 	if c.headers == nil {
 		c.headers = make(map[string]string)
 	}
@@ -304,7 +307,20 @@ func (c *client) listInstances(namespaceId, groupName, serviceName string) ([]*i
 	if err := json.Unmarshal(resp, &ir); err != nil {
 		return nil, err
 	}
-
+	if c.injectNsGroupIntoMeta {
+		for _, inst := range ir.Hosts {
+			if inst.Metadata == nil {
+				inst.Metadata = make(nacosMetadata)
+			}
+			// replaces the original value
+			if c.metaKeyNamespace != "" {
+				inst.Metadata[c.metaKeyNamespace] = namespaceId
+			}
+			if c.metaKeyGroup != "" {
+				inst.Metadata[c.metaKeyGroup] = groupName
+			}
+		}
+	}
 	return ir.Hosts, nil
 }
 
