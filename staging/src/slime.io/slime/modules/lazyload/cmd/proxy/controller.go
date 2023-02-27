@@ -29,7 +29,7 @@ func NewController(indexer cache.Indexer, queue workqueue.RateLimitingInterface,
 	}
 }
 
-func (c *controller) Run(stopCh chan struct{}) {
+func (c *controller) Run(stopCh <-chan struct{}) {
 	defer runtime.HandleCrash()
 
 	defer c.queue.ShutDown()

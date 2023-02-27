@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/types"
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -37,6 +38,10 @@ var (
 	logLevel  = os.Getenv(EnvLogLevel)
 
 	configLabelSelector = "lazyload.slime.io/config=global-sidecar"
+
+	Cache = &proxy.Cache{
+		Data: make(map[types.NamespacedName]struct{}),
+	}
 )
 
 func main() {
@@ -64,20 +69,17 @@ func main() {
 		}()
 	}
 
+	ctx := ctrl.SetupSignalHandler()
+	if err := startSvcCache(ctx); err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("start svc cache")
+
 	controller, err := newConfigMapController()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	stop := make(chan struct{})
-	sigCh := make(chan os.Signal, 1)
-	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		sig := <-sigCh
-		log.Printf("Exit signal received: %s\n", sig)
-		close(stop)
-	}()
-	controller.Run(stop)
+	controller.Run(ctx.Done())
 	stopListenAndServe()
 }
 
@@ -150,8 +152,11 @@ func startListenAndServe(wormholePorts map[int]struct{}) {
 		}
 		if _, exist := servers[whPort]; !exist {
 			srv := &http.Server{
-				Addr:    "0.0.0.0" + ":" + strconv.Itoa(whPort),
-				Handler: &proxy.Proxy{WormholePort: whPort},
+				Addr: "0.0.0.0" + ":" + strconv.Itoa(whPort),
+				Handler: &proxy.Proxy{
+					WormholePort: whPort,
+					SvcCache:     Cache,
+				},
 			}
 			servers[whPort] = srv
 			go startServer(srv)
