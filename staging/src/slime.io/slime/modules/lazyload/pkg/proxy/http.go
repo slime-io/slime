@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/types"
 	"net"
 	"net/http"
 	"strconv"
@@ -26,6 +27,7 @@ func (p *HealthzProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 type Proxy struct {
 	WormholePort int
+	SvcCache     *Cache
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -37,16 +39,40 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	)
 	log.Debugf("proxy received request, reqHost: %s", reqHost)
 
-	// try to complete short name
 	if values := req.Header[HeaderSourceNs]; len(values) > 0 && values[0] != "" {
 		req.Header.Del(HeaderSourceNs)
+
+		// we do not sure if reqHost is k8s short name or no ns service
+		// so k8s svc will be extended/searched first
+		// otherwise original reqHost is used
+
 		if !strings.Contains(reqHost, ".") {
 			// short name
-			ns := values[0]
-			if idx := strings.LastIndex(reqHost, ":"); idx >= 0 {
-				reqHost = fmt.Sprintf("%s.%s%s", reqHost[:idx], ns, reqHost[idx:])
-			} else {
-				reqHost = fmt.Sprintf("%s.%s", reqHost, ns)
+			var (
+				ns      = values[0]
+				svcName = reqHost
+				port    string
+			)
+
+			// if host has port info, extract it
+			idx := strings.LastIndex(reqHost, ":")
+			if idx >= 0 {
+				svcName = reqHost[:idx]
+				port = reqHost[idx+1:]
+			}
+
+			nn := types.NamespacedName{
+				Namespace: svcName,
+				Name:      ns,
+			}
+
+			if p.SvcCache.Exist(nn) {
+				if idx >= 0 {
+					// add port info
+					reqHost = fmt.Sprintf("%s.%s:%s", nn.Name, nn.Namespace, port)
+				} else {
+					reqHost = fmt.Sprintf("%s.%s", nn.Name, nn.Namespace)
+				}
 			}
 		}
 		log.Debugf("handle request header [Slime-Source-Ns]: %s", values[0])
