@@ -4,6 +4,8 @@ import (
 	"flag"
 	"os"
 	"strings"
+
+	"github.com/gogo/protobuf/jsonpb"
 )
 
 const (
@@ -38,7 +40,6 @@ func Fatal() {
 }
 
 type AnyMessage struct {
-	Raw     []byte
 	RawJson []byte
 }
 
@@ -50,4 +51,9 @@ func (a *AnyMessage) String() string {
 }
 
 func (a *AnyMessage) ProtoMessage() {
+}
+
+func (a *AnyMessage) UnmarshalJSONPB(_ *jsonpb.Unmarshaler, data []byte) error {
+	a.RawJson = append([]byte{}, data...)
+	return nil
 }

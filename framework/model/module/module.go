@@ -392,23 +392,11 @@ func Main(bundle string, modules []Module) {
 				}
 			} else {
 				// new version: get mod.Config() value from config.general
-				if modCfg.General != nil {
-					rawMsg, ok := modSelfCfg.(*util.AnyMessage)
-					if len(modCfg.General.XXX_unrecognized) > 0 {
-						if ok {
-							rawMsg.Raw = modCfg.General.XXX_unrecognized
-						} else if err := proto.Unmarshal(modCfg.General.XXX_unrecognized, modSelfCfg); err != nil {
-							log.Errorf("unmarshal for mod %s XXX_unrecognized (%v) met err %v", modCfg.Name, modCfg.General.XXX_unrecognized, err)
-							fatal()
-						}
-					} else if len(modGeneralJson) > 0 {
-						u := jsonpb.Unmarshaler{AllowUnknownFields: true}
-						if ok {
-							rawMsg.RawJson = modGeneralJson
-						} else if err := u.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
-							log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, modGeneralJson, err)
-							fatal()
-						}
+				if len(modGeneralJson) > 0 {
+					u := jsonpb.Unmarshaler{AllowUnknownFields: true}
+					if err := u.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
+						log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, modGeneralJson, err)
+						fatal()
 					}
 				}
 			}
