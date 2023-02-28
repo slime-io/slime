@@ -56,7 +56,6 @@ func handleSvcUpdate(old, obj interface{}) {
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
 	}
-
 	Cache.Set(nn)
 }
 

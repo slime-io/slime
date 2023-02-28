@@ -62,8 +62,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			nn := types.NamespacedName{
-				Namespace: svcName,
-				Name:      ns,
+				Namespace: ns,
+				Name:      svcName,
 			}
 
 			if p.SvcCache.Exist(nn) {
@@ -75,6 +75,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 		}
+
 		log.Debugf("handle request header [Slime-Source-Ns]: %s", values[0])
 	}
 
