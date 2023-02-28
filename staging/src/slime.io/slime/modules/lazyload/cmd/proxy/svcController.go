@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"reflect"
 )
 
 func startSvcCache(ctx context.Context) error {
@@ -52,11 +53,21 @@ func handleSvcUpdate(old, obj interface{}) {
 	if !ok {
 		return
 	}
+
+	if old != nil {
+		oldSvc, ok := obj.(*corev1.Service)
+		if !ok {
+			return
+		}
+		if reflect.DeepEqual(oldSvc.Spec, svc.Spec) {
+			return
+		}
+	}
+
 	nn := types.NamespacedName{
 		Name:      svc.Name,
 		Namespace: svc.Namespace,
 	}
-
 	Cache.Set(nn)
 }
 
