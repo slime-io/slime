@@ -10,7 +10,6 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
-	"istio.io/pkg/log"
 )
 
 func (s *Source) Polling() {
@@ -27,24 +26,6 @@ func (s *Source) Polling() {
 			}
 		}
 	}()
-}
-
-func (s *Source) markServiceEntryInitDone() {
-	s.mut.RLock()
-	ch := s.seInitCh
-	s.mut.RUnlock()
-	if ch == nil {
-		return
-	}
-
-	s.mut.Lock()
-	ch, s.seInitCh = s.seInitCh, nil
-	s.mut.Unlock()
-	if ch != nil {
-		log.Infof("service entry init done, close ch and call initWg.Done")
-		s.initWg.Done()
-		close(ch)
-	}
 }
 
 func (s *Source) refresh() {

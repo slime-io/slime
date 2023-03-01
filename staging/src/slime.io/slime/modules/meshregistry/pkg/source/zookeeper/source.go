@@ -66,16 +66,18 @@ type Source struct {
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
 	changedApps          map[string]struct{}
 	appSidecarUpdateTime map[string]time.Time
+	dubboPortsCache      map[uint32]*v1alpha3.Port
 
 	Con            *atomic.Value // store *zk.Conn
 	handlers       []event.Handler
 	initedCallback func(string)
 	mut            sync.RWMutex
 
-	seInitCh               chan struct{}
-	initWg                 sync.WaitGroup
-	refreshSidecarNotifyCh chan struct{}
-	stop                   chan struct{}
+	seInitCh                               chan struct{}
+	initWg                                 sync.WaitGroup
+	refreshSidecarNotifyCh                 chan struct{}
+	refreshSidecarMockServiceEntryNotifyCh chan struct{}
+	stop                                   chan struct{}
 }
 
 func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
@@ -104,6 +106,7 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 		pollingCache:         cmap.New(),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
 		appSidecarUpdateTime: map[string]time.Time{},
+		dubboPortsCache:      map[uint32]*v1alpha3.Port{},
 
 		seInitCh:               make(chan struct{}),
 		stop:                   make(chan struct{}),
@@ -112,7 +115,10 @@ func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collectio
 
 		Con: &atomic.Value{},
 	}
-	ret.handlers = append(ret.handlers, event.HandlerFromFn(ret.refreshSidecarHandler))
+	ret.handlers = append(
+		ret.handlers,
+		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecar),
+		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecarMockServiceEntry))
 
 	ret.initWg.Add(1) // ServiceEntry init-sync ready
 	if args.EnableDubboSidecar {
@@ -240,40 +246,27 @@ func (s *Source) Start() {
 
 	if s.args.EnableDubboSidecar {
 		go func() {
-			var (
-				waitCh      <-chan time.Time
-				waitRefresh int
-			)
-
 			select {
 			case <-s.stop:
 				return
 			case <-s.seInitCh:
+				s.refreshSidecarMockServiceEntry()
 				s.refreshSidecar(true)
+
 				s.markSidecarInitDone()
 			}
 
-			for {
-				select {
-				case <-s.stop:
-					return
-				case <-waitCh:
-					waitCh = nil
-					if waitRefresh == 0 {
-						continue
-					}
-				case <-s.refreshSidecarNotifyCh:
-					waitRefresh++
-					if waitCh != nil {
-						continue
+			go s.refreshSidecarTask(s.stop)
+			go func() {
+				for {
+					select {
+					case <-s.stop:
+						return
+					case <-s.refreshSidecarMockServiceEntryNotifyCh:
+						s.refreshSidecarMockServiceEntry()
 					}
 				}
-
-				scope.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
-				waitRefresh = 0
-				s.refreshSidecar(false)
-				waitCh = time.After(time.Second)
-			}
+			}()
 		}()
 	}
 }
@@ -334,36 +327,6 @@ func (s *Source) Stop() {
 	s.stop <- struct{}{}
 }
 
-func (s *Source) refreshSidecarHandler(e event.Event) {
-	if e.Source != collections.K8SNetworkingIstioIoV1Alpha3Serviceentries {
-		return
-	}
-
-	var preCallModel, callModel map[string]DubboCallModel
-	if att := e.Resource.Attachments[AttachmentDubboCallModel]; att != nil {
-		callModel = att.(map[string]DubboCallModel)
-	}
-	s.mut.Lock()
-	preCallModel, s.seDubboCallModels[e.Resource.Metadata.FullName] = s.seDubboCallModels[e.Resource.Metadata.FullName], callModel
-	changedApps := calcChangedApps(preCallModel, callModel)
-	if len(changedApps) > 0 {
-		if s.changedApps == nil {
-			s.changedApps = map[string]struct{}{}
-		}
-		for _, app := range changedApps {
-			s.changedApps[app] = struct{}{}
-		}
-	}
-	s.mut.Unlock()
-
-	if len(changedApps) > 0 {
-		select {
-		case s.refreshSidecarNotifyCh <- struct{}{}:
-		default:
-		}
-	}
-}
-
 func (s *Source) ServiceEntries() []*v1alpha3.ServiceEntry {
 	cacheItems := s.cacheInUse().Items()
 	ret := make([]*v1alpha3.ServiceEntry, 0, len(cacheItems))
@@ -408,6 +371,24 @@ func (s *Source) ServiceEntry(fullName resource.FullName) *v1alpha3.ServiceEntry
 		return nil
 	}
 	return sem.ServiceEntry
+}
+
+func (s *Source) markServiceEntryInitDone() {
+	s.mut.RLock()
+	ch := s.seInitCh
+	s.mut.RUnlock()
+	if ch == nil {
+		return
+	}
+
+	s.mut.Lock()
+	ch, s.seInitCh = s.seInitCh, nil
+	s.mut.Unlock()
+	if ch != nil {
+		log.Infof("service entry init done, close ch and call initWg.Done")
+		s.initWg.Done()
+		close(ch)
+	}
 }
 
 func buildSeEvent(kind event.Kind, item *v1alpha3.ServiceEntry, meta resource.Metadata, service string, callModel map[string]DubboCallModel) (event.Event, error) {

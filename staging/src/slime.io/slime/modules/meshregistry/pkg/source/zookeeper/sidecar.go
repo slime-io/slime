@@ -3,6 +3,7 @@ package zookeeper
 import (
 	"encoding/json"
 	"fmt"
+	"istio.io/libistio/pkg/config/schema/collections"
 	"net/http"
 	"sort"
 	"strings"
@@ -19,6 +20,8 @@ import (
 
 const (
 	nonNsSpecSidecarAnno = "sidecar.config.istio.io/nonNsSpec"
+	mockServiceEntryName = "qz-not-exist-svc"
+	mockService          = mockServiceEntryName + ".qz"
 )
 
 type DubboCallModel struct {
@@ -72,6 +75,36 @@ func (m DubboCallModel) Provide(interfaceName string) bool {
 func (m DubboCallModel) Consume(interfaceName string) bool {
 	_, ok := m.ConsumeServices[interfaceName]
 	return ok
+}
+
+func (s *Source) serviceEntryHandlerRefreshSidecar(e event.Event) {
+	if e.Source != collections.K8SNetworkingIstioIoV1Alpha3Serviceentries {
+		return
+	}
+
+	var preCallModel, callModel map[string]DubboCallModel
+	if att := e.Resource.Attachments[AttachmentDubboCallModel]; att != nil {
+		callModel = att.(map[string]DubboCallModel)
+	}
+	s.mut.Lock()
+	preCallModel, s.seDubboCallModels[e.Resource.Metadata.FullName] = s.seDubboCallModels[e.Resource.Metadata.FullName], callModel
+	changedApps := calcChangedApps(preCallModel, callModel)
+	if len(changedApps) > 0 {
+		if s.changedApps == nil {
+			s.changedApps = map[string]struct{}{}
+		}
+		for _, app := range changedApps {
+			s.changedApps[app] = struct{}{}
+		}
+	}
+	s.mut.Unlock()
+
+	if len(changedApps) > 0 {
+		select {
+		case s.refreshSidecarNotifyCh <- struct{}{}:
+		default:
+		}
+	}
 }
 
 func (s *Source) refreshSidecar(init bool) {
@@ -183,6 +216,67 @@ func (s *Source) refreshSidecar(init bool) {
 	for _, ev := range events {
 		for _, h := range s.handlers {
 			h.Handle(ev)
+		}
+	}
+}
+
+func (s *Source) refreshSidecarMockServiceEntry() {
+	se := &networking.ServiceEntry{
+		Hosts:      []string{mockService},
+		Ports:      make([]*networking.Port, 0),
+		Resolution: networking.ServiceEntry_STATIC,
+	}
+
+	s.mut.RLock()
+	for _, p := range s.dubboPortsCache {
+		se.Ports = append(se.Ports, p)
+	}
+	s.mut.RUnlock()
+	sort.Slice(se.Ports, func(i, j int) bool {
+		return se.Ports[i].Number < se.Ports[j].Number
+	})
+
+	now := time.Now()
+	ev, err := buildSeEvent(event.Updated, se, resource.Metadata{
+		FullName:   resource.FullName{Namespace: DubboNamespace, Name: mockServiceEntryName},
+		CreateTime: now,
+		Version:    resource.Version(now.String()),
+		Labels: map[string]string{
+			"path":     mockService,
+			"registry": "zookeeper",
+		},
+		Annotations: map[string]string{},
+	}, mockServiceEntryName, nil)
+	if err != nil {
+		log.Errorf("buildSeEvent met err %v", err)
+		return
+	}
+
+	for _, h := range s.handlers {
+		h.Handle(ev)
+	}
+}
+
+func (s *Source) serviceEntryHandlerRefreshSidecarMockServiceEntry(e event.Event) {
+	if e.Source != collections.K8SNetworkingIstioIoV1Alpha3Serviceentries || e.Resource.Metadata.FullName.Name == mockServiceEntryName {
+		return
+	}
+
+	se := e.Resource.Message.(*networking.ServiceEntry)
+	var newPort bool
+	s.mut.Lock()
+	for _, p := range se.Ports {
+		if _, ok := s.dubboPortsCache[p.Number]; !ok {
+			s.dubboPortsCache[p.Number] = p
+			newPort = true
+		}
+	}
+	s.mut.Unlock()
+
+	if newPort {
+		select {
+		case s.refreshSidecarMockServiceEntryNotifyCh <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -484,6 +578,35 @@ func (s *Source) HandleSidecarDubboCallModel(w http.ResponseWriter, request *htt
 func (s *Source) markSidecarInitDone() {
 	log.Infof("sidecar init done, call initWg.Done")
 	s.initWg.Done()
+}
+
+func (s *Source) refreshSidecarTask(stop <-chan struct{}) {
+	var (
+		waitCh      <-chan time.Time
+		waitRefresh int
+	)
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-waitCh:
+			waitCh = nil
+			if waitRefresh == 0 {
+				continue
+			}
+		case <-s.refreshSidecarNotifyCh:
+			waitRefresh++
+			if waitCh != nil {
+				continue
+			}
+		}
+
+		scope.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
+		waitRefresh = 0
+		s.refreshSidecar(false)
+		waitCh = time.After(time.Second)
+	}
 }
 
 func calcChangedApps(pre, cur map[string]DubboCallModel) []string {
