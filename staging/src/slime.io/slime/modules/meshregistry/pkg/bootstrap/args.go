@@ -96,6 +96,8 @@ type SourceArgs struct {
 	// A list of selectors that specify the set of service instances to be processed,
 	// configured in the same way as the k8s label selector.
 	EndpointSelectors []*metav1.LabelSelector
+	// Endpoint selectors for specific service, the key of the map is the service name
+	ServicedEndpointSelectors map[string][]*metav1.LabelSelector
 }
 
 type K8SSourceArgs struct {

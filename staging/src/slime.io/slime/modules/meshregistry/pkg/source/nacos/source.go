@@ -66,6 +66,10 @@ var (
 	ApplyInstanceFilter source.ApplyHook = func(sh source.SelectHook) {
 		instanceFilter.Store(sh)
 	}
+	servicedInstanceFilter                                  = new(atomic.Value) // source.SelectHookStore
+	ApplyServicedInstanceFilter source.ApplySelectHookStore = func(shs source.SelectHookStore) {
+		servicedInstanceFilter.Store(shs)
+	}
 
 	Scope = log.RegisterScope("nacos", "nacos debugging", 0)
 )
@@ -131,6 +135,7 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		s.namingClient = namingClient
 	}
 	source.UpdateSelector(nacoesArgs.EndpointSelectors, ApplyInstanceFilter)
+	source.UpdateGroupedSelector(nacoesArgs.ServicedEndpointSelectors, ApplyServicedInstanceFilter)
 	return s, s.cacheJson, nil
 }
 

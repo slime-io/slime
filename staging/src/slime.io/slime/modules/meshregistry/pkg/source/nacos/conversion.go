@@ -74,9 +74,16 @@ func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.Wor
 	}
 	ports = append(ports, port)
 	filter, enableInstanceFilter := instanceFilter.Load().(source.SelectHook)
+	servicedFiters, enableServicedInstanceFilter := servicedInstanceFilter.Load().(source.SelectHookStore)
 	for _, ins := range instances {
 		if enableInstanceFilter && !filter(ins.Metadata) {
 			continue
+		}
+		if enableServicedInstanceFilter {
+			servicedFilter := servicedFiters(ins.ServiceName)
+			if servicedFilter != nil && !servicedFilter(ins.Metadata) {
+				continue
+			}
 		}
 		if !ins.Healthy {
 			continue

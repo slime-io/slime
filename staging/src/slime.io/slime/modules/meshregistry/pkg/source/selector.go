@@ -5,6 +5,10 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 )
 
+type SelectHookStore func(string) SelectHook
+
+type ApplySelectHookStore func(SelectHookStore)
+
 type SelectHook func(map[string]string) bool
 
 type ApplyHook func(SelectHook)
@@ -40,4 +44,19 @@ func NewSelectHook(labelSelectors []*metav1.LabelSelector) SelectHook {
 // UpdateSelector updates the given selector with the input LabelSelectors.
 func UpdateSelector(labelSelectors []*metav1.LabelSelector, apply ApplyHook) {
 	apply(NewSelectHook(labelSelectors))
+}
+
+// NewSelectHookStore returns a SelectHookStore
+func NewSelectHookStore(groupedSelectors map[string][]*metav1.LabelSelector) SelectHookStore {
+	m := make(map[string]SelectHook, len(groupedSelectors))
+	for key, sels := range groupedSelectors {
+		m[key] = NewSelectHook(sels)
+	}
+	return func(s string) SelectHook {
+		return m[s]
+	}
+}
+
+func UpdateGroupedSelector(groupedSelectors map[string][]*metav1.LabelSelector, apply ApplySelectHookStore) {
+	apply(NewSelectHookStore(groupedSelectors))
 }
