@@ -57,3 +57,7 @@ func (a *AnyMessage) UnmarshalJSONPB(_ *jsonpb.Unmarshaler, data []byte) error {
 	a.RawJson = append([]byte{}, data...)
 	return nil
 }
+
+func (a *AnyMessage) MarshalJSONPB(_ *jsonpb.Marshaler) ([]byte, error) {
+	return a.RawJson, nil
+}
