@@ -393,7 +393,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 
 			paths, _, e, err := sw.conn.Load().(*zk.Conn).ChildrenW(sw.rootPath)
 			if err != nil {
-				if errors.Is(err, zk.ErrNoNode) {
+				if errors.Is(err, zk.ErrNoNode) && firstLoop {
 					// mark ready
 					firstLoop = false
 					close(initCh)
