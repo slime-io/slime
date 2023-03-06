@@ -20,16 +20,16 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[string]*networking.ServiceEntry, error) {
+func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore) (map[string]*networking.ServiceEntry, error) {
 	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
 		if gatewayModel {
-			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel)
+			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filters)
 		} else {
-			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel) {
+			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel, filters) {
 				seMap[k] = v
 			}
 		}
@@ -38,8 +38,8 @@ func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gate
 }
 
 // -------- for gateway mode --------
-func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool) *networking.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel)
+func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filters source.SelectHookStore) *networking.ServiceEntry {
+	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filters)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".nacos"
@@ -56,7 +56,7 @@ func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel boo
 	return ret
 }
 
-func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
+func convertEndpoints(instances []*instance, patchLabel bool, filters source.SelectHookStore) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
 	var (
 		endpoints      = make([]*networking.WorkloadEntry, 0)
 		ports          = make([]*networking.Port, 0)
@@ -73,17 +73,13 @@ func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.Wor
 		Name:     "http",
 	}
 	ports = append(ports, port)
-	filter, enableInstanceFilter := instanceFilter.Load().(source.SelectHook)
-	servicedFiters, enableServicedInstanceFilter := servicedInstanceFilter.Load().(source.SelectHookStore)
+
 	for _, ins := range instances {
-		if enableInstanceFilter && !filter(ins.Metadata) {
+		if filter := filters[allSeriveFilter]; filter != nil && !filter(ins.Metadata) {
 			continue
 		}
-		if enableServicedInstanceFilter {
-			servicedFilter := servicedFiters(ins.ServiceName)
-			if servicedFilter != nil && !servicedFilter(ins.Metadata) {
-				continue
-			}
+		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {
+			continue
 		}
 		if !ins.Healthy {
 			continue
@@ -126,8 +122,8 @@ func convertEndpoints(instances []*instance, patchLabel bool) ([]*networking.Wor
 	return endpoints, ports, address, hasNonIPEpAddr
 }
 
-func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) map[string]*networking.ServiceEntry {
-	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel)
+func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore) map[string]*networking.ServiceEntry {
+	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel, filters)
 	if len(endpointMap) == 0 {
 		return nil
 	}
@@ -161,16 +157,19 @@ func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svc
 	return ses
 }
 
-func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
+func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool, filters source.SelectHookStore) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
 	portsMap := make(map[string][]*networking.Port, 0)
 	useDNSMap := make(map[string]bool, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
 	})
-	filter, enableInstanceFilter := instanceFilter.Load().(source.SelectHook)
+
 	for _, ins := range instances {
-		if enableInstanceFilter && !filter(ins.Metadata) {
+		if filter := filters[allSeriveFilter]; filter != nil && !filter(ins.Metadata) {
+			continue
+		}
+		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {
 			continue
 		}
 		if !ins.Healthy {

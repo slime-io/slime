@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync/atomic"
 	"time"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
@@ -59,20 +58,14 @@ type Source struct {
 	stop        chan struct{}
 
 	initedCallback func(string)
+
+	// InstanceFilers, the key of the map is the service name, and the corresponding value
+	// is the filters applied to this service. If the service name is empty, it means that
+	// all services are applicable to this filter.
+	instanceFilters source.SelectHookStore
 }
 
-var (
-	instanceFilter                       = new(atomic.Value) // source.SelectHook
-	ApplyInstanceFilter source.ApplyHook = func(sh source.SelectHook) {
-		instanceFilter.Store(sh)
-	}
-	servicedInstanceFilter                                  = new(atomic.Value) // source.SelectHookStore
-	ApplyServicedInstanceFilter source.ApplySelectHookStore = func(shs source.SelectHookStore) {
-		servicedInstanceFilter.Store(shs)
-	}
-
-	Scope = log.RegisterScope("nacos", "nacos debugging", 0)
-)
+var Scope = log.RegisterScope("nacos", "nacos debugging", 0)
 
 const (
 	SourceName       = "nacos"
@@ -80,6 +73,8 @@ const (
 	POLLING          = "polling"
 	WATCHING         = "watching"
 	clientHeadersEnv = "NACOS_CLIENT_HEADERS"
+
+	allSeriveFilter = ""
 )
 
 func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
@@ -134,8 +129,10 @@ func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool
 		}
 		s.namingClient = namingClient
 	}
-	source.UpdateSelector(nacoesArgs.EndpointSelectors, ApplyInstanceFilter)
-	source.UpdateGroupedSelector(nacoesArgs.ServicedEndpointSelectors, ApplyServicedInstanceFilter)
+
+	s.instanceFilters = source.NewSelectHookStore(nacoesArgs.ServicedEndpointSelectors)
+	s.instanceFilters[allSeriveFilter] = source.NewSelectHook(nacoesArgs.EndpointSelectors)
+
 	return s, s.cacheJson, nil
 }
 
