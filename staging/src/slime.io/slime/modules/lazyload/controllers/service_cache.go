@@ -213,7 +213,7 @@ func (r *ServicefenceReconciler) StartIpToSvcCache(ctx context.Context) {
 		},
 	}
 
-	_, controller := cache.NewInformer(lw, &corev1.Endpoints{}, 60, cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformer(lw, &corev1.Endpoints{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { r.handleEpAdd(ctx, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { r.handleEpUpdate(ctx, oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { r.handleEpDelete(ctx, obj) },

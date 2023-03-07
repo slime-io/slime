@@ -11,6 +11,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"time"
 )
 
 func startSvcCache(ctx context.Context) error {
@@ -32,7 +33,7 @@ func startSvcCache(ctx context.Context) error {
 		},
 	}
 
-	_, controller := cache.NewInformer(lw, &corev1.Service{}, 60, cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformer(lw, &corev1.Service{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { handleSvcUpdate(nil, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { handleSvcUpdate(oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { handleSvcDelete(obj) },
