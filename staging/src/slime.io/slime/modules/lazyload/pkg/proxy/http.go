@@ -125,8 +125,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			addr = fmt.Sprintf("%s:%d", origDestIp, origDestPort)
 			return dialer.DialContext(ctx, network, addr)
 		},
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
+		MaxIdleConns:          1000,
+		IdleConnTimeout:       5 * time.Minute,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
 	}
@@ -138,6 +138,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		select {
 		case <-reqCtx.Done():
+			log.Infof("request's context done")
 		default:
 			log.Infof("do req get err %v", err)
 			http.Error(w, "", http.StatusInternalServerError)
