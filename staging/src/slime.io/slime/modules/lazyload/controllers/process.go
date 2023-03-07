@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -452,7 +453,7 @@ func (r *ServicefenceReconciler) NewPodController(client kubernetes.Interface, f
 			return client.CoreV1().Pods("").Watch(ctx, listOpts)
 		},
 	}
-	_, controller := cache.NewInformer(lw, &corev1.Pod{}, 60, cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformer(lw, &corev1.Pod{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { r.handlePodAdd(ctx, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { r.handlePodUpdate(ctx, oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { r.handlePodDelete(ctx, obj) },
