@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 
+	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/meshregistry/model"
@@ -71,6 +72,9 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	if regArgs == nil {
 		return fmt.Errorf("nil registry args")
+	}
+	if err := regArgs.Validate(); err != nil {
+		return fmt.Errorf("invalid args for meshregsitry: %w", err)
 	}
 	bs, err := json.MarshalIndent(regArgs, "", "  ")
 	log.Infof("inuse registry args: %s, err %v", string(bs), err)
