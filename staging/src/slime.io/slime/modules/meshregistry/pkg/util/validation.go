@@ -37,6 +37,14 @@ var (
 	dns1123LabelRegexp   = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 	wildcardPrefixRegexp = regexp.MustCompile("^" + wildcardPrefix + "$")
 	seLabelKeys          = []string{"app"}
+
+	skipValidateTagValue = func() bool {
+		switch os.Getenv("SKIP_VALIDATE_LABEL_VALUE") {
+		case "1", "t", "T", "true", "TRUE", "True":
+			return true
+		}
+		return false
+	}()
 )
 
 func init() {
@@ -68,6 +76,9 @@ func ValidateTagKey(k string) error {
 }
 
 func ValidateTagValue(v string) error {
+	if skipValidateTagValue {
+		return nil
+	}
 	if !labelValueRegexp.MatchString(v) {
 		return fmt.Errorf("invalid tag value: %q", v)
 	}
