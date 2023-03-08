@@ -38,7 +38,7 @@ type InitCallbacks struct {
 
 type moduleConfig struct {
 	module Module
-	config configH
+	config *bootconfig.Config
 }
 
 type configH struct {
@@ -143,11 +143,90 @@ func (rm *moduleReadyManager) check() error {
 	return errors.New(buf.String())
 }
 
-func Main(bundle string, modules []Module) {
-
-	fatal := func() {
-		os.Exit(1)
+func LoadModule(name string, modGetter func(modCfg *bootconfig.Config) Module, bundleConfig *bootconfig.Config) (Module, *bootstrap.ParsedModuleConfig, error) {
+	pmCfg, err := bootstrap.GetModuleConfig(name)
+	if err != nil {
+		return nil, nil, err
 	}
+
+	mod, err := LoadModuleFromConfig(pmCfg, modGetter, bundleConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mod, pmCfg, nil
+}
+
+func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(modCfg *bootconfig.Config) Module, bundleConfig *bootconfig.Config) (Module, error) {
+	mod := modGetter(pmCfg.Config)
+	modCfg := pmCfg.Config
+	if modCfg.Bundle != nil || mod == nil {
+		return nil, nil
+	}
+
+	// not bundle
+
+	mod = mod.Clone()
+
+	if bundleConfig != nil {
+		if bundleConfig.Global != nil {
+			modCfg.Global = merge(bundleConfig.Global, modCfg.Global).(*bootconfig.Global)
+		}
+	}
+
+	modConfigJson, err := json.Marshal(*modCfg)
+	if err != nil {
+		return nil, err
+	}
+	pmCfg.RawJson = modConfigJson
+
+	modSelfCfg := mod.Config()
+	if modSelfCfg == nil {
+		return mod, nil
+	}
+
+	var toCopy proto.Message
+	switch {
+	case modCfg.Fence != nil:
+		toCopy = modCfg.Fence
+	case modCfg.Limiter != nil:
+		toCopy = modCfg.Limiter
+	case modCfg.Plugin != nil:
+		toCopy = modCfg.Plugin
+	}
+
+	if toCopy != nil {
+		// old version: get mod.Config() value from config.Fence/Limiter/Plugin
+		ma := jsonpb.Marshaler{}
+		js, err := ma.MarshalToString(toCopy)
+		if err != nil {
+			log.Errorf("marshal for mod %s config (%v) met err %v", modCfg.Name, toCopy, err)
+			fatal()
+		}
+		um := jsonpb.Unmarshaler{AllowUnknownFields: true}
+		if err := um.Unmarshal(strings.NewReader(js), modSelfCfg); err != nil {
+			log.Errorf("unmarshal for mod %s config (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
+			fatal()
+		}
+	} else {
+		// new version: get mod.Config() value from config.general
+		if len(pmCfg.GeneralJson) > 0 {
+			u := jsonpb.Unmarshaler{AllowUnknownFields: true}
+			if err := u.Unmarshal(bytes.NewBuffer(pmCfg.GeneralJson), modSelfCfg); err != nil {
+				log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
+				fatal()
+			}
+		}
+	}
+
+	return mod, nil
+}
+
+func fatal() {
+	os.Exit(1)
+}
+
+func Main(bundle string, modules []Module) {
 
 	// prepare module definition map
 	moduleDefinitions := make(map[string]Module)
@@ -158,82 +237,63 @@ func Main(bundle string, modules []Module) {
 	// Init module of instance
 	var mcs []*moduleConfig
 
-	// get main module config
-	config, rawCfg, generalJson, err := bootstrap.GetModuleConfig("")
-	if err != nil {
-		panic(err)
-	}
-	if config == nil {
-		panic(fmt.Errorf("module config nil for %s", bundle))
-	}
-	err = util.InitLog(config.Global.Log)
-	if err != nil {
-		panic(err)
-	}
-
-	log.Infof("load module config of %s: %s", bundle, string(rawCfg))
-
-	// check if main module is bundle or not
-	isBundle := config.Bundle != nil
-	if !isBundle {
+	modGetter := func(pmCfg *bootconfig.Config) Module {
 		var m Module
-		if config.Kind != "" {
-			m = moduleDefinitions[config.Kind]
+		if pmCfg.Kind != "" {
+			m = moduleDefinitions[pmCfg.Kind]
 		} else {
 			// compatible for old version without kind field
-			m = moduleDefinitions[config.Name]
+			m = moduleDefinitions[pmCfg.Name]
 		}
-		if m == nil {
-			log.Errorf("wrong kind or name of module %s", config.Name)
+		return m
+	}
+	// get main module config
+	mainMod, mainModParsedCfg, err := LoadModule("", modGetter, nil)
+	if err != nil {
+		panic(err)
+	}
+	mainModConfig, mainModRawJson, mainModGeneralJson := mainModParsedCfg.Config,
+		mainModParsedCfg.RawJson, mainModParsedCfg.GeneralJson
+	if mainModConfig == nil {
+		panic(fmt.Errorf("module config nil for %s", bundle))
+	}
+	err = util.InitLog(mainModConfig.Global.Log)
+	if err != nil {
+		panic(err)
+	}
+
+	log.Infof("load module config of %s: %s, generalCfg: %s", bundle, string(mainModRawJson), string(mainModGeneralJson))
+
+	// check if main module is bundle or not
+	isBundle := mainModConfig.Bundle != nil
+	if !isBundle {
+		if mainMod == nil {
+			log.Errorf("mod nil for %s", mainModConfig.Name)
 			fatal()
 		}
+
 		mc := &moduleConfig{
-			module: m.Clone(),
-			config: configH{
-				config:      config,
-				generalJson: generalJson,
-			},
+			module: mainMod,
+			config: mainModConfig,
 		}
 		mcs = append(mcs, mc)
 	} else {
-		for _, modCfg := range config.Bundle.Modules {
-			var m Module
-			if modCfg.Kind != "" {
-				m = moduleDefinitions[modCfg.Kind]
-			} else {
-				// compatible for old version without kind field
-				m = moduleDefinitions[modCfg.Name]
-			}
-			if m == nil {
-				log.Errorf("wrong kind or name of module %s", modCfg.Name)
-				fatal()
-			}
-
-			modConfig, modRawCfg, modGeneralJson, err := bootstrap.GetModuleConfig(modCfg.Name)
+		for _, modCfg := range mainModConfig.Bundle.Modules {
+			mod, modParsedCfg, err := LoadModule(modCfg.Name, modGetter, mainModConfig)
 			if err != nil {
 				panic(err)
 			}
-			if modConfig == nil {
-				modConfig = &bootconfig.Config{}
+			if mod == nil {
+				log.Errorf("mod nil for %s", modCfg.Name)
+				fatal()
 			}
 
-			if config.Global != nil {
-				if modConfig.Global == nil {
-					modConfig.Global = &bootconfig.Global{}
-				}
-				modConfig.Global = merge(config.Global, modConfig.Global).(*bootconfig.Global)
-			}
-			log.Infof("load raw module config of bundle item %s: %s", modCfg.Name, string(modRawCfg))
-			log.Infof("general config of bundle item %s: %s", modCfg.Name, string(modGeneralJson))
-			modConfigJson, _ := json.Marshal(*modConfig)
-			log.Infof("after merge with bundle config, module config of bundle item %s: %s", modCfg.Name, string(modConfigJson))
+			log.Infof("load raw module config of bundle item %s: %s, general: %s",
+				modCfg.Name, string(modParsedCfg.RawJson), string(modParsedCfg.GeneralJson))
 
 			mc := &moduleConfig{
-				module: m.Clone(),
-				config: configH{
-					config:      modConfig,
-					generalJson: modGeneralJson,
-				},
+				module: mod,
+				config: modParsedCfg.Config,
 			}
 			mcs = append(mcs, mc)
 		}
@@ -254,23 +314,23 @@ func Main(bundle string, modules []Module) {
 	}
 
 	var conf *restclient.Config
-	if config.Global != nil && config.Global.GetMasterUrl() != "" {
-		if conf, err = clientcmd.BuildConfigFromFlags(config.Global.GetMasterUrl(), ""); err != nil {
-			log.Errorf("unable to build rest client by %s", config.Global.GetMasterUrl())
+	if mainModConfig.Global != nil && mainModConfig.Global.GetMasterUrl() != "" {
+		if conf, err = clientcmd.BuildConfigFromFlags(mainModConfig.Global.GetMasterUrl(), ""); err != nil {
+			log.Errorf("unable to build rest client by %s", mainModConfig.Global.GetMasterUrl())
 			os.Exit(1)
 		}
 	} else {
 		conf = ctrl.GetConfigOrDie()
 	}
 
-	if config.Global != nil && config.Global.ClientGoTokenBucket != nil {
-		conf.Burst = int(config.Global.ClientGoTokenBucket.Burst)
-		conf.QPS = float32(config.Global.ClientGoTokenBucket.Qps)
+	if mainModConfig.Global != nil && mainModConfig.Global.ClientGoTokenBucket != nil {
+		conf.Burst = int(mainModConfig.Global.ClientGoTokenBucket.Burst)
+		conf.QPS = float32(mainModConfig.Global.ClientGoTokenBucket.Qps)
 		log.Infof("set burst: %d, qps %f based on user-specified value in client config", conf.Burst, conf.QPS)
 	}
 
 	// setup for leaderelection
-	if config.Global.Misc["enable-leader-election"] == "on" {
+	if mainModConfig.Global.Misc["enable-leader-election"] == "on" {
 		// create a resource lock in the same namespace as the workload instance
 		rl, err := leaderelection.NewKubeResourceLock(conf, os.Getenv("WATCH_NAMESPACE"), bundle)
 		if err != nil {
@@ -284,7 +344,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	mgrOpts.Scheme = scheme
-	mgrOpts.MetricsBindAddress = config.Global.Misc["metrics-addr"]
+	mgrOpts.MetricsBindAddress = mainModConfig.Global.Misc["metrics-addr"]
 	mgrOpts.Port = 9443
 	mgr, err := ctrl.NewManager(conf, mgrOpts)
 	if err != nil {
@@ -312,8 +372,8 @@ func Main(bundle string, modules []Module) {
 
 	// parse pathRedirect param
 	pathRedirects := make(map[string]string)
-	if config.Global.Misc["pathRedirect"] != "" {
-		mappings := strings.Split(config.Global.Misc["pathRedirect"], ",")
+	if mainModConfig.Global.Misc["pathRedirect"] != "" {
+		mappings := strings.Split(mainModConfig.Global.Misc["pathRedirect"], ",")
 		for _, m := range mappings {
 			paths := strings.Split(m, "->")
 			if len(paths) != 2 {
@@ -335,16 +395,16 @@ func Main(bundle string, modules []Module) {
 	// init ConfigController
 	var configController, istioConfigController bootstrap.ConfigController
 
-	if config.GetGlobal() != nil && len(config.GetGlobal().GetConfigSources()) > 0 {
-		configController, err = bootstrap.NewConfigController(config.GetGlobal().GetConfigSources(), ctx.Done())
+	if mainModConfig.GetGlobal() != nil && len(mainModConfig.GetGlobal().GetConfigSources()) > 0 {
+		configController, err = bootstrap.NewConfigController(mainModConfig.GetGlobal().GetConfigSources(), ctx.Done())
 		if err != nil {
 			log.Warnf("new ConfigController failed: %+v", err)
 			configController = nil
 		}
 	}
 
-	if config.GetGlobal() != nil && config.GetGlobal().IstioConfigSource != nil {
-		istioConfigController, err = bootstrap.NewConfigController([]*bootconfig.ConfigSource{config.GetGlobal().IstioConfigSource}, ctx.Done())
+	if mainModConfig.GetGlobal() != nil && mainModConfig.GetGlobal().IstioConfigSource != nil {
+		istioConfigController, err = bootstrap.NewConfigController([]*bootconfig.ConfigSource{mainModConfig.GetGlobal().IstioConfigSource}, ctx.Done())
 		if err != nil {
 			log.Warnf("new IstioConfigController error: %+v", err)
 			istioConfigController = nil
@@ -362,46 +422,7 @@ func Main(bundle string, modules []Module) {
 
 	// setup modules
 	for _, mc := range mcs {
-		modCfg, modGeneralJson := mc.config.config, mc.config.generalJson
-		modSelfCfg := mc.module.Config()
-
-		if modCfg != nil && modSelfCfg != nil {
-
-			var toCopy proto.Message
-			switch {
-			case modCfg.Fence != nil:
-				toCopy = modCfg.Fence
-			case modCfg.Limiter != nil:
-				toCopy = modCfg.Limiter
-			case modCfg.Plugin != nil:
-				toCopy = modCfg.Plugin
-			}
-
-			if toCopy != nil {
-				// old version: get mod.Config() value from config.Fence/Limiter/Plugin
-				ma := jsonpb.Marshaler{}
-				js, err := ma.MarshalToString(toCopy)
-				if err != nil {
-					log.Errorf("marshal for mod %s config (%v) met err %v", modCfg.Name, toCopy, err)
-					fatal()
-				}
-				um := jsonpb.Unmarshaler{AllowUnknownFields: true}
-				if err := um.Unmarshal(strings.NewReader(js), modSelfCfg); err != nil {
-					log.Errorf("unmarshal for mod %s config (%v) met err %v", modCfg.Name, modGeneralJson, err)
-					fatal()
-				}
-			} else {
-				// new version: get mod.Config() value from config.general
-				if len(modGeneralJson) > 0 {
-					u := jsonpb.Unmarshaler{AllowUnknownFields: true}
-					if err := u.Unmarshal(bytes.NewBuffer(modGeneralJson), modSelfCfg); err != nil {
-						log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, modGeneralJson, err)
-						fatal()
-					}
-				}
-			}
-		}
-
+		modCfg := mc.config
 		moduleEnv := bootstrap.Environment{
 			Config:                modCfg,
 			ConfigController:      configController,
@@ -440,7 +461,7 @@ func Main(bundle string, modules []Module) {
 
 	// run ConfigController
 	if configController != nil {
-		configController, err = bootstrap.RunController(configController, config, mgr.GetConfig())
+		configController, err = bootstrap.RunController(configController, mainModConfig, mgr.GetConfig())
 		if err != nil {
 			log.Errorf("run config controller failed: %s", err)
 			return
@@ -448,7 +469,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	if istioConfigController != nil {
-		istioConfigController, err = bootstrap.RunIstioController(istioConfigController, config)
+		istioConfigController, err = bootstrap.RunIstioController(istioConfigController, mainModConfig)
 		if err != nil {
 			log.Errorf("run config controller failed: %s", err)
 			return
@@ -456,11 +477,11 @@ func Main(bundle string, modules []Module) {
 	}
 
 	go func() {
-		auxAddr := config.Global.Misc["aux-addr"]
+		auxAddr := mainModConfig.Global.Misc["aux-addr"]
 		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check)
 	}()
 
-	// Run the runable function registered by the submodule
+	// Run the runnable function registered by the submodule
 	for _, startup := range startups {
 		startup(ctx)
 	}
