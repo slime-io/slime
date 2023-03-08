@@ -6,6 +6,7 @@
 package bootstrap
 
 import (
+	"errors"
 	"time"
 
 	"istio.io/libistio/galley/pkg/config/util/kuberesource"
@@ -78,6 +79,19 @@ type RegistryArgs struct {
 	RegistryStartDelay util.Duration
 }
 
+func (args *RegistryArgs) Validate() error {
+	if err := args.ZookeeperSource.Validate(); err != nil {
+		return err
+	}
+	if err := args.EurekaSource.Validate(); err != nil {
+		return err
+	}
+	if err := args.NacosSource.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 type SourceArgs struct {
 	// enable the source
 	Enabled bool
@@ -140,6 +154,16 @@ type ZookeeperSourceArgs struct {
 	// mcp configs
 }
 
+func (zkArgs *ZookeeperSourceArgs) Validate() error {
+	if !zkArgs.Enabled {
+		return nil
+	}
+	if len(zkArgs.Address) == 0 {
+		return errors.New("zookeeper server address must be set when zookeeper source is enabled")
+	}
+	return nil
+}
+
 type EurekaSourceArgs struct {
 	SourceArgs
 
@@ -150,6 +174,16 @@ type EurekaSourceArgs struct {
 	K8sDomainSuffix bool
 	// need ns in Host
 	NsHost bool
+}
+
+func (eurekaArgs *EurekaSourceArgs) Validate() error {
+	if !eurekaArgs.Enabled {
+		return nil
+	}
+	if len(eurekaArgs.Address) == 0 {
+		return errors.New("eureka server address must be set when eureka source is enabled")
+	}
+	return nil
 }
 
 type NacosSourceArgs struct {
@@ -175,6 +209,16 @@ type NacosSourceArgs struct {
 	AllNamespaces bool
 	//  If set, namespace and group information will be injected into the ep's metadata using the set key.
 	MetaKeyGroup, MetaKeyNamespace string
+}
+
+func (nacosArgs *NacosSourceArgs) Validate() error {
+	if !nacosArgs.Enabled {
+		return nil
+	}
+	if len(nacosArgs.Address) == 0 {
+		return errors.New("nacos server address must be set when nacos source is enabled")
+	}
+	return nil
 }
 
 type McpArgs struct {
