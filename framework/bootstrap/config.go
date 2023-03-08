@@ -117,52 +117,66 @@ func patchGlobal(global, patch *bootconfig.Global) {
 	}
 }
 
-func GetModuleConfig(name string) (*bootconfig.Config, []byte, []byte, error) {
+type ParsedModuleConfig struct {
+	Config      *bootconfig.Config
+	RawJson     []byte
+	GeneralJson []byte
+}
+
+func GetModuleConfig(name string) (*ParsedModuleConfig, error) {
 	filePath := DefaultModuleConfigPath
 	if name != "" {
 		filePath += "_" + name
 	}
-	cfg, raw, generalJson, err := readModuleConfig(filePath)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	if cfg == nil {
-		cfg = &bootconfig.Config{}
-	}
 
-	if cfg != nil && name == "" {
-		patchModuleConfig(cfg, defaultModuleConfig)
-	}
-	return cfg, raw, generalJson, nil
-}
-
-func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, error) {
-	raw, err := ioutil.ReadFile(filePath)
+	cfgData, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil
 		}
-		return nil, nil, nil, err
+		return nil, err
 	}
 
-	c := &bootconfig.Config{}
-	var rawJson, generalJson []byte
-	var m map[string]interface{}
+	return LoadModuleConfigFromData(cfgData, filePath == DefaultModuleConfigPath)
+}
+
+func LoadModuleConfigFromData(data []byte, patchDefault bool) (*ParsedModuleConfig, error) {
+	parsed, err := parseModuleConfig(data)
+	if err != nil {
+		return nil, err
+	}
+	if parsed.Config == nil {
+		parsed.Config = &bootconfig.Config{}
+	}
+
+	if patchDefault {
+		patchModuleConfig(parsed.Config, defaultModuleConfig)
+	}
+	return parsed, nil
+}
+
+func parseModuleConfig(data []byte) (*ParsedModuleConfig, error) {
+	var (
+		c                    = &bootconfig.Config{}
+		err                  error
+		rawJson, generalJson []byte
+		m                    map[string]interface{}
+	)
 
 	// convert yaml/json to json
-	rawJson, err = ghYaml.YAMLToJSON(raw)
+	rawJson, err = ghYaml.YAMLToJSON(data)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 
 	// as jsonpb does not support XXX_unrecognized
 	if err = json.Unmarshal(rawJson, &m); err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	} else if m != nil {
 		gen := m["general"]
 		if gen != nil {
 			if generalJson, err = json.Marshal(gen); err != nil {
-				return nil, nil, nil, err
+				return nil, err
 			}
 		}
 	}
@@ -170,9 +184,14 @@ func readModuleConfig(filePath string) (*bootconfig.Config, []byte, []byte, erro
 	um := jsonpb.Unmarshaler{AllowUnknownFields: true}
 	err = um.Unmarshal(bytes.NewBuffer(rawJson), c)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
-	return c, rawJson, generalJson, nil
+
+	return &ParsedModuleConfig{
+		Config:      c,
+		RawJson:     rawJson,
+		GeneralJson: generalJson,
+	}, nil
 }
 
 type ReadyManager interface {
