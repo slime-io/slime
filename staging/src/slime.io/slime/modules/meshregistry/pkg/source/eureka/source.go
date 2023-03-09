@@ -54,7 +54,7 @@ const (
 	HttpPath   = "/eureka"
 )
 
-func New(eurekaArgs bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+func New(eurekaArgs *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	client := NewClient(eurekaArgs.Address)
 	if client == nil {
 		return nil, nil, Error{

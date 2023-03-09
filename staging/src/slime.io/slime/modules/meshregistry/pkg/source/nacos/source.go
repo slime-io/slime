@@ -77,7 +77,7 @@ const (
 	allSeriveFilter = ""
 )
 
-func New(nacoesArgs bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+func New(nacoesArgs *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	s := &Source{
 		namespace:         nacoesArgs.Namespace,
 		group:             nacoesArgs.Group,

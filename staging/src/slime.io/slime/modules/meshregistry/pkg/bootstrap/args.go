@@ -65,15 +65,15 @@ type BusinessArgs struct {
 type RegistryArgs struct {
 	Args
 
-	Business BusinessArgs `json:"Business"`
+	Business *BusinessArgs `json:"Business,omitempty"`
 
-	Mcp McpArgs `json:"Mcp"`
-	K8S K8SArgs `json:"K8S"`
+	Mcp *McpArgs `json:"Mcp,omitempty"`
+	K8S *K8SArgs `json:"K8S,omitempty"`
 
-	K8SSource       K8SSourceArgs       `json:"K8SSource"`
-	ZookeeperSource ZookeeperSourceArgs `json:"ZookeeperSource"`
-	EurekaSource    EurekaSourceArgs    `json:"EurekaSource"`
-	NacosSource     NacosSourceArgs     `json:"NacosSource"`
+	K8SSource       *K8SSourceArgs       `json:"K8SSource,omitempty"`
+	ZookeeperSource *ZookeeperSourceArgs `json:"ZookeeperSource,omitempty"`
+	EurekaSource    *EurekaSourceArgs    `json:"EurekaSource,omitempty"`
+	NacosSource     *NacosSourceArgs     `json:"NacosSource,omitempty"`
 
 	HTTPServerAddr string `json:"HTTPServerAddr,omitempty"`
 	// istio revision
@@ -259,24 +259,24 @@ func NewRegistryArgs() *RegistryArgs {
 	return &RegistryArgs{
 		Args:    a,
 		RevCrds: "sidecars,destinationrules,envoyfilters,gateways,virtualservices",
-		Mcp: McpArgs{
+		Mcp: &McpArgs{
 			ServerUrl:           "xds://0.0.0.0:16010",
 			EnableAnnoResVer:    true,
 			EnableIncPush:       true,
 			CleanZombieInterval: 0,
 		},
-		K8S: K8SArgs{
+		K8S: &K8SArgs{
 			ClusterID:                  features.ClusterName,
 			ClusterRegistriesNamespace: podNamespace,
 		},
 		RegistryStartDelay: util.Duration(5 * time.Second),
 
-		K8SSource: K8SSourceArgs{
+		K8SSource: &K8SSourceArgs{
 			SourceArgs:        SourceArgs{},
 			EnableConfigFile:  false,
 			WatchedNamespaces: metav1.NamespaceAll,
 		},
-		ZookeeperSource: ZookeeperSourceArgs{
+		ZookeeperSource: &ZookeeperSourceArgs{
 			SourceArgs: SourceArgs{
 				RefreshPeriod: util.Duration(10 * time.Second),
 				LabelPatch:    true,
@@ -292,7 +292,7 @@ func NewRegistryArgs() *RegistryArgs {
 			EnableDubboSidecar:          true,
 			DubboWorkloadAppLabel:       "app",
 		},
-		EurekaSource: EurekaSourceArgs{
+		EurekaSource: &EurekaSourceArgs{
 			SourceArgs: SourceArgs{
 				RefreshPeriod: util.Duration(30 * time.Second),
 				LabelPatch:    true,
@@ -304,7 +304,7 @@ func NewRegistryArgs() *RegistryArgs {
 			K8sDomainSuffix: true,
 			NsHost:          true,
 		},
-		NacosSource: NacosSourceArgs{
+		NacosSource: &NacosSourceArgs{
 			SourceArgs: SourceArgs{
 				RefreshPeriod:    util.Duration(30 * time.Second),
 				LabelPatch:       true,
