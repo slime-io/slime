@@ -17,6 +17,7 @@ import (
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"sync"
+	"time"
 
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/util"
@@ -36,7 +37,10 @@ var (
 )
 
 type Module struct {
-	config util.AnyMessage
+	config                  util.AnyMessage
+	reloadDynamicConfigTask func(ctx context.Context)
+	dynConfigHandlers       []func(args *meshregbootstrap.RegistryArgs)
+	mut                     sync.RWMutex
 }
 
 func (m *Module) Kind() string {
@@ -60,7 +64,7 @@ func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 }
 
 func (m *Module) Clone() module.Module {
-	ret := *m
+	ret := Module{}
 	return &ret
 }
 
@@ -174,7 +178,7 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 		default:
 		}
 	}
-	_, controller := cache.NewInformer(lw, &corev1.ConfigMap{}, 60, cache.ResourceEventHandlerFuncs{
+	_, controller := cache.NewInformer(lw, &corev1.ConfigMap{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { notify(nil, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { notify(obj, nil) },
@@ -185,17 +189,36 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 		return nil, fmt.Errorf("failed to wait for configmap cache sync")
 	}
 
+	m.reloadDynamicConfigTask = func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-changeNotifyCh:
+				log.Infof("reloadDynamicConfigTask get notified")
+				regArgs, err := loadArgFromCache()
+				if err != nil {
+					log.Errorf("load arg from cache met err %v, skip...", err)
+					continue
+				}
+
+				m.mut.RLock()
+				handlers := m.dynConfigHandlers
+				m.mut.RUnlock()
+
+				for _, h := range handlers {
+					h(regArgs)
+				}
+			}
+		}
+	}
+
 	select {
 	case <-changeNotifyCh:
 		log.Infof("cm notify: will get dynamic config and replace the original one")
 		return loadArgFromCache()
 	default:
 	}
-
-	go func() {
-		// handle ...
-		// TODO
-	}()
 
 	return nil, nil
 }
@@ -245,11 +268,22 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	cbs := opts.InitCbs
 	cbs.AddStartup(func(ctx context.Context) {
+		if m.reloadDynamicConfigTask != nil {
+			go m.reloadDynamicConfigTask(ctx)
+		}
+
 		go func() {
 			// Create the server for the discovery service.
 			registryServer, err := server.NewServer(&server.Args{
 				SlimeEnv:     opts.Env,
 				RegistryArgs: regArgs,
+				AddOnRegArgs: func(onConfig func(args *meshregbootstrap.RegistryArgs)) {
+					m.mut.Lock()
+					m.dynConfigHandlers = append(m.dynConfigHandlers, onConfig)
+					m.mut.Unlock()
+
+					log.Infof("add new dyn config handler")
+				},
 			})
 			if err != nil {
 				log.Errorf("failed to create discovery service: %v", err)

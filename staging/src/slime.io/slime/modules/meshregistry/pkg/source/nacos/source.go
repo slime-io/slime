@@ -3,9 +3,12 @@ package nacos
 import (
 	"encoding/json"
 	"fmt"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
@@ -22,6 +25,8 @@ import (
 )
 
 type Source struct {
+	args *bootstrap.NacosSourceArgs // should only be accessed in `onConfig`
+
 	// nacos client
 	client       Client
 	namingClient naming_client.INamingClient
@@ -52,6 +57,8 @@ type Source struct {
 	namingServiceList cmap.ConcurrentMap
 	handler           []event.Handler
 
+	mut sync.RWMutex
+
 	// source status
 	started     bool
 	firstInited bool
@@ -74,30 +81,41 @@ const (
 	WATCHING         = "watching"
 	clientHeadersEnv = "NACOS_CLIENT_HEADERS"
 
-	allSeriveFilter = ""
+	allServiceFilter = ""
 )
 
-func New(nacoesArgs *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+type Option func(s *Source) error
+
+func WithDynamicConfigOption(addCb func(func(*bootstrap.NacosSourceArgs))) Option {
+	return Option(func(s *Source) error {
+		addCb(s.onConfig)
+		return nil
+	})
+}
+
+func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	s := &Source{
-		namespace:         nacoesArgs.Namespace,
-		group:             nacoesArgs.Group,
+		args: args,
+
+		namespace:         args.Namespace,
+		group:             args.Group,
 		delay:             delay,
 		cache:             make(map[string]*networking.ServiceEntry),
 		namingServiceList: cmap.New(),
-		refreshPeriod:     time.Duration(nacoesArgs.RefreshPeriod),
-		mode:              nacoesArgs.Mode,
-		svcNameWithNs:     nacoesArgs.NameWithNs,
+		refreshPeriod:     time.Duration(args.RefreshPeriod),
+		mode:              args.Mode,
+		svcNameWithNs:     args.NameWithNs,
 		started:           false,
-		gatewayModel:      nacoesArgs.GatewayModel,
-		patchLabel:        nacoesArgs.LabelPatch,
-		svcPort:           nacoesArgs.SvcPort,
+		gatewayModel:      args.GatewayModel,
+		patchLabel:        args.LabelPatch,
+		svcPort:           args.SvcPort,
 		nsHost:            nsHost,
 		k8sDomainSuffix:   k8sDomainSuffix,
 		stop:              make(chan struct{}),
 		firstInited:       false,
 		initedCallback:    readyCallback,
-		defaultSvcNs:      nacoesArgs.DefaultServiceNs,
-		resourceNs:        nacoesArgs.ResourceNs,
+		defaultSvcNs:      args.DefaultServiceNs,
+		resourceNs:        args.ResourceNs,
 	}
 
 	headers := make(map[string]string)
@@ -110,18 +128,18 @@ func New(nacoesArgs *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix boo
 			}
 		}
 	}
-	if nacoesArgs.Mode == POLLING {
-		s.client = NewClient(nacoesArgs.Address,
-			nacoesArgs.Username,
-			nacoesArgs.Password,
-			nacoesArgs.Namespace,
-			nacoesArgs.Group,
-			nacoesArgs.MetaKeyNamespace,
-			nacoesArgs.MetaKeyGroup,
-			nacoesArgs.AllNamespaces,
+	if args.Mode == POLLING {
+		s.client = NewClient(args.Address,
+			args.Username,
+			args.Password,
+			args.Namespace,
+			args.Group,
+			args.MetaKeyNamespace,
+			args.MetaKeyGroup,
+			args.AllNamespaces,
 			headers)
 	} else {
-		namingClient, err := newNamingClient(nacoesArgs.Address, nacoesArgs.Namespace, headers)
+		namingClient, err := newNamingClient(args.Address, args.Namespace, headers)
 		if err != nil {
 			return nil, nil, Error{
 				msg: fmt.Sprintf("init nacos client failed: %s", err.Error()),
@@ -130,10 +148,42 @@ func New(nacoesArgs *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix boo
 		s.namingClient = namingClient
 	}
 
-	s.instanceFilters = source.NewSelectHookStore(nacoesArgs.ServicedEndpointSelectors)
-	s.instanceFilters[allSeriveFilter] = source.NewSelectHook(nacoesArgs.EndpointSelectors)
+	s.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
+
+	for _, op := range options {
+		if err := op(s); err != nil {
+			return nil, nil, err
+		}
+	}
 
 	return s, s.cacheJson, nil
+}
+
+func generateInstanceFilters(
+	svcSel map[string][]*metav1.LabelSelector, epSel []*metav1.LabelSelector) source.SelectHookStore {
+	ret := source.NewSelectHookStore(svcSel)
+	ret[allServiceFilter] = source.NewSelectHook(epSel)
+	return ret
+}
+
+func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
+	var prevArgs *bootstrap.NacosSourceArgs
+	prevArgs, s.args = s.args, args
+
+	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
+		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
+		newInstSel := generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
+		s.mut.Lock()
+		s.instanceFilters = newInstSel
+		s.mut.Unlock()
+	}
+}
+
+func (s *Source) getInstanceFilters() source.SelectHookStore {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+
+	return s.instanceFilters
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {

@@ -75,7 +75,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, filters source.Sel
 	ports = append(ports, port)
 
 	for _, ins := range instances {
-		if filter := filters[allSeriveFilter]; filter != nil && !filter(ins.Metadata) {
+		if filter := filters[allServiceFilter]; filter != nil && !filter(ins.Metadata) {
 			continue
 		}
 		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {
@@ -166,7 +166,7 @@ func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uin
 	})
 
 	for _, ins := range instances {
-		if filter := filters[allSeriveFilter]; filter != nil && !filter(ins.Metadata) {
+		if filter := filters[allServiceFilter]; filter != nil && !filter(ins.Metadata) {
 			continue
 		}
 		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {

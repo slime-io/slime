@@ -47,7 +47,7 @@ func (s *Source) updateServiceInfo() {
 		Scope.Errorf("get nacos instances failed: " + err.Error())
 		return
 	}
-	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel, s.instanceFilters)
+	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel, s.getInstanceFilters())
 	if err != nil {
 		Scope.Errorf("convert nacos servceentry map failed: " + err.Error())
 		return
