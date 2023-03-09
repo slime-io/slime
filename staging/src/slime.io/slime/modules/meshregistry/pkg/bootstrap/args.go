@@ -28,7 +28,8 @@ var podNamespace = env.RegisterStringVar("POD_NAMESPACE", "istio-system", "").Ge
 
 type Args struct {
 	// Path to the mesh config file
-	MeshConfigFile    string
+	MeshConfigFile string
+
 	EnableGRPCTracing bool
 	WatchedNamespaces string
 	// Resync period for rescanning Kubernetes resources

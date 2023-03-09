@@ -8,7 +8,6 @@ package server
 import (
 	"os"
 	slimebootstrap "slime.io/slime/framework/bootstrap"
-
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
@@ -24,6 +23,7 @@ type Args struct {
 func NewServer(args *Args) (*Server, error) {
 	os.Setenv("istio-revision", args.RegistryArgs.Revision)
 	os.Setenv("rev-crds", args.RegistryArgs.RevCrds)
+
 	proc := NewProcessing(args)
 
 	return &Server{
