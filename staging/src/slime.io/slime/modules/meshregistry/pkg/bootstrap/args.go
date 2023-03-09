@@ -28,21 +28,21 @@ var podNamespace = env.RegisterStringVar("POD_NAMESPACE", "istio-system", "").Ge
 
 type Args struct {
 	// Path to the mesh config file
-	MeshConfigFile string
+	MeshConfigFile string `json:"MeshConfigFile,omitempty"`
 
-	EnableGRPCTracing bool
-	WatchedNamespaces string
+	EnableGRPCTracing bool   `json:"EnableGRPCTracing,omitempty"`
+	WatchedNamespaces string `json:"WatchedNamespaces,omitempty"`
 	// Resync period for rescanning Kubernetes resources
-	ResyncPeriod util.Duration
+	ResyncPeriod util.Duration `json:"ResyncPeriod,omitempty"`
 
 	// Enable service discovery / endpoint processing.
-	EnableServiceDiscovery bool
+	EnableServiceDiscovery bool `json:"EnableServiceDiscovery,omitempty"`
 
 	// ExcludedResourceKinds is a list of resource kinds for which no source events will be triggered.
 	// DEPRECATED
-	ExcludedResourceKinds []string
+	ExcludedResourceKinds []string `json:"ExcludedResourceKinds,omitempty"`
 
-	Snapshots []string
+	Snapshots []string `json:"Snapshots,omitempty"`
 }
 
 // DefaultArgs allocates an Args struct initialized with Galley's default configuration.
@@ -56,28 +56,31 @@ func DefaultArgs() *Args {
 }
 
 type BusinessArgs struct {
-	RegionLabels, ZoneLabels, SubzoneLabels []string // TODO support set via args
+	RegionLabels  []string `json:"RegionLabels,omitempty"`
+	ZoneLabels    []string `json:"ZoneLabels,omitempty"`
+	SubzoneLabels []string `json:"SubzoneLabels,omitempty"`
+	// TODO support set via args
 }
 
 type RegistryArgs struct {
 	Args
 
-	Business BusinessArgs
+	Business BusinessArgs `json:"Business"`
 
-	Mcp McpArgs
-	K8S K8SArgs
+	Mcp McpArgs `json:"Mcp"`
+	K8S K8SArgs `json:"K8S"`
 
-	K8SSource       K8SSourceArgs
-	ZookeeperSource ZookeeperSourceArgs
-	EurekaSource    EurekaSourceArgs
-	NacosSource     NacosSourceArgs
+	K8SSource       K8SSourceArgs       `json:"K8SSource"`
+	ZookeeperSource ZookeeperSourceArgs `json:"ZookeeperSource"`
+	EurekaSource    EurekaSourceArgs    `json:"EurekaSource"`
+	NacosSource     NacosSourceArgs     `json:"NacosSource"`
 
-	HTTPServerAddr string
+	HTTPServerAddr string `json:"HTTPServerAddr,omitempty"`
 	// istio revision
-	Revision string
+	Revision string `json:"Revision,omitempty"`
 	// istio revision match for crds
-	RevCrds            string
-	RegistryStartDelay util.Duration
+	RevCrds            string        `json:"RevCrds,omitempty"`
+	RegistryStartDelay util.Duration `json:"RegistryStartDelay,omitempty"`
 }
 
 func (args *RegistryArgs) Validate() error {
@@ -95,62 +98,62 @@ func (args *RegistryArgs) Validate() error {
 
 type SourceArgs struct {
 	// enable the source
-	Enabled bool
+	Enabled bool `json:"Enabled,omitempty"`
 	// ready time to wait, non-0 means optional
-	WaitTime util.Duration
+	WaitTime util.Duration `json:"WaitTime,omitempty"`
 	// Set refresh period. meaningful for sources which support and is in `polling` mode
-	RefreshPeriod util.Duration
-	GatewayModel  bool
+	RefreshPeriod util.Duration `json:"RefreshPeriod,omitempty"`
+	GatewayModel  bool          `json:"GatewayModel,omitempty"`
 	// patch instances label
-	LabelPatch bool
+	LabelPatch bool `json:"LabelPatch,omitempty"`
 	// svc port for services
-	SvcPort uint32
+	SvcPort uint32 `json:"SvcPort,omitempty"`
 	// if empty, those endpoints with ns attr will be aggregated into a no-ns service like "foo"
-	DefaultServiceNs string
-	ResourceNs       string
+	DefaultServiceNs string `json:"DefaultServiceNs,omitempty"`
+	ResourceNs       string `json:"ResourceNs,omitempty"`
 	// A list of selectors that specify the set of service instances to be processed,
 	// configured in the same way as the k8s label selector.
-	EndpointSelectors []*metav1.LabelSelector
+	EndpointSelectors []*metav1.LabelSelector `json:"EndpointSelectors,omitempty"`
 	// Endpoint selectors for specific service, the key of the map is the service name
-	ServicedEndpointSelectors map[string][]*metav1.LabelSelector
+	ServicedEndpointSelectors map[string][]*metav1.LabelSelector `json:"ServicedEndpointSelectors,omitempty"`
 }
 
 type K8SSourceArgs struct {
 	SourceArgs
 
-	WatchedNamespaces string
+	WatchedNamespaces string `json:"WatchedNamespaces,omitempty"`
 
 	// Enables extra k8s file source.
-	EnableConfigFile bool
+	EnableConfigFile bool `json:"EnableConfigFile,omitempty"`
 	// path of k8s file source
-	ConfigPath string
+	ConfigPath string `json:"ConfigPath,omitempty"`
 	// WatchConfigFiles if set to true, enables Fsnotify watcher for watching and signaling config file changes.
 	// Default is false
-	WatchConfigFiles bool
+	WatchConfigFiles bool `json:"WatchConfigFiles,omitempty"`
 }
 
 type ZookeeperSourceArgs struct {
 	SourceArgs
 
-	Address []string
+	Address []string `json:"Address,omitempty"`
 	// ignore label in ZookeeperSource instance
-	IgnoreLabel       []string
-	ConnectionTimeout util.Duration
+	IgnoreLabel       []string      `json:"IgnoreLabel,omitempty"`
+	ConnectionTimeout util.Duration `json:"ConnectionTimeout,omitempty"`
 	// dubbo register node in Zookeeper
-	RegistryRootNode            string
-	ApplicationRegisterRootNode string
+	RegistryRootNode            string `json:"RegistryRootNode,omitempty"`
+	ApplicationRegisterRootNode string `json:"ApplicationRegisterRootNode,omitempty"`
 	// zk mode for get zk info
-	Mode                string
-	WatchingWorkerCount int
+	Mode                string `json:"Mode,omitempty"`
+	WatchingWorkerCount int    `json:"WatchingWorkerCount,omitempty"`
 
 	// dubbo configs
 
 	// whether to gen dubbo `Sidecar`
-	EnableDubboSidecar bool
+	EnableDubboSidecar bool `json:"EnableDubboSidecar,omitempty"`
 	// the removed dep service of an app will only be effective when so much time has passed (since last)
-	TrimDubboRemoveDepInterval util.Duration
+	TrimDubboRemoveDepInterval util.Duration `json:"TrimDubboRemoveDepInterval,omitempty"`
 	// specify how to map `app` to label key:value pair
-	DubboWorkloadAppLabel string
+	DubboWorkloadAppLabel string `json:"DubboWorkloadAppLabel,omitempty"`
 
 	// mcp configs
 }
@@ -168,13 +171,13 @@ func (zkArgs *ZookeeperSourceArgs) Validate() error {
 type EurekaSourceArgs struct {
 	SourceArgs
 
-	Address []string
+	Address []string `json:"Address,omitempty"`
 	// EurekaSource address belongs to nsf or not
-	NsfEureka bool
+	NsfEureka bool `json:"NsfEureka,omitempty"`
 	// need k8sDomainSuffix in Host
-	K8sDomainSuffix bool
+	K8sDomainSuffix bool `json:"K8SDomainSuffix,omitempty"`
 	// need ns in Host
-	NsHost bool
+	NsHost bool `json:"NsHost,omitempty"`
 }
 
 func (eurekaArgs *EurekaSourceArgs) Validate() error {
@@ -190,26 +193,27 @@ func (eurekaArgs *EurekaSourceArgs) Validate() error {
 type NacosSourceArgs struct {
 	SourceArgs
 
-	Address []string
+	Address []string `json:"Address,omitempty"`
 	// nacos mode for get nacos info
-	Mode string
+	Mode string `json:"Mode,omitempty"`
 	// namespace value for nacos client
-	Namespace string
+	Namespace string `json:"Namespace,omitempty"`
 	// group value for nacos client
-	Group string
+	Group string `json:"Group,omitempty"`
 	// nacos service name is like name.ns
-	NameWithNs bool
+	NameWithNs bool `json:"NameWithNs,omitempty"`
 	// need k8sDomainSuffix in Host
-	K8sDomainSuffix bool
+	K8sDomainSuffix bool `json:"K8SDomainSuffix,omitempty"`
 	// need ns in Host
-	NsHost bool
+	NsHost bool `json:"NsHost,omitempty"`
 	// username and password for nacos auth
-	Username string
-	Password string
+	Username string `json:"Username,omitempty"`
+	Password string `json:"Password,omitempty"`
 	// fetch services from all namespaces, only support Polling mode
-	AllNamespaces bool
+	AllNamespaces bool `json:"AllNamespaces,omitempty"`
 	//  If set, namespace and group information will be injected into the ep's metadata using the set key.
-	MetaKeyGroup, MetaKeyNamespace string
+	MetaKeyGroup     string `json:"MetaKeyGroup,omitempty"`
+	MetaKeyNamespace string `json:"MetaKeyNamespace,omitempty"`
 }
 
 func (nacosArgs *NacosSourceArgs) Validate() error {
@@ -223,31 +227,31 @@ func (nacosArgs *NacosSourceArgs) Validate() error {
 }
 
 type McpArgs struct {
-	ServerUrl string
+	ServerUrl string `json:"ServerUrl,omitempty"`
 	// Enables the use of resource version in annotations.
-	EnableAnnoResVer bool
+	EnableAnnoResVer bool `json:"EnableAnnoResVer,omitempty"`
 	// Enables incremental push.
-	EnableIncPush bool
+	EnableIncPush bool `json:"EnableIncPush,omitempty"`
 	// non-0 means enable clean zombie config brought by incremental push.
-	CleanZombieInterval util.Duration
+	CleanZombieInterval util.Duration `json:"CleanZombieInterval,omitempty"`
 }
 
 type K8SArgs struct {
 	// the ID of the cluster in which this mesh-registry instance is deployed
-	ClusterID string
+	ClusterID string `json:"ClusterID,omitempty"`
 	// Select a namespace where the multicluster controller resides. If not set, uses ${POD_NAMESPACE} environment variable
-	ClusterRegistriesNamespace string
+	ClusterRegistriesNamespace string `json:"ClusterRegistriesNamespace,omitempty"`
 
-	ApiServerUrl string
+	ApiServerUrl string `json:"ApiServerUrl,omitempty"`
 	// specify api server url to get deploy or pod info
-	ApiServerUrlForDeploy string
+	ApiServerUrlForDeploy string `json:"ApiServerUrlForDeploy,omitempty"`
 
 	// KubeRestConfig has a rest config, common with other components
 	KubeRestConfig *rest.Config `json:"-"`
 
 	// The path to kube configuration file.
 	// Use a Kubernetes configuration file instead of in-cluster configuration
-	KubeConfig string
+	KubeConfig string `json:"KubeConfig,omitempty"`
 }
 
 func NewRegistryArgs() *RegistryArgs {
