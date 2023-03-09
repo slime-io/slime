@@ -81,6 +81,7 @@ func (c *controller) updatePorts(key string) error {
 	if !exists {
 		log.Infof("Configmap %s does not exist anymore", key)
 	} else {
+		// TODO how to handle del event
 		cm, err := convertToConfigMap(obj)
 		if err != nil {
 			return fmt.Errorf("Convert to configmap failed with: %v", err)
