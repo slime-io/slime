@@ -15,6 +15,7 @@
 package server
 
 import (
+	"k8s.io/client-go/tools/cache"
 	"net"
 	"net/http"
 	slimebootstrap "slime.io/slime/framework/bootstrap"
@@ -28,7 +29,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
 	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
 	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
-	"slime.io/slime/modules/meshregistry/pkg/util/cache"
+	utilcache "slime.io/slime/modules/meshregistry/pkg/util/cache"
 
 	cmap "github.com/orcaman/concurrent-map"
 	"google.golang.org/grpc"
@@ -42,12 +43,6 @@ import (
 	"istio.io/libistio/pkg/mcp/snapshot"
 	"istio.io/pkg/log"
 	"k8s.io/client-go/tools/clientcmd"
-)
-
-const (
-	versionMetadataKey = "config.source.version"
-	MCP                = "mcp"
-	XDS                = "xds"
 )
 
 // Processing component is the main config processing component that will listen to a config source and publish
@@ -66,6 +61,8 @@ type Processing struct {
 	listener      net.Listener
 	stopCh        chan struct{}
 	httpServer    *HttpServer
+
+	dynConfigController cache.Controller
 
 	sources []event.Source
 }
@@ -114,6 +111,7 @@ func (p *Processing) Start() (err error) {
 
 		shouldInitKubeClient bool
 	)
+
 	if p.args.MeshConfigFile != "" && p.args.K8SSource.Enabled {
 		if meshConfigFileSrc, err = meshcfgNewFS(p.args.MeshConfigFile); err != nil {
 			return
@@ -369,8 +367,8 @@ func (p *Processing) initMulticluster() {
 
 	controller := multicluster.NewController(k, p.args.K8S.ClusterRegistriesNamespace, time.Duration(p.args.ResyncPeriod), p.localCLusterID)
 	if controller != nil {
-		controller.AddHandler(cache.K8sPodCaches)
-		controller.AddHandler(cache.K8sNodeCaches)
+		controller.AddHandler(utilcache.K8sPodCaches)
+		controller.AddHandler(utilcache.K8sNodeCaches)
 		if err = controller.Run(p.stopCh); err != nil {
 			log.Errorf("start multicluster controller met err %v", err)
 		}
