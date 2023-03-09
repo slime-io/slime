@@ -34,7 +34,7 @@ type McpController struct {
 	verMut             sync.Mutex
 	stop, notifyPushCh chan struct{}
 
-	mcpArgs bootstrap.McpArgs
+	mcpArgs *bootstrap.McpArgs
 
 	lastPushVer       string
 	revChangedConfigs map[mcpmodel.ConfigKey]struct{}

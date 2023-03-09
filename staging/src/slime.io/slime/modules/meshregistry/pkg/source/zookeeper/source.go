@@ -43,7 +43,7 @@ const (
 )
 
 type Source struct {
-	args                        bootstrap.ZookeeperSourceArgs
+	args                        *bootstrap.ZookeeperSourceArgs
 	delay                       time.Duration
 	addresses                   []string
 	timeout                     time.Duration
@@ -80,7 +80,7 @@ type Source struct {
 	stop                                   chan struct{}
 }
 
-func NewSource(args bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
+func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	ignoreLabels := make(map[string]string, 0)
 	for _, v := range args.IgnoreLabel {
 		ignoreLabels[v] = v
