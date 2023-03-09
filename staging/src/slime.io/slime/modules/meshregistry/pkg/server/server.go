@@ -18,6 +18,8 @@ type Server struct {
 type Args struct {
 	SlimeEnv     slimebootstrap.Environment
 	RegistryArgs *bootstrap.RegistryArgs
+	// AddOnRegArgs should be called only in `new` stage. NOT IN `RUN` stage
+	AddOnRegArgs func(onConfig func(args *bootstrap.RegistryArgs))
 }
 
 func NewServer(args *Args) (*Server, error) {

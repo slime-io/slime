@@ -48,8 +48,9 @@ import (
 // Processing component is the main config processing component that will listen to a config source and publish
 // resources through an MCP server, or a dialout connection.
 type Processing struct {
-	env  slimebootstrap.Environment
-	args *bootstrap.RegistryArgs
+	env          slimebootstrap.Environment
+	regArgs      *bootstrap.RegistryArgs
+	addOnRegArgs func(onRegArgs func(args *bootstrap.RegistryArgs))
 
 	mcpCache *snapshot.Cache
 
@@ -87,7 +88,8 @@ func NewProcessing(args *Args) *Processing {
 	hs.HandleFunc("/nc", hs.nc)
 
 	ret := &Processing{
-		args:           args.RegistryArgs,
+		regArgs:        args.RegistryArgs,
+		addOnRegArgs:   args.AddOnRegArgs,
 		stopCh:         make(chan struct{}),
 		httpServer:     hs,
 		localCLusterID: args.RegistryArgs.K8S.ClusterID,
@@ -112,13 +114,13 @@ func (p *Processing) Start() (err error) {
 		shouldInitKubeClient bool
 	)
 
-	if p.args.MeshConfigFile != "" && p.args.K8SSource.Enabled {
-		if meshConfigFileSrc, err = meshcfgNewFS(p.args.MeshConfigFile); err != nil {
+	if p.regArgs.MeshConfigFile != "" && p.regArgs.K8SSource.Enabled {
+		if meshConfigFileSrc, err = meshcfgNewFS(p.regArgs.MeshConfigFile); err != nil {
 			return
 		}
 	}
 
-	shouldInitKubeClient = shouldInitKubeClient || p.args.K8SSource.Enabled
+	shouldInitKubeClient = shouldInitKubeClient || p.regArgs.K8SSource.Enabled
 
 	if shouldInitKubeClient {
 		if p.k, err = p.getResourceKubeInterfaces(); err != nil {
@@ -132,14 +134,14 @@ func (p *Processing) Start() (err error) {
 
 	// Disable any unnecessary resources, including resources not in configured snapshots
 	var colsInSnapshots collection.Names
-	for _, c := range m.AllCollectionsInSnapshots(p.args.Snapshots) {
+	for _, c := range m.AllCollectionsInSnapshots(p.regArgs.Snapshots) {
 		colsInSnapshots = append(colsInSnapshots, collection.NewName(c))
 	}
 	kubeResources := kuberesource.DisableExcludedCollections(m.KubeCollections(), transformProviders,
-		colsInSnapshots, p.args.ExcludedResourceKinds, p.args.EnableServiceDiscovery)
+		colsInSnapshots, p.regArgs.ExcludedResourceKinds, p.regArgs.EnableServiceDiscovery)
 
-	if p.args.K8SSource.EnableConfigFile && p.args.K8SSource.ConfigPath != "" {
-		if extraKubeSrc, err = p.createFileKubeSource(kubeResources, p.args.K8SSource.ConfigPath, p.args.K8SSource.WatchConfigFiles); err != nil {
+	if p.regArgs.K8SSource.EnableConfigFile && p.regArgs.K8SSource.ConfigPath != "" {
+		if extraKubeSrc, err = p.createFileKubeSource(kubeResources, p.regArgs.K8SSource.ConfigPath, p.regArgs.K8SSource.WatchConfigFiles); err != nil {
 			log.Errorf("create extra k8s file source met err %v", err)
 			return
 		}
@@ -147,8 +149,8 @@ func (p *Processing) Start() (err error) {
 
 	clusterCache := false
 
-	if srcArgs := p.args.ZookeeperSource.SourceArgs; srcArgs.Enabled {
-		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.NewSource(p.args.ZookeeperSource, kubeResources.All(), time.Duration(p.args.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+	if srcArgs := p.regArgs.ZookeeperSource.SourceArgs; srcArgs.Enabled {
+		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.NewSource(p.regArgs.ZookeeperSource, kubeResources.All(), time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
 			return
 		}
 		p.httpServer.HandleFunc(zookeeper.ZkPath, httpHandle)
@@ -161,11 +163,11 @@ func (p *Processing) Start() (err error) {
 		if srcArgs.WaitTime > 0 {
 			p.httpServer.SourceReadyLater(zookeeper.ZK, time.Duration(srcArgs.WaitTime))
 		}
-		clusterCache = clusterCache || p.args.ZookeeperSource.LabelPatch
+		clusterCache = clusterCache || p.regArgs.ZookeeperSource.LabelPatch
 	}
 
-	if srcArgs := p.args.EurekaSource; srcArgs.Enabled {
-		if eurekaSrc, httpHandle, err = eureka.New(p.args.EurekaSource, time.Duration(p.args.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+	if srcArgs := p.regArgs.EurekaSource; srcArgs.Enabled {
+		if eurekaSrc, httpHandle, err = eureka.New(p.regArgs.EurekaSource, time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
 			return
 		}
 		p.httpServer.HandleFunc(eureka.HttpPath, httpHandle)
@@ -173,11 +175,19 @@ func (p *Processing) Start() (err error) {
 		if srcArgs.WaitTime > 0 {
 			p.httpServer.SourceReadyLater(eureka.SourceName, time.Duration(srcArgs.WaitTime))
 		}
-		clusterCache = clusterCache || p.args.EurekaSource.LabelPatch
+		clusterCache = clusterCache || p.regArgs.EurekaSource.LabelPatch
 	}
 
-	if srcArgs := p.args.NacosSource; srcArgs.Enabled {
-		if nacosSrc, httpHandle, err = nacos.New(p.args.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.args.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+	if srcArgs := p.regArgs.NacosSource; srcArgs.Enabled {
+		if nacosSrc, httpHandle, err = nacos.New(
+			p.regArgs.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.regArgs.RegistryStartDelay),
+			p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {
+				if p.addOnRegArgs != nil {
+					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
+						onNacosArgs(args.NacosSource)
+					})
+				}
+			})); err != nil {
 			return
 		}
 		p.httpServer.HandleFunc(nacos.HttpPath, httpHandle)
@@ -185,10 +195,10 @@ func (p *Processing) Start() (err error) {
 		if srcArgs.WaitTime > 0 {
 			p.httpServer.SourceReadyLater(nacos.SourceName, time.Duration(srcArgs.WaitTime))
 		}
-		clusterCache = clusterCache || p.args.EurekaSource.LabelPatch
+		clusterCache = clusterCache || p.regArgs.EurekaSource.LabelPatch
 	}
 
-	if srcArgs := p.args.K8SSource; srcArgs.Enabled {
+	if srcArgs := p.regArgs.K8SSource; srcArgs.Enabled {
 		if kubeSrc, err = p.createKubeSource(kubeResources); err != nil {
 			log.Errorf("create k8s source met err %v", err)
 			return
@@ -222,10 +232,10 @@ func (p *Processing) Start() (err error) {
 	}
 
 	p.httpServer.start()
-	grpc.EnableTracing = p.args.EnableGRPCTracing
+	grpc.EnableTracing = p.regArgs.EnableGRPCTracing
 
 	// TODO start sources
-	mcpController, err := mcpoverxds.NewController(p.args)
+	mcpController, err := mcpoverxds.NewController(p.regArgs)
 	if err != nil {
 		log.Errorf("init mcpoverxds controller error: %v", err)
 	} else {
@@ -277,31 +287,31 @@ func CombineSources(c []event.Source) event.Source {
 }
 
 func (p *Processing) getResourceKubeInterfaces() (k kube.Interfaces, err error) {
-	if p.args.K8S.ApiServerUrl != "" {
-		config, err := clientcmd.BuildConfigFromFlags(p.args.K8S.ApiServerUrl, "")
+	if p.regArgs.K8S.ApiServerUrl != "" {
+		config, err := clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrl, "")
 		if err != nil {
 			return nil, err
 		}
 		k = kube.NewInterfaces(config)
-	} else if p.args.K8S.KubeRestConfig != nil {
-		k = kube.NewInterfaces(p.args.K8S.KubeRestConfig)
+	} else if p.regArgs.K8S.KubeRestConfig != nil {
+		k = kube.NewInterfaces(p.regArgs.K8S.KubeRestConfig)
 	} else {
-		k, err = newInterfaces(p.args.K8S.KubeConfig)
+		k, err = newInterfaces(p.regArgs.K8S.KubeConfig)
 	}
 	return
 }
 
 func (p *Processing) getDeployKubeClient() (k kube.Interfaces, err error) {
-	if p.args.K8S.ApiServerUrlForDeploy != "" {
-		config, err := clientcmd.BuildConfigFromFlags(p.args.K8S.ApiServerUrlForDeploy, "")
+	if p.regArgs.K8S.ApiServerUrlForDeploy != "" {
+		config, err := clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrlForDeploy, "")
 		if err != nil {
 			return nil, err
 		}
 		k = kube.NewInterfaces(config)
-	} else if p.args.K8S.KubeRestConfig != nil {
-		k = kube.NewInterfaces(p.args.K8S.KubeRestConfig)
+	} else if p.regArgs.K8S.KubeRestConfig != nil {
+		k = kube.NewInterfaces(p.regArgs.K8S.KubeRestConfig)
 	} else {
-		k, err = newInterfaces(p.args.K8S.KubeConfig)
+		k, err = newInterfaces(p.regArgs.K8S.KubeConfig)
 	}
 	return
 }
@@ -315,8 +325,8 @@ func (p *Processing) createKubeSource(schemas collection.Schemas) (
 	src event.Source, err error) {
 	o := apiserver.Options{
 		Client:            p.k,
-		WatchedNamespaces: p.args.K8SSource.WatchedNamespaces,
-		ResyncPeriod:      time.Duration(p.args.ResyncPeriod),
+		WatchedNamespaces: p.regArgs.K8SSource.WatchedNamespaces,
+		ResyncPeriod:      time.Duration(p.regArgs.ResyncPeriod),
 		Schemas:           schemas,
 	}
 	s := apiserver.New(o)
@@ -365,7 +375,7 @@ func (p *Processing) initMulticluster() {
 		return
 	}
 
-	controller := multicluster.NewController(k, p.args.K8S.ClusterRegistriesNamespace, time.Duration(p.args.ResyncPeriod), p.localCLusterID)
+	controller := multicluster.NewController(k, p.regArgs.K8S.ClusterRegistriesNamespace, time.Duration(p.regArgs.ResyncPeriod), p.localCLusterID)
 	if controller != nil {
 		controller.AddHandler(utilcache.K8sPodCaches)
 		controller.AddHandler(utilcache.K8sNodeCaches)
