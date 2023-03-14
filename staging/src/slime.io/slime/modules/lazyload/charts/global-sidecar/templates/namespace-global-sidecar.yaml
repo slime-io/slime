@@ -8,9 +8,6 @@
       {{- if and .global .global.misc }}
         {{- if eq .global.misc.globalSidecarMode "namespace" }}
           {{ $f := .general }}
-              {{ if .fence }}
-                  {{ $f = .fence }}
-              {{- end -}}
           {{ $g := .global }}
           {{ $name := .name }}
           {{ $gsSvcPorts := list }}

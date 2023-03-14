@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"sort"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 
@@ -115,10 +115,7 @@ type Image struct {
 }
 
 type Module struct {
-	Plugin  *config.Plugin        `protobuf:"bytes,1,opt,name=plugin,proto3" json:"plugin,omitempty"`
-	Limiter *config.Limiter       `protobuf:"bytes,2,opt,name=limiter,proto3" json:"limiter,omitempty"`
 	Global  *config.Global        `protobuf:"bytes,3,opt,name=global,proto3" json:"global,omitempty"`
-	Fence   *config.Fence         `protobuf:"bytes,4,opt,name=fence,proto3" json:"fence,omitempty"`
 	Metric  *config.Metric        `protobuf:"bytes,6,opt,name=metric,proto3" json:"metric,omitempty"`
 	Name    string                `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`
 	Enable  bool                  `protobuf:"varint,7,opt,name=enable,proto3" json:"enable,omitempty"`

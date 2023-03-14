@@ -185,37 +185,12 @@ func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(mo
 		return mod, nil
 	}
 
-	var toCopy proto.Message
-	switch {
-	case modCfg.Fence != nil:
-		toCopy = modCfg.Fence
-	case modCfg.Limiter != nil:
-		toCopy = modCfg.Limiter
-	case modCfg.Plugin != nil:
-		toCopy = modCfg.Plugin
-	}
-
-	if toCopy != nil {
-		// old version: get mod.Config() value from config.Fence/Limiter/Plugin
-		ma := jsonpb.Marshaler{}
-		js, err := ma.MarshalToString(toCopy)
-		if err != nil {
-			log.Errorf("marshal for mod %s config (%v) met err %v", modCfg.Name, toCopy, err)
+	// get mod.Config() value from config.general
+	if len(pmCfg.GeneralJson) > 0 {
+		u := jsonpb.Unmarshaler{AllowUnknownFields: true}
+		if err := u.Unmarshal(bytes.NewBuffer(pmCfg.GeneralJson), modSelfCfg); err != nil {
+			log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
 			fatal()
-		}
-		um := jsonpb.Unmarshaler{AllowUnknownFields: true}
-		if err := um.Unmarshal(strings.NewReader(js), modSelfCfg); err != nil {
-			log.Errorf("unmarshal for mod %s config (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
-			fatal()
-		}
-	} else {
-		// new version: get mod.Config() value from config.general
-		if len(pmCfg.GeneralJson) > 0 {
-			u := jsonpb.Unmarshaler{AllowUnknownFields: true}
-			if err := u.Unmarshal(bytes.NewBuffer(pmCfg.GeneralJson), modSelfCfg); err != nil {
-				log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
-				fatal()
-			}
 		}
 	}
 
