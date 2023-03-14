@@ -276,7 +276,10 @@ func Main(bundle string, modules []Module) {
 			module: mainMod,
 			config: mainModConfig,
 		}
-		mcs = append(mcs, mc)
+
+		if mainModConfig.Enable {
+			mcs = append(mcs, mc)
+		}
 	} else {
 		for _, modCfg := range mainModConfig.Bundle.Modules {
 			mod, modParsedCfg, err := LoadModule(modCfg.Name, modGetter, mainModConfig)
@@ -295,7 +298,10 @@ func Main(bundle string, modules []Module) {
 				module: mod,
 				config: modParsedCfg.Config,
 			}
-			mcs = append(mcs, mc)
+
+			if mc.config.Enable {
+				mcs = append(mcs, mc)
+			}
 		}
 	}
 
