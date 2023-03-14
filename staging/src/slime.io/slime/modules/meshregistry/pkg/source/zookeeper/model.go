@@ -9,7 +9,6 @@ import (
 
 const (
 	wildcardNamespace = "*"
-	DubboNamespace    = "dubbo"
 )
 
 type ServiceEntryWithMeta struct {
