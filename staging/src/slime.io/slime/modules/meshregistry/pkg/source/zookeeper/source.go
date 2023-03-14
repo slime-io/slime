@@ -68,7 +68,6 @@ type Source struct {
 	appSidecarUpdateTime map[string]time.Time
 	dubboPortsCache      map[uint32]*v1alpha3.Port
 
-	Con            *atomic.Value // store *zk.Conn
 	handlers       []event.Handler
 	initedCallback func(string)
 	mut            sync.RWMutex
@@ -78,6 +77,9 @@ type Source struct {
 	refreshSidecarNotifyCh                 chan struct{}
 	refreshSidecarMockServiceEntryNotifyCh chan struct{}
 	stop                                   chan struct{}
+
+	Con               *atomic.Value // store *zk.Conn
+	seMergePortMocker *source.ServiceEntryMergePortMocker
 }
 
 func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
@@ -85,6 +87,11 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 	for _, v := range args.IgnoreLabel {
 		ignoreLabels[v] = v
 	}
+
+	svcMocker := source.NewServiceEntryMergePortMocker(mockServiceEntryName, DubboNamespace, mockService, map[string]string{
+		"path":     mockService,
+		"registry": "zookeeper",
+	})
 
 	ret := &Source{
 		args:                        args,
@@ -113,12 +120,16 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
 
-		Con: &atomic.Value{},
+		Con:               &atomic.Value{},
+		seMergePortMocker: svcMocker,
 	}
+	svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
+
 	ret.handlers = append(
 		ret.handlers,
 		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecar),
-		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecarMockServiceEntry))
+		ret.seMergePortMocker,
+	)
 
 	ret.initWg.Add(1) // ServiceEntry init-sync ready
 	if args.EnableDubboSidecar {
@@ -126,6 +137,18 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 	}
 
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
+}
+
+func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *v1alpha3.ServiceEntry) {
+	ev, err := buildSeEvent(event.Updated, se, meta, nil)
+	if err != nil {
+		log.Errorf("buildSeEvent met err %v", err)
+		return
+	}
+
+	for _, h := range s.handlers {
+		h.Handle(ev)
+	}
 }
 
 func (s *Source) reConFunc(reconCh chan<- struct{}) {
@@ -250,23 +273,14 @@ func (s *Source) Start() {
 			case <-s.stop:
 				return
 			case <-s.seInitCh:
-				s.refreshSidecarMockServiceEntry()
+				s.seMergePortMocker.Refresh()
 				s.refreshSidecar(true)
 
 				s.markSidecarInitDone()
 			}
 
 			go s.refreshSidecarTask(s.stop)
-			go func() {
-				for {
-					select {
-					case <-s.stop:
-						return
-					case <-s.refreshSidecarMockServiceEntryNotifyCh:
-						s.refreshSidecarMockServiceEntry()
-					}
-				}
-			}()
+			go s.seMergePortMocker.Start(s.stop)
 		}()
 	}
 }
@@ -391,7 +405,7 @@ func (s *Source) markServiceEntryInitDone() {
 	}
 }
 
-func buildSeEvent(kind event.Kind, item *v1alpha3.ServiceEntry, meta resource.Metadata, service string, callModel map[string]DubboCallModel) (event.Event, error) {
+func buildSeEvent(kind event.Kind, item *v1alpha3.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
 	se := util.CopySe(item)
 	source.FillRevision(meta)
 	util.FillSeLabels(se, meta)

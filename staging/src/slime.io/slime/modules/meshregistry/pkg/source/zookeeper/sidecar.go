@@ -220,67 +220,6 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 }
 
-func (s *Source) refreshSidecarMockServiceEntry() {
-	se := &networking.ServiceEntry{
-		Hosts:      []string{mockService},
-		Ports:      make([]*networking.Port, 0),
-		Resolution: networking.ServiceEntry_STATIC,
-	}
-
-	s.mut.RLock()
-	for _, p := range s.dubboPortsCache {
-		se.Ports = append(se.Ports, p)
-	}
-	s.mut.RUnlock()
-	sort.Slice(se.Ports, func(i, j int) bool {
-		return se.Ports[i].Number < se.Ports[j].Number
-	})
-
-	now := time.Now()
-	ev, err := buildSeEvent(event.Updated, se, resource.Metadata{
-		FullName:   resource.FullName{Namespace: DubboNamespace, Name: mockServiceEntryName},
-		CreateTime: now,
-		Version:    resource.Version(now.String()),
-		Labels: map[string]string{
-			"path":     mockService,
-			"registry": "zookeeper",
-		},
-		Annotations: map[string]string{},
-	}, mockServiceEntryName, nil)
-	if err != nil {
-		log.Errorf("buildSeEvent met err %v", err)
-		return
-	}
-
-	for _, h := range s.handlers {
-		h.Handle(ev)
-	}
-}
-
-func (s *Source) serviceEntryHandlerRefreshSidecarMockServiceEntry(e event.Event) {
-	if e.Source != collections.K8SNetworkingIstioIoV1Alpha3Serviceentries || e.Resource.Metadata.FullName.Name == mockServiceEntryName {
-		return
-	}
-
-	se := e.Resource.Message.(*networking.ServiceEntry)
-	var newPort bool
-	s.mut.Lock()
-	for _, p := range se.Ports {
-		if _, ok := s.dubboPortsCache[p.Number]; !ok {
-			s.dubboPortsCache[p.Number] = p
-			newPort = true
-		}
-	}
-	s.mut.Unlock()
-
-	if newPort {
-		select {
-		case s.refreshSidecarMockServiceEntryNotifyCh <- struct{}{}:
-		default:
-		}
-	}
-}
-
 func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel, includeProvider bool) map[string]DubboCallModel {
 	ret := make(map[string]DubboCallModel, len(seCallModels))
 
