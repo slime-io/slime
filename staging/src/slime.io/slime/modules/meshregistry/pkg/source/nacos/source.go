@@ -101,9 +101,12 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		if args.MockServiceName == "" {
 			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
-		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
-			"registry": "nacos",
-		})
+		svcMocker = source.NewServiceEntryMergePortMocker(
+			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
+			args.MockServiceMergeInstancePort, args.MockServiceMergeServicePort,
+			map[string]string{
+				"registry": SourceName,
+			})
 	}
 
 	ret := &Source{

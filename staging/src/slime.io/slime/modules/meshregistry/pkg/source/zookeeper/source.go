@@ -30,7 +30,7 @@ import (
 var scope = log.RegisterScope("zk", "zk debugging", 0)
 
 const (
-	SourceName                = "zk"
+	SourceName                = "zookeeper"
 	ZkPath                    = "/zk"
 	ZkSimplePath              = "/zks"
 	DubboCallModelPath        = "/dubboCallModel"
@@ -84,7 +84,7 @@ type Source struct {
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 }
 
-func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
+func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	ignoreLabels := make(map[string]string, 0)
 	for _, v := range args.IgnoreLabel {
 		ignoreLabels[v] = v
@@ -95,10 +95,13 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		if args.MockServiceName == "" {
 			return nil, nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
-		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
-			"path":     args.MockServiceName,
-			"registry": "zookeeper",
-		})
+		svcMocker = source.NewServiceEntryMergePortMocker(
+			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
+			args.MockServiceMergeInstancePort, args.MockServiceMergeServicePort,
+			map[string]string{
+				"path":     args.MockServiceName,
+				"registry": SourceName,
+			})
 	}
 
 	ret := &Source{
