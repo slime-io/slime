@@ -1,6 +1,7 @@
 package source
 
 import (
+	"fmt"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -12,6 +13,8 @@ import (
 )
 
 type ServiceEntryMergePortMocker struct {
+	mergeSvcPorts, mergeInstPorts bool
+
 	resourceName, resourceNs, host string
 	resourceLabels                 map[string]string
 
@@ -22,11 +25,15 @@ type ServiceEntryMergePortMocker struct {
 	mut        sync.RWMutex
 }
 
-func NewServiceEntryMergePortMocker(resourceName, resourceNs, serviceHost string, resourceLabels map[string]string) *ServiceEntryMergePortMocker {
+func NewServiceEntryMergePortMocker(
+	resourceName, resourceNs, serviceHost string, mergeInstPorts, mergeSvcPorts bool,
+	resourceLabels map[string]string) *ServiceEntryMergePortMocker {
 	return &ServiceEntryMergePortMocker{
 		resourceName:   resourceName,
 		resourceNs:     resourceNs,
 		host:           serviceHost,
+		mergeInstPorts: mergeInstPorts,
+		mergeSvcPorts:  mergeSvcPorts,
 		resourceLabels: resourceLabels,
 
 		notifyCh:   make(chan struct{}, 1),
@@ -91,10 +98,35 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 	se := e.Resource.Message.(*networking.ServiceEntry)
 	var newPort bool
 	m.mut.Lock()
-	for _, p := range se.Ports {
-		if _, ok := m.portsCache[p.Number]; !ok {
-			m.portsCache[p.Number] = p
-			newPort = true
+	if m.mergeSvcPorts {
+		for _, p := range se.Ports {
+			if _, ok := m.portsCache[p.Number]; !ok {
+				m.portsCache[p.Number] = p
+				newPort = true
+			}
+		}
+	}
+
+	if m.mergeInstPorts {
+		for _, ep := range se.Endpoints {
+			for portName, portNum := range ep.Ports {
+				_, ok := m.portsCache[portNum]
+				if ok {
+					continue
+				}
+
+				for _, svcPort := range se.Ports {
+					if svcPort.Name == portName {
+						port := &networking.Port{
+							Number:   portNum,
+							Protocol: svcPort.Protocol,
+							Name:     fmt.Sprintf("%s-%d", portName, portNum),
+						}
+						m.portsCache[portNum] = port
+						break
+					}
+				}
+			}
 		}
 	}
 	m.mut.Unlock()

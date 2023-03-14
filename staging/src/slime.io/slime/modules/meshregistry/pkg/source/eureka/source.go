@@ -73,9 +73,12 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 		if args.MockServiceName == "" {
 			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
-		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
-			"registry": SourceName,
-		})
+		svcMocker = source.NewServiceEntryMergePortMocker(
+			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
+			args.MockServiceMergeInstancePort, args.MockServiceMergeServicePort,
+			map[string]string{
+				"registry": SourceName,
+			})
 	}
 
 	ret := &Source{
