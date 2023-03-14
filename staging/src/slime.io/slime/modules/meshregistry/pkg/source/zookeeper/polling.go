@@ -104,7 +104,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 		if value, exist := seCache.Get(serviceKey); !exist {
 			seCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildSeEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, serviceKey, callModel); err == nil {
+			if ev, err := buildSeEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
 				scope.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
@@ -115,7 +115,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 				continue
 			}
 			seCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildSeEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, serviceKey, callModel); err == nil {
+			if ev, err := buildSeEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
 				scope.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
@@ -147,7 +147,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 		// del event -> empty-ep update event
 		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-		ev, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, serviceKey, nil)
+		ev, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
 		if err != nil {
 			scope.Errorf("delete svc failed, case: %v", err.Error())
 			continue
@@ -177,10 +177,10 @@ func (s *Source) handleNodeDelete(childrens []string) {
 	for _, service := range deleteKey {
 		if seCache, ok := s.pollingCache.Get(service); ok {
 			if ses, castok := seCache.(cmap.ConcurrentMap); castok {
-				for serviceKey, v := range ses.Items() {
+				for _, v := range ses.Items() {
 					if seValue, ok := v.(*ServiceEntryWithMeta); ok {
 						seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-						if event, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, serviceKey, nil); err == nil {
+						if event, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil); err == nil {
 							scope.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 							for _, h := range s.handlers {
 								h.Handle(event)
