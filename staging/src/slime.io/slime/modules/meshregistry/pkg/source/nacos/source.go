@@ -61,11 +61,10 @@ type Source struct {
 	mut sync.RWMutex
 
 	// source status
-	started     bool
-	firstInited bool
-	stop        chan struct{}
-	seInitCh    chan struct{}
-	initWg      sync.WaitGroup
+	started  bool
+	stop     chan struct{}
+	seInitCh chan struct{}
+	initWg   sync.WaitGroup
 
 	initedCallback func(string)
 
@@ -98,11 +97,16 @@ func WithDynamicConfigOption(addCb func(func(*bootstrap.NacosSourceArgs))) Optio
 
 func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	var svcMocker *source.ServiceEntryMergePortMocker
-	svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
-		"registry": "nacos",
-	})
+	if args.MockServiceEntryName != "" {
+		if args.MockServiceName == "" {
+			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+		}
+		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
+			"registry": "nacos",
+		})
+	}
 
-	s := &Source{
+	ret := &Source{
 		args: args,
 
 		namespace:       args.Namespace,
@@ -117,7 +121,6 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		svcPort:         args.SvcPort,
 		nsHost:          nsHost,
 		k8sDomainSuffix: k8sDomainSuffix,
-		firstInited:     false,
 		defaultSvcNs:    args.DefaultServiceNs,
 		resourceNs:      args.ResourceNs,
 
@@ -130,12 +133,6 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 
 		seMergePortMocker: svcMocker,
 	}
-	svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
-		ev := buildEventFromMeta(event.Updated, item, meta)
-		for _, h := range s.handlers {
-			h.Handle(ev)
-		}
-	})
 
 	headers := make(map[string]string)
 	nacosHeaders := os.Getenv(clientHeadersEnv)
@@ -148,7 +145,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		}
 	}
 	if args.Mode == POLLING {
-		s.client = NewClient(args.Address,
+		ret.client = NewClient(args.Address,
 			args.Username,
 			args.Password,
 			args.Namespace,
@@ -164,23 +161,32 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 				msg: fmt.Sprintf("init nacos client failed: %s", err.Error()),
 			}
 		}
-		s.namingClient = namingClient
+		ret.namingClient = namingClient
 	}
 
-	s.initWg.Add(1)
-	if s.seMergePortMocker != nil {
-		s.initWg.Add(1)
+	ret.initWg.Add(1)
+	if ret.seMergePortMocker != nil {
+		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
+
+		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
+			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
+			for _, h := range ret.handlers {
+				h.Handle(ev)
+			}
+		})
+
+		ret.initWg.Add(1)
 	}
 
-	s.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
+	ret.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
 
 	for _, op := range options {
-		if err := op(s); err != nil {
+		if err := op(ret); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	return s, s.cacheJson, nil
+	return ret, ret.cacheJson, nil
 }
 
 func generateInstanceFilters(
@@ -202,7 +208,7 @@ func (s *Source) markServiceEntryInitDone() {
 	ch, s.seInitCh = s.seInitCh, nil
 	s.mut.Unlock()
 	if ch != nil {
-		log.Infof("service entry init done, close ch and call initWg.Done")
+		log.Infof("%s service entry init done, close ch and call initWg.Done", SourceName)
 		s.initWg.Done()
 		close(ch)
 	}
@@ -255,20 +261,7 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 		Annotations: map[string]string{},
 	}
 
-	return buildEventFromMeta(kind, se, meta), nil
-}
-
-func buildEventFromMeta(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata) event.Event {
-	source.FillRevision(meta)
-	util.FillSeLabels(se, meta)
-	return event.Event{
-		Kind:   kind,
-		Source: collections.K8SNetworkingIstioIoV1Alpha3Serviceentries,
-		Resource: &resource.Instance{
-			Metadata: meta,
-			Message:  se,
-		},
-	}
+	return source.BuildServiceEntryEvent(kind, se, meta), nil
 }
 
 func (s *Source) Dispatch(handler event.Handler) {
@@ -299,7 +292,7 @@ func (s *Source) Start() {
 		go func() {
 			<-s.seInitCh
 
-			log.Infof("service entry init done, begin to do init se merge port refresh")
+			log.Infof("%s service entry init done, begin to do init se merge port refresh", SourceName)
 			s.seMergePortMocker.Refresh()
 			s.initWg.Done()
 

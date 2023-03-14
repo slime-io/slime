@@ -30,7 +30,7 @@ import (
 var scope = log.RegisterScope("zk", "zk debugging", 0)
 
 const (
-	ZK                        = "zk"
+	SourceName                = "zk"
 	ZkPath                    = "/zk"
 	ZkSimplePath              = "/zks"
 	DubboCallModelPath        = "/dubboCallModel"
@@ -139,16 +139,13 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecar),
 	)
 
-	if svcMocker != nil {
-		ret.handlers = append(ret.handlers, svcMocker)
-		svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
-	}
-
 	ret.initWg.Add(1) // ServiceEntry init-sync ready
 	if args.EnableDubboSidecar {
 		ret.initWg.Add(1) // Sidecar init-sync ready
 	}
-	if svcMocker != nil {
+	if ret.seMergePortMocker != nil {
+		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
+		svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
 		ret.initWg.Add(1) // merge ports se init-sync ready
 	}
 
@@ -252,7 +249,7 @@ func (s *Source) Start() {
 	if s.initedCallback != nil {
 		go func() {
 			s.initWg.Wait()
-			s.initedCallback(ZK)
+			s.initedCallback(SourceName)
 		}()
 	}
 
@@ -289,11 +286,13 @@ func (s *Source) Start() {
 			return
 		case <-s.seInitCh:
 			if s.seMergePortMocker != nil {
+				log.Infof("%s service entry init done, begin to do init se merge port refresh", SourceName)
 				s.seMergePortMocker.Refresh()
 				s.initWg.Done()
 			}
 
 			if s.args.EnableDubboSidecar {
+				log.Infof("%s service entry init done, begin to do init sidecar refresh", SourceName)
 				s.refreshSidecar(true)
 				s.markSidecarInitDone()
 			}
@@ -422,7 +421,7 @@ func (s *Source) markServiceEntryInitDone() {
 	ch, s.seInitCh = s.seInitCh, nil
 	s.mut.Unlock()
 	if ch != nil {
-		log.Infof("service entry init done, close ch and call initWg.Done")
+		log.Infof("%s service entry init done, close ch and call initWg.Done", SourceName)
 		s.initWg.Done()
 		close(ch)
 	}

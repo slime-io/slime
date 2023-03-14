@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
@@ -22,10 +23,6 @@ import (
 )
 
 type Source struct {
-	cache   map[string]*networking.ServiceEntry
-	client  Client
-	handler []event.Handler
-
 	// worker        *util.Worker
 	delay         time.Duration
 	refreshPeriod time.Duration
@@ -41,10 +38,19 @@ type Source struct {
 	k8sDomainSuffix bool
 	nsfEureka       bool
 
-	stop           chan struct{}
-	started        bool
-	firstInited    bool
 	initedCallback func(string)
+	handlers       []event.Handler
+
+	stop     chan struct{}
+	started  bool
+	seInitCh chan struct{}
+	initWg   sync.WaitGroup
+	mut      sync.RWMutex
+
+	cache map[string]*networking.ServiceEntry
+
+	seMergePortMocker *source.ServiceEntryMergePortMocker
+	client            Client
 }
 
 var Scope = log.RegisterScope("eureka", "eureka debugging", 0)
@@ -54,32 +60,62 @@ const (
 	HttpPath   = "/eureka"
 )
 
-func New(eurekaArgs *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
-	client := NewClient(eurekaArgs.Address)
+func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+	client := NewClient(args.Address)
 	if client == nil {
 		return nil, nil, Error{
 			msg: "Init eureka client failed",
 		}
 	}
 
+	var svcMocker *source.ServiceEntryMergePortMocker
+	if args.MockServiceEntryName != "" {
+		if args.MockServiceName == "" {
+			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+		}
+		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
+			"registry": SourceName,
+		})
+	}
+
 	ret := &Source{
 		delay:           delay,
-		cache:           make(map[string]*networking.ServiceEntry),
-		client:          client,
-		refreshPeriod:   time.Duration(eurekaArgs.RefreshPeriod),
+		refreshPeriod:   time.Duration(args.RefreshPeriod),
 		started:         false,
-		gatewayModel:    eurekaArgs.GatewayModel,
-		patchLabel:      eurekaArgs.LabelPatch,
-		svcPort:         eurekaArgs.SvcPort,
-		nsHost:          eurekaArgs.NsHost,
-		k8sDomainSuffix: eurekaArgs.K8sDomainSuffix,
-		defaultSvcNs:    eurekaArgs.DefaultServiceNs,
-		resourceNs:      eurekaArgs.ResourceNs,
-		stop:            make(chan struct{}),
-		firstInited:     false,
-		initedCallback:  readyCallback,
-		nsfEureka:       eurekaArgs.NsfEureka,
+		gatewayModel:    args.GatewayModel,
+		patchLabel:      args.LabelPatch,
+		svcPort:         args.SvcPort,
+		nsHost:          args.NsHost,
+		k8sDomainSuffix: args.K8sDomainSuffix,
+		defaultSvcNs:    args.DefaultServiceNs,
+		resourceNs:      args.ResourceNs,
+		nsfEureka:       args.NsfEureka,
+
+		initedCallback: readyCallback,
+
+		cache: make(map[string]*networking.ServiceEntry),
+
+		stop:     make(chan struct{}),
+		seInitCh: make(chan struct{}),
+
+		client:            client,
+		seMergePortMocker: svcMocker,
 	}
+
+	ret.initWg.Add(1) // service entry init-sync
+	if svcMocker != nil {
+		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
+
+		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
+			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
+			for _, h := range ret.handlers {
+				h.Handle(ev)
+			}
+		})
+
+		ret.initWg.Add(1)
+	}
+
 	return ret, ret.cacheJson, nil
 }
 
@@ -119,7 +155,7 @@ func (s *Source) refresh() {
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
 			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
 				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
-				for _, h := range s.handler {
+				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			}
@@ -132,7 +168,7 @@ func (s *Source) refresh() {
 			s.cache[service] = newEntry
 			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
 				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
-				for _, h := range s.handler {
+				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			}
@@ -142,17 +178,15 @@ func (s *Source) refresh() {
 				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
 					log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
-					for _, h := range s.handler {
+					for _, h := range s.handlers {
 						h.Handle(event)
 					}
 				}
 			}
 		}
 	}
-	if !s.firstInited {
-		s.firstInited = true
-		s.initedCallback(SourceName)
-	}
+
+	s.markServiceEntryInitDone()
 }
 
 func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
@@ -166,32 +200,49 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 	meta := resource.Metadata{
 		CreateTime: now,
 		Labels: map[string]string{
-			"registry": "eureka",
+			"registry": SourceName,
 		},
 		Version:     source.GenVersion(collections.K8SNetworkingIstioIoV1Alpha3Serviceentries),
 		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}
-	source.FillRevision(meta)
-	util.FillSeLabels(se, meta)
-	return event.Event{
-		Kind:   kind,
-		Source: collections.K8SNetworkingIstioIoV1Alpha3Serviceentries,
-		Resource: &resource.Instance{
-			Metadata: meta,
-			Message:  se,
-		},
-	}, nil
+
+	return source.BuildServiceEntryEvent(kind, se, meta), nil
+}
+
+func (s *Source) markServiceEntryInitDone() {
+	s.mut.RLock()
+	ch := s.seInitCh
+	s.mut.RUnlock()
+	if ch == nil {
+		return
+	}
+
+	s.mut.Lock()
+	ch, s.seInitCh = s.seInitCh, nil
+	s.mut.Unlock()
+	if ch != nil {
+		log.Infof("%s service entry init done, close ch and call initWg.Done", SourceName)
+		s.initWg.Done()
+		close(ch)
+	}
 }
 
 func (s *Source) Dispatch(handler event.Handler) {
-	if s.handler == nil {
-		s.handler = make([]event.Handler, 0, 1)
+	if s.handlers == nil {
+		s.handlers = make([]event.Handler, 0, 1)
 	}
-	s.handler = append(s.handler, handler)
+	s.handlers = append(s.handlers, handler)
 }
 
 func (s *Source) Start() {
+	if s.initedCallback != nil {
+		go func() {
+			s.initWg.Wait()
+			s.initedCallback(SourceName)
+		}()
+	}
+
 	go func() {
 		time.Sleep(s.delay)
 		ticker := time.NewTicker(s.refreshPeriod)
@@ -205,6 +256,18 @@ func (s *Source) Start() {
 			}
 		}
 	}()
+
+	if s.seMergePortMocker != nil {
+		go func() {
+			<-s.seInitCh
+
+			log.Infof("%s service entry init done, begin to do init se merge port refresh", SourceName)
+			s.seMergePortMocker.Refresh()
+			s.initWg.Done()
+
+			s.seMergePortMocker.Start(nil)
+		}()
+	}
 }
 
 func (s *Source) Stop() {
