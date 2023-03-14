@@ -2,37 +2,7 @@ syntax = "proto3";
 
 package slime.config.v1alpha1;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-import "google/protobuf/duration.proto";
-
 option go_package = "slime.io/slime/framework/apis/config/v1alpha1";
-
-message LocalSource {
-  string mount = 1;
-}
-
-message RemoteSource {
-  string address = 1;
-}
-
-message Plugin {
-  oneof wasm_source {
-    LocalSource local = 2;
-    RemoteSource remote = 3;
-  }
-}
-
-message Limiter {
-  enum RateLimitBackend {
-    netEaseLocalFlowControl = 0;
-    envoyLocalRateLimit = 1;
-  }
-  RateLimitBackend backend = 3;
-  google.protobuf.Duration refresh = 4 [(gogoproto.stdduration) = true];
-  bool disableGlobalRateLimit = 5;
-  bool disableAdaptive = 6;
-  bool enableServiceEntry = 7;
-}
 
 message Global {
   string service = 1;
@@ -79,9 +49,6 @@ message LogRotateConfig {
   bool compress = 5;
 }
 
-message Fence {
-  repeated string wormholePort = 2;
-}
 
 message Prometheus_Source{
   enum Type{
@@ -118,11 +85,11 @@ message Bundle {
   repeated Item modules = 1;
 }
 
+
 message Config {
-  Plugin plugin = 1;
-  Limiter limiter = 2;
+
   Global global = 3;
-  Fence fence = 4;
+
   Metric metric = 6;
   string name = 5;
   bool enable = 7;

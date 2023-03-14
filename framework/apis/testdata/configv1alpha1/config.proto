@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package slime.config.v1alpha1;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
-
 option go_package = "slime.io/slime/pkg/apis/config/v1alpha1";
 
 message Bar {

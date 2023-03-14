@@ -19,10 +19,7 @@ const (
 )
 
 var defaultModuleConfig = &bootconfig.Config{
-	Enable:  false,
-	Limiter: &bootconfig.Limiter{},
-	Plugin:  &bootconfig.Plugin{},
-	Fence:   &bootconfig.Fence{},
+	Enable: false,
 	Global: &bootconfig.Global{
 		Service:        "app",
 		IstioNamespace: "istio-system",
