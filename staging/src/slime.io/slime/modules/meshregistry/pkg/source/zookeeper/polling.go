@@ -75,7 +75,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		newSeWithMeta := &ServiceEntryWithMeta{
 			ServiceEntry: se,
 			Meta: resource.Metadata{
-				FullName:   resource.FullName{Namespace: DubboNamespace, Name: resource.LocalName(serviceKey)},
+				FullName:   resource.FullName{Namespace: resource.Namespace(s.resourceNs), Name: resource.LocalName(serviceKey)},
 				CreateTime: now,
 				Version:    resource.Version(now.String()),
 				Labels: map[string]string{

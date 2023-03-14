@@ -20,8 +20,6 @@ import (
 
 const (
 	nonNsSpecSidecarAnno = "sidecar.config.istio.io/nonNsSpec"
-	mockServiceEntryName = "qz-not-exist-svc"
-	mockService          = mockServiceEntryName + ".qz"
 )
 
 type DubboCallModel struct {
@@ -156,7 +154,7 @@ func (s *Source) refreshSidecar(init bool) {
 	s.recordAppSidecarUpdateTime(diff)
 	s.mut.Unlock()
 
-	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(mergedCallModels, diff, s.args.DubboWorkloadAppLabel)
+	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.resourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel)
 
 	sidecarMap := make(map[resource.FullName]SidecarWithMeta, len(diffSidecars))
 	for _, sc := range diffSidecars {
@@ -396,7 +394,7 @@ func convertDubboCallModel(se *networking.ServiceEntry, inboundEndpoints []*netw
 	return dubboModels
 }
 
-func convertDubboCallModelConfigToSidecar(callModel map[string]DubboCallModel, diff map[string]DubboCallModel, dubboWorkloadAppLabel string) ([]SidecarWithMeta, map[resource.FullName]bool) {
+func convertDubboCallModelConfigToSidecar(resourceNs string, callModel map[string]DubboCallModel, diff map[string]DubboCallModel, dubboWorkloadAppLabel string) ([]SidecarWithMeta, map[resource.FullName]bool) {
 	var (
 		ret             []SidecarWithMeta
 		deletedSidecars = map[resource.FullName]bool{}
@@ -404,7 +402,7 @@ func convertDubboCallModelConfigToSidecar(callModel map[string]DubboCallModel, d
 
 	now := time.Now()
 	for app, m := range callModel {
-		fullName := resource.FullName{Namespace: DubboNamespace, Name: resource.LocalName(fmt.Sprintf("%s.dubbo.generated", m.Application))}
+		fullName := resource.FullName{Namespace: resource.Namespace(resourceNs), Name: resource.LocalName(fmt.Sprintf("%s.dubbo.generated", m.Application))}
 		if diff != nil {
 			if _, ok := diff[app+suffixDel]; ok {
 				// handle app-del standalone

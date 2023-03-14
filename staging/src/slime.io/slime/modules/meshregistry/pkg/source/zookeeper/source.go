@@ -39,11 +39,12 @@ const (
 	ProviderNode              = "providers"
 	Polling                   = "polling"
 
-	AttachmentDubboCallModel = "ATTACHEMT_DUBBO_CALL_MODEL"
+	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
 )
 
 type Source struct {
-	args                        *bootstrap.ZookeeperSourceArgs
+	args *bootstrap.ZookeeperSourceArgs
+
 	delay                       time.Duration
 	addresses                   []string
 	timeout                     time.Duration
@@ -57,6 +58,7 @@ type Source struct {
 	ignoreLabels                map[string]string
 	watchingRoot                bool // TODO useless?
 	watchingWorkerCount         int
+	resourceNs                  string
 
 	serviceCache         map[string]*ServiceEntryWithMeta
 	cache                cmap.ConcurrentMap
@@ -88,10 +90,16 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		ignoreLabels[v] = v
 	}
 
-	svcMocker := source.NewServiceEntryMergePortMocker(mockServiceEntryName, DubboNamespace, mockService, map[string]string{
-		"path":     mockService,
-		"registry": "zookeeper",
-	})
+	var svcMocker *source.ServiceEntryMergePortMocker
+	if args.MockServiceEntryName != "" {
+		if args.MockServiceName == "" {
+			return nil, nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+		}
+		svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
+			"path":     args.MockServiceName,
+			"registry": "zookeeper",
+		})
+	}
 
 	ret := &Source{
 		args:                        args,
@@ -107,7 +115,9 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		exceptedResources:           exceptedResources,
 		zkGatewayModel:              args.GatewayModel,
 		ignoreLabels:                ignoreLabels,
-		initedCallback:              readyCallback,
+		resourceNs:                  args.ResourceNs,
+
+		initedCallback: readyCallback,
 
 		cache:                cmap.New(),
 		pollingCache:         cmap.New(),
@@ -123,17 +133,23 @@ func NewSource(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collecti
 		Con:               &atomic.Value{},
 		seMergePortMocker: svcMocker,
 	}
-	svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
 
 	ret.handlers = append(
 		ret.handlers,
 		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecar),
-		ret.seMergePortMocker,
 	)
+
+	if svcMocker != nil {
+		ret.handlers = append(ret.handlers, svcMocker)
+		svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
+	}
 
 	ret.initWg.Add(1) // ServiceEntry init-sync ready
 	if args.EnableDubboSidecar {
 		ret.initWg.Add(1) // Sidecar init-sync ready
+	}
+	if svcMocker != nil {
+		ret.initWg.Add(1) // merge ports se init-sync ready
 	}
 
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
@@ -267,22 +283,29 @@ func (s *Source) Start() {
 		}
 	}()
 
-	if s.args.EnableDubboSidecar {
-		go func() {
-			select {
-			case <-s.stop:
-				return
-			case <-s.seInitCh:
+	go func() {
+		select {
+		case <-s.stop:
+			return
+		case <-s.seInitCh:
+			if s.seMergePortMocker != nil {
 				s.seMergePortMocker.Refresh()
-				s.refreshSidecar(true)
-
-				s.markSidecarInitDone()
+				s.initWg.Done()
 			}
 
+			if s.args.EnableDubboSidecar {
+				s.refreshSidecar(true)
+				s.markSidecarInitDone()
+			}
+		}
+
+		if s.args.EnableDubboSidecar {
 			go s.refreshSidecarTask(s.stop)
+		}
+		if s.seMergePortMocker != nil {
 			go s.seMergePortMocker.Start(s.stop)
-		}()
-	}
+		}
+	}()
 }
 
 func (s *Source) cacheInfo(iface string) interface{} {
