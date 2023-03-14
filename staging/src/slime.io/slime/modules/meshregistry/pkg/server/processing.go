@@ -159,9 +159,9 @@ func (p *Processing) Start() (err error) {
 			p.httpServer.HandleFunc(zookeeper.DubboCallModelPath, zkSrc.HandleDubboCallModel)
 			p.httpServer.HandleFunc(zookeeper.SidecarDubboCallModelPath, zkSrc.HandleSidecarDubboCallModel)
 		}
-		p.httpServer.SourceRegistry(zookeeper.ZK)
+		p.httpServer.SourceRegistry(zookeeper.SourceName)
 		if srcArgs.WaitTime > 0 {
-			p.httpServer.SourceReadyLater(zookeeper.ZK, time.Duration(srcArgs.WaitTime))
+			p.httpServer.SourceReadyLater(zookeeper.SourceName, time.Duration(srcArgs.WaitTime))
 		}
 		clusterCache = clusterCache || p.regArgs.ZookeeperSource.LabelPatch
 	}

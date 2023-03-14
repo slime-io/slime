@@ -5,6 +5,7 @@ import (
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
+	"slime.io/slime/modules/meshregistry/pkg/util"
 	"sort"
 	"sync"
 	"time"
@@ -103,5 +104,18 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 		case m.notifyCh <- struct{}{}:
 		default:
 		}
+	}
+}
+
+func BuildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata) event.Event {
+	FillRevision(meta)
+	util.FillSeLabels(se, meta)
+	return event.Event{
+		Kind:   kind,
+		Source: collections.K8SNetworkingIstioIoV1Alpha3Serviceentries,
+		Resource: &resource.Instance{
+			Metadata: meta,
+			Message:  se,
+		},
 	}
 }
