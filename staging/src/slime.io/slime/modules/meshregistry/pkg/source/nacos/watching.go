@@ -88,10 +88,7 @@ func (s *Source) watch() {
 	// Scope.Infof("nacos refresh start : %d", time.Now().UnixNano())
 	s.updateNacosService()
 	// Scope.Infof("nacos refresh finish : %d", time.Now().UnixNano())
-	if !s.firstInited {
-		s.firstInited = true
-		s.initedCallback(SourceName)
-	}
+	s.markServiceEntryInitDone()
 }
 
 func (s *Source) parseNacosService(serviceInfos model.ServiceList, subscribe bool) {
@@ -180,7 +177,7 @@ func (s *Source) deleteService(serviceName string) {
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
 			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
-				for _, h := range s.handler {
+				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			}
@@ -195,7 +192,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 			s.cache[service] = newEntry
 			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
 				Scope.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
-				for _, h := range s.handler {
+				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			}
@@ -205,7 +202,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
 					Scope.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
-					for _, h := range s.handler {
+					for _, h := range s.handlers {
 						h.Handle(event)
 					}
 				}

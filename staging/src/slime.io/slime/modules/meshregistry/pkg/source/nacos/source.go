@@ -28,11 +28,12 @@ type Source struct {
 	args *bootstrap.NacosSourceArgs // should only be accessed in `onConfig`
 
 	// nacos client
-	client       Client
-	namingClient naming_client.INamingClient
-	group        string
+	client            Client
+	namingClient      naming_client.INamingClient
+	seMergePortMocker *source.ServiceEntryMergePortMocker
 
 	// common configs
+	group           string
 	patchLabel      bool
 	gatewayModel    bool
 	nsHost          bool
@@ -55,7 +56,7 @@ type Source struct {
 	// source cache
 	cache             map[string]*networking.ServiceEntry
 	namingServiceList cmap.ConcurrentMap
-	handler           []event.Handler
+	handlers          []event.Handler
 
 	mut sync.RWMutex
 
@@ -63,6 +64,8 @@ type Source struct {
 	started     bool
 	firstInited bool
 	stop        chan struct{}
+	seInitCh    chan struct{}
+	initWg      sync.WaitGroup
 
 	initedCallback func(string)
 
@@ -87,36 +90,52 @@ const (
 type Option func(s *Source) error
 
 func WithDynamicConfigOption(addCb func(func(*bootstrap.NacosSourceArgs))) Option {
-	return Option(func(s *Source) error {
+	return func(s *Source) error {
 		addCb(s.onConfig)
 		return nil
-	})
+	}
 }
 
 func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+	var svcMocker *source.ServiceEntryMergePortMocker
+	svcMocker = source.NewServiceEntryMergePortMocker(args.MockServiceEntryName, args.ResourceNs, args.MockServiceName, map[string]string{
+		"registry": "nacos",
+	})
+
 	s := &Source{
 		args: args,
 
-		namespace:         args.Namespace,
-		group:             args.Group,
-		delay:             delay,
+		namespace:       args.Namespace,
+		group:           args.Group,
+		delay:           delay,
+		refreshPeriod:   time.Duration(args.RefreshPeriod),
+		mode:            args.Mode,
+		svcNameWithNs:   args.NameWithNs,
+		started:         false,
+		gatewayModel:    args.GatewayModel,
+		patchLabel:      args.LabelPatch,
+		svcPort:         args.SvcPort,
+		nsHost:          nsHost,
+		k8sDomainSuffix: k8sDomainSuffix,
+		firstInited:     false,
+		defaultSvcNs:    args.DefaultServiceNs,
+		resourceNs:      args.ResourceNs,
+
+		initedCallback: readyCallback,
+
 		cache:             make(map[string]*networking.ServiceEntry),
 		namingServiceList: cmap.New(),
-		refreshPeriod:     time.Duration(args.RefreshPeriod),
-		mode:              args.Mode,
-		svcNameWithNs:     args.NameWithNs,
-		started:           false,
-		gatewayModel:      args.GatewayModel,
-		patchLabel:        args.LabelPatch,
-		svcPort:           args.SvcPort,
-		nsHost:            nsHost,
-		k8sDomainSuffix:   k8sDomainSuffix,
 		stop:              make(chan struct{}),
-		firstInited:       false,
-		initedCallback:    readyCallback,
-		defaultSvcNs:      args.DefaultServiceNs,
-		resourceNs:        args.ResourceNs,
+		seInitCh:          make(chan struct{}),
+
+		seMergePortMocker: svcMocker,
 	}
+	svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
+		ev := buildEventFromMeta(event.Updated, item, meta)
+		for _, h := range s.handlers {
+			h.Handle(ev)
+		}
+	})
 
 	headers := make(map[string]string)
 	nacosHeaders := os.Getenv(clientHeadersEnv)
@@ -148,6 +167,11 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		s.namingClient = namingClient
 	}
 
+	s.initWg.Add(1)
+	if s.seMergePortMocker != nil {
+		s.initWg.Add(1)
+	}
+
 	s.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
 
 	for _, op := range options {
@@ -164,6 +188,24 @@ func generateInstanceFilters(
 	ret := source.NewSelectHookStore(svcSel)
 	ret[allServiceFilter] = source.NewSelectHook(epSel)
 	return ret
+}
+
+func (s *Source) markServiceEntryInitDone() {
+	s.mut.RLock()
+	ch := s.seInitCh
+	s.mut.RUnlock()
+	if ch == nil {
+		return
+	}
+
+	s.mut.Lock()
+	ch, s.seInitCh = s.seInitCh, nil
+	s.mut.Unlock()
+	if ch != nil {
+		log.Infof("service entry init done, close ch and call initWg.Done")
+		s.initWg.Done()
+		close(ch)
+	}
 }
 
 func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
@@ -212,6 +254,11 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}
+
+	return buildEventFromMeta(kind, se, meta), nil
+}
+
+func buildEventFromMeta(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata) event.Event {
 	source.FillRevision(meta)
 	util.FillSeLabels(se, meta)
 	return event.Event{
@@ -221,17 +268,24 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 			Metadata: meta,
 			Message:  se,
 		},
-	}, nil
+	}
 }
 
 func (s *Source) Dispatch(handler event.Handler) {
-	if s.handler == nil {
-		s.handler = make([]event.Handler, 0, 1)
+	if s.handlers == nil {
+		s.handlers = make([]event.Handler, 0, 1)
 	}
-	s.handler = append(s.handler, handler)
+	s.handlers = append(s.handlers, handler)
 }
 
 func (s *Source) Start() {
+	if s.initedCallback != nil {
+		go func() {
+			s.initWg.Wait()
+			s.initedCallback(SourceName)
+		}()
+	}
+
 	go func() {
 		if s.mode == POLLING {
 			go s.Polling()
@@ -240,6 +294,18 @@ func (s *Source) Start() {
 		}
 		<-s.stop
 	}()
+
+	if s.seMergePortMocker != nil {
+		go func() {
+			<-s.seInitCh
+
+			log.Infof("service entry init done, begin to do init se merge port refresh")
+			s.seMergePortMocker.Refresh()
+			s.initWg.Done()
+
+			s.seMergePortMocker.Start(nil)
+		}()
+	}
 }
 
 func (s *Source) Stop() {

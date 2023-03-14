@@ -116,6 +116,9 @@ type SourceArgs struct {
 	EndpointSelectors []*metav1.LabelSelector `json:"EndpointSelectors,omitempty"`
 	// Endpoint selectors for specific service, the key of the map is the service name
 	ServicedEndpointSelectors map[string][]*metav1.LabelSelector `json:"ServicedEndpointSelectors,omitempty"`
+
+	MockServiceName      string `json:"MockServiceName,omitempty"`
+	MockServiceEntryName string `json:"MockServiceEntryName,omitempty"`
 }
 
 type K8SSourceArgs struct {
