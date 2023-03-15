@@ -53,11 +53,16 @@ if [[ -z "${IGNORE_DIRTY}" && -n "$(git status -s --porcelain)" ]]; then
 fi
 
 commit=$(git rev-parse --short HEAD)
+
+if [[ -n "$GIT_TAG" ]]; then
+  echo "checkout to specified git tag: $GIT_TAG" >&2
+  git checkout "$GIT_TAG"
+fi
+
 if [[ -z "$TAG" ]]; then
   branch=$(git symbolic-ref --short -q HEAD)
-  tag=$(git show-ref --tags | grep "$commit" | awk -F"[/]" '{print $3}' | tail -1)
+  tag=${GIT_TAG:-$(git show-ref --tags | grep "$commit" | awk -F"[/]" '{print $3}' | tail -1)}
   if [ -z "$tag" ]; then
-
     if [ -z "$branch" ]; then
       export TAG="$commit" # detach case
     else
