@@ -3,15 +3,14 @@ package cache
 import (
 	"sync"
 
-	"slime.io/slime/modules/meshregistry/pkg/multicluster"
-
 	cmap "github.com/orcaman/concurrent-map"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/resource"
-	"istio.io/pkg/log"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
+
+	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 )
 
 var K8sPodCaches = &podCacheHandler{}
@@ -75,7 +74,7 @@ func (pc *podCache) add(obj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			log.Warnf("pod %s has no ip when add", pod.Name)
+			// log.Warnf("pod %s has no ip when add", pod.Name)
 			return
 		}
 		pc.cache.Set(ip, &podWrapper{&pod.ObjectMeta, pod.Spec.NodeName})
@@ -87,7 +86,7 @@ func (pc *podCache) update(oldObj, newObj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			log.Warnf("pod %s has no ip when update", pod.Name)
+			// log.Warnf("pod %s has no ip when update", pod.Name)
 			return
 		}
 		pc.cache.Set(ip, &podWrapper{&pod.ObjectMeta, pod.Spec.NodeName})
@@ -99,7 +98,7 @@ func (pc *podCache) delete(obj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			log.Warnf("pod %s has no ip when delete", pod.Name)
+			// log.Warnf("pod %s has no ip when delete", pod.Name)
 			return
 		}
 		pc.cache.Remove(ip)

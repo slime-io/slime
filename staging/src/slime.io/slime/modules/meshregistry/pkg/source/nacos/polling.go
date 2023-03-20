@@ -32,21 +32,21 @@ func (s *Source) refresh() {
 		s.started = false
 	}()
 	s.started = true
-	Scope.Infof("nacos refresh start : %d", time.Now().UnixNano())
+	log.Infof("nacos refresh start : %d", time.Now().UnixNano())
 	s.updateServiceInfo()
-	Scope.Infof("nacos refresh finsh : %d", time.Now().UnixNano())
+	log.Infof("nacos refresh finsh : %d", time.Now().UnixNano())
 	s.markServiceEntryInitDone()
 }
 
 func (s *Source) updateServiceInfo() {
 	instances, err := s.client.Instances()
 	if err != nil {
-		Scope.Errorf("get nacos instances failed: " + err.Error())
+		log.Errorf("get nacos instances failed: " + err.Error())
 		return
 	}
 	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel, s.getInstanceFilters())
 	if err != nil {
-		Scope.Errorf("convert nacos servceentry map failed: " + err.Error())
+		log.Errorf("convert nacos servceentry map failed: " + err.Error())
 		return
 	}
 	for service, oldEntry := range s.cache {
@@ -55,7 +55,7 @@ func (s *Source) updateServiceInfo() {
 			delete(s.cache, service)
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
 			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
-				Scope.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
+				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
@@ -68,7 +68,7 @@ func (s *Source) updateServiceInfo() {
 			// ADD
 			s.cache[service] = newEntry
 			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
-				Scope.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
+				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
@@ -78,7 +78,7 @@ func (s *Source) updateServiceInfo() {
 				// UPDATE
 				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
-					Scope.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
+					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}

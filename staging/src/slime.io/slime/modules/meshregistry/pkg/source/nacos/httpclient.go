@@ -165,7 +165,7 @@ func (c *client) call(api string, method string, header map[string]string, query
 		if err == nil {
 			return resp, nil
 		}
-		Scope.Debugf("call nacos api %s failed: %s", url, err)
+		log.Debugf("call nacos api %s failed: %s", url, err)
 		lastErr = err
 	}
 	return nil, lastErr
@@ -202,7 +202,7 @@ func (c *client) Instances() ([]*instanceResp, error) {
 	}
 	m, err := fetcher()
 	if err != nil {
-		Scope.Errorf("do get instances failed: %s", err)
+		log.Errorf("do get instances failed: %s", err)
 		return nil, err
 	}
 	resp := make([]*instanceResp, 0, len(m))
@@ -342,14 +342,14 @@ func (c *client) listNamespaces() ([]*nacosNamespace, error) {
 func (c *client) namespacedGroupedInstances(namespaceId, groupName string) (map[string][]*instance, error) {
 	svcs, err := c.listServices(namespaceId, groupName)
 	if err != nil {
-		Scope.Errorf("list services in namespace %q group %q failed: %s", namespaceId, groupName, err)
+		log.Errorf("list services in namespace %q group %q failed: %s", namespaceId, groupName, err)
 		return nil, err
 	}
 	svcInstances := make(map[string][]*instance, len(svcs))
 	for _, svc := range svcs {
 		instances, err := c.listInstances(namespaceId, groupName, svc)
 		if err != nil {
-			Scope.Warnf("list instances of service %q in namespace %q group %q failed: %s", namespaceId, groupName, svc, err)
+			log.Warnf("list instances of service %q in namespace %q group %q failed: %s", namespaceId, groupName, svc, err)
 			// try best
 			continue
 		}
@@ -361,14 +361,14 @@ func (c *client) namespacedGroupedInstances(namespaceId, groupName string) (map[
 func (c *client) namespacedInstances(namespaceId string) (map[string][]*instance, error) {
 	svcs, err := c.listCatalogServices(namespaceId)
 	if err != nil {
-		Scope.Errorf("list services using catalog api in namespace %q failed: %s", namespaceId, err)
+		log.Errorf("list services using catalog api in namespace %q failed: %s", namespaceId, err)
 		return nil, err
 	}
 	svcInstances := make(map[string][]*instance, len(svcs))
 	for _, svc := range svcs {
 		instances, err := c.listInstances(namespaceId, svc.GroupName, svc.Name)
 		if err != nil {
-			Scope.Warnf("list instances of service %q in namespace %q group %q failed: %s", namespaceId, svc.GroupName, svc.Name, err)
+			log.Warnf("list instances of service %q in namespace %q group %q failed: %s", namespaceId, svc.GroupName, svc.Name, err)
 			// try best
 			continue
 		}
@@ -381,14 +381,14 @@ func (c *client) namespacedInstances(namespaceId string) (map[string][]*instance
 func (c *client) allNamespacesInstances() (map[string][]*instance, error) {
 	nsList, err := c.listNamespaces()
 	if err != nil {
-		Scope.Errorf("list namespaces failed: %s", err)
+		log.Errorf("list namespaces failed: %s", err)
 		return nil, err
 	}
 	svcInstances := make(map[string][]*instance)
 	for _, ns := range nsList {
 		instances, err := c.namespacedInstances(ns.Namespace)
 		if err != nil {
-			Scope.Warnf("get all instances in namespace %q failed: %s", ns.Namespace, err)
+			log.Warnf("get all instances in namespace %q failed: %s", ns.Namespace, err)
 			// try best
 			continue
 		}
@@ -417,7 +417,7 @@ func (c *client) login() {
 	}()
 	resp, err := c.call(loginAPI, http.MethodPost, c.headers, nil, body)
 	if err != nil {
-		Scope.Warnf("login with user %s failed: %s", c.username, err)
+		log.Warnf("login with user %s failed: %s", c.username, err)
 		needResetTTL = true
 		return
 	}
@@ -427,7 +427,7 @@ func (c *client) login() {
 	}{}
 	err = json.Unmarshal(resp, &result)
 	if err != nil {
-		Scope.Warnf("parse response of login request failed: %s", err)
+		log.Warnf("parse response of login request failed: %s", err)
 		needResetTTL = true
 		return
 	}

@@ -6,8 +6,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
-
-	"istio.io/pkg/log"
 )
 
 type application struct {

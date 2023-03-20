@@ -1,13 +1,13 @@
 package eureka
 
 import (
-	log "github.com/sirupsen/logrus"
 	"math"
 	"net"
 	"sort"
 	"strings"
 
 	networking "istio.io/api/networking/v1alpha3"
+
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -116,7 +116,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, projectCode string
 			continue
 		}
 		if ins.Port.Port > math.MaxUint16 {
-			Scope.Errorf("instance port illegal %v", ins)
+			log.Errorf("instance port illegal %v", ins)
 			continue
 		}
 		// 与要求projectCode不同的服务实例跳过，实现eureka服务实例项目隔离

@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"sync"
+	"time"
+
 	"github.com/golang/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -12,13 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/watch"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
-	"os"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
-	"sync"
-	"time"
-
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/meshregistry/model"

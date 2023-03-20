@@ -4,21 +4,17 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"k8s.io/kube-openapi/pkg/common"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
+	cmap "github.com/orcaman/concurrent-map"
+	"k8s.io/kube-openapi/pkg/common"
+
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
 	"slime.io/slime/modules/meshregistry/pkg/util/cache"
-
-	cmap "github.com/orcaman/concurrent-map"
-
-	"istio.io/pkg/log"
 )
-
-var Scope = log.RegisterScope("httpserver", "httpserver debugging", 0)
 
 type HttpServer struct {
 	addr                string

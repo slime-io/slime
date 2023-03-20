@@ -3,7 +3,6 @@ package zookeeper
 import (
 	"encoding/json"
 	"fmt"
-	"istio.io/libistio/pkg/config/schema/collections"
 	"net/http"
 	"sort"
 	"strings"
@@ -13,7 +12,7 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
-	"istio.io/pkg/log"
+	"istio.io/libistio/pkg/config/schema/collections"
 
 	"slime.io/slime/modules/meshregistry/pkg/source"
 )
@@ -539,7 +538,7 @@ func (s *Source) refreshSidecarTask(stop <-chan struct{}) {
 			}
 		}
 
-		scope.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
+		log.Infof("waitRefresh %d, refresh sidecar", waitRefresh)
 		waitRefresh = 0
 		s.refreshSidecar(false)
 		waitCh = time.After(time.Second)

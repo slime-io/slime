@@ -12,9 +12,6 @@ import (
 	"time"
 
 	"github.com/gogo/protobuf/proto"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/yaml"
-
 	"istio.io/istio-mcp/pkg/config/schema/resource"
 	mcp "istio.io/istio-mcp/pkg/mcp"
 	mcpsvr "istio.io/istio-mcp/pkg/mcp/server"
@@ -22,10 +19,16 @@ import (
 	mcpmodel "istio.io/istio-mcp/pkg/model"
 	"istio.io/libistio/pkg/config/event"
 	resource2 "istio.io/libistio/pkg/config/resource"
-	"istio.io/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/yaml"
+
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "mcpoverxds")
 
 type McpController struct {
 	ctx                context.Context
@@ -90,12 +93,13 @@ func (c *McpController) HandleClientsInfo(w http.ResponseWriter, r *http.Request
 // HandleXdsCache
 // query: format=yaml&layout=plain&k8sRsc=true will get all config in k8s format like kubectl get service -o yaml
 // params:
-//   res or typeUrl: ...
-//   ns: namespace
-//   ver: version, will return configs which is newer than that
-//   format: see below constants
-//   layout: see below constants
-//   k8sRsc: whether to convert config to k8s resource format obj
+//
+//	res or typeUrl: ...
+//	ns: namespace
+//	ver: version, will return configs which is newer than that
+//	format: see below constants
+//	layout: see below constants
+//	k8sRsc: whether to convert config to k8s resource format obj
 func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 	const (
 		LayoutGroupByGvk = "gvk"   // map[typeUrl][]config

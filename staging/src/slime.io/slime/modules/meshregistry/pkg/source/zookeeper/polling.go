@@ -29,24 +29,24 @@ func (s *Source) Polling() {
 }
 
 func (s *Source) refresh() {
-	scope.Infof("zk refresh start : %d", time.Now().UnixNano())
+	log.Infof("zk refresh start : %d", time.Now().UnixNano())
 	children, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode)
 	if err != nil {
-		scope.Errorf("zk path %s get child error: %s", s.RegisterRootNode, err.Error())
+		log.Errorf("zk path %s get child error: %s", s.RegisterRootNode, err.Error())
 		return
 	}
 	for _, child := range children {
 		s.iface(child)
 	}
 	s.handleNodeDelete(children)
-	scope.Infof("zk refresh finish : %d", time.Now().UnixNano())
+	log.Infof("zk refresh finish : %d", time.Now().UnixNano())
 	s.markServiceEntryInitDone()
 }
 
 func (s *Source) iface(service string) {
 	providerChild, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ProviderNode)
 	if err != nil {
-		scope.Errorf("zk %s get provider error: %s", service, err.Error())
+		log.Errorf("zk %s get provider error: %s", service, err.Error())
 		return
 	}
 
@@ -56,7 +56,7 @@ func (s *Source) iface(service string) {
 	} else {
 		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ConsumerNode)
 		if err != nil {
-			scope.Errorf("zk %s get consumer error: %s", service, err.Error())
+			log.Errorf("zk %s get consumer error: %s", service, err.Error())
 		}
 	}
 
@@ -105,7 +105,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		if value, exist := seCache.Get(serviceKey); !exist {
 			seCache.Set(serviceKey, newSeWithMeta)
 			if ev, err := buildSeEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
-				scope.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
@@ -116,7 +116,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 			}
 			seCache.Set(serviceKey, newSeWithMeta)
 			if ev, err := buildSeEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
-				scope.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
@@ -149,10 +149,10 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
 		ev, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
 		if err != nil {
-			scope.Errorf("delete svc failed, case: %v", err.Error())
+			log.Errorf("delete svc failed, case: %v", err.Error())
 			continue
 		}
-		scope.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
+		log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 		for _, h := range s.handlers {
 			h.Handle(ev)
 		}
@@ -181,12 +181,12 @@ func (s *Source) handleNodeDelete(childrens []string) {
 					if seValue, ok := v.(*ServiceEntryWithMeta); ok {
 						seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
 						if event, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil); err == nil {
-							scope.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
+							log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 							for _, h := range s.handlers {
 								h.Handle(event)
 							}
 						} else {
-							scope.Errorf("delete(update) svc failed, case: %v", err.Error())
+							log.Errorf("delete(update) svc failed, case: %v", err.Error())
 						}
 					}
 				}
