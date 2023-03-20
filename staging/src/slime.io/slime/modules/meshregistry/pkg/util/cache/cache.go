@@ -3,7 +3,12 @@ package cache
 import (
 	cmap "github.com/orcaman/concurrent-map"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "util/cache")
 
 type caches map[string]objectCache
 

@@ -15,21 +15,10 @@
 package server
 
 import (
-	"k8s.io/client-go/tools/cache"
 	"net"
 	"net/http"
-	slimebootstrap "slime.io/slime/framework/bootstrap"
-	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
 	"sync"
 	"time"
-
-	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
-	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
-	"slime.io/slime/modules/meshregistry/pkg/multicluster"
-	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
-	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
-	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
-	utilcache "slime.io/slime/modules/meshregistry/pkg/util/cache"
 
 	cmap "github.com/orcaman/concurrent-map"
 	"google.golang.org/grpc"
@@ -41,8 +30,18 @@ import (
 	"istio.io/libistio/pkg/config/schema"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/mcp/snapshot"
-	"istio.io/pkg/log"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
+
+	slimebootstrap "slime.io/slime/framework/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
+	"slime.io/slime/modules/meshregistry/pkg/multicluster"
+	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
+	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
+	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
+	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
+	utilcache "slime.io/slime/modules/meshregistry/pkg/util/cache"
 )
 
 // Processing component is the main config processing component that will listen to a config source and publish
@@ -348,9 +347,6 @@ func (p *Processing) Stop() {
 		p.listener = nil
 	}
 	p.listenerMutex.Unlock()
-
-	// final attempt to purge buffered logs
-	_ = log.Sync()
 }
 
 func (p *Processing) getListener() net.Listener {

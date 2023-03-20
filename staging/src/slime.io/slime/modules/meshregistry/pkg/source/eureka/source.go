@@ -9,18 +9,19 @@ import (
 	"sync"
 	"time"
 
-	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
-
-	"slime.io/slime/modules/meshregistry/pkg/util"
-
-	"istio.io/libistio/pkg/config/schema/collections"
-	"slime.io/slime/modules/meshregistry/pkg/source"
-
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
-	"istio.io/pkg/log"
+	"istio.io/libistio/pkg/config/schema/collections"
+
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/source"
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "eureka")
 
 type Source struct {
 	// worker        *util.Worker
@@ -52,8 +53,6 @@ type Source struct {
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 	client            Client
 }
-
-var Scope = log.RegisterScope("eureka", "eureka debugging", 0)
 
 const (
 	SourceName = "eureka"

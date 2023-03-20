@@ -11,10 +11,9 @@ import (
 	"strconv"
 	"strings"
 
-	"istio.io/pkg/log"
-	"slime.io/slime/modules/meshregistry/pkg/util"
-
 	networking "istio.io/api/networking/v1alpha3"
+
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
 const (
@@ -156,7 +155,7 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 		}
 	}()
 	if providers == nil || len(providers) == 0 {
-		scope.Debugf("%s no provider", service)
+		log.Debugf("%s no provider", service)
 		return serviceEntryByServiceKey
 	}
 
@@ -171,7 +170,7 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 
 		addr, portNum, err := parseAddr(providerParts[2])
 		if err != nil {
-			scope.Errorf("invalid provider ip or port %s of %s", provider, service)
+			log.Errorf("invalid provider ip or port %s of %s", provider, service)
 			continue
 		}
 		port := convertPort(portNum, !gatewayMode)

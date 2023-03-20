@@ -3,7 +3,6 @@ package nacos
 import (
 	"encoding/json"
 	"fmt"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net/http"
 	"os"
 	"reflect"
@@ -17,12 +16,16 @@ import (
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
-	"istio.io/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "nacos")
 
 type Source struct {
 	args *bootstrap.NacosSourceArgs // should only be accessed in `onConfig`
@@ -73,8 +76,6 @@ type Source struct {
 	// all services are applicable to this filter.
 	instanceFilters source.SelectHookStore
 }
-
-var Scope = log.RegisterScope("nacos", "nacos debugging", 0)
 
 const (
 	SourceName       = "nacos"

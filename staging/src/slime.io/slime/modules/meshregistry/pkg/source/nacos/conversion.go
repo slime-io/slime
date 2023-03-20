@@ -85,7 +85,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, filters source.Sel
 			continue
 		}
 		if ins.Port > math.MaxUint16 {
-			Scope.Errorf("instance port illegal %v", ins)
+			log.Errorf("instance port illegal %v", ins)
 			continue
 		}
 

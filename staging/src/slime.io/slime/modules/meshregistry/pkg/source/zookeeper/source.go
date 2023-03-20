@@ -20,14 +20,15 @@ import (
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/collections"
-	"istio.io/pkg/log"
 
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-var scope = log.RegisterScope("zk", "zk debugging", 0)
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "zk")
 
 const (
 	SourceName                = "zookeeper"
@@ -193,7 +194,7 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 			}
 		}))
 		if err != nil {
-			scope.Infof("re connect zk error %v", err)
+			log.Infof("re connect zk error %v", err)
 			time.Sleep(time.Second)
 		} else {
 			// replace the connection

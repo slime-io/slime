@@ -4,7 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "util")
 
 var ValueError = errors.New("value error")
 

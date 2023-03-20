@@ -40,7 +40,7 @@ func (s *Source) EndpointUpdate(provider, consumer []string, path string) {
 }
 
 func (s *Source) Watching() {
-	scope.Info("zk source start to watching")
+	log.Info("zk source start to watching")
 	sw := ServiceWatcher{
 		conn:               s.Con,
 		rootPath:           s.RegisterRootNode,
@@ -124,7 +124,7 @@ type EndpointWatcher struct {
 
 // Start should not block
 func (ew *EndpointWatcher) Start(ctx context.Context) {
-	scope.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
+	log.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
 	providerPath, consumerPath := providerPathSuffix, consumerPathSuffix
 	if ew.gatewayMode {
 		consumerPath = "" // gw does not need consumer data
@@ -161,7 +161,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 
 		paths, _, eventCh, err := ew.conn.Load().(*zk.Conn).ChildrenW(path)
 		if err != nil {
-			scope.Debugf("endpointWatcher %q watch %q failed: %v", ew.servicePath, path, err)
+			log.Debugf("endpointWatcher %q watch %q failed: %v", ew.servicePath, path, err)
 			if !first {
 				time.Sleep(b.Duration())
 				continue
@@ -169,6 +169,8 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		} else {
 			b.Reset()
 		}
+
+		log.Debugf("endpointWatcher %q watch %q got: %v", ew.servicePath, path, paths)
 
 		select {
 		case ch <- simpleWatchItem{
@@ -219,14 +221,14 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 		select {
 		case <-ew.signalExit:
 			ew.serviceDeleteHandler()
-			scope.Infof("endpointWatcher %q exit due to service deleted", ew.servicePath)
+			log.Infof("endpointWatcher %q exit due to service deleted", ew.servicePath)
 			return
 		default:
 		}
 
 		select {
 		case <-ctx.Done():
-			scope.Debugf("endpointWatcher %q exit due to ctx.Done()", ew.servicePath)
+			log.Debugf("endpointWatcher %q exit due to ctx.Done()", ew.servicePath)
 			return
 		default:
 		}
@@ -341,14 +343,14 @@ func (w *worker) processItem(ctx context.Context) bool {
 	if e.etype == EventTypeDelete && ok {
 		ew := watcher.(*EndpointWatcher)
 		ew.Exit() // may block other service events from being processed？
-		scope.Infof("endpoint watcher %q exited", ew.servicePath)
+		log.Infof("endpoint watcher %q exited", ew.servicePath)
 		w.cache.Remove(e.path)
 		return true
 	}
 	if e.etype == EventTypeCreate && !ok {
 		ew := NewEndpointWatcher(e.path, w.epWatcherOpts)
 		w.cache.Set(e.path, ew)
-		scope.Infof("service worker start a new endpoint watcher for %s", e.path)
+		log.Infof("service worker start a new endpoint watcher for %s", e.path)
 		ew.Start(ctx)
 		return true
 	}
@@ -439,9 +441,9 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 func (sw *ServiceWatcher) handleSvcs(svcs []string) {
 	var oldSvcs []string
 	sw.svcs, oldSvcs = svcs, sw.svcs
-	scope.Debugf("service watcher handle event with current services: %v, last services: %v", sw.svcs, oldSvcs)
+	log.Debugf("service watcher handle event with current services: %v, last services: %v", sw.svcs, oldSvcs)
 	deleted, created := calculateDiff(oldSvcs, sw.svcs)
-	scope.Debugf("service watcher calculate diff with delete: %v, create: %v", deleted, created)
+	log.Debugf("service watcher calculate diff with delete: %v, create: %v", deleted, created)
 	// dispatch deleted service first
 	for _, d := range deleted {
 		sw.dispatch(ServiceEvent{

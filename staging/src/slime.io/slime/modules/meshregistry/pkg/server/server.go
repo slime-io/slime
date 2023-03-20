@@ -9,7 +9,12 @@ import (
 	"os"
 	slimebootstrap "slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "server")
 
 type Server struct {
 	p *Processing

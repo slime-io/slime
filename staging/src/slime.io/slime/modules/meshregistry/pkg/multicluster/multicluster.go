@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	"istio.io/libistio/galley/pkg/config/source/kube"
+	"istio.io/libistio/galley/pkg/config/source/kube/rt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -21,10 +23,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
 
-	"istio.io/libistio/galley/pkg/config/source/kube"
-	"istio.io/libistio/galley/pkg/config/source/kube/rt"
-	"istio.io/pkg/log"
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 )
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "multicluster")
 
 const (
 	multiClusterSecretLabel = "istio/multiCluster"
