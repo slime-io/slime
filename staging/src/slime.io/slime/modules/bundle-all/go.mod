@@ -34,7 +34,6 @@ require (
 	github.com/envoyproxy/go-control-plane v0.11.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v0.9.1 // indirect
 	github.com/evanphx/json-patch v4.11.0+incompatible // indirect
-	github.com/fatih/color v1.12.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
 	github.com/go-logr/logr v0.4.0 // indirect
@@ -42,7 +41,6 @@ require (
 	github.com/go-openapi/jsonreference v0.19.5 // indirect
 	github.com/go-openapi/swag v0.19.14 // indirect
 	github.com/go-zookeeper/zk v1.0.3 // indirect
-	github.com/gobuffalo/flect v0.2.2 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
@@ -63,8 +61,6 @@ require (
 	github.com/jpillora/backoff v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
-	github.com/mattn/go-colorable v0.1.8 // indirect
-	github.com/mattn/go-isatty v0.0.12 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
@@ -91,7 +87,6 @@ require (
 	go.uber.org/multierr v1.6.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20211108221036-ceb1ce70b4fa // indirect
-	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
 	golang.org/x/sync v0.1.0 // indirect
@@ -99,7 +94,6 @@ require (
 	golang.org/x/term v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
 	golang.org/x/time v0.0.0-20220722155302-e5dcc9cfc0b9 // indirect
-	golang.org/x/tools v0.3.0 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
@@ -127,7 +121,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e // indirect
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a // indirect
 	sigs.k8s.io/controller-runtime v0.10.3 // indirect
-	sigs.k8s.io/controller-tools v0.6.0 // indirect
 	sigs.k8s.io/service-apis v0.0.0-20200227172328-b9010cfacdbe // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
@@ -135,16 +128,17 @@ require (
 
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
-	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20220815023449-add01187ad4f
+	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20230210055653-e5ab5bf5cb30
 	github.com/prometheus/common => github.com/prometheus/common v0.26.0
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230105060927-109703897996
 
 	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855
-	slime.io/slime/framework => ../../framework
-	slime.io/slime/modules/lazyload => ../../staging/src/slime.io/slime/modules/lazyload
-	slime.io/slime/modules/limiter => ../../staging/src/slime.io/slime/modules/limiter
-	slime.io/slime/modules/meshregistry => ../../staging/src/slime.io/slime/modules/meshregistry
-	slime.io/slime/modules/plugin => ../../staging/src/slime.io/slime/modules/plugin
+
+	slime.io/slime/framework => ./../../../../../../framework
+	slime.io/slime/modules/lazyload => ./../lazyload
+	slime.io/slime/modules/limiter => ./../limiter
+	slime.io/slime/modules/meshregistry => ./../meshregistry
+	slime.io/slime/modules/plugin => ./../plugin
 )
