@@ -39,7 +39,7 @@ Slime core capabilities include intelligent traffic management, intelligent oper
   - [configure lazy loading](./staging/src/slime.io/slime/modules/lazyload): no need to configure SidecarScope, automatically load configuration and service discovery information on demand, solving the problem of full volume push. The source of the service call relationship supports Prometheus or Accesslog
   - [mesh(service) repository](./staging/src/slime.io/slime/modules/meshregistry): helps istio to quickly integrate various service registries
   - File distribution management (filemanager, to be provided later)
-  - Command line interaction (i9s)
+  - Command line interaction [i9s](https://github.com/slime-io/i9s)
   - Patrol (patrol)
   - Troubleshooting tools (tracetio)
 

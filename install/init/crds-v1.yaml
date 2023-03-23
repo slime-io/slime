@@ -75,39 +75,6 @@ spec:
                   items:
                     type: object
                     properties:
-                      limiter:
-                        type: object
-                        description: 'limiter parameters'
-                        properties:
-                          disableGlobalRateLimit:
-                            type: boolean
-                            description: 'disable GlobalRateLimit'
-                          disableAdaptive:
-                            type: boolean
-                            description: 'disable use promql'
-                          enableServiceEntry:
-                            type: boolean
-                            description: 'use se from from framework'
-                          disableInsertLocalRateLimit:
-                            type: boolean
-                            description: 'it will not generate envoy.filters.http.local_ratelimit insert before http.router when true'
-                          disableInsertGlobalRateLimit:
-                            type: boolean
-                            description: 'it will not generate envoy.filters.http.ratelimit insert before http.router when true'
-                          rlsConfigMap:
-                            type: object
-                            description: 'specify the rls namespaces'
-                            x-kubernetes-preserve-unknown-fields: true
-                          domain:
-                            description: 'specify domain, it is useful in global ratelimiter'
-                            type: string
-                          rls:
-                            description: 'specify rls server address, if disableGlobalRateLimit if false'
-                            type: object
-                            x-kubernetes-preserve-unknown-fields: true
-                      plugin:
-                        type: object
-                        x-kubernetes-preserve-unknown-fields: true
                       global:
                         type: object
                         properties:
@@ -171,40 +138,6 @@ spec:
                                 type: integer
                               burst:
                                 type: integer
-                      fence:
-                        type: object
-                        properties:
-                          wormholePort:
-                            description: "service ports enable lazyload"
-                            type: array
-                            items:
-                              type: string
-                          autoFence:
-                            type: boolean
-                            description: "whether enable ServiceFence auto generating, default value is false"
-                          namespace:
-                            type: array
-                            description: "the namespace list which enable lazyload"
-                            items:
-                              type: string
-                          dispatches:
-                            type: array
-                            description: 'custom outside dispatch traffic rules'
-                            items:
-                              type: object
-                              x-kubernetes-preserve-unknown-fields: true
-                          domainAliases:
-                            type: array
-                            description: 'can convert to one or many domain alias rules'
-                            items:
-                              type: object
-                              x-kubernetes-preserve-unknown-fields: true
-                          defaultFence:
-                            description: 'default behavior of create fence or not when autoFence is true, default value is false'
-                            type: boolean
-                          autoPort:
-                            description: 'whether enable http service port auto management, default value is false'
-                            type: boolean
                       metric:
                         type: object
                         properties:

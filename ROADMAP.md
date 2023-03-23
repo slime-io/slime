@@ -39,7 +39,7 @@
 
 
 
-## Slime v0.5.0 (Release in progress)
+## Slime v0.5.0 (Released)
 
 **Traffic Management**
 
@@ -61,8 +61,19 @@
 - Support for registering HTTP redirection interfaces
 
 
+## Slime v0.6.0 (Released)
 
-## Slime v0.6.0 (In Planning)
+- Released new module meshregistry for interfacing with multiple registries
+- i9s provide universal expansion interface
+- Standardize issue processing, pr processing, posting, community meeting mechanism and other content
+- Improve tutorials to help new users join the community
+
+## Slime v0.7.0
+
+- Optimized many of the problems encountered in practice
+
+
+## Slime v0.8.0 (In Planning)
 
 **Traffic Management**
 
@@ -72,27 +83,10 @@
 **Operation Management**
 
 - [Lazyload] Release of Service Mesh accurate pushing standard API
-- [Lazyload] Support for multi-service registration centers
 
 **Extension Management**
 
 - [Plugin] Support for service level plugin distribution
-
-**Engineering**
-
-- Compatiable with Kubernetes 1.22+
-
-
-
-## Slime v0.7.0 (In Planning)
-
-**Traffic Management**
-
-- [SmartMeltdown] Release of Service Mesh meltdown standard API
-- [SmartMeltdown] Release of New smart meltdown module
-
-
-
 
 
 # 路线图
@@ -123,7 +117,7 @@
 
 
 
-## Slime v0.5.0（发布中）
+## Slime v0.5.0（已发布）
 
 **流量管理**
 
@@ -145,8 +139,25 @@
 - 支持注册 HTTP 重定向接口
 
 
+## Slime v0.6.0（已发布）
 
-## Slime v0.6.0（规划中）
+**扩展管理**
+-【注册中心】发布新模块meshregistry，用于对接多注册中心
+
+**运维管理**
+-【i9s】提供通用扩展接口
+
+**工程**
+- 规范issue处理、pr处理、发版、社区会议机制等内容 
+- 完善教程，帮助新用户加入社区
+
+
+## Slime v0.7.0（发布中）
+
+- 优化处理了很多实践过程中遇到的问题
+
+
+## Slime v0.8.0（规划中）
 
 **流量管理**
 
@@ -156,24 +167,13 @@
 **运维管理**
 
 - 【配置懒加载】发布服务网格配置精准推送标准 API
-- 【配置懒加载】支持多服务注册中心
 
 **扩展管理**
 
 - 【插件管理】支持服务级别插件下发
 
-**工程**
 
-- 适配 Kubernetes 1.22+
+## Slime v0.9.0（规划中）
 
-
-
-## Slime v0.7.0（规划中）
-
-**流量管理**
-
-- 【智能熔断】发布服务网格熔断标准 API
-- 【智能熔断】发布智能熔断新模块
-
-
-
+**运维管理**
+- 前端控制台
