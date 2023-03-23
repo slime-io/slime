@@ -121,7 +121,6 @@ type Module struct {
 	Enable  bool                  `protobuf:"varint,7,opt,name=enable,proto3" json:"enable,omitempty"`
 	General *lazyloadconfig.Fence `protobuf:"bytes,8,opt,name=general,proto3" json:"general,omitempty"`
 	Bundle  *config.Bundle        `protobuf:"bytes,9,opt,name=bundle,proto3" json:"bundle,omitempty"`
-	Mode    config.Config_Mode    `protobuf:"varint,10,opt,name=mode,proto3,enum=slime.config.v1alpha1.Config_Mode" json:"mode,omitempty"`
 	// like bundle item kind, necessary if not bundle
 	Kind string `protobuf:"bytes,11,opt,name=kind,proto3" json:"kind,omitempty"`
 }
