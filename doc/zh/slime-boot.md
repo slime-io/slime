@@ -25,10 +25,10 @@
 
 **注意**：在k8s v1.22以及之后的版本中，只支持`apiextensions.k8s.io/v1`版本的`CRD`，不再支持`apiextensions.k8s.io/v1beta1`版本`CRD`，详见[k8s官方文档](https://kubernetes.io/docs/reference/using-api/deprecation-guide/#customresourcedefinition-v122)，而 k8s v1.16~v1.21 两个版本都能用
 
-1. 对于k8s v1.22以及之后版本，需要手动安装[v1版本](../../install/init/crds-v1.yaml)，而之前版本可手动安装[v1版本](../../install/init/crds-v1.yaml)或者[v1beta1版本](../../install/init/crds.yaml)
+1. 对于k8s v1.22以及之后版本，需要手动安装[v1版本-crd](../../install/init/crds-v1.yaml)，而之前版本可手动安装[v1版本-crd](../../install/init/crds-v1.yaml)或者[v1beta1版本-crd](../../install/init/crds.yaml)
 2. 手动安装 [deployment/slime-boot](../../install/init/deployment_slime-boot.yaml)
 
-或者执行以下命令安装`CRD`和`deployment/slime-boot`，需要注意的是如果网络无法访问，你可以在以下目录发现相关文档 `slime/install/init/`
+或者执行以下命令安装`slimeboot CRD`和`deployment/slime-boot`，需要注意的是如果网络无法访问，你可以在项目的`slime/install/init/`目录发现相关文档 
 
 - k8s version >= v1.22
 ```shell
@@ -55,6 +55,7 @@ kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commi
 ```
 
 ## 参数介绍
+
 根据之前的章节，我们知道用户通过下发`SlimeBoot`的方式，安装`slime`组件，在正常使用过程中，用户使用的`SlimeBoot CR`主要包含以下几项
 
 - image: 定义镜像相关的参数
@@ -129,8 +130,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.6.0_linux_amd64
+    repository: docker.io/slimeio/slime-bundle-all
+    tag: v0.7.0
   module:
     - name: bundle
       enable: true
@@ -180,7 +181,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.6.0_linux_amd64
+    tag: v0.7.0
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -188,9 +189,9 @@ spec:
       kind: lazyload
       enable: true
       general:
-        autoPort: false
+        autoPort: true
         autoFence: true
-        defaultFence: false   
+        defaultFence: true   
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
       global:
@@ -212,15 +213,9 @@ spec:
       enable: true
       sidecarInject:
         enable: true # should be true
-        # mode definition:
-        # "pod": sidecar auto-inject on pod level, need provide labels for injection
-        # "namespace": sidecar auto-inject on namespace level, no need to provide labels for injection
-        # if globalSidecarMode is cluster, global-sidecar will be deployed in slime namespace, which does not enable auto-inject on namespace level, mode can only be "pod".
-        # if globalSidecarMode is namespace, depending on the namespace definition, mode can be "pod" or "namespace".
         mode: pod
         labels: # optional, used for sidecarInject.mode = pod
           sidecar.istio.io/inject: "true"
-          # istio.io/rev: canary # use control plane revisions
       resources:
         requests:
           cpu: 200m
@@ -230,7 +225,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.6.0_linux_amd64
+        tag: v0.7.0
       probePort: 20000
 ```
 
@@ -259,7 +254,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.6.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: limiter
       kind: limiter
@@ -268,11 +263,6 @@ spec:
         disableGlobalRateLimit: true
         disableAdaptive: true
         disableInsertGlobalRateLimit: true
-      global:
-        log:
-          logLevel: info
-        configSources:
-          - address: ss:// 
 ```
 
 ### plugin 安装样例
@@ -296,14 +286,11 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.6.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: plugin
       kind: plugin
       enable: true
-      global:
-        log:
-          logLevel: info
 ```
 
 ### meshregistry安装样例
@@ -328,14 +315,11 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-meshregistry
-    tag: v0.6.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: meshregistry
       kind: meshregistry
       enable: true
-      global:
-        log:
-          logLevel: info
       general:
         LEGACY:
           MeshConfigFile: ""
@@ -375,8 +359,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.6.0_linux_amd64
+    repository: docker.io/slimeio/slime-bundle-all
+    tag: v0.7.0
   module:
     - name: bundle
       enable: true
@@ -393,16 +377,14 @@ spec:
       global:
         log:
           logLevel: info
-        configSources:
-        - address: ss://
     - name: bundle #与上面的name一致TODO
       kind: lazyload
       enable: true
       mode: BundleItem
       general:
-        autoPort: false
+        autoPort: true
         autoFence: true
-        defaultFence: false
+        defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
         - "9080"
       global:
@@ -451,7 +433,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.6.0_linux_amd64
+        tag: v0.7.0
       probePort: 20000 # health probe port
       port: 80 # global-sidecar default svc port
       legacyFilterName: true
@@ -474,7 +456,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.6.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: limiter
       kind: limiter
@@ -484,12 +466,8 @@ spec:
         disableAdaptive: true
         disableInsertGlobalRateLimit: true
       global:
-        log:
-          logLevel: info
-        configSources:
-          - address: ss:// 
         misc:
-          enable-leader-election: "on"  #多副本
+          enable-leader-election: "on"
 ```
 
 

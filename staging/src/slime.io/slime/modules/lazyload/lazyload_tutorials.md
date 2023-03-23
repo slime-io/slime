@@ -100,12 +100,19 @@ This step is to prepare the CRD needed for lazy loading and the launcher for the
 
 The installation files are slightly different for different k8s versions, see [SlimeBoot Introduction and Use - Preparation](../../../../../../doc/en/slime-boot.md#Preparation)
 
-Here we assume that k8s version is 1.16+
-
-```sh
+- k8s version >= v1.22
+```shell
 export tag_or_commit=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
 kubectl create ns mesh-operator
 kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds-v1.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
+```
+
+- k8s v1.16 <= version < 1.22
+```shell
+export tag_or_commit=$(curl -s https://api.github.com/repos/slime-io/slime/tags | grep 'name' | cut -d\" -f4 | head -1)
+kubectl create ns mesh-operator
+kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds.yaml"
 kubectl apply -f "https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
 ```
 
@@ -124,7 +131,8 @@ slime-boot-6f778b75cd-4v675       1/1     Running   0          26s
 apply `SlimeBoot`
 
 ```sh
-$ echo 'apiVersion: config.netease.com/v1alpha1
+$ echo '
+apiVersion: config.netease.com/v1alpha1
 kind: SlimeBoot
 metadata:
   name: lazyload
@@ -133,44 +141,41 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.5.0_linux_amd64
-  resources:
-    requests:
-      cpu: 300m
-      memory: 300Mi
-    limits:
-      cpu: 600m
-      memory: 600Mi
+    tag: v0.7.0
+  namespace: mesh-operator
+  istioNamespace: istio-system
   module:
-    - name: lazyload # custom value
-      kind: lazyload # should be "lazyload"
+    - name: lazyload
+      kind: lazyload
       enable: true
-      general: # replace previous "fence" field
-        autoPort: false
+      general:
+        autoPort: true
         autoFence: true
-        defaultFence: false
+        defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
       global:
         log:
           logLevel: info
         misc:
-          globalSidecarMode: cluster # inform the mode of global-sidecar
+          globalSidecarMode: cluster # the mode of global-sidecar
           metricSourceType: accesslog # indicate the metric source
+        slimeNamespace: mesh-operator
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+    limits:
+      cpu: 600m
+      memory: 600Mi        
   component:
     globalSidecar:
       enable: true
       sidecarInject:
         enable: true # should be true
-        # mode definition:
-        # "pod": sidecar auto-inject on pod level, need provide labels for injection
-        # "namespace": sidecar auto-inject on namespace level, no need to provide labels for injection
-        # if globalSidecarMode is cluster, global-sidecar will be deployed in slime namespace, which does not enable auto-inject on namespace level, mode can only be "pod".
-        # if globalSidecarMode is namespace, depending on the namespace definition, mode can be "pod" or "namespace".
         mode: pod
         labels: # optional, used for sidecarInject.mode = pod
           sidecar.istio.io/inject: "true"
-          # istio.io/rev: canary # use control plane revisions
       resources:
         requests:
           cpu: 200m
@@ -180,7 +185,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.7.0
       probePort: 20000
 ' > /tmp/lazyload-slimeboot.yaml
 

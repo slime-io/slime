@@ -129,8 +129,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.5.0_linux_amd64
+    repository: docker.io/slimeio/slime-bundle-all
+    tag: xx
   module:
     - name: bundle
       enable: true
@@ -180,7 +180,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.5.0_linux_amd64
+    tag: v0.7.0
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -230,7 +230,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.7.0
       probePort: 20000
 ```
 
@@ -259,7 +259,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.5.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: limiter
       kind: limiter
@@ -268,11 +268,6 @@ spec:
         disableGlobalRateLimit: true
         disableAdaptive: true
         disableInsertGlobalRateLimit: true
-      global:
-        log:
-          logLevel: info
-        configSources:
-          - address: ss:// 
 ```
 
 ### Sample plugin installation
@@ -297,14 +292,11 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.5.0_linux_amd64
+    tag: v0.7.0
   module:
     - name: plugin
       kind: plugin
       enable: true
-      global:
-        log:
-          logLevel: info
 ```
 
 ### Sample bundle mode installation
@@ -321,8 +313,8 @@ metadata:
 spec:
   image:
     pullPolicy: Always
-    repository: docker.io/slimeio/slime-bundle-example-all
-    tag: v0.5.0_linux_amd64
+    repository: docker.io/slimeio/slime-bundle-all
+    tag: v0.7.0
   module:
     - name: bundle
       enable: true
@@ -362,9 +354,6 @@ spec:
         disableGlobalRateLimit: true
         disableAdaptive: true
         disableInsertGlobalRateLimit: true
-      global:
-        configSources:
-          - address: ss://
     - name: plugin
       kind: plugin
       enable: true
@@ -390,7 +379,7 @@ spec:
           memory: 1024Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.7.0_linux_amd64
       probePort: 20000 # health probe port
       port: 80 # global-sidecar default svc port
       legacyFilterName: true

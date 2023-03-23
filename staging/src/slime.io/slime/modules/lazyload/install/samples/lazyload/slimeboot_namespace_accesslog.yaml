@@ -8,35 +8,43 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.5.0_linux_amd64
+    tag: v0.7.0
+  namespace: mesh-operator
+  istioNamespace: istio-system
   module:
-    - name: lazyload # custom value
-      kind: lazyload # should be "lazyload"
+    - name: lazyload
+      kind: lazyload
       enable: true
-      general: # replace previous "fence" field
+      general:
+        autoPort: true
+        autoFence: true
+        defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
-          - "80"
           - "9080"
         namespace: # replace to your service's namespace which will use lazyload, and extend the list in case of multi namespaces
           - default
       global:
+        log:
+          logLevel: info
         misc:
-          globalSidecarMode: namespace # inform the mode of global-sidecar
+          globalSidecarMode: namespace # the mode of global-sidecar
           metricSourceType: accesslog # indicate the metric source
+        slimeNamespace: mesh-operator
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+    limits:
+      cpu: 600m
+      memory: 600Mi
   component:
     globalSidecar:
       enable: true
       sidecarInject:
         enable: true # should be true
-        # mode definition:
-        # "pod": sidecar auto-inject on pod level, need provide labels for injection
-        # "namespace": sidecar auto-inject on namespace level, no need to provide labels for injection
-        # if globalSidecarMode is cluster, global-sidecar will be deployed in slime namespace, which does not enable auto-inject on namespace level, mode can only be "pod".
-        # if globalSidecarMode is namespace, depending on the namespace definition, mode can be "pod" or "namespace".
         mode: namespace
-        # labels: # optional, used for sidecarInject.mode = pod
-          # sidecar.istio.io/inject: "true"
-          # istio.io/rev: canary # using control plane revisions
+        labels: # optional, used for sidecarInject.mode = pod
+          sidecar.istio.io/inject: "true"
       resources:
         requests:
           cpu: 200m
@@ -46,4 +54,5 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.5.0_linux_amd64
+        tag: v0.7.0
+      probePort: 20000

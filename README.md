@@ -40,14 +40,14 @@ Slime 核心能力包括智能流量管理、智能运维管理、智能扩展�
   - [配置懒加载](./staging/src/slime.io/slime/modules/lazyload)：无须配置SidecarScope，自动按需加载配置和服务发现信息 ，解决了全量推送的问题。服务调用关系的来源支持Prometheus或者Accesslog
   - [网格（服务）仓库](./staging/src/slime.io/slime/modules/meshregistry)：帮助istio快速集成各种服务注册中心
   - 文件分发管理（filemanager，后续提供）
-  - 命令行交互（i9s）
+  - 命令行交互 [i9s](https://github.com/slime-io/i9s)
   - 巡检（patrol）
   - 排障工具（tracetio）
 
 - **智能插件管理**：针对服务网格缺少高效的插件管理工具的问题，提供批量插件管理能力，简化服务网格数据面插件管理的难度
   - [Http插件管理](./staging/src/slime.io/slime/modules/plugin)：使用新的的CRD pluginmanager/envoyplugin包装了可读性及可维护性差的envoyfilter，使得插件扩展更为便捷。
 
-后续我们会开源更多的功能模块。
+目前我们开源了自适应限流、配置懒加载、网格（服务）仓库、i9s、Http插件管理，后续我们会开源更多的功能模块。
 
 
 ## 架构
@@ -79,7 +79,7 @@ Slime-module
 - [懒加载使用](./staging/src/slime.io/slime/modules/lazyload/README.md)
 - [插件管理使用](./staging/src/slime.io/slime/modules/plugin/README.md)
 - [自适应限流使用](./staging/src/slime.io/slime/modules/limiter/README.md)
-- [网格（服务）仓库](./staging/src/slime.io/slime/modules/meshregistry)：帮助istio快速集成各种服务注册中心。
+- [网格（服务）仓库](./staging/src/slime.io/slime/modules/meshregistry/README_CH.md)
 
 [E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 
