@@ -434,7 +434,14 @@ $ kubectl delete -f "https://raw.githubusercontent.com/slime-io/slime/v0.5.0/ins
 卸载 lazyload
 
 ```sh
-$ kubectl delete -f /tmp/lazyload-slimeboot.yaml
+kubectl delete -f /tmp/lazyload-slimeboot.yaml
+kubectl delete envoyfilter to-global-sidecar -n istio-system
+```
+
+卸载 servicefence
+
+```
+for i in $(kubectl get ns --no-headers |awk '{print $1}');do kubectl delete servicefence -n $i --all;done
 ```
 
 卸载 slime-boot
