@@ -11,7 +11,7 @@ first_hub=$(echo $HUB | awk -F " " '{print $1}')
 TARGET_GOARCH=${TARGET_GOARCH:-${GOARCH:-amd64}}
 TARGET_GOOS=${TARGET_GOOS:-${GOOS:-linux}}
 CGO_ENABLED=${CGO_ENABLED:-0}
-BASE_IMAGE=${BASE_IMAGE-"ubuntu:bionic"}
+BASE_IMAGE=${BASE_IMAGE-"ubuntu:focal"}
 
 export GO111MODULE=on
 
