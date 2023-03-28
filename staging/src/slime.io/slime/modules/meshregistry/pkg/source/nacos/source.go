@@ -111,30 +111,26 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	}
 
 	ret := &Source{
-		args: args,
-
-		namespace:       args.Namespace,
-		group:           args.Group,
-		delay:           delay,
-		refreshPeriod:   time.Duration(args.RefreshPeriod),
-		mode:            args.Mode,
-		svcNameWithNs:   args.NameWithNs,
-		started:         false,
-		gatewayModel:    args.GatewayModel,
-		patchLabel:      args.LabelPatch,
-		svcPort:         args.SvcPort,
-		nsHost:          nsHost,
-		k8sDomainSuffix: k8sDomainSuffix,
-		defaultSvcNs:    args.DefaultServiceNs,
-		resourceNs:      args.ResourceNs,
-
-		initedCallback: readyCallback,
-
+		args:              args,
+		namespace:         args.Namespace,
+		group:             args.Group,
+		delay:             delay,
+		refreshPeriod:     time.Duration(args.RefreshPeriod),
+		mode:              args.Mode,
+		svcNameWithNs:     args.NameWithNs,
+		started:           false,
+		gatewayModel:      args.GatewayModel,
+		patchLabel:        args.LabelPatch,
+		svcPort:           args.SvcPort,
+		nsHost:            nsHost,
+		k8sDomainSuffix:   k8sDomainSuffix,
+		defaultSvcNs:      args.DefaultServiceNs,
+		resourceNs:        args.ResourceNs,
+		initedCallback:    readyCallback,
 		cache:             make(map[string]*networking.ServiceEntry),
 		namingServiceList: cmap.New(),
 		stop:              make(chan struct{}),
 		seInitCh:          make(chan struct{}),
-
 		seMergePortMocker: svcMocker,
 	}
 
@@ -149,15 +145,11 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		}
 	}
 	if args.Mode == POLLING {
-		ret.client = NewClient(args.Address,
-			args.Username,
-			args.Password,
-			args.Namespace,
-			args.Group,
-			args.MetaKeyNamespace,
-			args.MetaKeyGroup,
-			args.AllNamespaces,
-			headers)
+		servers := args.Servers
+		if len(servers) == 0 {
+			servers = []bootstrap.NacosServer{args.NacosServer}
+		}
+		ret.client = NewClients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
 	} else {
 		namingClient, err := newNamingClient(args.Address, args.Namespace, headers)
 		if err != nil {

@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
 const defaultNacosTokenTTL = 5
@@ -66,6 +68,44 @@ type Client interface {
 	Instances() ([]*instanceResp, error)
 }
 
+type clients []*client
+
+func NewClients(
+	servers []bootstrap.NacosServer,
+	metaKeyNamespace, metaKeyGroup string,
+	headers map[string]string) Client {
+	clis := make(clients, 0, len(servers))
+	for _, server := range servers {
+		clis = append(clis, newClient(server, metaKeyNamespace, metaKeyGroup, headers))
+	}
+	return clis
+}
+
+func (clis clients) Instances() ([]*instanceResp, error) {
+	if len(clis) == 1 {
+		return clis[0].Instances()
+	}
+	cache := make(map[string][]*instance)
+	for _, cli := range clis {
+		insts, err := cli.Instances()
+		if err != nil {
+			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			continue
+		}
+		for _, instResp := range insts {
+			cache[instResp.Dom] = append([]*instance(cache[instResp.Dom]), instResp.Hosts...)
+		}
+	}
+	ret := make([]*instanceResp, 0, len(cache))
+	for dom, hosts := range cache {
+		ret = append(ret, &instanceResp{
+			Dom:   dom,
+			Hosts: hosts,
+		})
+	}
+	return ret, nil
+}
+
 type client struct {
 	client  http.Client
 	urls    []string
@@ -84,23 +124,21 @@ type client struct {
 	tokenTTL int64
 }
 
-func NewClient(urls []string,
-	username, password string,
-	namespaceId, group string,
+func newClient(
+	server bootstrap.NacosServer,
 	metaKeyNamespace, metaKeyGroup string,
-	allNamespaces bool,
-	headers map[string]string) Client {
+	headers map[string]string) *client {
 	c := &client{
 		client:             http.Client{Timeout: 30 * time.Second},
 		headers:            headers,
-		urls:               urls,
-		namespaceId:        namespaceId,
-		group:              group,
+		urls:               server.Address,
+		namespaceId:        server.Namespace,
+		group:              server.Group,
 		metaKeyNamespace:   metaKeyNamespace,
 		metaKeyGroup:       metaKeyGroup,
-		fetchAllNamespaces: allNamespaces,
-		username:           username,
-		password:           password,
+		fetchAllNamespaces: server.AllNamespaces,
+		username:           server.Username,
+		password:           server.Password,
 		tokenTTL:           defaultNacosTokenTTL, // default TokenTTL as 5 second, if first login failed
 		token:              &atomic.Value{},
 	}

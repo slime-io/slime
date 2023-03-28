@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	nacosClients "github.com/nacos-group/nacos-sdk-go/v2/clients"
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
@@ -52,7 +52,7 @@ func newNamingClient(addresses []string, namespace string, header map[string]str
 		})
 	}
 
-	namingClient, err := clients.NewNamingClient(
+	namingClient, err := nacosClients.NewNamingClient(
 		vo.NacosClientParam{
 			ClientConfig:  clientConfig,
 			ServerConfigs: serverConfigs,

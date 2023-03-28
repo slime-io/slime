@@ -197,36 +197,54 @@ func (eurekaArgs *EurekaSourceArgs) Validate() error {
 
 type NacosSourceArgs struct {
 	SourceArgs
-
-	Address []string `json:"Address,omitempty"`
+	NacosServer
 	// nacos mode for get nacos info
 	Mode string `json:"Mode,omitempty"`
-	// namespace value for nacos client
-	Namespace string `json:"Namespace,omitempty"`
-	// group value for nacos client
-	Group string `json:"Group,omitempty"`
 	// nacos service name is like name.ns
 	NameWithNs bool `json:"NameWithNs,omitempty"`
 	// need k8sDomainSuffix in Host
 	K8sDomainSuffix bool `json:"K8SDomainSuffix,omitempty"`
 	// need ns in Host
 	NsHost bool `json:"NsHost,omitempty"`
+	// If set, namespace and group information will be injected into the ep's metadata using the set key.
+	MetaKeyGroup     string        `json:"MetaKeyGroup,omitempty"`
+	MetaKeyNamespace string        `json:"MetaKeyNamespace,omitempty"`
+	Servers          []NacosServer `json:"Servers,omitempty"`
+}
+
+type NacosServer struct {
+	// addresses of the nacos servers
+	Address []string `json:"Address,omitempty"`
+	// namespace value for nacos client
+	Namespace string `json:"Namespace,omitempty"`
+	// group value for nacos client
+	Group string `json:"Group,omitempty"`
 	// username and password for nacos auth
 	Username string `json:"Username,omitempty"`
 	Password string `json:"Password,omitempty"`
 	// fetch services from all namespaces, only support Polling mode
 	AllNamespaces bool `json:"AllNamespaces,omitempty"`
-	//  If set, namespace and group information will be injected into the ep's metadata using the set key.
-	MetaKeyGroup     string `json:"MetaKeyGroup,omitempty"`
-	MetaKeyNamespace string `json:"MetaKeyNamespace,omitempty"`
+}
+
+func (nacosServer *NacosServer) Validate() error {
+	if len(nacosServer.Address) == 0 {
+		return errors.New("nacos server address must be set")
+	}
+	return nil
 }
 
 func (nacosArgs *NacosSourceArgs) Validate() error {
 	if !nacosArgs.Enabled {
 		return nil
 	}
-	if len(nacosArgs.Address) == 0 {
-		return errors.New("nacos server address must be set when nacos source is enabled")
+	if len(nacosArgs.Servers) == 0 {
+		return nacosArgs.NacosServer.Validate()
+	}
+	for _, server := range nacosArgs.Servers {
+		err := server.Validate()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
