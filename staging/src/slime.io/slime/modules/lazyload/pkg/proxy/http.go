@@ -66,7 +66,10 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 				Name:      svcName,
 			}
 
-			if p.SvcCache.Exist(nn) {
+			// it means svc controller is disabled when SvcCache is nil,
+			// so, all short domain should add ns info
+
+			if p.SvcCache == nil || p.SvcCache.Exist(nn) {
 				if idx >= 0 {
 					// add port info
 					reqHost = fmt.Sprintf("%s.%s:%s", nn.Name, nn.Namespace, port)
