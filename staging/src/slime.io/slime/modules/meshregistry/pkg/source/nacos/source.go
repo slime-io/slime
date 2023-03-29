@@ -75,6 +75,8 @@ type Source struct {
 	// is the filters applied to this service. If the service name is empty, it means that
 	// all services are applicable to this filter.
 	instanceFilters source.SelectHookStore
+
+	reGroupInstances func(in []*instanceResp) []*instanceResp
 }
 
 const (
@@ -143,6 +145,9 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 				headers[items[0]] = items[1]
 			}
 		}
+	}
+	if args.ServiceNaming != nil {
+		ret.reGroupInstances = reGroupInstances(args.ServiceNaming)
 	}
 	if args.Mode == POLLING {
 		servers := args.Servers
@@ -307,4 +312,57 @@ func printEps(eps []*networking.WorkloadEntry) string {
 		ips = append(ips, ep.Address)
 	}
 	return strings.Join(ips, ",")
+}
+
+func reGroupInstances(c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
+	substrFuncs := make([]func(inst *instance) string, 0, len(c.Items))
+	for _, item := range c.Items {
+		switch item.Kind {
+		case bootstrap.InstanceBasicInfoKind:
+			switch item.Value {
+			case bootstrap.InstanceBasicInfoSvc:
+				substrFuncs = append(substrFuncs, func(inst *instance) string { return inst.ServiceName })
+			case bootstrap.InstanceBasicInfoIP:
+				substrFuncs = append(substrFuncs, func(inst *instance) string { return inst.Ip })
+			case bootstrap.InstanceBasicInfoPort:
+				substrFuncs = append(substrFuncs, func(inst *instance) string { return fmt.Sprintf("%d", inst.Port) })
+			}
+		case bootstrap.InstanceMetadataKind:
+			substrFuncs = append(substrFuncs, func(inst *instance) string {
+				if inst.Metadata == nil {
+					return ""
+				}
+				return inst.Metadata[item.Value]
+			})
+		case bootstrap.StaticKind:
+			substrFuncs = append(substrFuncs, func(_ *instance) string { return item.Value })
+		}
+	}
+	instanceDom := func(inst *instance) string {
+		subs := make([]string, 0, len(c.Items))
+		for _, f := range substrFuncs {
+			subs = append(subs, f(inst))
+		}
+		svcName := strings.Join(subs, c.Sep)
+		inst.ServiceName = svcName
+		return svcName
+	}
+
+	return func(in []*instanceResp) []*instanceResp {
+		m := map[string][]*instance{}
+		for _, ir := range in {
+			for _, host := range ir.Hosts {
+				dom := instanceDom(host)
+				m[dom] = append([]*instance(m[dom]), host)
+			}
+		}
+		out := make([]*instanceResp, 0, len(m))
+		for dom, hosts := range m {
+			out = append(out, &instanceResp{
+				Dom:   dom,
+				Hosts: hosts,
+			})
+		}
+		return out
+	}
 }
