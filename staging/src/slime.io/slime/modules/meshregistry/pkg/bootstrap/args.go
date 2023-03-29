@@ -121,6 +121,40 @@ type SourceArgs struct {
 	MockServiceEntryName         string `json:"MockServiceEntryName,omitempty"`
 	MockServiceMergeInstancePort bool   `json:"MockServiceMergeInstancePort,omitempty"`
 	MockServiceMergeServicePort  bool   `json:"MockServiceMergeServicePort,omitempty"`
+
+	// ServiceNaming is used to reassign the service to which the instance belongs
+	ServiceNaming *ServiceNameConverter `json:"ServiceNaming,omitempty"`
+}
+
+// ServiceNameConverter configures the service name of an instance,
+// using Seq to connect the substring configured by each item.
+type ServiceNameConverter struct {
+	Sep   string              `json:"Sep,omitempty"`
+	Items []ServiceNamingItem `json:"Items,omitempty"`
+}
+
+type ServiceNameItemKind string
+
+var (
+	InstanceBasicInfoKind ServiceNameItemKind = "$"
+	InstanceMetadataKind  ServiceNameItemKind = "meta"
+	StaticKind            ServiceNameItemKind = "static"
+
+	InstanceBasicInfoSvc  string = "service"
+	InstanceBasicInfoIP   string = "ip"
+	InstanceBasicInfoPort string = "port"
+)
+
+// ServiceNamingItem configure how a service name substring is generated.
+// The Kind field indicates the data source of the substring and
+// configurable values are `$`, `static` and `meta`.
+//   - `$`: basic information of the instance, supports `service`(the original service name of the instance),
+//     `ip`(the instance ip), `port`(the instance port).
+//   - `meta`: metadata of the instance, the value of the Value field is the extracted key specified in the metadata.
+//   - `static`: static configuration, directly using the value of the Value field.
+type ServiceNamingItem struct {
+	Kind  ServiceNameItemKind `json:"Kind,omitempty"`
+	Value string              `json:"Value,omitempty"`
 }
 
 type K8SSourceArgs struct {
