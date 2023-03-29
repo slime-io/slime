@@ -25,9 +25,10 @@ import (
 )
 
 const (
-	EnvProbePort    = "PROBE_PORT"
-	EnvLogLevel     = "LOG_LEVEL"
-	EnvPodNamespace = "POD_NAMESPACE"
+	EnvProbePort         = "PROBE_PORT"
+	EnvLogLevel          = "LOG_LEVEL"
+	EnvPodNamespace      = "POD_NAMESPACE"
+	DisableSvcController = "DISABLE_SVC_CONTROLLER"
 )
 
 var (
@@ -37,14 +38,23 @@ var (
 	probePort = os.Getenv(EnvProbePort)
 	logLevel  = os.Getenv(EnvLogLevel)
 
+	disableSvcController = os.Getenv(DisableSvcController) == "true"
+
 	configLabelSelector = "lazyload.slime.io/config=global-sidecar"
 
-	Cache = &proxy.Cache{
-		Data: make(map[types.NamespacedName]struct{}),
-	}
+	Cache *proxy.Cache
 )
 
+func init() {
+	if !disableSvcController {
+		Cache = &proxy.Cache{
+			Data: make(map[types.NamespacedName]struct{}),
+		}
+	}
+}
+
 func main() {
+
 	// set log config
 	if logLevel == "" {
 		logLevel = "info"
@@ -70,10 +80,13 @@ func main() {
 	}
 
 	ctx := ctrl.SetupSignalHandler()
-	if err := startSvcCache(ctx); err != nil {
-		log.Fatal(err)
+
+	if !disableSvcController {
+		if err := startSvcCache(ctx); err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("start svc cache")
 	}
-	log.Infof("start svc cache")
 
 	controller, err := newConfigMapController()
 	if err != nil {
