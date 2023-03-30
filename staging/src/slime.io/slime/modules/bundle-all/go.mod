@@ -1,4 +1,4 @@
-module slime.io/slime/modules/bundle_example
+module slime.io/slime/modules/bundle-all
 
 go 1.17
 

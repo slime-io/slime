@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	module.Main("bundle_example", []module.Module{
+	module.Main("bundle-hango", []module.Module{
 		&limitermod.Module{},
 		&pluginmod.Module{},
 		&meshregistrymod.Module{},
