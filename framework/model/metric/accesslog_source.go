@@ -88,7 +88,7 @@ func (s *AccessLogSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 					Value: convertor.CacheResultCopy()[meta],
 				}
 				metric[meta] = append(metric[meta], result)
-				log.Debugf("add metric from accesslog %+v", result)
+				log.Debugf("%s add metric from accesslog %+v", meta, result)
 			}
 		}
 

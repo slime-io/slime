@@ -135,54 +135,57 @@ func mapStrStrEqual(m1, m2 map[string]string) bool {
 	return true
 }
 
-func (r *ServicefenceReconciler) isNsFenced(ns *corev1.Namespace) bool {
+// second bool value means: is it clearly known to be managed
+func (r *ServicefenceReconciler) isNsFenced(ns *corev1.Namespace) (bool, bool) {
 	if ns != nil && ns.Labels != nil {
 		switch ns.Labels[LabelServiceFenced] {
 		case ServiceFencedTrue:
-			return true
+			return true, true
 		case ServiceFencedFalse:
-			return false
+			return false, true
 		}
 	}
-	return r.cfg.DefaultFence
+	return false, false
 }
 
-func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev1.Service) bool {
+func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev1.Service) (bool, error) {
 	var svcLabel string
+	var err error
+
 	if svc.Labels != nil {
 		svcLabel = svc.Labels[LabelServiceFenced]
 	}
 
 	switch svcLabel {
 	case ServiceFencedFalse:
-		return false
+		return false, nil
 	case ServiceFencedTrue:
-		return true
+		return true, nil
 	default:
-		if r.staleNamespaces[svc.Namespace] {
-			ns := &corev1.Namespace{}
-			if err := r.Client.Get(ctx, types.NamespacedName{
-				Namespace: "",
-				Name:      svc.Namespace,
-			}, ns); err != nil {
-				if errors.IsNotFound(err) {
-					ns = nil
-				} else {
-					ns = nil
-					log.Errorf("fail to get ns: %s", svc.Namespace)
-				}
+		// refer to ns and default value
+		ns := &corev1.Namespace{}
+		if err = r.Client.Get(ctx, types.NamespacedName{
+			Namespace: "",
+			Name:      svc.Namespace,
+		}, ns); err != nil {
+			if errors.IsNotFound(err) {
+				log.Errorf("namespace %s is not found in isServiceFenced", svc.Namespace)
+			} else {
+				log.Errorf("fail to get ns: %s", svc.Namespace)
 			}
+			return false, err
+		}
 
-			if ns != nil {
-				return r.isNsFenced(ns)
+		if ns != nil {
+			if fenced, ok := r.isNsFenced(ns); ok {
+				return fenced, nil
 			}
 		}
-		return r.enabledNamespaces[svc.Namespace]
+		return r.cfg.DefaultFence, nil
 	}
 }
 
 func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	if r.inSpecialNs(req.Namespace) {
 		//log.Debugf("auto fence does not apply to specifical namespace: %s, skip", req.NamespacedName)
 		return ctrl.Result{}, nil
@@ -207,7 +210,6 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 	if err != nil {
 		if errors.IsNotFound(err) {
 			ns = nil
-			delete(r.enabledNamespaces, req.Name)
 			return reconcile.Result{}, nil // do not process deletion ...
 		} else {
 			log.Errorf("get namespace %s error, %+v", req.NamespacedName, err)
@@ -218,26 +220,7 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
 
-	defer func() {
-		if err == nil {
-			delete(r.staleNamespaces, req.Name)
-		}
-	}()
-
-	nsFenced := r.isNsFenced(ns)
-
-	if nsFenced == r.enabledNamespaces[req.Name] {
-		return reconcile.Result{}, nil
-	} else {
-		prev := r.enabledNamespaces[req.Name]
-		r.enabledNamespaces[req.Name] = nsFenced
-		defer func() {
-			if err != nil {
-				r.enabledNamespaces[req.Name] = prev // restore, leave to re-process next time
-				r.staleNamespaces[req.Name] = true
-			}
-		}()
-	}
+	log.Debugf("namespace %s is not fenced in this time", req.NamespacedName)
 
 	// refresh service fenced status
 	services := &corev1.ServiceList{}
@@ -292,36 +275,56 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 	if sf == nil {
 		// ignore services without label selector
 		if svc != nil && &(svc.Spec) != nil && svc.Spec.Selector != nil &&
-			len(svc.Spec.Selector) > 0 && r.isServiceFenced(ctx, svc) {
-			// add svc -> add sf
-			sf = &lazyloadv1alpha1.ServiceFence{
-				TypeMeta: metav1.TypeMeta{},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      svc.Name,
-					Namespace: svc.Namespace,
-				},
-				Spec: lazyloadv1alpha1.ServiceFenceSpec{
-					Enable: true,
-					WorkloadSelector: &lazyloadv1alpha1.WorkloadSelector{
-						FromService: true,
-					},
-				},
-			}
-			markFenceCreatedByController(sf)
-			model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
-			if err = r.Client.Create(ctx, sf); err != nil {
-				log.Errorf("create fence %s failed, %+v", nsName, err)
+			len(svc.Spec.Selector) > 0 {
+
+			if fenced, err := r.isServiceFenced(ctx, svc); err != nil {
 				return reconcile.Result{}, err
+			} else if fenced {
+				// add svc -> add sf
+				sf = &lazyloadv1alpha1.ServiceFence{
+					TypeMeta: metav1.TypeMeta{},
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      svc.Name,
+						Namespace: svc.Namespace,
+					},
+					Spec: lazyloadv1alpha1.ServiceFenceSpec{
+						Enable: true,
+						WorkloadSelector: &lazyloadv1alpha1.WorkloadSelector{
+							FromService: true,
+						},
+					},
+				}
+				markFenceCreatedByController(sf)
+				model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
+				if err = r.Client.Create(ctx, sf); err != nil {
+					log.Errorf("create fence %s failed, %+v", nsName, err)
+					return reconcile.Result{}, err
+				}
+				log.Infof("create fence succeed %s:%s in refreshFenceStatusOfService", sf.Namespace, sf.Name)
 			}
-			log.Infof("create fence succeed %s:%s in refreshFenceStatusOfService", sf.Namespace, sf.Name)
 		}
 	} else if rev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(rev) {
 		// check if svc needs auto fence created
 		log.Errorf("existed fence %v istioRev %s but our rev %s, skip ...",
 			nsName, rev, r.env.IstioRev())
-	} else if isFenceCreatedByController(sf) && (svc == nil || !r.isServiceFenced(ctx, svc)) {
-		if err := r.Client.Delete(ctx, sf); err != nil {
-			log.Errorf("delete fence %s failed, %+v", nsName, err)
+	} else if isFenceCreatedByController(sf) {
+
+		if svc == nil {
+			log.Infof("svc is nil and delete svf %s:%s", sf.Namespace, sf.Name)
+			if err := r.Client.Delete(ctx, sf); err != nil {
+				log.Errorf("delete fence %s failed, %+v", nsName, err)
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
+		}
+
+		if fenced, err := r.isServiceFenced(ctx, svc); err != nil {
+			return reconcile.Result{}, err
+		} else if !fenced {
+			log.Infof("svc is not fenced and delete svf %s:%s", svc.Namespace, svc.Name)
+			if err := r.Client.Delete(ctx, sf); err != nil {
+				log.Errorf("delete fence %s failed, %+v", nsName, err)
+			}
 		}
 	}
 

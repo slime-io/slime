@@ -59,8 +59,6 @@ type ServicefenceReconciler struct {
 	watcherMetricChan          <-chan metric.Metric
 	tickerMetricChan           <-chan metric.Metric
 	reconcileLock              sync.RWMutex
-	staleNamespaces            map[string]bool
-	enabledNamespaces          map[string]bool
 	svcSynced                  func() bool
 	nsSvcCache                 *NsSvcCache
 	labelSvcCache              *LabelSvcCache
@@ -114,8 +112,6 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 	r := &ServicefenceReconciler{
 		interestMeta:      map[string]bool{},
 		interestMetaCopy:  map[string]bool{},
-		staleNamespaces:   map[string]bool{},
-		enabledNamespaces: map[string]bool{},
 		nsSvcCache:        &NsSvcCache{Data: map[string]map[string]struct{}{}},
 		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
 		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
@@ -176,7 +172,7 @@ func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			req.NamespacedName, rev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	}
-	log.Infof("ServicefenceReconciler got serviceFence request, %+v", req.NamespacedName)
+	log.Infof("serviceFence %+v is added or update", req.NamespacedName)
 
 	// 资源更新
 	r.updateServicefenceDomain(instance)
@@ -486,6 +482,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	hosts := make([]string, 0)
 
 	if !sf.Spec.Enable {
+		log.Debugf("svf %s/%s not enable", sf.Namespace, sf.Name)
 		return nil, nil
 	}
 
