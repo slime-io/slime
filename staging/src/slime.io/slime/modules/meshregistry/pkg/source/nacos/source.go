@@ -317,26 +317,32 @@ func printEps(eps []*networking.WorkloadEntry) string {
 func reGroupInstances(c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
 	substrFuncs := make([]func(inst *instance) string, 0, len(c.Items))
 	for _, item := range c.Items {
+		var substrF func(inst *instance) string
 		switch item.Kind {
 		case bootstrap.InstanceBasicInfoKind:
 			switch item.Value {
 			case bootstrap.InstanceBasicInfoSvc:
-				substrFuncs = append(substrFuncs, func(inst *instance) string { return inst.ServiceName })
+				substrF = func(inst *instance) string { return inst.ServiceName }
 			case bootstrap.InstanceBasicInfoIP:
-				substrFuncs = append(substrFuncs, func(inst *instance) string { return inst.Ip })
+				substrF = func(inst *instance) string { return inst.Ip }
 			case bootstrap.InstanceBasicInfoPort:
-				substrFuncs = append(substrFuncs, func(inst *instance) string { return fmt.Sprintf("%d", inst.Port) })
+				substrF = func(inst *instance) string { return fmt.Sprintf("%d", inst.Port) }
 			}
 		case bootstrap.InstanceMetadataKind:
-			substrFuncs = append(substrFuncs, func(inst *instance) string {
-				if inst.Metadata == nil {
-					return ""
+			substrF = func(meta string) func(inst *instance) string {
+				return func(inst *instance) string {
+					if inst.Metadata == nil {
+						return ""
+					}
+					return inst.Metadata[meta]
 				}
-				return inst.Metadata[item.Value]
-			})
+			}(item.Value)
 		case bootstrap.StaticKind:
-			substrFuncs = append(substrFuncs, func(_ *instance) string { return item.Value })
+			substrF = func(staticValue string) func(inst *instance) string {
+				return func(inst *instance) string { return staticValue }
+			}(item.Value)
 		}
+		substrFuncs = append(substrFuncs, substrF)
 	}
 	instanceDom := func(inst *instance) string {
 		subs := make([]string, 0, len(c.Items))
