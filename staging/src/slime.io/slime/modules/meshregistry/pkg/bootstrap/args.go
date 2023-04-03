@@ -124,6 +124,14 @@ type SourceArgs struct {
 
 	// ServiceNaming is used to reassign the service to which the instance belongs
 	ServiceNaming *ServiceNameConverter `json:"ServiceNaming,omitempty"`
+	// ServiceHostAliases allows configuring additional aliases for the specified service host
+	ServiceHostAliases []*ServiceHostAlias `json:"ServiceHostAliases,omitempty"`
+}
+
+// ServiceHostAlias includes the original host and all aliases of the original host
+type ServiceHostAlias struct {
+	Host    string   `json:"Host,omitempty"`
+	Aliases []string `json:"Aliases,omitempty"`
 }
 
 // ServiceNameConverter configures the service name of an instance,

@@ -74,9 +74,16 @@ type Source struct {
 	// InstanceFilers, the key of the map is the service name, and the corresponding value
 	// is the filters applied to this service. If the service name is empty, it means that
 	// all services are applicable to this filter.
+	// Updates are only allowed when the configuration is loaded or reloaded.
 	instanceFilters source.SelectHookStore
 
 	reGroupInstances func(in []*instanceResp) []*instanceResp
+
+	// serviceHostAliases, the key of the map is the original host of a service, and
+	// if an original host exists in serviceHostAliases, the corresponding value will
+	// be appended to the converted ServiceEntry hosts.
+	// Updates are only allowed when the configuration is loaded or reloaded.
+	serviceHostAliases map[string][]string
 }
 
 const (
@@ -180,6 +187,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	}
 
 	ret.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
+	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
 
 	for _, op := range options {
 		if err := op(ret); err != nil {
@@ -195,6 +203,17 @@ func generateInstanceFilters(
 	ret := source.NewSelectHookStore(svcSel)
 	ret[allServiceFilter] = source.NewSelectHook(epSel)
 	return ret
+}
+
+func generateServiceHostAliases(hostAliases []*bootstrap.ServiceHostAlias) map[string][]string {
+	if len(hostAliases) != 0 {
+		serviceHostAliases := make(map[string][]string, len(hostAliases))
+		for _, ha := range hostAliases {
+			serviceHostAliases[ha.Host] = ha.Aliases
+		}
+		return serviceHostAliases
+	}
+	return nil
 }
 
 func (s *Source) markServiceEntryInitDone() {
@@ -219,13 +238,17 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	var prevArgs *bootstrap.NacosSourceArgs
 	prevArgs, s.args = s.args, args
 
+	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
 		newInstSel := generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
-		s.mut.Lock()
 		s.instanceFilters = newInstSel
-		s.mut.Unlock()
 	}
+	if !reflect.DeepEqual(prevArgs.ServiceHostAliases, args.ServiceHostAliases) {
+		newSvcHostAliases := generateServiceHostAliases(args.ServiceHostAliases)
+		s.serviceHostAliases = newSvcHostAliases
+	}
+	s.mut.Unlock()
 }
 
 func (s *Source) getInstanceFilters() source.SelectHookStore {
@@ -233,6 +256,13 @@ func (s *Source) getInstanceFilters() source.SelectHookStore {
 	defer s.mut.RUnlock()
 
 	return s.instanceFilters
+}
+
+func (s *Source) getServiceHostAlias() map[string][]string {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+
+	return s.serviceHostAliases
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {

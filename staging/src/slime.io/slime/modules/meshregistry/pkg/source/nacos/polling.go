@@ -47,7 +47,7 @@ func (s *Source) updateServiceInfo() {
 	if s.reGroupInstances != nil {
 		instances = s.reGroupInstances(instances)
 	}
-	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel, s.getInstanceFilters())
+	newServiceEntryMap, err := ConvertServiceEntryMap(instances, s.defaultSvcNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel, s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
 		log.Errorf("convert nacos servceentry map failed: " + err.Error())
 		return

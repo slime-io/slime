@@ -20,16 +20,16 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore) (map[string]*networking.ServiceEntry, error) {
+func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) (map[string]*networking.ServiceEntry, error) {
 	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
 		if gatewayModel {
-			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filters)
+			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filters, hostAliases)
 		} else {
-			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel, filters) {
+			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel, filters, hostAliases) {
 				seMap[k] = v
 			}
 		}
@@ -38,14 +38,19 @@ func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gate
 }
 
 // -------- for gateway mode --------
-func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filters source.SelectHookStore) *networking.ServiceEntry {
+func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) *networking.ServiceEntry {
 	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filters)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".nacos"
 	}
+	host := strings.ReplaceAll(strings.ToLower(instanceResp.Dom), "_", "-") + nsSuffix
+	hosts := []string{host}
+	if hostAliases != nil {
+		hosts = append(hosts, hostAliases[host]...)
+	}
 	ret := &networking.ServiceEntry{
-		Hosts:      []string{strings.ReplaceAll(strings.ToLower(instanceResp.Dom), "_", "-") + nsSuffix},
+		Hosts:      hosts,
 		Resolution: networking.ServiceEntry_STATIC,
 		Endpoints:  endpoints,
 		Ports:      ports,
@@ -122,7 +127,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, filters source.Sel
 	return endpoints, ports, address, hasNonIPEpAddr
 }
 
-func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore) map[string]*networking.ServiceEntry {
+func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) map[string]*networking.ServiceEntry {
 	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel, filters)
 	if len(endpointMap) == 0 {
 		return nil
@@ -147,8 +152,12 @@ func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svc
 		if useDNSMap[ns] {
 			resolution = networking.ServiceEntry_DNS
 		}
+		hosts := []string{host}
+		if hostAliases != nil {
+			hosts = append(hosts, hostAliases[host]...)
+		}
 		ses[seName] = &networking.ServiceEntry{
-			Hosts:      []string{host},
+			Hosts:      hosts,
 			Resolution: resolution,
 			Endpoints:  endpoints,
 			Ports:      portMap[ns],
