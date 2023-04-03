@@ -96,13 +96,13 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 	}
 
 	se := e.Resource.Message.(*networking.ServiceEntry)
-	var newPort bool
+	var newPorts []uint32
 	m.mut.Lock()
 	if m.mergeSvcPorts {
 		for _, p := range se.Ports {
 			if _, ok := m.portsCache[p.Number]; !ok {
 				m.portsCache[p.Number] = p
-				newPort = true
+				newPorts = append(newPorts, p.Number)
 			}
 		}
 	}
@@ -123,6 +123,7 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 							Name:     fmt.Sprintf("%s-%d", portName, portNum),
 						}
 						m.portsCache[portNum] = port
+						newPorts = append(newPorts, portNum)
 						break
 					}
 				}
@@ -131,7 +132,9 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 	}
 	m.mut.Unlock()
 
-	if newPort {
+	if len(newPorts) > 0 {
+		log.Infof("ServiceEntryMergePortMocker: serviceentry %v brings new ports %+v",
+			e.Resource.Metadata.FullName, newPorts)
 		select {
 		case m.notifyCh <- struct{}{}:
 		default:

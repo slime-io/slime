@@ -1,6 +1,8 @@
 package source
 
 import (
+	frameworkmodel "slime.io/slime/framework/model"
+	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"strings"
 	"time"
@@ -15,6 +17,8 @@ var (
 	kindServiceEntry = collections.K8SNetworkingIstioIoV1Alpha3Serviceentries.Resource().Kind()
 	kindSidecar      = collections.K8SNetworkingIstioIoV1Alpha3Sidecars.Resource().Kind()
 	IstioRevisionKey = "istio.io/rev"
+
+	log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "source")
 )
 
 func GenVersion(sch collection.Schema) resource.Version {
