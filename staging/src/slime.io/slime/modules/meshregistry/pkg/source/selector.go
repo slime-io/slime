@@ -7,13 +7,15 @@ import (
 
 type SelectHookStore map[string]SelectHook
 
+// SelectHook returns TRUE if matched
 type SelectHook func(map[string]string) bool
 
 // NewSelectHook build a SelectHook by the input LabelSelectors.
-// If the input LabelSelectors is nil, the returned hook always returns TRUE.
-func NewSelectHook(labelSelectors []*metav1.LabelSelector) SelectHook {
+// If the input LabelSelectors is nil, the returned hook returns
+// the emptySelectorsReturn.
+func NewSelectHook(labelSelectors []*metav1.LabelSelector, emptySelectorsReturn bool) SelectHook {
 	if len(labelSelectors) == 0 {
-		return func(_ map[string]string) bool { return true }
+		return func(_ map[string]string) bool { return emptySelectorsReturn }
 	}
 	var selectors []labels.Selector
 	for _, selector := range labelSelectors {
@@ -38,10 +40,10 @@ func NewSelectHook(labelSelectors []*metav1.LabelSelector) SelectHook {
 }
 
 // NewSelectHookStore returns a SelectHookStore
-func NewSelectHookStore(groupedSelectors map[string][]*metav1.LabelSelector) SelectHookStore {
+func NewSelectHookStore(groupedSelectors map[string][]*metav1.LabelSelector, emptySelectorsReturn bool) SelectHookStore {
 	m := make(map[string]SelectHook, len(groupedSelectors))
 	for key, sels := range groupedSelectors {
-		m[key] = NewSelectHook(sels)
+		m[key] = NewSelectHook(sels, emptySelectorsReturn)
 	}
 	return m
 }

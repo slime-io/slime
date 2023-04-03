@@ -71,11 +71,9 @@ type Source struct {
 
 	initedCallback func(string)
 
-	// InstanceFilers, the key of the map is the service name, and the corresponding value
-	// is the filters applied to this service. If the service name is empty, it means that
-	// all services are applicable to this filter.
+	// instanceFiler fitler which instance of a service should be include
 	// Updates are only allowed when the configuration is loaded or reloaded.
-	instanceFilters source.SelectHookStore
+	instanceFilter func(*instance) bool
 
 	reGroupInstances func(in []*instanceResp) []*instanceResp
 
@@ -93,7 +91,7 @@ const (
 	WATCHING         = "watching"
 	clientHeadersEnv = "NACOS_CLIENT_HEADERS"
 
-	allServiceFilter = ""
+	defaultServiceFilter = ""
 )
 
 type Option func(s *Source) error
@@ -186,7 +184,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		ret.initWg.Add(1)
 	}
 
-	ret.instanceFilters = generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
+	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
 	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
 
 	for _, op := range options {
@@ -198,11 +196,17 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	return ret, ret.cacheJson, nil
 }
 
-func generateInstanceFilters(
-	svcSel map[string][]*metav1.LabelSelector, epSel []*metav1.LabelSelector) source.SelectHookStore {
-	ret := source.NewSelectHookStore(svcSel)
-	ret[allServiceFilter] = source.NewSelectHook(epSel)
-	return ret
+func generateInstanceFilter(
+	svcSel map[string][]*metav1.LabelSelector, epSel []*metav1.LabelSelector, emptySelectorsReturn bool) func(*instance) bool {
+	selectHookStore := source.NewSelectHookStore(svcSel, emptySelectorsReturn)
+	selectHookStore[defaultServiceFilter] = source.NewSelectHook(epSel, emptySelectorsReturn)
+	return func(i *instance) bool {
+		filter := selectHookStore[i.ServiceName]
+		if filter == nil {
+			filter = selectHookStore[defaultServiceFilter]
+		}
+		return filter(i.Metadata)
+	}
 }
 
 func generateServiceHostAliases(hostAliases []*bootstrap.ServiceHostAlias) map[string][]string {
@@ -241,8 +245,8 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
-		newInstSel := generateInstanceFilters(args.ServicedEndpointSelectors, args.EndpointSelectors)
-		s.instanceFilters = newInstSel
+		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
+		s.instanceFilter = newInstSel
 	}
 	if !reflect.DeepEqual(prevArgs.ServiceHostAliases, args.ServiceHostAliases) {
 		newSvcHostAliases := generateServiceHostAliases(args.ServiceHostAliases)
@@ -251,11 +255,10 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	s.mut.Unlock()
 }
 
-func (s *Source) getInstanceFilters() source.SelectHookStore {
+func (s *Source) getInstanceFilters() func(*instance) bool {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-
-	return s.instanceFilters
+	return s.instanceFilter
 }
 
 func (s *Source) getServiceHostAlias() map[string][]string {
@@ -380,6 +383,7 @@ func reGroupInstances(c *bootstrap.ServiceNameConverter) func(in []*instanceResp
 			subs = append(subs, f(inst))
 		}
 		svcName := strings.Join(subs, c.Sep)
+		// overwrite the original service name
 		inst.ServiceName = svcName
 		return svcName
 	}

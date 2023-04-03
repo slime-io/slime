@@ -8,7 +8,6 @@ import (
 
 	networking "istio.io/api/networking/v1alpha3"
 
-	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -20,16 +19,16 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) (map[string]*networking.ServiceEntry, error) {
+func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string) (map[string]*networking.ServiceEntry, error) {
 	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
 		if gatewayModel {
-			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filters, hostAliases)
+			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filter, hostAliases)
 		} else {
-			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel, filters, hostAliases) {
+			for k, v := range convertServiceEntryWithNs(ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel, filter, hostAliases) {
 				seMap[k] = v
 			}
 		}
@@ -38,8 +37,8 @@ func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gate
 }
 
 // -------- for gateway mode --------
-func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) *networking.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filters)
+func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string) *networking.ServiceEntry {
+	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filter)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".nacos"
@@ -61,7 +60,7 @@ func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel boo
 	return ret
 }
 
-func convertEndpoints(instances []*instance, patchLabel bool, filters source.SelectHookStore) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
+func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
 	var (
 		endpoints      = make([]*networking.WorkloadEntry, 0)
 		ports          = make([]*networking.Port, 0)
@@ -80,12 +79,10 @@ func convertEndpoints(instances []*instance, patchLabel bool, filters source.Sel
 	ports = append(ports, port)
 
 	for _, ins := range instances {
-		if filter := filters[allServiceFilter]; filter != nil && !filter(ins.Metadata) {
+		if filter != nil && !filter(ins) {
 			continue
 		}
-		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {
-			continue
-		}
+
 		if !ins.Healthy {
 			continue
 		}
@@ -127,8 +124,8 @@ func convertEndpoints(instances []*instance, patchLabel bool, filters source.Sel
 	return endpoints, ports, address, hasNonIPEpAddr
 }
 
-func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filters source.SelectHookStore, hostAliases map[string][]string) map[string]*networking.ServiceEntry {
-	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel, filters)
+func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string) map[string]*networking.ServiceEntry {
+	endpointMap, portMap, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, defaultNs, svcPort, nsHost, patchLabel, filter)
 	if len(endpointMap) == 0 {
 		return nil
 	}
@@ -166,7 +163,7 @@ func convertServiceEntryWithNs(instanceResp *instanceResp, defaultNs string, svc
 	return ses
 }
 
-func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool, filters source.SelectHookStore) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
+func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool, filter func(*instance) bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
 	portsMap := make(map[string][]*networking.Port, 0)
 	useDNSMap := make(map[string]bool, 0)
@@ -175,10 +172,7 @@ func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uin
 	})
 
 	for _, ins := range instances {
-		if filter := filters[allServiceFilter]; filter != nil && !filter(ins.Metadata) {
-			continue
-		}
-		if filter := filters[ins.ServiceName]; filter != nil && !filter(ins.Metadata) {
+		if filter != nil && !filter(ins) {
 			continue
 		}
 		if !ins.Healthy {

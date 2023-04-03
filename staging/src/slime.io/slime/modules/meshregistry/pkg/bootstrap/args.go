@@ -114,8 +114,11 @@ type SourceArgs struct {
 	// A list of selectors that specify the set of service instances to be processed,
 	// configured in the same way as the k8s label selector.
 	EndpointSelectors []*metav1.LabelSelector `json:"EndpointSelectors,omitempty"`
-	// Endpoint selectors for specific service, the key of the map is the service name
+	// Endpoint selectors for specific service, the key of the map is the service name.
+	// If a service matched a ServicedEndpointSelector the source scoped EndpointSelectors should be ignore.
 	ServicedEndpointSelectors map[string][]*metav1.LabelSelector `json:"ServicedEndpointSelectors,omitempty"`
+	// EmptyEpSelectorsExcludeAll if set to true, when no ep selectors are configured, the source should exclude all eps.
+	EmptyEpSelectorsExcludeAll bool `json:"EmptyEpSelectorsExcludeAll,omitempty"`
 
 	MockServiceName              string `json:"MockServiceName,omitempty"`
 	MockServiceEntryName         string `json:"MockServiceEntryName,omitempty"`
