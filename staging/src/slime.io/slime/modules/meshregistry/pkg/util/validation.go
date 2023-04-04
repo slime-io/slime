@@ -2,12 +2,11 @@ package util
 
 import (
 	"fmt"
+	networking "istio.io/api/networking/v1alpha3"
+	"istio.io/libistio/pkg/config/resource"
 	"os"
 	"regexp"
 	"strings"
-
-	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/libistio/pkg/config/resource"
 
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/util/cache"
@@ -34,7 +33,8 @@ var (
 	labelValueRegexp     = regexp.MustCompile("^" + "(" + qualifiedNameFmt + ")?" + "$")
 	dns1123LabelRegexp   = regexp.MustCompile("^" + dns1123LabelFmt + "$")
 	wildcardPrefixRegexp = regexp.MustCompile("^" + wildcardPrefix + "$")
-	seLabelKeys          = []string{"app"}
+	seLabelKeys          *seLabelKeysHolder
+	seLabelKeysStr       = "app"
 
 	skipValidateTagValue = func() bool {
 		switch os.Getenv("SKIP_VALIDATE_LABEL_VALUE") {
@@ -45,11 +45,96 @@ var (
 	}()
 )
 
+type seLabelKeyItem struct {
+	key, mapKey string
+}
+
+type seLabelKeysHolder struct {
+	// example: app:ourApp
+	instanceLabels []*seLabelKeyItem
+	// $-prefixed meta
+	// support:
+	//   $host : the first host of se. example: $host:theFirstHost
+	seMeta []*seLabelKeyItem
+}
+
+func (h *seLabelKeysHolder) selectLabelsInto(se *networking.ServiceEntry, labels map[string]string) {
+	for _, item := range h.instanceLabels {
+		if _, ok := labels[item.mapKey]; ok {
+			continue
+		}
+
+		for _, ep := range se.Endpoints {
+			if v, exist := ep.Labels[item.key]; exist {
+				labels[item.mapKey] = v
+				break
+			}
+		}
+	}
+
+	for _, item := range h.seMeta {
+		if _, ok := labels[item.mapKey]; ok {
+			continue
+		}
+
+		switch item.key {
+		case "host":
+			var v string
+			if len(se.Hosts) > 0 {
+				v = se.Hosts[0]
+			}
+			labels[item.mapKey] = v
+		}
+	}
+}
+
+func parseSeLabelKeys(s string) (*seLabelKeysHolder, error) {
+	var (
+		instLabels []*seLabelKeyItem
+		seMeta     []*seLabelKeyItem
+	)
+
+	for _, part := range strings.Split(s, ",") {
+		item := &seLabelKeyItem{}
+
+		if strings.HasPrefix(part, "$") {
+			part = part[2:]
+			seMeta = append(seMeta, item)
+		} else {
+			instLabels = append(instLabels, item)
+		}
+
+		if idx := strings.Index(part, ":"); idx >= 0 {
+			item.key = part[:idx]
+			item.mapKey = part[idx+1:]
+		} else {
+			item.key = part
+			item.mapKey = part
+		}
+	}
+
+	if len(instLabels) > 0 || len(seMeta) > 0 {
+		return &seLabelKeysHolder{
+			instanceLabels: instLabels,
+			seMeta:         seMeta,
+		}, nil
+	}
+
+	return nil, nil
+}
+
 func init() {
-	seLabelKeysStr := os.Getenv("SE_LABEL_SELECTOR_KEYS")
-	if seLabelKeysStr == "" {
-	} else {
-		seLabelKeys = strings.Split(seLabelKeysStr, ",")
+	// TODO move to source args
+	if v := os.Getenv("SE_LABEL_SELECTOR_KEYS"); v != "" {
+		// XXX can not override to "" ?
+		seLabelKeysStr = v
+	}
+	if seLabelKeysStr != "" {
+		if v, err := parseSeLabelKeys(seLabelKeysStr); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "invalid seLabelKeysStr %s ignored", seLabelKeysStr)
+		} else {
+			seLabelKeys = v
+		}
 	}
 }
 
@@ -169,16 +254,12 @@ func CopySe(item *networking.ServiceEntry) *networking.ServiceEntry {
 }
 
 func SelectLabels(item *networking.ServiceEntry) map[string]string {
-	labes := make(map[string]string, 0)
-	for _, key := range seLabelKeys {
-		for _, ep := range item.Endpoints {
-			if v, exist := ep.Labels[key]; exist {
-				labes[key] = v
-				break
-			}
-		}
+	labels := make(map[string]string, 0)
+
+	if seLabelKeys != nil {
+		seLabelKeys.selectLabelsInto(item, labels)
 	}
-	return labes
+	return labels
 }
 
 func FillSeLabels(se *networking.ServiceEntry, meta resource.Metadata) {
