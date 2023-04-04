@@ -3,6 +3,7 @@ package metric
 import (
 	"fmt"
 	"net"
+	"strings"
 
 	service_accesslog "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	log "github.com/sirupsen/logrus"
@@ -96,4 +97,42 @@ func (s *AccessLogSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 
 	log.Debugf("successfully get metric from accesslog")
 	return metric, nil
+}
+
+func (s *AccessLogSource) Reset(info string) error {
+	parts := strings.Split(info, "/")
+	ns, name := parts[0], parts[1]
+
+	for _, convertor := range s.convertors {
+		convertor.convertorLock.Lock()
+
+		// reset ns/name
+		for k, _ := range convertor.cacheResult {
+			// it will reset all svf in ns if svc is empty
+			if name == "" {
+				if ns == strings.Split(k, "/")[0] {
+					convertor.cacheResult[k] = map[string]string{}
+				}
+			} else {
+				if k == info {
+					convertor.cacheResult[k] = map[string]string{}
+				}
+			}
+		}
+
+		// sync to cacheResultCopy
+		newCacheResultCopy := make(map[string]map[string]string)
+		for meta, value := range convertor.cacheResult {
+			tmpValue := make(map[string]string)
+			for k, v := range value {
+				tmpValue[k] = v
+			}
+			newCacheResultCopy[meta] = tmpValue
+		}
+		convertor.cacheResultCopy = newCacheResultCopy
+
+		convertor.convertorLock.Unlock()
+	}
+
+	return nil
 }

@@ -220,8 +220,6 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
 
-	log.Debugf("namespace %s is not fenced in this time", req.NamespacedName)
-
 	// refresh service fenced status
 	services := &corev1.ServiceList{}
 	if err = r.Client.List(ctx, services, client.InNamespace(req.Name)); err != nil {

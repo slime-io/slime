@@ -16,6 +16,7 @@ import (
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	"slime.io/slime/modules/lazyload/controllers"
 	modmodel "slime.io/slime/modules/lazyload/model"
+	"slime.io/slime/modules/lazyload/pkg/server"
 )
 
 var log = modmodel.ModuleLog
@@ -59,7 +60,6 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err != nil {
 		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
 	}
-
 	sfReconciler := controllers.NewReconciler(
 		controllers.ReconcilerWithCfg(&m.config),
 		controllers.ReconcilerWithEnv(env),
@@ -76,6 +76,13 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		sfReconciler.StartSvcCache(ctx)
 		sfReconciler.StartIpToSvcCache(ctx)
 	})
+
+	source := metric.NewSource(pc)
+	handler := &server.Handler{
+		HttpPathHandler: env.HttpPathHandler,
+		Source:          source,
+	}
+	svfResetRegister(handler)
 
 	var builder basecontroller.ObjectReconcilerBuilder
 
@@ -115,12 +122,12 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		return fmt.Errorf("unable to create controller,%+v", err)
 	}
 
-	le.AddOnStartedLeading(func(_ context.Context) {
+	le.AddOnStartedLeading(func(ctx context.Context) {
 		log.Infof("producers starts")
-		metric.NewProducer(pc)
+		metric.NewProducer(pc, source)
 	})
-	if m.config.AutoPort {
 
+	if m.config.AutoPort {
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			sfReconciler.StartAutoPort(ctx)
 		})
@@ -137,4 +144,8 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 
 	le.AddOnStoppedLeading(sfReconciler.Clear)
 	return nil
+}
+
+func svfResetRegister(handler *server.Handler) {
+	handler.HandleFunc("/debug/svfReset", handler.SvfResetSetting)
 }

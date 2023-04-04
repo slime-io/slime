@@ -17,3 +17,7 @@ func (s *MockSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 	}
 	return metric, nil
 }
+
+func (s *MockSource) Reset(info string) error {
+	return nil
+}
