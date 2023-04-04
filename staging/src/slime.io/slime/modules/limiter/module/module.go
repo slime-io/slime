@@ -98,9 +98,11 @@ func (m *Module) setupWithManager(mgr manager.Manager) error {
 
 func (m *Module) setupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
 
+	source := metric.NewSource(m.pc)
 	le.AddOnStartedLeading(func(ctx context.Context) {
 		log.Infof("producers starts")
-		metric.NewProducer(m.pc)
+
+		metric.NewProducer(m.pc, source)
 		go m.sr.WatchMetric(ctx)
 	})
 

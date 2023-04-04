@@ -4,19 +4,9 @@ import (
 	"github.com/prometheus/common/log"
 )
 
-func NewProducer(config *ProducerConfig) {
-	var source Source
+func NewProducer(config *ProducerConfig, source Source) {
 	var wp *WatcherProducer
 	var tp *TickerProducer
-
-	// init source
-	if config.EnablePrometheusSource {
-		source = NewPrometheusSource(config.PrometheusSourceConfig)
-	} else if config.EnableMockSource {
-		source = NewMockSource()
-	} else {
-		source = NewAccessLogSource(config.AccessLogSourceConfig)
-	}
 
 	if config.EnableWatcherProducer {
 		log.Debugf("lazyload: watch producer begin")
@@ -44,4 +34,17 @@ func NewProducer(config *ProducerConfig) {
 		log.Infof("all producers stopped")
 		return
 	}()
+}
+
+func NewSource(config *ProducerConfig) Source {
+	// init source
+	var source Source
+	if config.EnablePrometheusSource {
+		source = NewPrometheusSource(config.PrometheusSourceConfig)
+	} else if config.EnableMockSource {
+		source = NewMockSource()
+	} else {
+		source = NewAccessLogSource(config.AccessLogSourceConfig)
+	}
+	return source
 }
