@@ -175,7 +175,7 @@ func (s *Source) deleteService(serviceName string) {
 		if service == serviceName {
 			// DELETE, set ep size to zero
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs); err == nil {
+			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs, nil); err == nil {
 				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
@@ -190,7 +190,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 		if oldEntry, ok := s.cache[service]; !ok {
 			// ADD
 			s.cache[service] = newEntry
-			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs); err == nil {
+			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs, nil); err == nil {
 				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
@@ -200,7 +200,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 			if !reflect.DeepEqual(oldEntry, newEntry) {
 				// UPDATE
 				s.cache[service] = newEntry
-				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs); err == nil {
+				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs, nil); err == nil {
 					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)

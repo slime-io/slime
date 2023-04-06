@@ -81,7 +81,8 @@ type Source struct {
 	// if an original host exists in serviceHostAliases, the corresponding value will
 	// be appended to the converted ServiceEntry hosts.
 	// Updates are only allowed when the configuration is loaded or reloaded.
-	serviceHostAliases map[string][]string
+	serviceHostAliases    map[string][]string
+	seMetaModifierFactory func(string) func(*resource.Metadata)
 }
 
 const (
@@ -186,6 +187,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 
 	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
 	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
+	ret.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
 
 	for _, op := range options {
 		if err := op(ret); err != nil {
@@ -220,6 +222,33 @@ func generateServiceHostAliases(hostAliases []*bootstrap.ServiceHostAlias) map[s
 	return nil
 }
 
+func generateSeMetaModifierFactory(additionalMetas map[string]*bootstrap.MetadataWrapper) func(string) func(*resource.Metadata) {
+	return func(s string) func(*resource.Metadata) {
+		additionalMeta, exist := additionalMetas[s]
+		if !exist || additionalMeta == nil {
+			return func(_ *resource.Metadata) { /*do nothing*/ }
+		}
+		return func(m *resource.Metadata) {
+			if len(additionalMeta.Labels) > 0 {
+				if m.Labels == nil {
+					m.Labels = make(resource.StringMap, len(additionalMeta.Labels))
+				}
+				for k, v := range additionalMeta.Labels {
+					m.Labels[k] = v
+				}
+			}
+			if len(additionalMeta.Annotations) > 0 {
+				if m.Annotations == nil {
+					m.Annotations = make(resource.StringMap, len(additionalMeta.Annotations))
+				}
+				for k, v := range additionalMeta.Annotations {
+					m.Annotations[k] = v
+				}
+			}
+		}
+	}
+}
+
 func (s *Source) markServiceEntryInitDone() {
 	s.mut.RLock()
 	ch := s.seInitCh
@@ -248,9 +277,15 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
 		s.instanceFilter = newInstSel
 	}
+
 	if !reflect.DeepEqual(prevArgs.ServiceHostAliases, args.ServiceHostAliases) {
 		newSvcHostAliases := generateServiceHostAliases(args.ServiceHostAliases)
 		s.serviceHostAliases = newSvcHostAliases
+	}
+
+	if !reflect.DeepEqual(prevArgs.ServiceAdditionalMetas, args.ServiceAdditionalMetas) {
+		newSeModifierFactory := generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
+		s.seMetaModifierFactory = newSeModifierFactory
 	}
 	s.mut.Unlock()
 }
@@ -268,6 +303,12 @@ func (s *Source) getServiceHostAlias() map[string][]string {
 	return s.serviceHostAliases
 }
 
+func (s *Source) getSeMetaModifierFactory() func(string) func(*resource.Metadata) {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	return s.seMetaModifierFactory
+}
+
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	b, err := json.MarshalIndent(s.cache, "", "  ")
 	if err != nil {
@@ -277,7 +318,7 @@ func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
 	se := util.CopySe(item)
 	items := strings.Split(service, ".")
 	ns := resourceNs
@@ -294,7 +335,9 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}
-
+	if metaModifier != nil {
+		metaModifier(&meta)
+	}
 	return source.BuildServiceEntryEvent(kind, se, meta), nil
 }
 
