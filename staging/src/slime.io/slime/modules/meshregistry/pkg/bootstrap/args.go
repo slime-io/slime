@@ -129,6 +129,13 @@ type SourceArgs struct {
 	ServiceNaming *ServiceNameConverter `json:"ServiceNaming,omitempty"`
 	// ServiceHostAliases allows configuring additional aliases for the specified service host
 	ServiceHostAliases []*ServiceHostAlias `json:"ServiceHostAliases,omitempty"`
+	// ServiceAdditionalMetas allows configuring additional metadata for the specified service when converting to a ServiceEntry
+	ServiceAdditionalMetas map[string]*MetadataWrapper `json:"ServiceAdditionalMetas,omitempty"`
+}
+
+type MetadataWrapper struct {
+	Annotations map[string]string `json:"Annotations,omitempty"`
+	Labels      map[string]string `json:"Labels,omitempty"`
 }
 
 // ServiceHostAlias includes the original host and all aliases of the original host
