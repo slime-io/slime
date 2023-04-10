@@ -14,4 +14,9 @@ done
 
 export MOD=boot
 export ALL_ACTIONS="image image-push"
-../bin/publish.sh "$@"
+
+if [[ "$1" == "publish" || "$1" == "copy"  ]]; then
+  ../bin/multiarch.sh "$@"
+else
+  ../bin/publish.sh "$@"
+fi
