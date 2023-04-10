@@ -108,3 +108,118 @@
    >
    > 配置内容详见 `pkg/bootstrap/args.go`
 
+## 单独部署样例
+
+1. 部署对接nacos的meshregistry子模块，也可参考 [slimeboot](../../../../../../doc/zh/slime-boot.md/#meshregistry安装样例)
+
+   ```yaml
+   apiVersion: config.netease.com/v1alpha1
+   kind: SlimeBoot
+   metadata:
+     name: meshregistry
+     namespace: mesh-operator
+   spec:
+     image:
+       pullPolicy: Always
+       repository: docker.io/slimeio/slime-meshregistry
+       tag: v0.7.0
+     module:
+     - name: meshregistry
+       kind: meshregistry
+       enable: true
+       general:
+         LEGACY:
+           NacosSource:
+             Enabled: true
+             RefreshPeriod: 30s
+             Address:
+             - "http://nacos.test.com"
+             Mode: polling
+   ```
+
+2. istiod 配置configSources, 从meshregistry获取服务信息
+
+   ```yaml
+   configSources:
+   - address: xds://meshregistry.mesh-operator.svc:16010
+   ```
+   
+3. 利用接口查询meshregistry已获取服务信息：`xx:8081/meshregistry/xdsCache`,
+
+   ```json
+   {
+     "networking.istio.io/v1alpha3/ServiceEntry": [
+       {
+         "type": "networking.istio.io/v1alpha3/ServiceEntry",
+         "name": "nacos.naming.servicename",
+         "namespace": "naming",
+         "labels": {
+           "registry": "nacos"
+         },
+         "annotations": {
+           "ResourceVersion": "2023-04-07 09:14:37.971015359 +0000 UTC m=+246.064642097"
+         },
+         "creationTimestamp": "2023-04-07T09:14:37.970977169Z",
+         "Spec": {
+           "hosts": [
+             "nacos.naming.servicename"
+           ],
+           "addresses": [],
+           "ports": [
+             {
+               "number": 80,
+               "protocol": "HTTP",
+               "name": "http"
+             }
+           ],
+           "resolution": "STATIC",
+           "endpoints": [
+             {
+               "address": "20.18.7.10",
+               "ports": {
+                 "http": 8080
+               },
+               "labels": {}
+             }
+           ]
+         }
+       }
+     ]
+   }
+   ```
+
+4.  利用接口查询istiod已获取服务信息 `xx:15014/debug/configz `
+
+   ```json
+   [
+     {
+       "kind": "ServiceEntry",
+       "apiVersion": "networking.istio.io/v1alpha3",
+       "metadata": {
+         "name": "nacos.naming.servicename",
+         "namespace": "naming",
+         "resourceVersion": "2023-04-07 09:27:15.69926204 +0000 UTC m=+0.090193089",
+         "creationTimestamp": "2023-04-07T09:15:07Z",
+         "labels": {
+           "registry": "nacos"
+         },
+         "annotations": {
+           "ResourceVersion": "2023-04-07 09:15:07.969794894 +0000 UTC m=+276.063421634"
+         }
+       },
+       "spec": {
+         "hosts": [
+           "nacos.naming.servicename"
+         ],
+         "ports": [
+           {
+             "name": "http",
+             "number": 80,
+             "protocol": "HTTP"
+           }
+         ],
+         "resolution": "STATIC"
+       }
+     }
+   ]
+   ```

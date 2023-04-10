@@ -72,9 +72,7 @@ service:
   port: 80
   auxiliaryPort: 8081
   logSourcePort: 8082
-
-auxiliaryPort: 8081
-logSourcePort: 8082
+  mcpOverXdsPort: 16010
 
 containers:
   slime:
