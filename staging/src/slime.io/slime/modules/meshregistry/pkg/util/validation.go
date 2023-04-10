@@ -98,7 +98,7 @@ func parseSeLabelKeys(s string) (*seLabelKeysHolder, error) {
 		item := &seLabelKeyItem{}
 
 		if strings.HasPrefix(part, "$") {
-			part = part[2:]
+			part = part[1:]
 			seMeta = append(seMeta, item)
 		} else {
 			instLabels = append(instLabels, item)
