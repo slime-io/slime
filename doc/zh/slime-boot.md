@@ -1,4 +1,4 @@
-- [slimeboot 介绍与使用](#slimeboot-介绍与使用)
+- [SlimeBoot 介绍与使用](#slimeboot-介绍与使用)
   - [介绍](#介绍)
   - [准备](#准备)
   - [参数介绍](#参数介绍)
@@ -6,7 +6,7 @@
     - [lazyload安装样例](#lazyload安装样例)
     - [limiter安装样例](#limiter安装样例)
     - [plugin 安装样例](#plugin-安装样例)
-    - [meshregistry 安装样例](#meshregistry-安装样例)
+    - [meshregistry安装样例](#meshregistry安装样例)
     - [bundle模式安装样例](#bundle模式安装样例)
     - [多副本样例](#多副本样例)
     - [Config.global](#configglobal)
@@ -317,33 +317,29 @@ spec:
     repository: docker.io/slimeio/slime-meshregistry
     tag: v0.7.0
   module:
-    - name: meshregistry
-      kind: meshregistry
-      enable: true
-      general:
-        LEGACY:
-          MeshConfigFile: ""
-          RevCrds: ""
-          Mcp: {}
-          K8SSource:
-            Enabled: false
-#          EurekaSource:
-#            Enabled: true
-#            Address:
-#              - "http://test/eureka"
-#            RefreshPeriod: 15s
-#            SvcPort: 80
-#          NacosSource:
-#            Enabled: true
-#            Address:
-#              - "http://test.com"
-#            Mode: polling
-#          ZookeeperSource:
-#            Enabled: true
-#            RefreshPeriod: 30s
-#            WaitTime: 10s
-#            Address:
-#              - zookeeper.test.svc.cluster.local:2181
+  - name: meshregistry
+    kind: meshregistry
+    enable: true
+    general:
+      LEGACY:
+        NacosSource:
+          Enabled: true
+          RefreshPeriod: 30s
+          Address:
+          - "http://nacos.test.com"
+          Mode: polling
+        # EurekaSource:
+        #   Enabled: true
+        #   Address:
+        #   - "http://test/eureka"
+        #   RefreshPeriod: 15s
+        #   SvcPort: 80
+        # ZookeeperSource:
+        #   Enabled: true
+        #   RefreshPeriod: 30s
+        #   WaitTime: 10s
+        #   Address:
+        #   - zookeeper.test.svc.cluster.local:2181
 ```
 
 ### bundle模式安装样例

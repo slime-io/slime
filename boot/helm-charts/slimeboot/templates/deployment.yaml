@@ -80,10 +80,13 @@ spec:
               containerPort: 80
               protocol: TCP
             - name: aux-port
-              containerPort: {{ $.Values.auxiliaryPort }}
+              containerPort: {{ $.Values.service.auxiliaryPort }}
               protocol: TCP
             - name: log-source-port
-              containerPort: {{ $.Values.logSourcePort }}
+              containerPort: {{ $.Values.service.logSourcePort }}
+              protocol: TCP
+            - name: mcp-over-xds
+              containerPort: {{ $.Values.service.mcpOverXdsPort }}
               protocol: TCP
           resources:
           {{- toYaml $.Values.resources | nindent 12 }}
@@ -176,6 +179,10 @@ spec:
       targetPort: log-source-port
       protocol: TCP
       name: log-source-port
+    - port: {{ $.Values.service.mcpOverXdsPort }}
+      targetPort: 16010
+      protocol: TCP
+      name: mcp-over-xds
   selector:
     app: {{.name}}
   {{- end }}
