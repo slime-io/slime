@@ -78,10 +78,12 @@ func (m *Module) init(env bootstrap.Environment) error {
 		return err
 	}
 	m.pc = pc
+	source := metric.NewSource(m.pc)
 	m.sr = controllers.NewReconciler(
 		controllers.ReconcilerWithCfg(&m.config),
 		controllers.ReconcilerWithEnv(m.env),
 		controllers.ReconcilerWithProducerConfig(m.pc),
+		controllers.ReconcilerWithSource(source),
 	)
 	return nil
 }
@@ -97,12 +99,10 @@ func (m *Module) setupWithManager(mgr manager.Manager) error {
 }
 
 func (m *Module) setupWithLeaderElection(le leaderelection.LeaderCallbacks) error {
-
-	source := metric.NewSource(m.pc)
 	le.AddOnStartedLeading(func(ctx context.Context) {
 		log.Infof("producers starts")
+		metric.NewProducer(m.pc, m.sr.Source)
 
-		metric.NewProducer(m.pc, source)
 		go m.sr.WatchMetric(ctx)
 	})
 

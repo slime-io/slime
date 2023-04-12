@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/types"
 	"strconv"
 	"sync"
 	"time"
@@ -33,8 +34,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	"sigs.k8s.io/controller-runtime/pkg/source"
-
 	"slime.io/slime/framework/bootstrap"
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
@@ -47,6 +46,7 @@ import (
 // SmartLimiterReconciler reconciles a SmartLimiter object
 type SmartLimiterReconciler struct {
 	client.Client
+	sync.RWMutex
 	Scheme *runtime.Scheme
 
 	cfg *config.Limiter
@@ -58,19 +58,18 @@ type SmartLimiterReconciler struct {
 	// reuse, or use another filed to store interested nn
 	// key is the interested namespace/name
 	// value is the metricInfo
-	metricInfo   cmap.ConcurrentMap
-	MetricSource source.Source
-
-	metricInfoLock sync.RWMutex
+	metricInfo cmap.ConcurrentMap
 
 	watcherMetricChan <-chan metric.Metric
 	tickerMetricChan  <-chan metric.Metric
+	Source            metric.Source
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters/status,verbs=get;update;patch
 
 func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+
 	log.Infof("begin reconcile, get smartlimiter %+v", req)
 	instance := &microservicev1alpha2.SmartLimiter{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
@@ -104,6 +103,8 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		} else {
 			r.RegisterInterest(instance, req, out)
 		}
+		log.Debugf("update start")
+		r.RefreshResource(instance)
 	}
 	return ctrl.Result{}, nil
 }
@@ -258,6 +259,32 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 	return out, nil
 }
 
+// RefreshResource refresh smartlimiter and ef on time
+// even if reconcile fails, there are still ticker tasks to refresh
+// only logging errors, no errors return
+func (r *SmartLimiterReconciler) RefreshResource(instance *microservicev1alpha2.SmartLimiter) {
+	log := log.WithField("function", "RefreshResource")
+
+	queryMap := r.handleEvent(types.NamespacedName{
+		Namespace: instance.Namespace,
+		Name:      instance.Name,
+	})
+	if len(queryMap) == 0 {
+		log.Debug("get empty queryMap, waiting for timed tasks")
+		return
+	}
+
+	metric, err := r.Source.QueryMetric(queryMap)
+	if err != nil {
+		log.Errorf("query metric failed: %s", err.Error())
+	} else if len(metric) == 0 {
+		log.Errorf("query metric get empty: %s", err.Error())
+	} else {
+		log.Debugf("get metric %+v", metric)
+		r.ConsumeMetric(metric)
+	}
+}
+
 func FQN(ns, name string) string {
 	return ns + "/" + name
 }
@@ -273,6 +300,12 @@ func ReconcilerWithEnv(env bootstrap.Environment) ReconcilerOpts {
 func ReconcilerWithCfg(cfg *config.Limiter) ReconcilerOpts {
 	return func(sr *SmartLimiterReconciler) {
 		sr.cfg = cfg
+	}
+}
+
+func ReconcilerWithSource(source metric.Source) ReconcilerOpts {
+	return func(sr *SmartLimiterReconciler) {
+		sr.Source = source
 	}
 }
 

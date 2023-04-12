@@ -57,6 +57,9 @@ func (r *SmartLimiterReconciler) WatchMetric(ctx context.Context) {
 }
 
 func (r *SmartLimiterReconciler) ConsumeMetric(metricMap metric.Metric) {
+	r.Lock()
+	defer r.Unlock()
+
 	for metaInfo, results := range metricMap {
 		Info := make(map[string]string)
 		meta := &StaticMeta{}
