@@ -131,6 +131,9 @@ type SourceArgs struct {
 	ServiceHostAliases []*ServiceHostAlias `json:"ServiceHostAliases,omitempty"`
 	// ServiceAdditionalMetas allows configuring additional metadata for the specified service when converting to a ServiceEntry
 	ServiceAdditionalMetas map[string]*MetadataWrapper `json:"ServiceAdditionalMetas,omitempty"`
+	// InstanceMetaRelabel is used to adjust the metadata of the instance.
+	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs to be processed before ServiceNaming
+	InstanceMetaRelabel *InstanceMetaRelabel `json:"InstanceMetaRelabel,omitempty"`
 }
 
 type MetadataWrapper struct {
@@ -173,6 +176,27 @@ var (
 type ServiceNamingItem struct {
 	Kind  ServiceNameItemKind `json:"Kind,omitempty"`
 	Value string              `json:"Value,omitempty"`
+}
+
+// InstanceMetaRelabel is used to configure how to adjust the metadata of the instance.
+type InstanceMetaRelabel struct {
+	// Items is the InstanceMetaRelabelItem configuration list, which is executed sequentially,
+	// which means that the subsequent items will be processed on the results of the previous items.
+	Items []*InstanceMetaRelabelItem `json:"Items,omitempty"`
+}
+
+// InstanceMetaRelabelItem represents an item used for relabeling instance metadata.
+type InstanceMetaRelabelItem struct {
+	// The key that currently exists in the instance metadata.
+	Key string `json:"Key,omitempty"`
+	// TargetKey is the new key to be added to the instance metadata based on the original key.
+	TargetKey string `json:"TargetKey,omitempty"`
+	// Whether to overwrite the value of the TargetKey if it already exists in the instance metadata.
+	Overwirte bool `json:"Overwirte,omitempty"`
+	// ValuesMapping is a map that associates values of the Key to values of the TargetKey.
+	// If the Key's value is found in the map, the corresponding value is used for the TargetKey.
+	// If not, the original value is used for the TargetKey.
+	ValuesMapping map[string]string `json:"ValuesMapping,omitempty"`
 }
 
 type K8SSourceArgs struct {

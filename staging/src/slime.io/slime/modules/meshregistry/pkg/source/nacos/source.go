@@ -152,9 +152,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 			}
 		}
 	}
-	if args.ServiceNaming != nil {
-		ret.reGroupInstances = reGroupInstances(args.ServiceNaming)
-	}
+
 	if args.Mode == POLLING {
 		servers := args.Servers
 		if len(servers) == 0 {
@@ -188,6 +186,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
 	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
 	ret.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
+	ret.reGroupInstances = reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
 
 	for _, op := range options {
 		if err := op(ret); err != nil {
@@ -286,6 +285,12 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	if !reflect.DeepEqual(prevArgs.ServiceAdditionalMetas, args.ServiceAdditionalMetas) {
 		newSeModifierFactory := generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
 		s.seMetaModifierFactory = newSeModifierFactory
+	}
+
+	if !reflect.DeepEqual(prevArgs.InstanceMetaRelabel, args.InstanceMetaRelabel) ||
+		!reflect.DeepEqual(prevArgs.ServiceNaming, args.ServiceNaming) {
+		newReGroupInstances := reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
+		s.reGroupInstances = newReGroupInstances
 	}
 	s.mut.Unlock()
 }
@@ -390,7 +395,41 @@ func printEps(eps []*networking.WorkloadEntry) string {
 	return strings.Join(ips, ",")
 }
 
-func reGroupInstances(c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
+func reGroupInstances(rl *bootstrap.InstanceMetaRelabel,
+	c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
+	if rl == nil && c == nil {
+		return nil
+	}
+
+	relabelFuncs := make([]func(inst *instance), 0, len(rl.Items))
+	for _, relabel := range rl.Items {
+		f := func(item *bootstrap.InstanceMetaRelabelItem) func(inst *instance) {
+			return func(inst *instance) {
+				if len(inst.Metadata) == 0 ||
+					item.Key == "" || item.TargetKey == "" {
+					return
+				}
+				v, exist := inst.Metadata[item.Key]
+				if !exist {
+					return
+				} else {
+					if nv, exist := item.ValuesMapping[v]; exist {
+						v = nv
+					}
+				}
+				if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwirte {
+					inst.Metadata[item.TargetKey] = v
+				}
+			}
+		}(relabel)
+		relabelFuncs = append(relabelFuncs, f)
+	}
+	instanceRelabel := func(inst *instance) {
+		for _, f := range relabelFuncs {
+			f(inst)
+		}
+	}
+
 	substrFuncs := make([]func(inst *instance) string, 0, len(c.Items))
 	for _, item := range c.Items {
 		var substrF func(inst *instance) string
@@ -435,6 +474,7 @@ func reGroupInstances(c *bootstrap.ServiceNameConverter) func(in []*instanceResp
 		m := map[string][]*instance{}
 		for _, ir := range in {
 			for _, host := range ir.Hosts {
+				instanceRelabel(host)
 				dom := instanceDom(host)
 				m[dom] = append([]*instance(m[dom]), host)
 			}
