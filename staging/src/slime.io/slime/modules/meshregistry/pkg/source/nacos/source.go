@@ -401,73 +401,79 @@ func reGroupInstances(rl *bootstrap.InstanceMetaRelabel,
 		return nil
 	}
 
-	relabelFuncs := make([]func(inst *instance), 0, len(rl.Items))
-	for _, relabel := range rl.Items {
-		f := func(item *bootstrap.InstanceMetaRelabelItem) func(inst *instance) {
-			return func(inst *instance) {
-				if len(inst.Metadata) == 0 ||
-					item.Key == "" || item.TargetKey == "" {
-					return
-				}
-				v, exist := inst.Metadata[item.Key]
-				if !exist {
-					return
-				} else {
-					if nv, exist := item.ValuesMapping[v]; exist {
-						v = nv
+	var instanceRelabel func(inst *instance) = func(inst *instance) { /*do nothing*/ }
+	if rl != nil {
+		var relabelFuncs []func(inst *instance)
+		for _, relabel := range rl.Items {
+			f := func(item *bootstrap.InstanceMetaRelabelItem) func(inst *instance) {
+				return func(inst *instance) {
+					if len(inst.Metadata) == 0 ||
+						item.Key == "" || item.TargetKey == "" {
+						return
+					}
+					v, exist := inst.Metadata[item.Key]
+					if !exist {
+						return
+					} else {
+						if nv, exist := item.ValuesMapping[v]; exist {
+							v = nv
+						}
+					}
+					if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwirte {
+						inst.Metadata[item.TargetKey] = v
 					}
 				}
-				if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwirte {
-					inst.Metadata[item.TargetKey] = v
-				}
+			}(relabel)
+			relabelFuncs = append(relabelFuncs, f)
+		}
+		instanceRelabel = func(inst *instance) {
+			for _, f := range relabelFuncs {
+				f(inst)
 			}
-		}(relabel)
-		relabelFuncs = append(relabelFuncs, f)
-	}
-	instanceRelabel := func(inst *instance) {
-		for _, f := range relabelFuncs {
-			f(inst)
 		}
 	}
 
-	substrFuncs := make([]func(inst *instance) string, 0, len(c.Items))
-	for _, item := range c.Items {
-		var substrF func(inst *instance) string
-		switch item.Kind {
-		case bootstrap.InstanceBasicInfoKind:
-			switch item.Value {
-			case bootstrap.InstanceBasicInfoSvc:
-				substrF = func(inst *instance) string { return inst.ServiceName }
-			case bootstrap.InstanceBasicInfoIP:
-				substrF = func(inst *instance) string { return inst.Ip }
-			case bootstrap.InstanceBasicInfoPort:
-				substrF = func(inst *instance) string { return fmt.Sprintf("%d", inst.Port) }
-			}
-		case bootstrap.InstanceMetadataKind:
-			substrF = func(meta string) func(inst *instance) string {
-				return func(inst *instance) string {
-					if inst.Metadata == nil {
-						return ""
-					}
-					return inst.Metadata[meta]
+	var instanceDom func(inst *instance) string = func(inst *instance) string { return inst.ServiceName }
+	if c != nil {
+		var substrFuncs []func(inst *instance) string
+		for _, item := range c.Items {
+			var substrF func(inst *instance) string
+			switch item.Kind {
+			case bootstrap.InstanceBasicInfoKind:
+				switch item.Value {
+				case bootstrap.InstanceBasicInfoSvc:
+					substrF = func(inst *instance) string { return inst.ServiceName }
+				case bootstrap.InstanceBasicInfoIP:
+					substrF = func(inst *instance) string { return inst.Ip }
+				case bootstrap.InstanceBasicInfoPort:
+					substrF = func(inst *instance) string { return fmt.Sprintf("%d", inst.Port) }
 				}
-			}(item.Value)
-		case bootstrap.StaticKind:
-			substrF = func(staticValue string) func(inst *instance) string {
-				return func(inst *instance) string { return staticValue }
-			}(item.Value)
+			case bootstrap.InstanceMetadataKind:
+				substrF = func(meta string) func(inst *instance) string {
+					return func(inst *instance) string {
+						if inst.Metadata == nil {
+							return ""
+						}
+						return inst.Metadata[meta]
+					}
+				}(item.Value)
+			case bootstrap.StaticKind:
+				substrF = func(staticValue string) func(inst *instance) string {
+					return func(inst *instance) string { return staticValue }
+				}(item.Value)
+			}
+			substrFuncs = append(substrFuncs, substrF)
 		}
-		substrFuncs = append(substrFuncs, substrF)
-	}
-	instanceDom := func(inst *instance) string {
-		subs := make([]string, 0, len(c.Items))
-		for _, f := range substrFuncs {
-			subs = append(subs, f(inst))
+		instanceDom = func(inst *instance) string {
+			subs := make([]string, 0, len(c.Items))
+			for _, f := range substrFuncs {
+				subs = append(subs, f(inst))
+			}
+			svcName := strings.Join(subs, c.Sep)
+			// overwrite the original service name
+			inst.ServiceName = svcName
+			return svcName
 		}
-		svcName := strings.Join(subs, c.Sep)
-		// overwrite the original service name
-		inst.ServiceName = svcName
-		return svcName
 	}
 
 	return func(in []*instanceResp) []*instanceResp {
