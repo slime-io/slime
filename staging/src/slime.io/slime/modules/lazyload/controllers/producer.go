@@ -127,21 +127,13 @@ func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error
 		// init log source port
 		port := env.Config.Global.Misc["logSourcePort"]
 
-		// init initCache
-		initCache, err := newInitCache(env)
-		if err != nil {
-			return nil, err
-		}
-		log.Debugf("initCache is %+v", initCache)
-
 		// init accessLog source config
 		accessLogSourceConfig = metric.AccessLogSourceConfig{
 			ServePort: port,
 			AccessLogConvertorConfigs: []metric.AccessLogConvertorConfig{
 				{
-					Name:      AccessLogConvertorName,
-					Handler:   nil,
-					InitCache: initCache,
+					Name:    AccessLogConvertorName,
+					Handler: nil,
 				},
 			},
 		}
@@ -209,7 +201,7 @@ func newPrometheusSourceConfig(env bootstrap.Environment) (metric.PrometheusSour
 	}, nil
 }
 
-func newInitCache(env bootstrap.Environment) (map[string]map[string]string, error) {
+func NewCache(env bootstrap.Environment) (map[string]map[string]string, error) {
 	result := make(map[string]map[string]string)
 
 	svfGvr := schema.GroupVersionResource{

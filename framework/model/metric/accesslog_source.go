@@ -136,3 +136,21 @@ func (s *AccessLogSource) Reset(info string) error {
 
 	return nil
 }
+
+func (s *AccessLogSource) Fullfill(cache map[string]map[string]string) error {
+
+	for _, convertor := range s.convertors {
+		convertor.convertorLock.Lock()
+		for meta, value := range cache {
+			convertor.cacheResult[meta] = value
+			tmpValue := make(map[string]string)
+			for k, v := range value {
+				tmpValue[k] = v
+			}
+
+			convertor.cacheResultCopy[meta] = tmpValue
+		}
+		convertor.convertorLock.Unlock()
+	}
+	return nil
+}

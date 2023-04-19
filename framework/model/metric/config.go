@@ -44,7 +44,6 @@ type AccessLogSourceConfig struct {
 }
 
 type AccessLogConvertorConfig struct {
-	Name      string // handler name
-	Handler   func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
-	InitCache map[string]map[string]string // for cacheResult init
+	Name    string // handler name
+	Handler func(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error)
 }

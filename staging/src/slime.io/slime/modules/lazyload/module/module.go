@@ -77,7 +77,17 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		sfReconciler.StartIpToSvcCache(ctx)
 	})
 
+	// build metric source
 	source := metric.NewSource(pc)
+
+	cache, err := controllers.NewCache(env)
+	if err != nil {
+		return fmt.Errorf("GetCacheFromServicefence occured err: %s", err)
+	}
+	source.Fullfill(cache)
+	log.Debugf("GetCacheFromServicefence %+v", cache)
+
+	// register svf reset
 	handler := &server.Handler{
 		HttpPathHandler: env.HttpPathHandler,
 		Source:          source,
@@ -121,6 +131,17 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err := builder.Build(mgr); err != nil {
 		return fmt.Errorf("unable to create controller,%+v", err)
 	}
+
+	le.AddOnStartedLeading(func(ctx context.Context) {
+		log.Infof("retrieve metric from svf status.metric")
+		cache, err := controllers.NewCache(env)
+		if err != nil {
+			log.Warnf("GetCacheFromServicefence occured err in StartedLeading: %s", err)
+			return
+		}
+		source.Fullfill(cache)
+		log.Debugf("GetCacheFromServicefence is %+v", cache)
+	})
 
 	le.AddOnStartedLeading(func(ctx context.Context) {
 		log.Infof("producers starts")
