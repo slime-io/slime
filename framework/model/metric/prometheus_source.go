@@ -67,6 +67,10 @@ func (ps *PrometheusSource) Reset(info string) error {
 	return nil
 }
 
+func (ps *PrometheusSource) Fullfill(cache map[string]map[string]string) error {
+	return nil
+}
+
 func defaultConvertor(qv prometheusModel.Value) map[string]string {
 	result := make(map[string]string)
 
