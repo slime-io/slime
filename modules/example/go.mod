@@ -15,7 +15,7 @@ require slime.io/slime/framework v0.0.0
 
 replace (
 	istio.io/api => istio.io/api v0.0.0-20200807181912-0e773b04cfc7
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230105060927-109703897996
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
 
 	// slime.io/slime/framework => ../../../../../../framework   // need uncomment
 	slime.io/slime/framework => ../../framework // need delete

@@ -117,7 +117,7 @@ replace (
 	github.com/prometheus/common => github.com/prometheus/common v0.26.0
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230105060927-109703897996
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
 
 	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855
 
