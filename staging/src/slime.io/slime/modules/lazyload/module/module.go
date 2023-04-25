@@ -5,8 +5,12 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"os"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	istioapi "slime.io/slime/framework/apis"
 	basecontroller "slime.io/slime/framework/controllers"
@@ -17,6 +21,7 @@ import (
 	"slime.io/slime/modules/lazyload/controllers"
 	modmodel "slime.io/slime/modules/lazyload/model"
 	"slime.io/slime/modules/lazyload/pkg/server"
+	"time"
 )
 
 var log = modmodel.ModuleLog
@@ -72,9 +77,16 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		sfReconciler.RegisterSeHandler()
 	}
 
+	podNs := os.Getenv("WATCH_NAMESPACE")
+	podName := os.Getenv("POD_NAME")
+
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
 		sfReconciler.StartSvcCache(ctx)
 		sfReconciler.StartIpToSvcCache(ctx)
+		if env.Config.Global != nil && env.Config.Global.Misc["enableLeaderElection"] == "on" {
+			log.Infof("delete leader labels before working")
+			deleteLeaderLabelUntilSucceed(env.K8SClient, podNs, podName)
+		}
 	})
 
 	// build metric source
@@ -163,10 +175,114 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		log.Warningf("watching metric is not running")
 	}
 
+	if env.Config.Global != nil && env.Config.Global.Misc["enableLeaderElection"] == "on" {
+
+		log.Infof("add/delete leader label in StartedLeading/stoppedLeading")
+
+		le.AddOnStartedLeading(func(ctx context.Context) {
+			first := make(chan struct{}, 1)
+			first <- struct{}{}
+			var retry <-chan time.Time
+
+			go func() {
+				for {
+					select {
+					case <-ctx.Done():
+						log.Infof("ctx is done, retrun")
+						return
+					case <-first:
+					case <-retry:
+						retry = nil
+					}
+					if err = addPodLabel(ctx, env.K8SClient, podNs, podName); err != nil {
+						log.Errorf("add leader labels error %s, retry", err)
+						retry = time.After(1 * time.Second)
+					} else {
+						log.Infof("add leader labels succeed")
+						return
+					}
+				}
+			}()
+		})
+
+		le.AddOnStoppedLeading(func() {
+			go deleteLeaderLabelUntilSucceed(env.K8SClient, podNs, podName)
+		})
+	}
+
 	le.AddOnStoppedLeading(sfReconciler.Clear)
 	return nil
 }
 
 func svfResetRegister(handler *server.Handler) {
 	handler.HandleFunc("/debug/svfReset", handler.SvfResetSetting)
+}
+
+func deleteLeaderLabelUntilSucceed(client *kubernetes.Clientset, podNs, podName string) {
+	first := make(chan struct{}, 1)
+	first <- struct{}{}
+	var retry <-chan time.Time
+	for {
+		select {
+		case <-first:
+		case <-retry:
+			retry = nil
+		}
+
+		if err := deletePodLabel(context.TODO(), client, podNs, podName); err != nil {
+			log.Errorf("delete leader labels error %s", err)
+			retry = time.After(1 * time.Second)
+		} else {
+			log.Infof("delete leader labels succeed")
+			return
+		}
+	}
+}
+
+func addPodLabel(ctx context.Context, client *kubernetes.Clientset, podNs, podName string) error {
+	po, err := getPod(ctx, client, podNs, podName)
+	if err != nil {
+		return err
+	}
+
+	po.Labels[modmodel.SlimeLeader] = "true"
+	_, err = client.CoreV1().Pods(podNs).Update(ctx, po, metav1.UpdateOptions{})
+	if err != nil {
+		return fmt.Errorf("update pod namespace/name: %s/%s err %s", podNs, podName, err)
+	}
+	return nil
+}
+
+func deletePodLabel(ctx context.Context, client *kubernetes.Clientset, podNs, podName string) error {
+
+	po, err := getPod(ctx, client, podNs, podName)
+	if err != nil {
+		return err
+	}
+	// if slime.io/leader not exist, skip
+	if _, ok := po.Labels[modmodel.SlimeLeader]; !ok {
+		log.Infof("label slime.io/leader is not found, skip")
+		return nil
+	}
+
+	delete(po.Labels, modmodel.SlimeLeader)
+	_, err = client.CoreV1().Pods(podNs).Update(ctx, po, metav1.UpdateOptions{})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getPod(ctx context.Context, client *kubernetes.Clientset, podNs, podName string) (*corev1.Pod, error) {
+
+	pod, err := client.CoreV1().Pods(podNs).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			err = fmt.Errorf("pod %s/%s is not found", podNs, podName)
+		} else {
+			err = fmt.Errorf("get pod %s/%s err %s", podNs, podName, err)
+		}
+		return nil, err
+	}
+	return pod, nil
 }

@@ -311,7 +311,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	// setup for leaderelection
-	if mainModConfig.Global.Misc["enable-leader-election"] == "on" {
+	if mainModConfig.Global.Misc["enableLeaderElection"] == "on" {
 		// create a resource lock in the same namespace as the workload instance
 		rl, err := leaderelection.NewKubeResourceLock(conf, os.Getenv("WATCH_NAMESPACE"), bundle)
 		if err != nil {
@@ -487,7 +487,6 @@ func Main(bundle string, modules []Module) {
 			log.Errorf("problem running, %+v", err)
 		}
 	}()
-
 	wg.Wait()
 }
 
