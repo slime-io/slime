@@ -505,7 +505,11 @@ data:
                 "endpoint": {
                   "address": {
                     "socket_address": {
+                      {{- if (eq $g.misc.enableLeaderElection "on") }}
+                      "address": "{{ .name }}-leader.{{ $g.slimeNamespace }}",
+                      {{- else }}
                       "address": "{{ .name }}.{{ $g.slimeNamespace }}",
+                      {{- end }}
                       "port_value": {{ $.Values.service.logSourcePort }}
                     }
                   }

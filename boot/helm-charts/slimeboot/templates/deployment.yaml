@@ -1,7 +1,6 @@
 {{ range .Values.module }}
   {{- if .enable }}
   {{- if not (eq (default "" .mode) "BundleItem") }}
-
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -185,7 +184,42 @@ spec:
       name: mcp-over-xds
   selector:
     app: {{.name}}
-  {{- end }}
-  {{- end }}
-  {{- end }}
-
+{{- if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
+{{- if and .global .global.misc }}
+{{- if eq .global.misc.enableLeaderElection "on" }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .name }}-leader
+  namespace: {{ $.Values.namespace}}
+  labels:
+    app: {{.name}}
+spec:
+  type: {{ $.Values.service.type }}
+  ports:
+    - port: {{ $.Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: {{ $.Values.service.auxiliaryPort }}
+      targetPort: aux-port
+      protocol: TCP
+      name: aux-port
+    - port: {{ $.Values.service.logSourcePort }}
+      targetPort: log-source-port
+      protocol: TCP
+      name: log-source-port
+    - port: {{ $.Values.service.mcpOverXdsPort }}
+      targetPort: 16010
+      protocol: TCP
+      name: mcp-over-xds
+  selector:
+    app: {{.name}}
+    slime.io/leader: "true"
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -37,12 +37,12 @@ var defaultModuleConfig = &bootconfig.Config{
 			},
 		},
 		Misc: map[string]string{
-			"metrics-addr":           ":8080",
-			"aux-addr":               ":8081",
-			"enable-leader-election": "off",
-			"globalSidecarMode":      "namespace",
-			"metricSourceType":       "prometheus", // can be prometheus or accesslog
-			"logSourcePort":          ":8082",
+			"metrics-addr":         ":8080",
+			"aux-addr":             ":8081",
+			"enableLeaderElection": "off",
+			"globalSidecarMode":    "namespace",
+			"metricSourceType":     "prometheus", // can be prometheus or accesslog
+			"logSourcePort":        ":8082",
 			// which label keys of serviceEntry select endpoints
 			// will take effect when serviceEntry does not have workloadSelector field
 			"seLabelSelectorKeys": "app",
@@ -203,7 +203,8 @@ func (f ReadyManagerFunc) AddReadyChecker(name string, checker func() error) {
 
 type Environment struct {
 	Config *bootconfig.Config
-	// clientSet, not support crd
+
+	// clientSet, not support crd, it can use in anytime anywhere
 	K8SClient *kubernetes.Clientset
 	// dynamic client, support any resource
 	DynamicClient    dynamic.Interface
