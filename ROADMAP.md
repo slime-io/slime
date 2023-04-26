@@ -115,7 +115,7 @@
 
 - 支持打多架构镜像
 
-
+详见RELEASE NOTE [V0.4.0](https://github.com/slime-io/slime/releases/tag/v0.4.0)
 
 ## Slime v0.5.0（已发布）
 
@@ -132,6 +132,8 @@
 - 【配置懒加载】支持同网络多集群场景
 - 【i9s】支持 Istio Debug API 视图
 - 【i9s】支持 Envoy Debug API 视图
+
+详见RELEASE NOTE [V0.5.0](https://github.com/slime-io/slime/releases/tag/v0.5.0)
 
 **工程**
 
@@ -151,11 +153,27 @@
 - 规范issue处理、pr处理、发版、社区会议机制等内容 
 - 完善教程，帮助新用户加入社区
 
+详见RELEASE NOTE [V0.6.0](https://github.com/slime-io/slime/releases/tag/v0.6.0)
 
-## Slime v0.7.0（发布中）
+## Slime v0.7.0（已发布）
+
+**流量管理**
+- 【智能限流】支持请求参数匹配条件
+- 【智能限流】持限流触发时，自定义响应头
+
+**运维管理**
+- 【配置懒加载】块支持ServiceEntry类型服务，现在可以同时支持K8s Service与ServiceEntry服务
+
+**扩展管理**
+- 【注册中心】网格仓库模块支持对接开启认证的 Nacos
+
+详见RELEASE NOTE [V0.7.0](https://github.com/slime-io/slime/releases/tag/v0.7.0)
+
+## Slime v0.7.1（发布中）
 
 - 优化处理了很多实践过程中遇到的问题
 
+详见RELEASE NOTE [V0.7.1](https://github.com/slime-io/slime/releases/tag/v0.7.1)
 
 ## Slime v0.8.0（规划中）
 
