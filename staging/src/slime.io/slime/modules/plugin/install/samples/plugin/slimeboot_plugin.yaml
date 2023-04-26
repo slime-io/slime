@@ -7,7 +7,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.5.0_linux_amd64
+    tag: v0.7.1
   module:
     - name: plugin
       kind: plugin
