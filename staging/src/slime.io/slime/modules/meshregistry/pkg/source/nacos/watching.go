@@ -64,7 +64,7 @@ func newNamingClient(addresses []string, namespace string, header map[string]str
 func (s *Source) Watching() {
 	go func() {
 		time.Sleep(s.delay)
-		ticker := time.NewTicker(s.refreshPeriod)
+		ticker := time.NewTicker(time.Duration(s.args.RefreshPeriod))
 		defer ticker.Stop()
 		for {
 			select {
@@ -98,14 +98,14 @@ func (s *Source) parseNacosService(serviceInfos model.ServiceList, subscribe boo
 			log.Infof("parse nacos service %v", serviceInfos.Doms)
 			instances, e := s.namingClient.SelectInstances(vo.SelectInstancesParam{
 				ServiceName: serviceName,
-				GroupName:   s.group,
+				GroupName:   s.args.Group,
 				HealthyOnly: true,
 			})
 			if e != nil {
 				log.Errorf("get %s instances failed", serviceName)
 			}
 			log.Infof("parse nacos instance %v", instances)
-			newServiceEntryMap, err := ConvertServiceEntryMapForNacos(serviceName, instances, s.svcNameWithNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel)
+			newServiceEntryMap, err := ConvertServiceEntryMapForNacos(serviceName, instances, s.args.NameWithNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.LabelPatch)
 			if err != nil {
 				log.Errorf("convert nacos servceentry map failed: " + err.Error())
 				return
@@ -122,7 +122,7 @@ func (s *Source) subNacosService(serviceName string) {
 	log.Infof("nacos start sub %s", serviceName)
 	go s.namingClient.Subscribe(&vo.SubscribeParam{
 		ServiceName: serviceName,
-		GroupName:   s.group,
+		GroupName:   s.args.Group,
 		SubscribeCallback: func(ins []model.Instance, err error) {
 			if err != nil {
 				log.Infof("nacos sub error  %v", serviceName, err)
@@ -130,7 +130,7 @@ func (s *Source) subNacosService(serviceName string) {
 				return
 			}
 			log.Infof("nacos sub %s changed, %v", serviceName, ins)
-			newServiceEntryMap, err := ConvertServiceEntryMapForNacos(serviceName, ins, s.svcNameWithNs, s.gatewayModel, s.svcPort, s.nsHost, s.k8sDomainSuffix, s.patchLabel)
+			newServiceEntryMap, err := ConvertServiceEntryMapForNacos(serviceName, ins, s.args.NameWithNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.LabelPatch)
 			if err != nil {
 				log.Errorf("convert nacos servceentry map failed: " + err.Error())
 				return
@@ -142,8 +142,8 @@ func (s *Source) subNacosService(serviceName string) {
 
 func (s *Source) updateNacosService() {
 	serviceInfos, err := s.namingClient.GetAllServicesInfo(vo.GetAllServiceInfoParam{
-		NameSpace: s.namespace,
-		GroupName: s.group,
+		NameSpace: s.args.Namespace,
+		GroupName: s.args.Group,
 		PageNo:    1,
 		PageSize:  10000,
 	})
@@ -156,8 +156,8 @@ func (s *Source) updateNacosService() {
 		pages := (serviceInfos.Count / 10000) + 1
 		for i := int64(2); i <= pages; i++ {
 			serviceInfos, err = s.namingClient.GetAllServicesInfo(vo.GetAllServiceInfoParam{
-				NameSpace: s.namespace,
-				GroupName: s.group,
+				NameSpace: s.args.Namespace,
+				GroupName: s.args.Group,
 				PageNo:    uint32(i),
 				PageSize:  10000,
 			})
@@ -175,7 +175,7 @@ func (s *Source) deleteService(serviceName string) {
 		if service == serviceName {
 			// DELETE, set ep size to zero
 			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-			if event, err := buildEvent(event.Updated, oldEntry, service, s.resourceNs, nil); err == nil {
+			if event, err := buildEvent(event.Updated, oldEntry, service, s.args.ResourceNs, nil); err == nil {
 				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
@@ -190,7 +190,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 		if oldEntry, ok := s.cache[service]; !ok {
 			// ADD
 			s.cache[service] = newEntry
-			if event, err := buildEvent(event.Added, newEntry, service, s.resourceNs, nil); err == nil {
+			if event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs, nil); err == nil {
 				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
@@ -200,7 +200,7 @@ func (s *Source) updateService(newServiceEntryMap map[string]*networking.Service
 			if !reflect.DeepEqual(oldEntry, newEntry) {
 				// UPDATE
 				s.cache[service] = newEntry
-				if event, err := buildEvent(event.Updated, newEntry, service, s.resourceNs, nil); err == nil {
+				if event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs, nil); err == nil {
 					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
