@@ -153,7 +153,7 @@ func (s *Source) refreshSidecar(init bool) {
 	s.recordAppSidecarUpdateTime(diff)
 	s.mut.Unlock()
 
-	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.resourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel)
+	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.args.ResourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel)
 
 	sidecarMap := make(map[resource.FullName]SidecarWithMeta, len(diffSidecars))
 	for _, sc := range diffSidecars {

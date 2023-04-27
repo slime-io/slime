@@ -43,11 +43,11 @@ func (s *Source) Watching() {
 	log.Info("zk source start to watching")
 	sw := ServiceWatcher{
 		conn:               s.Con,
-		rootPath:           s.RegisterRootNode,
+		rootPath:           s.args.RegistryRootNode,
 		endpointUpdateFunc: s.EndpointUpdate,
 		serviceDeleteFunc:  s.ServiceNodeDelete,
-		gatewatModel:       s.zkGatewayModel,
-		workers:            make([]*worker, s.watchingWorkerCount),
+		gatewatModel:       s.args.GatewayModel,
+		workers:            make([]*worker, s.args.WatchingWorkerCount),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
