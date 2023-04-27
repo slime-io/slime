@@ -14,7 +14,7 @@ import (
 
 func (s *Source) Polling() {
 	go func() {
-		ticker := time.NewTicker(s.refreshPeriod)
+		ticker := time.NewTicker(time.Duration(s.args.RefreshPeriod))
 		defer ticker.Stop()
 		for {
 			s.refresh()
@@ -30,9 +30,9 @@ func (s *Source) Polling() {
 
 func (s *Source) refresh() {
 	log.Infof("zk refresh start : %d", time.Now().UnixNano())
-	children, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode)
+	children, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode)
 	if err != nil {
-		log.Errorf("zk path %s get child error: %s", s.RegisterRootNode, err.Error())
+		log.Errorf("zk path %s get child error: %s", s.args.RegistryRootNode, err.Error())
 		return
 	}
 	for _, child := range children {
@@ -44,17 +44,17 @@ func (s *Source) refresh() {
 }
 
 func (s *Source) iface(service string) {
-	providerChild, _, err := s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ProviderNode)
+	providerChild, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ProviderNode)
 	if err != nil {
 		log.Errorf("zk %s get provider error: %s", service, err.Error())
 		return
 	}
 
 	var consumerChild []string
-	if s.zkGatewayModel {
+	if s.args.GatewayModel {
 		consumerChild = make([]string, 0)
 	} else {
-		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.RegisterRootNode + "/" + service + "/" + ConsumerNode)
+		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
 		if err != nil {
 			log.Errorf("zk %s get consumer error: %s", service, err.Error())
 		}
@@ -68,14 +68,14 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		cacheInUse.Set(service, cmap.New())
 	}
 
-	freshSeMap := convertServiceEntry(provider, consumer, service, s.patchLabel, s.ignoreLabels, s.zkGatewayModel)
+	freshSeMap := convertServiceEntry(provider, consumer, service, s.args.LabelPatch, s.ignoreLabelsMap, s.args.GatewayModel)
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
 		newSeWithMeta := &ServiceEntryWithMeta{
 			ServiceEntry: se,
 			Meta: resource.Metadata{
-				FullName:   resource.FullName{Namespace: resource.Namespace(s.resourceNs), Name: resource.LocalName(serviceKey)},
+				FullName:   resource.FullName{Namespace: resource.Namespace(s.args.ResourceNs), Name: resource.LocalName(serviceKey)},
 				CreateTime: now,
 				Version:    resource.Version(now.String()),
 				Labels: map[string]string{

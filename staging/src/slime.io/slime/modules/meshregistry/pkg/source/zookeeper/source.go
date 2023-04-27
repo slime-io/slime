@@ -46,20 +46,9 @@ const (
 type Source struct {
 	args *bootstrap.ZookeeperSourceArgs
 
-	delay                       time.Duration
-	addresses                   []string
-	timeout                     time.Duration
-	refreshPeriod               time.Duration
-	RegisterRootNode            string
-	ApplicationRegisterRootNode string
-	exceptedResources           []collection.Schema
-	mode                        string
-	zkGatewayModel              bool
-	patchLabel                  bool
-	ignoreLabels                map[string]string
-	watchingRoot                bool // TODO useless?
-	watchingWorkerCount         int
-	resourceNs                  string
+	exceptedResources []collection.Schema
+	ignoreLabelsMap   map[string]string
+	watchingRoot      bool // TODO useless?
 
 	serviceCache         map[string]*ServiceEntryWithMeta
 	cache                cmap.ConcurrentMap
@@ -106,20 +95,9 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 	}
 
 	ret := &Source{
-		args:                        args,
-		delay:                       delay,
-		addresses:                   args.Address,
-		timeout:                     time.Duration(args.ConnectionTimeout),
-		refreshPeriod:               time.Duration(args.RefreshPeriod),
-		mode:                        args.Mode,
-		watchingWorkerCount:         args.WatchingWorkerCount,
-		patchLabel:                  args.LabelPatch,
-		RegisterRootNode:            args.RegistryRootNode,
-		ApplicationRegisterRootNode: args.ApplicationRegisterRootNode,
-		exceptedResources:           exceptedResources,
-		zkGatewayModel:              args.GatewayModel,
-		ignoreLabels:                ignoreLabels,
-		resourceNs:                  args.ResourceNs,
+		args:              args,
+		exceptedResources: exceptedResources,
+		ignoreLabelsMap:   ignoreLabels,
 
 		initedCallback: readyCallback,
 
@@ -182,7 +160,7 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	}
 
 	for {
-		con, _, err := zk.Connect(s.addresses, s.timeout, zk.WithEventCallback(func(ev zk.Event) {
+		con, _, err := zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout), zk.WithEventCallback(func(ev zk.Event) {
 			if ev.Type != zk.EventDisconnected {
 				return
 			}
@@ -246,7 +224,7 @@ func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Source) isPollingMode() bool {
-	return s.mode == Polling
+	return s.args.Mode == Polling
 }
 
 func (s *Source) Start() {
@@ -337,7 +315,7 @@ func (s *Source) cacheInfo(iface string) interface{} {
 }
 
 func (s *Source) cacheInUse() cmap.ConcurrentMap {
-	if s.mode == Polling {
+	if s.args.Mode == Polling {
 		return s.pollingCache
 	} else {
 		return s.cache
