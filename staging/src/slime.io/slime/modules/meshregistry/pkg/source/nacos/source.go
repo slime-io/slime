@@ -36,25 +36,7 @@ type Source struct {
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 
 	// common configs
-	group           string
-	patchLabel      bool
-	gatewayModel    bool
-	nsHost          bool
-	k8sDomainSuffix bool
-	allNamespaces   bool
-	namespace       string
-	namespaces      []string
-	svcPort         uint32
-	mode            string
-	delay           time.Duration
-	refreshPeriod   time.Duration
-
-	// waching configs
-	svcNameWithNs bool
-
-	// polling configs
-	defaultSvcNs string
-	resourceNs   string
+	delay time.Duration
 
 	// source cache
 	cache             map[string]*networking.ServiceEntry
@@ -120,20 +102,8 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 
 	ret := &Source{
 		args:              args,
-		namespace:         args.Namespace,
-		group:             args.Group,
 		delay:             delay,
-		refreshPeriod:     time.Duration(args.RefreshPeriod),
-		mode:              args.Mode,
-		svcNameWithNs:     args.NameWithNs,
 		started:           false,
-		gatewayModel:      args.GatewayModel,
-		patchLabel:        args.LabelPatch,
-		svcPort:           args.SvcPort,
-		nsHost:            nsHost,
-		k8sDomainSuffix:   k8sDomainSuffix,
-		defaultSvcNs:      args.DefaultServiceNs,
-		resourceNs:        args.ResourceNs,
 		initedCallback:    readyCallback,
 		cache:             make(map[string]*networking.ServiceEntry),
 		namingServiceList: cmap.New(),
@@ -362,7 +332,7 @@ func (s *Source) Start() {
 	}
 
 	go func() {
-		if s.mode == POLLING {
+		if s.args.Mode == POLLING {
 			go s.Polling()
 		} else {
 			go s.Watching()
