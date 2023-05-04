@@ -137,7 +137,9 @@ type convertedServiceEntry struct {
 	InboundEndPoints []*networking.WorkloadEntry
 }
 
-func convertServiceEntry(providers, consumers []string, service string, patchLabel bool, ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
+func convertServiceEntry(
+	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
+	ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
 	// TODO y: sort endpoints
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
@@ -169,12 +171,16 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 			continue
 		}
 
+		svcPortInUse := svcPort
 		addr, portNum, err := parseAddr(providerParts[2])
 		if err != nil {
 			log.Errorf("invalid provider ip or port %s of %s", provider, service)
 			continue
 		}
-		port := convertPort(portNum, !gatewayMode)
+		if instancePortAsSvcPort {
+			svcPortInUse = portNum
+		}
+		instPort := convertPort(svcPortInUse, portNum, !gatewayMode)
 
 		methods := map[string]struct{}{}
 		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, func(method string) {
@@ -204,7 +210,7 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 			}
 			cse = &convertedServiceEntry{se: se}
 			serviceEntryByServiceKey[serviceKey] = cse
-			// 网关模式下，服务host添加".dubbo"后缀
+			// XXX 网关模式下，服务host添加".dubbo"后缀
 			if gatewayMode {
 				se.Hosts = []string{serviceKey + DubboHostnameSuffix}
 			} else {
@@ -230,7 +236,7 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 						log.Debugf("invalid consumer %s of %s", consumer, serviceKey)
 						cAddr = cAddr[:idx]
 					} else {
-						cPort = convertPort(portNum, !gatewayMode)
+						cPort = convertPort(portNum, portNum, !gatewayMode)
 						cAddr = addr
 					}
 				}
@@ -246,18 +252,21 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 		}
 		se := cse.se
 
-		se.Endpoints = append(se.Endpoints, convertEndpoint(addr, meta, port))
+		se.Endpoints = append(se.Endpoints, convertEndpoint(addr, meta, instPort))
 
 		if _, ok := uniquePort[serviceKey]; !ok {
 			uniquePort[serviceKey] = make(map[uint32]struct{})
 		}
-		if gatewayMode {
-			if len(se.Ports) == 0 {
-				se.Ports = []*networking.Port{convertPort(80, false)}
+
+		svcPortsToAdd := []uint32{svcPortInUse}
+		if svcPort != 0 && svcPort != svcPortInUse {
+			svcPortsToAdd = append(svcPortsToAdd, svcPort)
+		}
+		for _, p := range svcPortsToAdd {
+			if _, ok := uniquePort[serviceKey][p]; !ok {
+				se.Ports = append(se.Ports, convertPort(p, p, !gatewayMode))
+				uniquePort[serviceKey][p] = struct{}{}
 			}
-		} else if _, ok := uniquePort[serviceKey][port.Number]; !ok {
-			se.Ports = append(se.Ports, port)
-			uniquePort[serviceKey][port.Number] = struct{}{}
 		}
 	}
 
@@ -395,10 +404,10 @@ func parseDubboTag(str string, meta map[string]string) {
 	}
 }
 
-func convertPort(port uint32, nameWithPort bool) *networking.Port {
+func convertPort(svcPort, port uint32, nameWithPort bool) *networking.Port {
 	name := DubboPortName
 	if nameWithPort {
-		name = DubboPortName + "-" + strconv.FormatInt(int64(port), 10)
+		name = source.PortName(NetworkProtocolDubbo, svcPort)
 	}
 	return &networking.Port{
 		Protocol: NetworkProtocolDubbo,

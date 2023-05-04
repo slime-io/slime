@@ -9,13 +9,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/go-zookeeper/zk"
 	cmap "github.com/orcaman/concurrent-map"
-	"istio.io/api/networking/v1alpha3"
+	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collection"
@@ -58,7 +60,7 @@ type Source struct {
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
 	changedApps          map[string]struct{}
 	appSidecarUpdateTime map[string]time.Time
-	dubboPortsCache      map[uint32]*v1alpha3.Port
+	dubboPortsCache      map[uint32]*networking.Port
 
 	handlers       []event.Handler
 	initedCallback func(string)
@@ -75,6 +77,12 @@ type Source struct {
 }
 
 func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
+	// XXX refactor to config
+	if zkSrc := args; zkSrc != nil && zkSrc.GatewayModel {
+		zkSrc.SvcPort = 80
+		zkSrc.InstancePortAsSvcPort = false
+	}
+
 	ignoreLabels := make(map[string]string, 0)
 	for _, v := range args.IgnoreLabel {
 		ignoreLabels[v] = v
@@ -105,7 +113,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		pollingCache:         cmap.New(),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
 		appSidecarUpdateTime: map[string]time.Time{},
-		dubboPortsCache:      map[uint32]*v1alpha3.Port{},
+		dubboPortsCache:      map[uint32]*networking.Port{},
 
 		seInitCh:               make(chan struct{}),
 		stop:                   make(chan struct{}),
@@ -134,7 +142,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
 }
 
-func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *v1alpha3.ServiceEntry) {
+func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networking.ServiceEntry) {
 	ev, err := buildSeEvent(event.Updated, se, meta, nil)
 	if err != nil {
 		log.Errorf("buildSeEvent met err %v", err)
@@ -345,9 +353,9 @@ func (s *Source) Stop() {
 	s.stop <- struct{}{}
 }
 
-func (s *Source) ServiceEntries() []*v1alpha3.ServiceEntry {
+func (s *Source) ServiceEntries() []*networking.ServiceEntry {
 	cacheItems := s.cacheInUse().Items()
-	ret := make([]*v1alpha3.ServiceEntry, 0, len(cacheItems))
+	ret := make([]*networking.ServiceEntry, 0, len(cacheItems))
 
 	for _, seCache := range cacheItems {
 		ses, castOk := seCache.(cmap.ConcurrentMap)
@@ -364,7 +372,7 @@ func (s *Source) ServiceEntries() []*v1alpha3.ServiceEntry {
 	return ret
 }
 
-func (s *Source) ServiceEntry(fullName resource.FullName) *v1alpha3.ServiceEntry {
+func (s *Source) ServiceEntry(fullName resource.FullName) *networking.ServiceEntry {
 	// here we do not use the ns according to the cache layout.
 	serviceKey := string(fullName.Name)
 	service := parseServiceFromKey(serviceKey)
@@ -409,7 +417,109 @@ func (s *Source) markServiceEntryInitDone() {
 	}
 }
 
-func buildSeEvent(kind event.Kind, item *v1alpha3.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
+func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, service string) {
+	if _, ok := cacheInUse.Get(service); !ok {
+		cacheInUse.Set(service, cmap.New())
+	}
+
+	freshSeMap := convertServiceEntry(
+		provider, consumer, service, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
+		s.ignoreLabelsMap, s.args.GatewayModel)
+	for serviceKey, convertedSe := range freshSeMap {
+		se := convertedSe.se
+		now := time.Now()
+		newSeWithMeta := &ServiceEntryWithMeta{
+			ServiceEntry: se,
+			Meta: resource.Metadata{
+				FullName:   resource.FullName{Namespace: resource.Namespace(s.args.ResourceNs), Name: resource.LocalName(serviceKey)},
+				CreateTime: now,
+				Version:    resource.Version(now.String()),
+				Labels: map[string]string{
+					"path":            service,
+					"registry":        "zookeeper",
+					dubboParamMethods: convertedSe.methodsLabel,
+				},
+				Annotations: map[string]string{},
+			},
+		}
+
+		if !convertedSe.methodsEqual {
+			newSeWithMeta.Meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
+		}
+
+		v, ok := cacheInUse.Get(service)
+		if !ok {
+			continue
+		}
+		seCache, ok := v.(cmap.ConcurrentMap)
+		if !ok {
+			continue
+		}
+
+		callModel := convertDubboCallModel(se, convertedSe.InboundEndPoints)
+
+		if value, exist := seCache.Get(serviceKey); !exist {
+			seCache.Set(serviceKey, newSeWithMeta)
+			if ev, err := buildSeEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				for _, h := range s.handlers {
+					h.Handle(ev)
+				}
+			}
+		} else if existSeWithMeta, ok := value.(*ServiceEntryWithMeta); ok {
+			if reflect.DeepEqual(existSeWithMeta, newSeWithMeta) {
+				continue
+			}
+			seCache.Set(serviceKey, newSeWithMeta)
+			if ev, err := buildSeEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				for _, h := range s.handlers {
+					h.Handle(ev)
+				}
+			}
+		}
+	}
+
+	// check if svc deleted
+	deleteKey := make([]string, 0)
+	v, ok := cacheInUse.Get(service)
+	if !ok {
+		return
+	}
+	seCache, ok := v.(cmap.ConcurrentMap)
+	if !ok {
+		return
+	}
+	for serviceKey, v := range seCache.Items() {
+		_, exist := freshSeMap[serviceKey]
+		if exist {
+			continue
+		}
+		deleteKey = append(deleteKey, serviceKey)
+		seValue, ok := v.(*ServiceEntryWithMeta)
+		if !ok {
+			continue
+		}
+
+		// del event -> empty-ep update event
+		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
+		ev, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
+		if err != nil {
+			log.Errorf("delete svc failed, case: %v", err.Error())
+			continue
+		}
+		log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
+		for _, h := range s.handlers {
+			h.Handle(ev)
+		}
+	}
+
+	for _, key := range deleteKey {
+		seCache.Remove(key)
+	}
+}
+
+func buildSeEvent(kind event.Kind, item *networking.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
 	se := util.CopySe(item)
 	source.FillRevision(meta)
 	util.FillSeLabels(se, meta)
@@ -424,7 +534,7 @@ func buildSeEvent(kind event.Kind, item *v1alpha3.ServiceEntry, meta resource.Me
 	}, nil
 }
 
-func buildSidecarEvent(kind event.Kind, item *v1alpha3.Sidecar, meta resource.Metadata) event.Event {
+func buildSidecarEvent(kind event.Kind, item *networking.Sidecar, meta resource.Metadata) event.Event {
 	source.FillRevision(meta)
 	return event.Event{
 		Kind:   kind,

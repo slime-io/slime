@@ -24,7 +24,9 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(apps []*application, defaultSvcNs string, gatewayModel, patchLabel bool, svcPort uint32, nsHost, k8sDomainSuffix, nsfEureka bool) (map[string]*networking.ServiceEntry, error) {
+func ConvertServiceEntryMap(
+	apps []*application, defaultSvcNs string, gatewayModel, patchLabel bool, svcPort uint32,
+	instancePortAsSvcPort, nsHost, k8sDomainSuffix, nsfEureka bool) (map[string]*networking.ServiceEntry, error) {
 	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if apps == nil || len(apps) == 0 {
 		return seMap, nil
@@ -40,7 +42,8 @@ func ConvertServiceEntryMap(apps []*application, defaultSvcNs string, gatewayMod
 				seMap[app.Name] = convertServiceEntry(app, nsHost, patchLabel)
 			}
 		} else {
-			for k, v := range convertServiceEntryWithNs(app, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, patchLabel) {
+			for k, v := range convertServiceEntryWithNs(
+				app, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel) {
 				seMap[k] = v
 			}
 		}
@@ -163,10 +166,25 @@ func convertEndpoints(instances []*instance, patchLabel bool, projectCode string
 }
 
 // -------- for sidecar mode --------
-func convertServiceEntryWithNs(app *application, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) map[string]*networking.ServiceEntry {
-	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(app.Instances, defaultNs, svcPort, nsHost, patchLabel)
+func convertServiceEntryWithNs(
+	app *application, defaultNs string, svcPort uint32,
+	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool) map[string]*networking.ServiceEntry {
+	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(
+		app.Instances, defaultNs, svcPort, nsHost, instancePortAsSvcPort, patchLabel)
 	if len(nsEndpoints) == 0 {
 		return nil
+	}
+
+	if svcPort != 0 && instancePortAsSvcPort { // add extra svc port
+		for _, svcPorts := range nsSvcPorts {
+			if _, ok := svcPorts[svcPort]; !ok {
+				svcPorts[svcPort] = &networking.Port{
+					Number:   svcPort,
+					Protocol: source.ProtocolHTTP,
+					Name:     source.PortName(source.ProtocolHTTP, svcPort),
+				}
+			}
+		}
 	}
 
 	var (
@@ -218,7 +236,10 @@ func convertServiceEntryWithNs(app *application, defaultNs string, svcPort uint3
 	return ses
 }
 
-func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uint32, nsHost, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string]map[uint32]*networking.Port, map[string]bool) {
+func convertEndpointsWithNs(
+	instances []*instance, defaultNs string, svcPort uint32, nsHost, instancePortAsSvcPort,
+	patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string]map[uint32]*networking.Port, map[string]bool) {
+
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
 	portsMap := make(map[string]map[uint32]*networking.Port, 0)
 	useDNSMap := make(map[string]bool, 0)
@@ -244,21 +265,26 @@ func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uin
 			}
 		}
 
+		var svcPortName string
 		ports, exist := portsMap[ns]
 		if !exist {
 			ports = map[uint32]*networking.Port{}
 			portsMap[ns] = ports
 		}
-		portNum := svcPort
-		if svcPort == 0 {
-			portNum = uint32(ins.Port.Port)
+
+		svcPortInUse := svcPort
+		if instancePortAsSvcPort {
+			svcPortInUse = uint32(ins.Port.Port)
 		}
-		if _, ok := ports[portNum]; !ok {
-			ports[portNum] = &networking.Port{
-				Protocol: "HTTP",
-				Number:   portNum,
-				Name:     "http",
+		if v, ok := ports[svcPortInUse]; !ok {
+			svcPortName = source.PortName(source.ProtocolHTTP, svcPortInUse)
+			ports[svcPortInUse] = &networking.Port{
+				Protocol: source.ProtocolHTTP,
+				Number:   svcPortInUse,
+				Name:     svcPortName,
 			}
+		} else {
+			svcPortName = v.Name
 		}
 
 		if useDns := useDNSMap[ns]; !useDns {
@@ -270,7 +296,7 @@ func convertEndpointsWithNs(instances []*instance, defaultNs string, svcPort uin
 
 		ep := &networking.WorkloadEntry{
 			Address: ins.IPAddress,
-			Ports:   map[string]uint32{"http": uint32(ins.Port.Port)},
+			Ports:   map[string]uint32{svcPortName: uint32(ins.Port.Port)},
 			Labels:  ins.Metadata,
 		}
 		util.FillWorkloadEntryLocality(ep)

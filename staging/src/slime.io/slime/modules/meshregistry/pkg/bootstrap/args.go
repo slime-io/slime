@@ -356,7 +356,7 @@ type K8SArgs struct {
 
 func NewRegistryArgs() *RegistryArgs {
 	a := *DefaultArgs()
-	return &RegistryArgs{
+	ret := &RegistryArgs{
 		Args:    a,
 		RevCrds: "sidecars,destinationrules,envoyfilters,gateways,virtualservices",
 		Mcp: &McpArgs{
@@ -378,9 +378,10 @@ func NewRegistryArgs() *RegistryArgs {
 		},
 		ZookeeperSource: &ZookeeperSourceArgs{
 			SourceArgs: SourceArgs{
-				RefreshPeriod: util.Duration(10 * time.Second),
-				LabelPatch:    true,
-				ResourceNs:    "dubbo",
+				RefreshPeriod:         util.Duration(10 * time.Second),
+				LabelPatch:            true,
+				ResourceNs:            "dubbo",
+				InstancePortAsSvcPort: true,
 			},
 			IgnoreLabel:                 []string{"pid", "timestamp", "dubbo"},
 			Mode:                        "polling",
@@ -394,9 +395,10 @@ func NewRegistryArgs() *RegistryArgs {
 		},
 		EurekaSource: &EurekaSourceArgs{
 			SourceArgs: SourceArgs{
-				RefreshPeriod: util.Duration(30 * time.Second),
-				LabelPatch:    true,
-				SvcPort:       80,
+				RefreshPeriod:         util.Duration(30 * time.Second),
+				LabelPatch:            true,
+				SvcPort:               80,
+				InstancePortAsSvcPort: true,
 				// should set it to "xx" explicitly to get the same behaviour as before("foo.eureka")
 				DefaultServiceNs: "",
 				ResourceNs:       "eureka",
@@ -406,15 +408,18 @@ func NewRegistryArgs() *RegistryArgs {
 		},
 		NacosSource: &NacosSourceArgs{
 			SourceArgs: SourceArgs{
-				RefreshPeriod:    util.Duration(30 * time.Second),
-				LabelPatch:       true,
-				SvcPort:          80,
-				DefaultServiceNs: "",
-				ResourceNs:       "nacos",
+				RefreshPeriod:         util.Duration(30 * time.Second),
+				LabelPatch:            true,
+				SvcPort:               80,
+				InstancePortAsSvcPort: true,
+				DefaultServiceNs:      "",
+				ResourceNs:            "nacos",
 			},
 			Mode:            "watching",
 			K8sDomainSuffix: true,
 			NsHost:          true,
 		},
 	}
+
+	return ret
 }
