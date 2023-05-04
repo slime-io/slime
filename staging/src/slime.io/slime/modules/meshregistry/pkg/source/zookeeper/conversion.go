@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"regexp"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	"sort"
 	"strconv"
 	"strings"
@@ -258,6 +259,10 @@ func convertServiceEntry(providers, consumers []string, service string, patchLab
 			se.Ports = append(se.Ports, port)
 			uniquePort[serviceKey][port.Number] = struct{}{}
 		}
+	}
+
+	for _, cse := range serviceEntryByServiceKey {
+		source.ApplyServicePortToEndpoints(cse.se)
 	}
 
 	return serviceEntryByServiceKey

@@ -154,3 +154,33 @@ func BuildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta r
 		},
 	}
 }
+
+// ApplyServicePortToEndpoints add svcPort->instPort mappings for those extra svc ports which are mainly from
+// MERGE-INSTANCE-PORT-TO-SVC-PORTS.
+// For example: we have two ep 1.1.1.1:8080 and 2.2.2.2:8081. After aggregating the svc ports we get http-8080: 8080
+// and http-8081: 8081, each instance has one of the corresponding ports.
+// After this function takes effect, we get: 1.1.1.1 http-8080: 8080 http-8081: 8080 and 2.2.2.2 http-8080: 8081
+// http-8081: 8081
+func ApplyServicePortToEndpoints(se *networking.ServiceEntry) {
+	if len(se.Ports) == 0 || len(se.Endpoints) == 0 {
+		return
+	}
+
+	for _, ep := range se.Endpoints {
+		if len(ep.Ports) == 0 {
+			continue
+		}
+
+		var defaultInstPort uint32
+		for _, v := range ep.Ports {
+			defaultInstPort = v
+			break
+		}
+
+		for _, svcPort := range se.Ports {
+			if _, exist := ep.Ports[svcPort.Name]; !exist {
+				ep.Ports[svcPort.Name] = defaultInstPort
+			}
+		}
+	}
+}
