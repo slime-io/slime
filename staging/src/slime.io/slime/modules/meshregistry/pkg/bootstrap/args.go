@@ -106,8 +106,9 @@ type SourceArgs struct {
 	GatewayModel  bool          `json:"GatewayModel,omitempty"`
 	// patch instances label
 	LabelPatch bool `json:"LabelPatch,omitempty"`
-	// svc port for services
-	SvcPort uint32 `json:"SvcPort,omitempty"`
+	// svc port for services, 0 will be ignored
+	SvcPort               uint32 `json:"SvcPort,omitempty"`               // XXX
+	InstancePortAsSvcPort bool   `json:"InstancePortAsSvcPort,omitempty"` // TODO
 	// if empty, those endpoints with ns attr will be aggregated into a no-ns service like "foo"
 	DefaultServiceNs string `json:"DefaultServiceNs,omitempty"`
 	ResourceNs       string `json:"ResourceNs,omitempty"`
