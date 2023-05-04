@@ -8,8 +8,13 @@ import (
 	"istio.io/libistio/pkg/config/schema/collections"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 	"sort"
+	"strings"
 	"sync"
 	"time"
+)
+
+var (
+	ProtocolHTTP = "HTTP"
 )
 
 type ServiceEntryMergePortMocker struct {
@@ -183,4 +188,8 @@ func ApplyServicePortToEndpoints(se *networking.ServiceEntry) {
 			}
 		}
 	}
+}
+
+func PortName(protocol string, num uint32) string {
+	return fmt.Sprintf("%s-%d", strings.ToLower(protocol), num)
 }

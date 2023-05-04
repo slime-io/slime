@@ -69,6 +69,10 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 			})
 	}
 
+	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
+		return nil, nil, fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
+	}
+
 	ret := &Source{
 		args:    args,
 		delay:   delay,
@@ -125,7 +129,9 @@ func (s *Source) refresh() {
 		log.Errorf("get eureka app failed: " + err.Error())
 		return
 	}
-	newServiceEntryMap, err := ConvertServiceEntryMap(apps, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.LabelPatch, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.NsfEureka)
+	newServiceEntryMap, err := ConvertServiceEntryMap(
+		apps, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.LabelPatch, s.args.SvcPort,
+		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.NsfEureka)
 	if err != nil {
 		log.Errorf("convert eureka servceentry map failed: " + err.Error())
 		return
