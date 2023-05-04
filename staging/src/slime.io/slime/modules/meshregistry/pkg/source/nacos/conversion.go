@@ -3,6 +3,7 @@ package nacos
 import (
 	"math"
 	"net"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	"sort"
 	"strings"
 
@@ -32,6 +33,10 @@ func ConvertServiceEntryMap(instances []*instanceResp, defaultSvcNs string, gate
 				seMap[k] = v
 			}
 		}
+	}
+
+	for _, se := range seMap {
+		source.ApplyServicePortToEndpoints(se)
 	}
 	return seMap, nil
 }
