@@ -180,7 +180,7 @@ func convertServiceEntry(
 		if instancePortAsSvcPort {
 			svcPortInUse = portNum
 		}
-		instPort := convertPort(svcPortInUse, portNum, !gatewayMode)
+		instPort := convertPort(svcPortInUse, portNum)
 
 		methods := map[string]struct{}{}
 		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, func(method string) {
@@ -236,7 +236,7 @@ func convertServiceEntry(
 						log.Debugf("invalid consumer %s of %s", consumer, serviceKey)
 						cAddr = cAddr[:idx]
 					} else {
-						cPort = convertPort(portNum, portNum, !gatewayMode)
+						cPort = convertPort(portNum, portNum)
 						cAddr = addr
 					}
 				}
@@ -264,7 +264,7 @@ func convertServiceEntry(
 		}
 		for _, p := range svcPortsToAdd {
 			if _, ok := uniquePort[serviceKey][p]; !ok {
-				se.Ports = append(se.Ports, convertPort(p, p, !gatewayMode))
+				se.Ports = append(se.Ports, convertPort(p, p))
 				uniquePort[serviceKey][p] = struct{}{}
 			}
 		}
@@ -404,15 +404,11 @@ func parseDubboTag(str string, meta map[string]string) {
 	}
 }
 
-func convertPort(svcPort, port uint32, nameWithPort bool) *networking.Port {
-	name := DubboPortName
-	if nameWithPort {
-		name = source.PortName(NetworkProtocolDubbo, svcPort)
-	}
+func convertPort(svcPort, port uint32) *networking.Port {
 	return &networking.Port{
 		Protocol: NetworkProtocolDubbo,
 		Number:   port,
-		Name:     name,
+		Name:     source.PortName(NetworkProtocolDubbo, svcPort),
 	}
 }
 
