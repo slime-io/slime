@@ -107,8 +107,9 @@ func (r *ServicefenceReconciler) StartSvcCache(ctx context.Context) {
 							portProtos = make(map[Protocol]uint)
 							r.portProtocolCache.Data[p] = portProtos
 						}
-						proto := getProtocol(port)
-						portProtos[proto]++
+						if isHttp(port) {
+							portProtos[ProtocolHTTP]++
+						}
 					}
 					r.portProtocolCache.Unlock()
 				}
@@ -157,24 +158,12 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 	}()
 }
 
-// find protocol of service port
-func getProtocol(port corev1.ServicePort) Protocol {
+func isHttp(port corev1.ServicePort) bool {
 	if port.Protocol != "TCP" {
-		return ProtocolUnknown
+		return false
 	}
 	p := strings.Split(port.Name, "-")[0]
-	return portProtocolToProtocol(PortProtocol(p))
-}
-
-func portProtocolToProtocol(p PortProtocol) Protocol {
-	switch p {
-	case HTTP, HTTP2, GRPC, GRPCWeb:
-		return ProtocolHTTP
-	case TCP, HTTPS, TLS, Mongo, Redis, MySQL:
-		return ProtocolTCP
-	default:
-		return ProtocolUnknown
-	}
+	return PortProtocol(p) == HTTP
 }
 
 func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
