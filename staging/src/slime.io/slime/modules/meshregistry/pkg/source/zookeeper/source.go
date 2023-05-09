@@ -168,17 +168,19 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	}
 
 	for {
-		con, _, err := zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout), zk.WithEventCallback(func(ev zk.Event) {
-			if ev.Type != zk.EventDisconnected {
-				return
-			}
+		con, _, err := zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout),
+			zk.WithNoRetryHosts(), // https://github.com/slime-io/go-zk/pull/1
+			zk.WithEventCallback(func(ev zk.Event) {
+				if ev.Type != zk.EventDisconnected {
+					return
+				}
 
-			// notify recon
-			select {
-			case reconCh <- struct{}{}:
-			default:
-			}
-		}))
+				// notify recon
+				select {
+				case reconCh <- struct{}{}:
+				default:
+				}
+			}))
 		if err != nil {
 			log.Infof("re connect zk error %v", err)
 			time.Sleep(time.Second)
