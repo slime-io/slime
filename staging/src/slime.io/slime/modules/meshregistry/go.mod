@@ -33,7 +33,7 @@ replace (
 
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.9.5-0.20200326174812-e8bd2869ff56
 
-	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20230210055653-e5ab5bf5cb30
+	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20230511022353-149c2ace7165
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29

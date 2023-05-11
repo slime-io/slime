@@ -185,9 +185,26 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 			log.Infof("re connect zk error %v", err)
 			time.Sleep(time.Second)
 		} else {
-			// replace the connection
-			s.Con.Store(con)
-			break
+			// TODO: this should be done in go-zk
+			connected := false
+			for {
+				time.Sleep(time.Second) // Wait for connecting. When go-zk connects to zk, the timeout is one second.
+				connState := con.State()
+				if connState == zk.StateConnected || connState == zk.StateHasSession {
+					connected = true
+					break
+				}
+				if connState != zk.StateConnecting {
+					// connect failed
+					break
+				}
+				// try connecting another zk instance
+			}
+			if connected {
+				// replace the connection
+				s.Con.Store(con)
+				break
+			}
 		}
 	}
 }
