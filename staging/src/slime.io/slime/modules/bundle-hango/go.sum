@@ -978,8 +978,8 @@ github.com/sirupsen/logrus v1.6.0/go.mod h1:7uNnSEd1DgxDLC74fIahvMZmmYsHGZGEOFrf
 github.com/sirupsen/logrus v1.7.0/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
 github.com/sirupsen/logrus v1.8.1 h1:dJKuHgqk1NNQlqoA6BTlM1Wf9DOH3NBjQyu0h9+AZZE=
 github.com/sirupsen/logrus v1.8.1/go.mod h1:yWOB1SBYBC5VeMP7gHvWumXLIWorT60ONWic61uBYv0=
-github.com/slime-io/go-zk v0.0.0-20230210055653-e5ab5bf5cb30 h1:K+S7aE77oOdwPGm9fOIyohJU961Blf1Wqlyjs1y9s40=
-github.com/slime-io/go-zk v0.0.0-20230210055653-e5ab5bf5cb30/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=
+github.com/slime-io/go-zk v0.0.0-20230511022353-149c2ace7165 h1:tNeDCnirtMkmUgg1Sin9SZpGLsd+sf2whDa3J2HA1is=
+github.com/slime-io/go-zk v0.0.0-20230511022353-149c2ace7165/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=
 github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29 h1:1T2jIHxjlRO4JG9TWx9qprPLNq++AMBADdzeWgVm6s4=
 github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29/go.mod h1:vHYwJsTi/0FUGT8emU8ztlr84sc3G391rBm938dKvjM=
 github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855 h1:dwzP73IM2BVPeTAr5dZmuu9N1FNj/3K2PxYcEEF8BqE=
