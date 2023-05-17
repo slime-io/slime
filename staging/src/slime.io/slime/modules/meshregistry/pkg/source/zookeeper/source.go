@@ -442,7 +442,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 	freshSeMap := convertServiceEntry(
 		provider, consumer, service, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
-		s.ignoreLabelsMap, s.args.GatewayModel)
+		s.args.AggregateDubboMethods, s.ignoreLabelsMap, s.args.GatewayModel)
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
@@ -453,16 +453,19 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 				CreateTime: now,
 				Version:    resource.Version(now.String()),
 				Labels: map[string]string{
-					"path":            service,
-					"registry":        "zookeeper",
-					dubboParamMethods: convertedSe.methodsLabel,
+					"path":     service,
+					"registry": "zookeeper",
 				},
 				Annotations: map[string]string{},
 			},
 		}
 
 		if !convertedSe.methodsEqual {
+			// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
 			newSeWithMeta.Meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
+		}
+		if s.args.AggregateDubboMethods {
+			newSeWithMeta.Meta.Labels[dubboParamMethods] = convertedSe.methodsLabel
 		}
 
 		v, ok := cacheInUse.Get(service)
