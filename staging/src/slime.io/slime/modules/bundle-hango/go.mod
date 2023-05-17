@@ -71,7 +71,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.opencensus.io v0.23.0 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
-	go.uber.org/multierr v1.6.0 // indirect
+	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20221014153046-6fdb5e3db783 // indirect
@@ -109,6 +109,7 @@ require (
 	sigs.k8s.io/service-apis v0.0.0-20200227172328-b9010cfacdbe // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
+	slime.io/pkg v0.0.0-00010101000000-000000000000 // indirect
 )
 
 replace (
@@ -120,6 +121,8 @@ replace (
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
 
 	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855
+
+	slime.io/pkg => github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7
 
 	slime.io/slime/framework => ./../../../../../../framework
 	slime.io/slime/modules/limiter => ./../limiter

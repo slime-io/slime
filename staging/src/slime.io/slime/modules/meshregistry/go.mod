@@ -22,6 +22,7 @@ require (
 	k8s.io/client-go v0.22.2
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
 	sigs.k8s.io/yaml v1.2.0
+	slime.io/pkg v0.0.0-00010101000000-000000000000
 	slime.io/slime/framework v0.0.0
 )
 
@@ -38,6 +39,8 @@ replace (
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
 	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20221214030325-22f5add50855
+
+	slime.io/pkg => github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7
 
 	slime.io/slime/framework => ../../../../../../framework
 )
