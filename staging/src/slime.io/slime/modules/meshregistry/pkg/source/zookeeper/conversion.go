@@ -138,25 +138,29 @@ type convertedServiceEntry struct {
 }
 
 func convertServiceEntry(
-	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
-	ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
-	// TODO y: sort endpoints
+	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel,
+	aggregateDubboMethods bool, ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
+
 	defer func() {
 		for k, cse := range serviceEntryByServiceKey {
 			cse.methodsEqual = trimSameDubboMethodsLabel(cse.se)
-			if v := methodsByServiceKey[k]; len(v) > 0 {
-				methods := make([]string, 0, len(v))
-				for method := range v {
-					methods = append(methods, method)
-				}
-				sort.Strings(methods)
 
-				cse.methodsLabel = escapeDubboMethods(methods, nil)
+			if aggregateDubboMethods {
+				if v := methodsByServiceKey[k]; len(v) > 0 {
+					methods := make([]string, 0, len(v))
+					for method := range v {
+						methods = append(methods, method)
+					}
+					sort.Strings(methods)
+
+					cse.methodsLabel = escapeDubboMethods(methods, nil)
+				}
 			}
 		}
 	}()
+
 	if providers == nil || len(providers) == 0 {
 		log.Debugf("%s no provider", service)
 		return serviceEntryByServiceKey
@@ -182,15 +186,24 @@ func convertServiceEntry(
 		}
 		instPort := convertPort(svcPortInUse, portNum)
 
-		methods := map[string]struct{}{}
-		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, func(method string) {
-			methods[method] = struct{}{}
-		})
+		var (
+			methods       = map[string]struct{}{}
+			methodApplier func(method string)
+		)
+		if aggregateDubboMethods {
+			methods = map[string]struct{}{}
+			methodApplier = func(method string) {
+				methods[method] = struct{}{}
+			}
+		}
+
+		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, methodApplier)
 		if !ok {
 			continue
 		}
 
 		serviceKey := buildServiceKey(service, meta)
+
 		if len(methods) > 0 {
 			serviceMethods := methodsByServiceKey[serviceKey]
 			if serviceMethods == nil {
@@ -241,6 +254,7 @@ func convertServiceEntry(
 					}
 				}
 
+				// XXX optimize inbound ep meta calculation
 				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, patchLabel, ignoreLabels, nil); ok {
 					meta = consumerMeta(meta)
 					consumerServiceKey := buildServiceKey(service, meta)

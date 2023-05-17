@@ -236,6 +236,7 @@ type ZookeeperSourceArgs struct {
 	TrimDubboRemoveDepInterval util.Duration `json:"TrimDubboRemoveDepInterval,omitempty"`
 	// specify how to map `app` to label key:value pair
 	DubboWorkloadAppLabel string `json:"DubboWorkloadAppLabel,omitempty"`
+	AggregateDubboMethods bool   `json:"AggregateDubboMethods,omitempty"` // XXX totally remove this feature?
 
 	// mcp configs
 }
