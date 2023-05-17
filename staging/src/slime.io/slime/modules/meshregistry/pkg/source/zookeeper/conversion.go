@@ -1,7 +1,6 @@
 package zookeeper
 
 import (
-	"bytes"
 	"encoding/json"
 	"math"
 	"net"
@@ -15,6 +14,8 @@ import (
 
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
+
+	"slime.io/pkg/text"
 )
 
 const (
@@ -155,7 +156,7 @@ func convertServiceEntry(
 					}
 					sort.Strings(methods)
 
-					cse.methodsLabel = escapeDubboMethods(methods, nil)
+					cse.methodsLabel = text.EscapeLabelValues(methods)
 				}
 			}
 		}
@@ -386,7 +387,14 @@ func verifyMeta(url string, ip string, patchLabel bool, ignoreLabels map[string]
 		case dubboParamMethods:
 			methods := strings.Split(v, ",")
 			sort.Strings(methods)
-			meta[k] = escapeDubboMethods(methods, methodApplier)
+			if methodApplier != nil {
+				for _, method := range methods {
+					if method != "" {
+						methodApplier(method)
+					}
+				}
+			}
+			meta[k] = text.EscapeLabelValues(methods)
 			continue
 		}
 
@@ -475,60 +483,4 @@ func splitUrl(zkChild string) []string {
 		return nil
 	}
 	return ss
-}
-
-// escapeDubboMethods caller should ensure that methods is an ordered list
-func escapeDubboMethods(methods []string, methodApplier func(string)) string {
-	// printData2,printData1$ -> printData12-4.printData2 while hex('$') == "24"
-	isValidChar := func(b byte) bool {
-		if 'a' <= b && b <= 'z' {
-			return true
-		}
-		if 'A' <= b && b <= 'Z' {
-			return true
-		}
-		if '0' <= b && b <= '9' {
-			return true
-		}
-		if '_' == b {
-			return true
-		}
-		return false
-	}
-
-	const (
-		hextable  = "0123456789abcdef"
-		sep       = '-'
-		methodSep = '.'
-	)
-
-	buf := &bytes.Buffer{}
-	for _, method := range methods {
-		if method == "" {
-			continue
-		}
-
-		if methodApplier != nil {
-			methodApplier(method)
-		}
-
-		for idx := 0; idx < len(method); idx++ {
-			c := method[idx]
-			if isValidChar(c) {
-				buf.WriteByte(c)
-			} else {
-				buf.WriteByte(hextable[c>>4])
-				buf.WriteByte(sep)
-				buf.WriteByte(hextable[c&0x0f])
-			}
-		}
-		buf.WriteByte(methodSep)
-	}
-
-	ret := buf.String()
-	if l := len(ret); l > 0 && ret[l-1] == methodSep {
-		// remove trailing sep
-		ret = ret[:l-1]
-	}
-	return ret
 }
