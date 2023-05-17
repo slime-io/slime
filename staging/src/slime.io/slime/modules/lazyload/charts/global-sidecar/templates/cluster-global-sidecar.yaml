@@ -12,6 +12,7 @@
           {{ $name := .name }}
           {{ $gsSvcPorts := list }}
           {{ $hasGsPort := false }}
+          {{ $addEnvHeaderViaLua := .global.misc.addEnvHeaderViaLua }}
           {{ $autoPort := .general.autoPort }}
           {{ $clusterGsNamespace := .general.clusterGsNamespace | default $.Values.namespace }}
           {{- range $f.wormholePort }}
@@ -362,6 +363,12 @@ spec:
                 key: "Slime-Orig-Dest"
                 value: "%DOWNSTREAM_LOCAL_ADDRESS%"
               append: true
+          {{- if ne $addEnvHeaderViaLua "true" }}
+            - header:
+                key: "Slime-Source-Ns"
+                value: "%ENVIRONMENT(POD_NAMESPACE)%"
+          {{- end }}
+{{- if eq $addEnvHeaderViaLua "true" }}
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_OUTBOUND
@@ -407,6 +414,7 @@ spec:
             envoy.filters.http.lua:
               "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.LuaPerRoute
               name: add.lua
+{{- end }}
     - applyTo: VIRTUAL_HOST
       match:
         proxy:
