@@ -7,13 +7,13 @@ import (
 	"net"
 	"net/url"
 	"regexp"
-	"slime.io/slime/modules/meshregistry/pkg/source"
 	"sort"
 	"strconv"
 	"strings"
 
 	networking "istio.io/api/networking/v1alpha3"
 
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -272,6 +272,7 @@ func convertServiceEntry(
 
 	for _, cse := range serviceEntryByServiceKey {
 		source.ApplyServicePortToEndpoints(cse.se)
+		source.RectifyServiceEntry(cse.se)
 	}
 
 	return serviceEntryByServiceKey
