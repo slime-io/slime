@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -486,7 +485,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 				}
 			}
 		} else if existSeWithMeta, ok := value.(*ServiceEntryWithMeta); ok {
-			if reflect.DeepEqual(existSeWithMeta, newSeWithMeta) {
+			if existSeWithMeta.Equals(*newSeWithMeta) {
 				continue
 			}
 			seCache.Set(serviceKey, newSeWithMeta)

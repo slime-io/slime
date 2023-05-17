@@ -3,12 +3,12 @@ package eureka
 import (
 	"math"
 	"net"
-	"slime.io/slime/modules/meshregistry/pkg/source"
 	"sort"
 	"strings"
 
 	networking "istio.io/api/networking/v1alpha3"
 
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
@@ -51,6 +51,7 @@ func ConvertServiceEntryMap(
 
 	for _, se := range seMap {
 		source.ApplyServicePortToEndpoints(se)
+		source.RectifyServiceEntry(se)
 	}
 	return seMap, nil
 }

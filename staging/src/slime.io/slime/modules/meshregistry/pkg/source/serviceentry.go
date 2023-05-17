@@ -2,15 +2,17 @@ package source
 
 import (
 	"fmt"
-	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/libistio/pkg/config/event"
-	"istio.io/libistio/pkg/config/resource"
-	"istio.io/libistio/pkg/config/schema/collections"
-	"slime.io/slime/modules/meshregistry/pkg/util"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	networking "istio.io/api/networking/v1alpha3"
+	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/resource"
+	"istio.io/libistio/pkg/config/schema/collections"
+
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
 var (
@@ -192,4 +194,16 @@ func ApplyServicePortToEndpoints(se *networking.ServiceEntry) {
 
 func PortName(protocol string, num uint32) string {
 	return fmt.Sprintf("%s-%d", strings.ToLower(protocol), num)
+}
+
+func RectifyServiceEntry(se *networking.ServiceEntry) {
+	for _, strs := range [][]string{se.Addresses, se.ExportTo, se.Hosts, se.SubjectAltNames} {
+		sort.SliceStable(strs, func(i, j int) bool { return strs[i] < strs[j] })
+	}
+	sort.SliceStable(se.Endpoints, func(i, j int) bool {
+		return se.Endpoints[i].Address < se.Endpoints[j].Address
+	})
+	sort.SliceStable(se.Ports, func(i, j int) bool {
+		return se.Ports[i].Number < se.Ports[j].Number
+	})
 }

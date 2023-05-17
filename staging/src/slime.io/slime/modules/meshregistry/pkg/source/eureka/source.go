@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -162,7 +162,7 @@ func (s *Source) refresh() {
 				}
 			}
 		} else {
-			if !reflect.DeepEqual(oldEntry, newEntry) {
+			if !proto.Equal(oldEntry, newEntry) {
 				// UPDATE
 				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs); err == nil {

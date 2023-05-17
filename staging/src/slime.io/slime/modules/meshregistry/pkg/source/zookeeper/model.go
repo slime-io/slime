@@ -1,8 +1,7 @@
 package zookeeper
 
 import (
-	"reflect"
-
+	"github.com/gogo/protobuf/proto"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/resource"
 )
@@ -46,16 +45,20 @@ func metadataEquals(m1, m2 resource.Metadata) bool {
 	return true
 }
 
+func (sem ServiceEntryWithMeta) Equals(o ServiceEntryWithMeta) bool {
+	if !metadataEquals(sem.Meta, o.Meta) {
+		return false
+	}
+
+	return proto.Equal(sem.ServiceEntry, o.ServiceEntry)
+}
+
 func (scm SidecarWithMeta) Equals(o SidecarWithMeta) bool {
 	if !metadataEquals(scm.Meta, o.Meta) {
 		return false
 	}
 
-	if !reflect.DeepEqual(scm.Sidecar, o.Sidecar) {
-		return false
-	}
-
-	return true
+	return proto.Equal(scm.Sidecar, o.Sidecar)
 }
 
 type DubboServiceInstance struct {
