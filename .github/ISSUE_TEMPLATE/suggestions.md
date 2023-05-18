@@ -1,10 +1,9 @@
 ---
-name: Suggestions
-about: " Your suggestions for slime"
+name: 建议
+about: 关于slime的建议
 title: ''
 labels: advice
-assignees: YonkaFang
-
+assignees: MouceL
 ---
 
-**whatever you want to say to slime developers**
+**你想对slime开发者提的建议内容**

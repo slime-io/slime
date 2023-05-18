@@ -1,20 +1,15 @@
 ---
-name: Feature request
-about: Suggest an idea for this project
+name: 特性请求
+about: 需要slime支持新特性的请求
 title: ''
 labels: ''
-assignees: YonkaFang
-
+assignees: MouceL
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+**问题背景**
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+**您想要的解决方案**
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+**您考虑过的替代方案**
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+**额外的上下文**
