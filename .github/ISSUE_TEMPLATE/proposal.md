@@ -1,12 +1,10 @@
 ---
-name: 问题报告
-about: 向slime开发者报告任何存在的问题
-title: 问题报告
-labels: bug
+name: 提案
+about: 用户的提案
+title: ''
+labels: 'proposal'
 assignees: MouceL
 ---
-
-**问题描述**
 
 **影响的子模块(在下面列表中打'X')**
 
@@ -16,5 +14,6 @@ assignees: MouceL
 - [ ] 注册仓库
 - [ ] 安装Boot
 
-**重现问题的步骤**
+**问题背景**
 
+**您的提案内容**
