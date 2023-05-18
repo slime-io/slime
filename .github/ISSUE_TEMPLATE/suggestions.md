@@ -1,5 +1,5 @@
 ---
-name: 建议
+name: 用户建议
 about: 关于slime的建议
 title: ''
 labels: advice
