@@ -1,5 +1,5 @@
 ---
-name: 提案
+name: 用户提案
 about: 用户的提案
 title: ''
 labels: 'proposal'
