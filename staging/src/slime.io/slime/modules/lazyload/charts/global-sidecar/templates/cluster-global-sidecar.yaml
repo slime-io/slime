@@ -43,7 +43,7 @@ metadata:
 spec:
   ports:
     {{- range $gsSvcPorts }}
-    - name: http-{{ . }}
+    - name: http2-{{ . }}
       port: {{ int . }}
       protocol: TCP
       targetPort: {{ int . }}
@@ -53,6 +53,18 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 {{- end }}
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: global-sidecar
+  namespace: {{ $ns }}
+spec:
+  host: global-sidecar.{{ $ns }}.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        useClientProtocol: true
 ---
 apiVersion: v1
 kind: ServiceAccount
