@@ -51,9 +51,9 @@ type Source struct {
 	ignoreLabelsMap   map[string]string
 	watchingRoot      bool // TODO useless?
 
-	serviceCache         map[string]*ServiceEntryWithMeta
-	cache                cmap.ConcurrentMap
-	pollingCache         cmap.ConcurrentMap
+	serviceMethods       map[string]string
+	cache                cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
+	pollingCache         cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
 	sidecarCache         map[resource.FullName]SidecarWithMeta
 	dubboCallModels      map[string]DubboCallModel // can only be replaced rather than being modified
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
@@ -108,6 +108,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 
 		initedCallback: readyCallback,
 
+		serviceMethods:       map[string]string{},
 		cache:                cmap.New(),
 		pollingCache:         cmap.New(),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
@@ -232,16 +233,61 @@ func (s *Source) simpleCacheJson(w http.ResponseWriter, r *http.Request) {
 
 func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 	temp := s.cacheInUse()
-	all := make(map[string]interface{}, 0)
-	if interfaceName := req.URL.Query().Get("interfaceName"); interfaceName != "" {
+	cacheData := map[string]map[string]*ServiceEntryWithMeta{}
+	var result interface{}
+
+	interfaceName := req.URL.Query().Get("interfaceName")
+	if interfaceName != "" {
+		newTemp := cmap.New()
 		if value, exist := temp.Get(interfaceName); exist {
-			all["cache"] = value
+			newTemp.Set(interfaceName, value)
 		}
-	} else {
-		all["cache"] = temp
-		all["serviceCache"] = s.serviceCache
+		temp = newTemp
 	}
-	b, err := json.MarshalIndent(all, "", "  ")
+
+	temp.IterCb(func(dubboInterface string, v interface{}) {
+		if v == nil {
+			return
+		}
+
+		inner := v.(cmap.ConcurrentMap)
+		if inner == nil {
+			return
+		}
+
+		interfaceCacheData := cacheData[dubboInterface]
+		if interfaceCacheData == nil {
+			interfaceCacheData = map[string]*ServiceEntryWithMeta{}
+			cacheData[dubboInterface] = interfaceCacheData
+		}
+		inner.IterCb(func(host string, v interface{}) {
+			sem := v.(*ServiceEntryWithMeta)
+			s.mut.RLock()
+			methods, ok := s.serviceMethods[host]
+			s.mut.RUnlock()
+
+			if ok && sem.Meta.Labels[dubboParamMethods] != methods {
+				semCopy := *sem
+				labelCopy := make(map[string]string, len(sem.Meta.Labels))
+				for k, v := range sem.Meta.Labels {
+					labelCopy[k] = v
+				}
+				labelCopy[dubboParamMethods] = methods
+				semCopy.Meta.Labels = labelCopy
+				sem = &semCopy
+			}
+
+			interfaceCacheData[host] = sem
+		})
+	})
+
+	if interfaceName != "" {
+		result = cacheData[interfaceName]
+	} else {
+		result = cacheData
+	}
+
+	b, err := json.MarshalIndent(map[string]interface{}{"cache": result}, "", "  ")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "unable to marshal zk se cache: %v", err)
 		return
@@ -435,14 +481,14 @@ func (s *Source) markServiceEntryInitDone() {
 	}
 }
 
-func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, service string) {
-	if _, ok := cacheInUse.Get(service); !ok {
-		cacheInUse.Set(service, cmap.New())
+func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, dubboInterface string) {
+	if _, ok := cacheInUse.Get(dubboInterface); !ok {
+		cacheInUse.Set(dubboInterface, cmap.New())
 	}
 
 	freshSeMap := convertServiceEntry(
-		provider, consumer, service, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
-		s.args.AggregateDubboMethods, s.ignoreLabelsMap, s.args.GatewayModel)
+		provider, consumer, dubboInterface, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
+		s.ignoreLabelsMap, s.args.GatewayModel)
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
@@ -453,7 +499,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 				CreateTime: now,
 				Version:    resource.Version(now.String()),
 				Labels: map[string]string{
-					"path":     service,
+					"path":     dubboInterface,
 					"registry": "zookeeper",
 				},
 				Annotations: map[string]string{},
@@ -464,11 +510,12 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 			// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
 			newSeWithMeta.Meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
 		}
-		if s.args.AggregateDubboMethods {
-			newSeWithMeta.Meta.Labels[dubboParamMethods] = convertedSe.methodsLabel
-		}
 
-		v, ok := cacheInUse.Get(service)
+		s.mut.Lock()
+		s.serviceMethods[serviceKey] = convertedSe.methodsLabel
+		s.mut.Unlock()
+
+		v, ok := cacheInUse.Get(dubboInterface)
 		if !ok {
 			continue
 		}
@@ -503,7 +550,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 	// check if svc deleted
 	deleteKey := make([]string, 0)
-	v, ok := cacheInUse.Get(service)
+	v, ok := cacheInUse.Get(dubboInterface)
 	if !ok {
 		return
 	}

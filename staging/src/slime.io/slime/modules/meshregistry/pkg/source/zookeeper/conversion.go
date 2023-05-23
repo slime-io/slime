@@ -139,8 +139,8 @@ type convertedServiceEntry struct {
 }
 
 func convertServiceEntry(
-	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel,
-	aggregateDubboMethods bool, ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
+	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
+	ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
 
@@ -148,16 +148,14 @@ func convertServiceEntry(
 		for k, cse := range serviceEntryByServiceKey {
 			cse.methodsEqual = trimSameDubboMethodsLabel(cse.se)
 
-			if aggregateDubboMethods {
-				if v := methodsByServiceKey[k]; len(v) > 0 {
-					methods := make([]string, 0, len(v))
-					for method := range v {
-						methods = append(methods, method)
-					}
-					sort.Strings(methods)
-
-					cse.methodsLabel = text.EscapeLabelValues(methods)
+			if v := methodsByServiceKey[k]; len(v) > 0 {
+				methods := make([]string, 0, len(v))
+				for method := range v {
+					methods = append(methods, method)
 				}
+				sort.Strings(methods)
+
+				cse.methodsLabel = text.EscapeLabelValues(methods)
 			}
 		}
 	}()
@@ -189,21 +187,17 @@ func convertServiceEntry(
 
 		var (
 			methods       = map[string]struct{}{}
-			methodApplier func(method string)
-		)
-		if aggregateDubboMethods {
-			methods = map[string]struct{}{}
 			methodApplier = func(method string) {
 				methods[method] = struct{}{}
 			}
-		}
+		)
 
 		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, methodApplier)
 		if !ok {
 			continue
 		}
 
-		serviceKey := buildServiceKey(service, meta)
+		serviceKey := buildServiceKey(service, meta) // istio service host
 
 		if len(methods) > 0 {
 			serviceMethods := methodsByServiceKey[serviceKey]
