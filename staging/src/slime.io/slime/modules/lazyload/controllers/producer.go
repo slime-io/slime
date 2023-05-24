@@ -314,13 +314,13 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 
 func fetchSourceIp(entry *data_accesslog.HTTPAccessLogEntry) (string, error) {
 	log := log.WithField("reporter", "accesslog convertor").WithField("function", "fetchSourceIp")
-	if entry.CommonProperties.DownstreamRemoteAddress == nil {
-		log.Debugf("DownstreamRemoteAddress is nil, skip")
+	if entry.CommonProperties.DownstreamDirectRemoteAddress == nil {
+		log.Debugf("DownstreamDirectRemoteAddress is nil, skip")
 		return "", nil
 	}
-	downstreamSock, ok := entry.CommonProperties.DownstreamRemoteAddress.Address.(*envoy_config_core.Address_SocketAddress)
+	downstreamSock, ok := entry.CommonProperties.DownstreamDirectRemoteAddress.Address.(*envoy_config_core.Address_SocketAddress)
 	if !ok {
-		return "", stderrors.New("wrong type of DownstreamRemoteAddress")
+		return "", stderrors.New("wrong type of DownstreamDirectRemoteAddress")
 	}
 	if downstreamSock == nil || downstreamSock.SocketAddress == nil {
 		return "", stderrors.New("downstream socket address is nil")
