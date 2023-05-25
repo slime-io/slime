@@ -57,9 +57,9 @@ apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
   name: global-sidecar
-  namespace: {{ $ns }}
+  namespace: {{ $clusterGsNamespace }}
 spec:
-  host: global-sidecar.{{ $ns }}.svc.cluster.local
+  host: global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
   trafficPolicy:
     connectionPool:
       http:
