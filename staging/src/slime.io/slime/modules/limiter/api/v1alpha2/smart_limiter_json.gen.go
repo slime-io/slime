@@ -104,6 +104,17 @@ func (this *Target) UnmarshalJSON(b []byte) error {
 	return SmartLimiterUnmarshaler.Unmarshal(bytes.NewReader(b), this)
 }
 
+// MarshalJSON is a custom marshaler for Header
+func (this *Header) MarshalJSON() ([]byte, error) {
+	str, err := SmartLimiterMarshaler.MarshalToString(this)
+	return []byte(str), err
+}
+
+// UnmarshalJSON is a custom unmarshaler for Header
+func (this *Header) UnmarshalJSON(b []byte) error {
+	return SmartLimiterUnmarshaler.Unmarshal(bytes.NewReader(b), this)
+}
+
 var (
 	SmartLimiterMarshaler   = &github_com_gogo_protobuf_jsonpb.Marshaler{}
 	SmartLimiterUnmarshaler = &github_com_gogo_protobuf_jsonpb.Unmarshaler{AllowUnknownFields: true}
