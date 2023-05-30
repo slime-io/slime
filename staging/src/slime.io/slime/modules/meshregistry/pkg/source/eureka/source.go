@@ -49,7 +49,11 @@ const (
 )
 
 func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
-	client := NewClient(args.Address)
+	serviers := args.Servers
+	if len(serviers) == 0 {
+		serviers = []bootstrap.EurekaServer{args.EurekaServer}
+	}
+	client := NewClients(serviers)
 	if client == nil {
 		return nil, nil, Error{
 			msg: "Init eureka client failed",
@@ -123,7 +127,13 @@ func (s *Source) refresh() {
 		s.started = false
 	}()
 	s.started = true
+	log.Infof("eureka refresh start : %d", time.Now().UnixNano())
+	s.updateServiceInfo()
+	log.Infof("eureka refresh finsh : %d", time.Now().UnixNano())
+	s.markServiceEntryInitDone()
+}
 
+func (s *Source) updateServiceInfo() {
 	apps, err := s.client.Applications()
 	if err != nil {
 		log.Errorf("get eureka app failed: " + err.Error())
@@ -174,8 +184,6 @@ func (s *Source) refresh() {
 			}
 		}
 	}
-
-	s.markServiceEntryInitDone()
 }
 
 func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
