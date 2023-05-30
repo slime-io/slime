@@ -319,7 +319,6 @@ spec:
         value:
           virtual_hosts:
             {{- if $f.dispatches }}
-            {{- $svcPort := . }}
             {{- range $f.dispatches }}
             - domains:
               {{- toYaml .domains | nindent 14 }}
@@ -329,19 +328,18 @@ spec:
                     prefix: /
                   route:
                     {{- if eq .cluster "_GLOBAL_SIDECAR" }}
-                    cluster: outbound|{{$svcPort}}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
+                    cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
                     timeout: 0s
                     {{- else }}
                     cluster: {{ tpl .cluster $ }}
-              # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
                     {{- end }}
             {{- end }}
-            {{- else }}
+            {{- end }}
             - domains:
               - '*'
               name: to_global_sidecar
               routes:
-{{- if (ne $f.disableIpv4Passthrough true) }}
+                {{- if (ne $f.disableIpv4Passthrough true) }}
                 - match:
                     prefix: /
                     headers:
@@ -353,13 +351,12 @@ spec:
                   route:
                     cluster: PassthroughCluster
                     timeout: 0s
-{{- end }}
+                {{- end }}
                 - match:
                     prefix: /
                   route:
                     cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
                     timeout: 0s
-            {{- end }}
           request_headers_to_add:
             - header:
                 key: "Slime-Orig-Dest"

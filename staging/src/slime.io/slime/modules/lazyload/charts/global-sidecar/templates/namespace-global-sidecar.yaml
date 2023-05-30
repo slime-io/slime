@@ -298,7 +298,6 @@ spec:
         value:
           virtual_hosts:
             {{- if $f.dispatches }}
-              {{- $svcPort := . }}
               {{- range $f.dispatches }}
               - domains:
               {{- toYaml .domains | nindent 14 }}
@@ -308,23 +307,33 @@ spec:
                       prefix: /
                     route:
                       {{- if eq .cluster "_GLOBAL_SIDECAR" }}
-                      cluster: outbound|{{$svcPort}}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
                       {{- else }}
                       cluster: {{ tpl .cluster $ }}
-                      # (dict "fence" $f "dispatch" . "root" $ "Template" (dict "BasePath" "xx"))
                       {{- end }}
               {{- end }}
-              {{- else }}
               - domains:
                   - '*'
                 name: to_global_sidecar
                 routes:
+                  {{ - if (ne $f.disableIpv4Passthrough true) }}
+                  - match:
+                      prefix: /
+                      headers:
+                        - name: ':authority'
+                          string_match:
+                            safe_regex:
+                              google_re2: { }
+                              regex: '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::([1-9]|[1-9]\d{1,3}|[1-5]\d{4}|6[0-5][0-5][0-3][0-5]))?$'
+                    route:
+                      cluster: PassthroughCluster
+                      timeout: 0s
+                  {{ - end }}
                   - match:
                       prefix: /
                     route:
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
                       timeout: 0s
-              {{- end }}
           request_headers_to_add:
             - header:
                 key: "Slime-Orig-Dest"
