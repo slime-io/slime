@@ -252,14 +252,19 @@ func (zkArgs *ZookeeperSourceArgs) Validate() error {
 
 type EurekaSourceArgs struct {
 	SourceArgs
-
-	Address []string `json:"Address,omitempty"`
+	EurekaServer
 	// EurekaSource address belongs to nsf or not
 	NsfEureka bool `json:"NsfEureka,omitempty"`
 	// need k8sDomainSuffix in Host
 	K8sDomainSuffix bool `json:"K8SDomainSuffix,omitempty"`
 	// need ns in Host
 	NsHost bool `json:"NsHost,omitempty"`
+
+	Servers []EurekaServer `json:"Servers,omitempty"`
+}
+
+type EurekaServer struct {
+	Address []string `json:"Address,omitempty"`
 }
 
 func (eurekaArgs *EurekaSourceArgs) Validate() error {

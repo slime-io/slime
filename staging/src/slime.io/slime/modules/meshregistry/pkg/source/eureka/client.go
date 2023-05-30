@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
 type application struct {
@@ -38,6 +40,41 @@ type Client interface {
 	Applications() ([]*application, error)
 }
 
+type clients []*client
+
+func NewClients(servers []bootstrap.EurekaServer) Client {
+	clis := make(clients, 0, len(servers))
+	for _, server := range servers {
+		clis = append(clis, NewClient(server.Address))
+	}
+	return clis
+}
+
+func (clis clients) Applications() ([]*application, error) {
+	if len(clis) == 1 {
+		return clis[0].Applications()
+	}
+	cache := make(map[string][]*instance)
+	for _, cli := range clis {
+		insts, err := cli.Applications()
+		if err != nil {
+			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			continue
+		}
+		for _, instResp := range insts {
+			cache[instResp.Name] = append([]*instance(cache[instResp.Name]), instResp.Instances...)
+		}
+	}
+	ret := make([]*application, 0, len(cache))
+	for dom, hosts := range cache {
+		ret = append(ret, &application{
+			Name:      dom,
+			Instances: hosts,
+		})
+	}
+	return ret, nil
+}
+
 // Minimal client for Eureka server's REST APIs.
 // TODO: caching
 // TODO: Eureka v3 support
@@ -48,7 +85,7 @@ type client struct {
 }
 
 // NewClient instantiates a new Eureka client
-func NewClient(urls []string) Client {
+func NewClient(urls []string) *client {
 	return &client{
 		client: http.Client{Timeout: 30 * time.Second},
 		urls:   urls,
