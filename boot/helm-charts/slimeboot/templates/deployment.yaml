@@ -186,7 +186,7 @@ spec:
     app: {{.name}}
 {{- if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
 {{- if and .global .global.misc }}
-{{- if eq .global.misc.enableLeaderElection "on" }}
+{{- if eq (default .global.misc.enableLeaderElection "off") "on" }}
 ---
 apiVersion: v1
 kind: Service

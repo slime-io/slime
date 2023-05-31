@@ -297,7 +297,7 @@ spec:
         operation: MERGE
         value:
           virtual_hosts:
-            {{- if $f.dispatches }}
+              {{- if $f.dispatches }}
               {{- range $f.dispatches }}
               - domains:
               {{- toYaml .domains | nindent 14 }}
@@ -312,11 +312,12 @@ spec:
                       cluster: {{ tpl .cluster $ }}
                       {{- end }}
               {{- end }}
+              {{- end }}
               - domains:
                   - '*'
                 name: to_global_sidecar
                 routes:
-                  {{ - if (ne $f.disableIpv4Passthrough true) }}
+                  {{- if (ne $f.disableIpv4Passthrough true) }}
                   - match:
                       prefix: /
                       headers:
@@ -328,7 +329,7 @@ spec:
                     route:
                       cluster: PassthroughCluster
                       timeout: 0s
-                  {{ - end }}
+                  {{- end }}
                   - match:
                       prefix: /
                     route:
