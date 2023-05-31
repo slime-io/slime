@@ -38,6 +38,8 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
+	"slime.io/slime/modules/meshregistry/pkg/source/generic"
+	genericnacos "slime.io/slime/modules/meshregistry/pkg/source/generic/nacos"
 	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
 	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
 	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
@@ -178,17 +180,34 @@ func (p *Processing) Start() (err error) {
 	}
 
 	if srcArgs := p.regArgs.NacosSource; srcArgs.Enabled {
-		if nacosSrc, httpHandle, err = nacos.New(
-			p.regArgs.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.regArgs.RegistryStartDelay),
-			p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {
+
+		if nacosSrc, httpHandle, err = genericnacos.Source(
+			p.regArgs.NacosSource,
+			srcArgs.NsHost,
+			srcArgs.K8sDomainSuffix,
+			time.Duration(p.regArgs.RegistryStartDelay),
+			p.httpServer.SourceReadyCallBack,
+			generic.WithDynamicConfigOption[*genericnacos.Instance, *genericnacos.InstancesResp](func(onArgs func(*bootstrap.SourceArgs)) {
 				if p.addOnRegArgs != nil {
 					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
-						onNacosArgs(args.NacosSource)
+						onArgs(&args.NacosSource.SourceArgs)
 					})
 				}
 			})); err != nil {
 			return
 		}
+
+		// if nacosSrc, httpHandle, err = nacos.New(
+		// 	p.regArgs.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.regArgs.RegistryStartDelay),
+		// 	p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {
+		// 		if p.addOnRegArgs != nil {
+		// 			p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
+		// 				onNacosArgs(args.NacosSource)
+		// 			})
+		// 		}
+		// 	})); err != nil {
+		// 	return
+		// }
 		p.httpServer.HandleFunc(nacos.HttpPath, httpHandle)
 		p.httpServer.SourceRegistry(nacos.SourceName)
 		if srcArgs.WaitTime > 0 {
