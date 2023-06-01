@@ -389,7 +389,6 @@ spec:
             - header:
                 key: "Slime-Orig-Dest"
                 value: "%DOWNSTREAM_LOCAL_ADDRESS%"
-              append: true
           {{- if ne $addEnvHeaderViaLua "true" }}
             - header:
                 key: "Slime-Source-Ns"
