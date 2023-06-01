@@ -65,6 +65,33 @@ static_resources:
                 route:
                   cluster: original_dst_cluster 
           http_filters:
+          - name: envoy.filters.http.lua
+            typed_config:
+              "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+              default_source_code:
+                inline_string:
+                  function insert_namespace(host, namespace)
+                    if string.find(host, '%.') then
+                      return host
+                    end
+                    if not namespace or namespace == '' then
+                      return host
+                    end
+                    local idx = string.find(host, ':')
+                    if idx then
+                      local prefix = string.sub(host, 1, idx-1)
+                      local suffix = string.sub(host, idx)
+                      return prefix .. "." .. namespace .. suffix
+                    end
+                    return host .. '.' .. namespace
+                  end
+
+                  function envoy_on_request(request_handle)
+                    local sourceNs = request_handle:headers():get("Slime-Source-Ns")
+                    local reqHost = request_handle:headers():get(":authority")
+                    reqHost = insert_namespace(reqHost, sourceNs)
+                    request_handle:headers():replace(":authority", reqHost)
+                  end
           - name: envoy.filters.http.router
             typed_config:
               "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
