@@ -53,6 +53,8 @@ static_resources:
           use_remote_address: true
           route_config:
             name: proxy 
+            request_headers_to_remove:
+            - "Slime-Orig-Dest"
             virtual_hosts:
             - name: all
               domains:
