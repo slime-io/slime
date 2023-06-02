@@ -257,9 +257,9 @@ func (s *Source[I, IR]) updateServiceInfo() {
 		instances = s.reGroupInstances(instances)
 	}
 
-	newServiceEntryMap, err := convertServiceEntryMap(
-		instances, s.registry, s.args.DefaultServiceNs, s.args.SvcPort, s.args.GatewayModel, s.nsHost, s.k8sDomainSuffix,
-		s.args.InstancePortAsSvcPort, s.args.LabelPatch, false, s.getInstanceFilters(), s.getServiceHostAlias())
+	newServiceEntryMap, err := convertServiceEntryMap(instances, s.registry, s.args.DefaultServiceNs, s.args.SvcPort,
+		s.args.GatewayModel, s.args.NSFRegistry, s.nsHost, s.k8sDomainSuffix, s.args.LabelPatch, s.args.InstancePortAsSvcPort,
+		s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
 		log.Errorf("%s convert servceentry map failed: %s", s.registry, err.Error())
 		return
@@ -359,16 +359,9 @@ func (s *Source[I, IR]) getSeMetaModifierFactory() func(string) func(*resource.M
 }
 
 func convertServiceEntryMap[I Instance[I], IR Application[I, IR]](
-	instances []IR,
-	registry string,
-	defaultSvcNs string,
-	svcPort uint32,
-	gatewayModel, nsfRegistry bool,
-	nsHost, k8sDomainSuffix bool,
-	patchLabel bool,
-	instancePortAsSvcPort bool,
-	filter func(I) bool,
-	hostAliases map[string][]string,
+	instances []IR, registry string, defaultSvcNs string, svcPort uint32,
+	gatewayModel, nsfRegistry, nsHost, k8sDomainSuffix, patchLabel, instancePortAsSvcPort bool,
+	filter func(I) bool, hostAliases map[string][]string,
 ) (map[string]*networking.ServiceEntry, error) {
 
 	seMap := make(map[string]*networking.ServiceEntry, 0)
