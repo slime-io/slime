@@ -20,7 +20,7 @@ func Source(
 	k8sDomainSuffix bool,
 	delay time.Duration,
 	readyCallback func(string),
-	options ...generic.Option[*Instance, *InstancesResp],
+	options ...generic.Option[*Instance, *Application],
 ) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	headers := make(map[string]string)
 	if nacosHeaders := os.Getenv(clientHeadersEnv); nacosHeaders != "" {
@@ -31,8 +31,12 @@ func Source(
 			}
 		}
 	}
-	client := Clients(args.Servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
-	s, err := generic.NewSource[*Instance, *InstancesResp](&args.SourceArgs,
+	servers := args.Servers
+	if len(servers) == 0 {
+		servers = []bootstrap.NacosServer{args.NacosServer}
+	}
+	client := Clients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
+	s, err := generic.NewSource[*Instance, *Application](&args.SourceArgs,
 		"nacos", nsHost, k8sDomainSuffix, delay, readyCallback, client, options...)
 	if err != nil {
 		return nil, nil, err

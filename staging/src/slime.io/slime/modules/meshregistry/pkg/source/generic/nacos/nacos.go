@@ -97,25 +97,25 @@ func (i *Instance) MutableServiceName() *string {
 	return &i.ServiceName
 }
 
-type InstancesResp struct {
+type Application struct {
 	Hosts []*Instance `json:"hosts"`
 	Dom   string      `json:"dom"`
 }
 
-func (ir *InstancesResp) GetProjectCodes() []string {
+func (app *Application) GetProjectCodes() []string {
 	return nil
 }
 
-func (ir *InstancesResp) GetInstances() []*Instance {
-	return ir.Hosts
+func (app *Application) GetInstances() []*Instance {
+	return app.Hosts
 }
 
-func (ir *InstancesResp) GetDomain() string {
-	return ir.Dom
+func (app *Application) GetDomain() string {
+	return app.Dom
 }
 
-func (ir *InstancesResp) New(dom string, hosts []*Instance) *InstancesResp {
-	return &InstancesResp{
+func (app *Application) New(dom string, hosts []*Instance) *Application {
+	return &Application{
 		Dom:   dom,
 		Hosts: hosts,
 	}
@@ -134,7 +134,7 @@ func Clients(
 	return clis
 }
 
-func (clis clients) Instances() ([]*InstancesResp, error) {
+func (clis clients) Applications() ([]*Application, error) {
 	if len(clis) == 1 {
 		return clis[0].Instances()
 	}
@@ -142,16 +142,16 @@ func (clis clients) Instances() ([]*InstancesResp, error) {
 	for _, cli := range clis {
 		insts, err := cli.Instances()
 		if err != nil {
-			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			log.Warningf("fetch instances from server %v failed: %v", cli.urls, err)
 			continue
 		}
 		for _, instResp := range insts {
 			cache[instResp.Dom] = append([]*Instance(cache[instResp.Dom]), instResp.Hosts...)
 		}
 	}
-	ret := make([]*InstancesResp, 0, len(cache))
+	ret := make([]*Application, 0, len(cache))
 	for dom, hosts := range cache {
-		ret = append(ret, &InstancesResp{
+		ret = append(ret, &Application{
 			Dom:   dom,
 			Hosts: hosts,
 		})
@@ -282,7 +282,7 @@ func (c *client) doCall(url string, method string, header map[string]string, bod
 	return io.ReadAll(resp.Body)
 }
 
-func (c *client) Instances() ([]*InstancesResp, error) {
+func (c *client) Instances() ([]*Application, error) {
 	var fetcher func() (map[string][]*Instance, error)
 	if c.fetchAllNamespaces {
 		fetcher = c.allNamespacesInstances
@@ -296,9 +296,9 @@ func (c *client) Instances() ([]*InstancesResp, error) {
 		log.Errorf("do get instances failed: %s", err)
 		return nil, err
 	}
-	resp := make([]*InstancesResp, 0, len(m))
+	resp := make([]*Application, 0, len(m))
 	for svc, instances := range m {
-		resp = append(resp, &InstancesResp{
+		resp = append(resp, &Application{
 			Dom:   svc,
 			Hosts: instances,
 		})
@@ -384,7 +384,7 @@ func (c *client) listCatalogServices(namespaceId string) ([]*catalogServiceInfo,
 }
 
 func (c *client) listInstances(namespaceId, groupName, serviceName string) ([]*Instance, error) {
-	var ir InstancesResp
+	var ir Application
 	param := map[string]string{
 		"namespaceId": namespaceId,
 		"groupName":   groupName,

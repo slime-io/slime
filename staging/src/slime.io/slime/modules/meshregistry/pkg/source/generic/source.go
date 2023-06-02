@@ -46,28 +46,28 @@ type Instance[T any] interface {
 	MutableServiceName() *string
 }
 
-type InstancesResp[I Instance[I], T any] interface {
+type Application[I Instance[I], T any] interface {
 	GetProjectCodes() []string
 	GetInstances() []I
 	GetDomain() string
 	New(string, []I) T
 }
 
-type Client[I Instance[I], IR InstancesResp[I, IR]] interface {
-	// Instances registered on the registery
-	Instances() ([]IR, error)
+type Client[I Instance[I], IR Application[I, IR]] interface {
+	// Applications registered on the registery
+	Applications() ([]IR, error)
 }
 
-type Option[I Instance[I], IR InstancesResp[I, IR]] func(s *Source[I, IR]) error
+type Option[I Instance[I], IR Application[I, IR]] func(s *Source[I, IR]) error
 
-func WithDynamicConfigOption[I Instance[I], IR InstancesResp[I, IR]](addCb func(func(*bootstrap.SourceArgs))) Option[I, IR] {
+func WithDynamicConfigOption[I Instance[I], IR Application[I, IR]](addCb func(func(*bootstrap.SourceArgs))) Option[I, IR] {
 	return func(s *Source[I, IR]) error {
 		addCb(s.onConfig)
 		return nil
 	}
 }
 
-type Source[I Instance[I], IR InstancesResp[I, IR]] struct {
+type Source[I Instance[I], IR Application[I, IR]] struct {
 	// configuration
 	args            *bootstrap.SourceArgs
 	registry        string
@@ -98,7 +98,7 @@ type Source[I Instance[I], IR InstancesResp[I, IR]] struct {
 	seMetaModifierFactory func(string) func(*resource.Metadata)
 }
 
-func NewSource[I Instance[I], IR InstancesResp[I, IR]](
+func NewSource[I Instance[I], IR Application[I, IR]](
 	args *bootstrap.SourceArgs,
 	registry string,
 	nsHost, k8sDomainSuffix bool,
@@ -248,12 +248,11 @@ func (s *Source[I, IR]) refresh() {
 }
 
 func (s *Source[I, IR]) updateServiceInfo() {
-	instances, err := s.client.Instances()
+	instances, err := s.client.Applications()
 	if err != nil {
 		log.Errorf("%s get instances failed: %v", s.registry, err)
 		return
 	}
-
 	if s.reGroupInstances != nil {
 		instances = s.reGroupInstances(instances)
 	}
@@ -359,7 +358,7 @@ func (s *Source[I, IR]) getSeMetaModifierFactory() func(string) func(*resource.M
 	return s.seMetaModifierFactory
 }
 
-func convertServiceEntryMap[I Instance[I], IR InstancesResp[I, IR]](
+func convertServiceEntryMap[I Instance[I], IR Application[I, IR]](
 	instances []IR,
 	registry string,
 	defaultSvcNs string,
@@ -402,7 +401,7 @@ func convertServiceEntryMap[I Instance[I], IR InstancesResp[I, IR]](
 }
 
 // gateway
-func convertServiceEntry[I Instance[I], IR InstancesResp[I, IR]](app IR, registry string, nsHost bool, defaultSuffix string, patchLabel bool,
+func convertServiceEntry[I Instance[I], IR Application[I, IR]](app IR, registry string, nsHost bool, defaultSuffix string, patchLabel bool,
 	filter func(I) bool, hostAliases map[string][]string) *networking.ServiceEntry {
 	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.GetInstances(), registry, patchLabel, "", filter)
 	nsSuffix := ""
@@ -427,7 +426,7 @@ func convertServiceEntry[I Instance[I], IR InstancesResp[I, IR]](app IR, registr
 }
 
 // gateway with projectCode
-func convertServiceEntryWithProjectCode[I Instance[I], IR InstancesResp[I, IR]](app IR, registry string, nsHost bool, defaultSuffix string, patchLabel bool, projectCode string,
+func convertServiceEntryWithProjectCode[I Instance[I], IR Application[I, IR]](app IR, registry string, nsHost bool, defaultSuffix string, patchLabel bool, projectCode string,
 	filter func(I) bool, hostAliases map[string][]string) *networking.ServiceEntry {
 	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.GetInstances(), registry, patchLabel, projectCode, filter)
 
@@ -515,7 +514,7 @@ func convertEndpoints[I Instance[I]](insts []I, registry string, patchLabel bool
 }
 
 // sidecar
-func convertServiceEntryWithNs[I Instance[I], IR InstancesResp[I, IR]](app IR, registry string, defaultNs string, svcPort uint32,
+func convertServiceEntryWithNs[I Instance[I], IR Application[I, IR]](app IR, registry string, defaultNs string, svcPort uint32,
 	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
 	filter func(I) bool, hostAliases map[string][]string) map[string]*networking.ServiceEntry {
 	endpointMap, nsSvcPorts, useDNSMap := convertEndpointsWithNs(
@@ -746,7 +745,7 @@ func generateSeMetaModifierFactory(additionalMetas map[string]*bootstrap.Metadat
 	}
 }
 
-func reGroupInstances[I Instance[I], IR InstancesResp[I, IR]](rl *bootstrap.InstanceMetaRelabel,
+func reGroupInstances[I Instance[I], IR Application[I, IR]](rl *bootstrap.InstanceMetaRelabel,
 	c *bootstrap.ServiceNameConverter) func(in []IR) []IR {
 	if rl == nil && c == nil {
 		return nil
