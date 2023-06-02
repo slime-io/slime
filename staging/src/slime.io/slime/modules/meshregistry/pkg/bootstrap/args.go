@@ -135,6 +135,9 @@ type SourceArgs struct {
 	// InstanceMetaRelabel is used to adjust the metadata of the instance.
 	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs to be processed before ServiceNaming
 	InstanceMetaRelabel *InstanceMetaRelabel `json:"InstanceMetaRelabel,omitempty"`
+
+	// Registry Source address belongs to nsf or not
+	NSFRegistry bool `json:"NSFRegistry,omitempty"`
 }
 
 type MetadataWrapper struct {
