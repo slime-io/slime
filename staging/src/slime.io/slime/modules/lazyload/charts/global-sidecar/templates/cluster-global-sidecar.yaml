@@ -389,10 +389,12 @@ spec:
             - header:
                 key: "Slime-Orig-Dest"
                 value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+              append: false
           {{- if ne $addEnvHeaderViaLua "true" }}
             - header:
                 key: "Slime-Source-Ns"
                 value: "%ENVIRONMENT(POD_NAMESPACE)%"
+              append: false
           {{- end }}
 {{- if eq $addEnvHeaderViaLua "true" }}
     - applyTo: HTTP_FILTER
