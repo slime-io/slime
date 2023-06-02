@@ -341,9 +341,11 @@ spec:
             - header:
                 key: "Slime-Orig-Dest"
                 value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+              append: false
             - header:
                 key: "Slime-Source-Ns"
                 value: {{ $ns }}
+              append: false
     - applyTo: VIRTUAL_HOST
       match:
         proxy:
