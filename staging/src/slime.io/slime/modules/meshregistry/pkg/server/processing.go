@@ -39,6 +39,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
 	"slime.io/slime/modules/meshregistry/pkg/source/generic"
+	genericeureka "slime.io/slime/modules/meshregistry/pkg/source/generic/eureka"
 	genericnacos "slime.io/slime/modules/meshregistry/pkg/source/generic/nacos"
 	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
 	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
@@ -168,9 +169,24 @@ func (p *Processing) Start() (err error) {
 	}
 
 	if srcArgs := p.regArgs.EurekaSource; srcArgs.Enabled {
-		if eurekaSrc, httpHandle, err = eureka.New(p.regArgs.EurekaSource, time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+		if eurekaSrc, httpHandle, err = genericeureka.Source(
+			p.regArgs.EurekaSource,
+			srcArgs.NsHost,
+			srcArgs.K8sDomainSuffix,
+			time.Duration(p.regArgs.RegistryStartDelay),
+			p.httpServer.SourceReadyCallBack,
+			generic.WithDynamicConfigOption[*genericeureka.Instance, *genericeureka.Application](func(onArgs func(*bootstrap.SourceArgs)) {
+				if p.addOnRegArgs != nil {
+					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
+						onArgs(&args.EurekaSource.SourceArgs)
+					})
+				}
+			})); err != nil {
 			return
 		}
+		// if eurekaSrc, httpHandle, err = eureka.New(p.regArgs.EurekaSource, time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+		// 	return
+		// }
 		p.httpServer.HandleFunc(eureka.HttpPath, httpHandle)
 		p.httpServer.SourceRegistry(eureka.SourceName)
 		if srcArgs.WaitTime > 0 {
@@ -180,14 +196,13 @@ func (p *Processing) Start() (err error) {
 	}
 
 	if srcArgs := p.regArgs.NacosSource; srcArgs.Enabled {
-
 		if nacosSrc, httpHandle, err = genericnacos.Source(
 			p.regArgs.NacosSource,
 			srcArgs.NsHost,
 			srcArgs.K8sDomainSuffix,
 			time.Duration(p.regArgs.RegistryStartDelay),
 			p.httpServer.SourceReadyCallBack,
-			generic.WithDynamicConfigOption[*genericnacos.Instance, *genericnacos.InstancesResp](func(onArgs func(*bootstrap.SourceArgs)) {
+			generic.WithDynamicConfigOption[*genericnacos.Instance, *genericnacos.Application](func(onArgs func(*bootstrap.SourceArgs)) {
 				if p.addOnRegArgs != nil {
 					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
 						onArgs(&args.NacosSource.SourceArgs)
@@ -196,7 +211,6 @@ func (p *Processing) Start() (err error) {
 			})); err != nil {
 			return
 		}
-
 		// if nacosSrc, httpHandle, err = nacos.New(
 		// 	p.regArgs.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.regArgs.RegistryStartDelay),
 		// 	p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {

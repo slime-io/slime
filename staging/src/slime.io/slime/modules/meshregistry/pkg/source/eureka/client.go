@@ -58,7 +58,7 @@ func (clis clients) Applications() ([]*application, error) {
 	for _, cli := range clis {
 		insts, err := cli.Applications()
 		if err != nil {
-			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			log.Warningf("fetch instances from server %v failed: %v", cli.urls, err)
 			continue
 		}
 		for _, instResp := range insts {
