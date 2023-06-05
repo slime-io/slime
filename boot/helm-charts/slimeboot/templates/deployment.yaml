@@ -106,7 +106,7 @@ spec:
           volumeMounts:
             - mountPath: /etc/slime/config
               name: config-volume
-            {{- with $.Values.containers.slime.volumeMounts }}
+            {{- with $.Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
       volumes:

@@ -1,25 +1,78 @@
-/*
-* @Author: yangdihang
-* @Date: 2020/5/21
-*/
-
 syntax = "proto3";
 
 import "config.proto";
+import "k8s.io/api/core/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/api/resource/generated.proto";
+import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/generated.proto";
+import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
+import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 package slime.config.v1alpha1;
 
 option go_package = "slime.io/slime/framework/apis/config/v1alpha1";
-message SlimeBootStatus {
 
-}
+message SlimeBootStatus {}
 
 message SlimeBootSpec {
   repeated Config module = 1;
   Component component = 2;
+  string    namespace = 3;
+  string    istioNamespace = 4;
+  Image     image= 5;
+  int32     replicaCount = 6;
+  Service   service = 7;
+
+  k8s.io.api.core.v1.ResourceRequirements resources = 8;
+  repeated k8s.io.api.core.v1.LocalObjectReference imagePullSecrets = 9;
+  map<string, string> nodeSelector = 10;
+  k8s.io.api.core.v1.PodSecurityContext podSecurityContext = 11;
+  k8s.io.api.core.v1.SecurityContext containerSecurityContext = 12;
+  repeated k8s.io.api.core.v1.Toleration tolerations = 13;
+  k8s.io.api.core.v1.Affinity affinity = 14;
+  repeated k8s.io.api.core.v1.Volume volumes = 15;
+  repeated k8s.io.api.core.v1.VolumeMount volumeMounts = 16;
+
+  ServiceAccount serviceAccount = 17;
+  repeated string args = 18;
+  repeated k8s.io.api.core.v1.EnvVar env = 19;
 }
 
+message ServiceAccount { bool create = 1; }
+
 message Component {
-  repeated string globalSidecarNamespace = 1;
-  bool reportServer = 2;
+  GlobalSidecar globalSidecar = 1;
+}
+
+message GlobalSidecar {
+
+  message SidecarInject {
+    bool enable = 1;
+    string mode = 2;
+    map<string, string> labels = 3;
+    map<string,string> annotations = 4;
+  }
+  bool  enable = 1;
+  int32 port = 2;
+  int32 probePort = 3;
+  int32 replicas = 4;
+  Image     image = 5;
+  SidecarInject sidecarInject = 6;
+  k8s.io.api.core.v1.ResourceRequirements resources = 7;
+  bool  legacyFilterName = 8;
+}
+
+message Image {
+  string pullPolicy = 1;
+  string repository = 2;
+  string tag = 3;
+}
+
+
+message Service {
+  string type = 1;
+  int32  port = 2;
+  int32  auxiliaryPort = 3;
+  int32  logSourcePort = 4;
+  int32  mcpOverXdsPort = 5;
 }

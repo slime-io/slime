@@ -251,7 +251,6 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 			}
 		}
 	}
-
 	return nil
 }
 

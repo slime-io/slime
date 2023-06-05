@@ -3,6 +3,7 @@ module slime.io/slime/modules/lazyload
 go 1.16
 
 require (
+	github.com/buger/jsonparser v1.1.1
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
