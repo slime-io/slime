@@ -267,12 +267,25 @@ type EurekaServer struct {
 	Address []string `json:"Address,omitempty"`
 }
 
+func (eurekaServer *EurekaServer) Validate() error {
+	if len(eurekaServer.Address) == 0 {
+		return errors.New("eureka server address must be set")
+	}
+	return nil
+}
+
 func (eurekaArgs *EurekaSourceArgs) Validate() error {
 	if !eurekaArgs.Enabled {
 		return nil
 	}
-	if len(eurekaArgs.Address) == 0 {
-		return errors.New("eureka server address must be set when eureka source is enabled")
+	if len(eurekaArgs.Servers) == 0 {
+		return eurekaArgs.EurekaServer.Validate()
+	}
+	for _, server := range eurekaArgs.Servers {
+		err := server.Validate()
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
