@@ -17,9 +17,14 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
-var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "nacos")
+const (
+	SourceName = "nacos"
+	HttpPath   = "/nacos"
 
-const defaultNacosTokenTTL = 5
+	defaultNacosTokenTTL = 5
+)
+
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "nacos")
 
 var serviceListPageSize = 1000
 
