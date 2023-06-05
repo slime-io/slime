@@ -29,7 +29,7 @@ func (r *ServicefenceReconciler) RegisterSeHandler() {
 func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
 	for _, svc := range istioSvcs {
 		for _, port := range svc.Ports {
-			if port.Protocol != model.HTTP {
+			if port.Protocol != model.HTTP && port.Protocol != model.GRPC && port.Protocol != model.HTTP2 {
 				continue
 			}
 			p := int32(port.Port)
