@@ -26,6 +26,7 @@ ENV CONTROLLER_GEN_VERSION=v0.7.0
 ENV ISTIO_TOOLS_VERSION=1.12.0
 ENV GOGO_PROTOBUF_VERSION=1.3.2
 ENV PROTOC_VERSION=3.20.1
+ENV K8S_API_VERSION=0.22.2
 
 # install controller-gen
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
@@ -41,6 +42,18 @@ RUN go install github.com/gogo/protobuf/protoc-gen-gogo@v${GOGO_PROTOBUF_VERSION
     unzip v${GOGO_PROTOBUF_VERSION}.zip -d ${GOPATH}/src/github.com/gogo && \
     mv ${GOPATH}/src/github.com/gogo/protobuf-${GOGO_PROTOBUF_VERSION} ${GOPATH}/src/github.com/gogo/protobuf && \
     rm v${GOGO_PROTOBUF_VERSION}.zip
+
+# install k8s api protobuf
+RUN mkdir -p ${GOPATH}/src/k8s.io && \
+    curl -LO https://github.com/kubernetes/api/archive/refs/tags/v${K8S_API_VERSION}.zip && \
+    unzip v${K8S_API_VERSION}.zip -d ${GOPATH}/src/k8s.io && \
+    mv ${GOPATH}/src/k8s.io/api-${K8S_API_VERSION} ${GOPATH}/src/k8s.io/api && \
+    rm v${K8S_API_VERSION}.zip && \
+    curl -LO https://github.com/kubernetes/apimachinery/archive/refs/tags/v${K8S_API_VERSION}.zip && \
+    unzip v${K8S_API_VERSION}.zip -d ${GOPATH}/src/k8s.io && \
+    mv ${GOPATH}/src/k8s.io/apimachinery-${K8S_API_VERSION} ${GOPATH}/src/k8s.io/apimachinery && \
+    rm v${K8S_API_VERSION}.zip
+
 
 # install protocol compiler
 RUN export PB_REL="https://github.com/protocolbuffers/protobuf/releases"; \

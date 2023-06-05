@@ -35,21 +35,26 @@ spec:
                 serviceAccount:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                podAnnotations:
+                podSecurityContext:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                podSecurityContext:
+                containerSecurityContext:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
                 resources:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                autoscaling:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 nodeSelector:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
+                imagePullSecrets:
+                  type: object
+                  x-kubernetes-preserve-unknown-fields: true
+                tolerations:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 affinity:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
@@ -60,16 +65,16 @@ spec:
                 service:
                   type: object
                   x-kubernetes-preserve-unknown-fields: true
-                auxiliaryPort:
-                  type: integer
-                logSourcePort:
-                  type: integer
-                containers:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
                 volumes:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
+                volumeMounts:
+                  type: array
+                  items:
+                    type: object
+                    x-kubernetes-preserve-unknown-fields: true
                 module:
                   type: array
                   items:
