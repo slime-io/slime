@@ -1,9 +1,12 @@
 package module
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -145,12 +148,31 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 		if cm == nil {
 			return nil, nil
 		}
-		cmValue, ok := cm.Data[configMapModuleKey(opts.Env.Config.Name)]
-		if !ok {
-			return nil, nil
+
+		var cmValue []byte
+		itemKey := configMapModuleKey(opts.Env.Config.Name)
+		value, ok := cm.Data[itemKey]
+		if ok {
+			cmValue = []byte(value)
+		} else {
+			compressedValue, ok := cm.BinaryData[itemKey]
+			if !ok {
+				return nil, nil
+			}
+			// support gzip compressed configuration
+			buf := bytes.NewBuffer(compressedValue)
+			gr, err := gzip.NewReader(buf)
+			if err != nil {
+				return nil, err
+			}
+			defer gr.Close()
+			cmValue, err = io.ReadAll(gr)
+			if err != nil {
+				return nil, err
+			}
 		}
 
-		anyMsg, err := parseModuleConfig([]byte(cmValue))
+		anyMsg, err := parseModuleConfig(cmValue)
 		if err != nil {
 			return nil, err
 		}
