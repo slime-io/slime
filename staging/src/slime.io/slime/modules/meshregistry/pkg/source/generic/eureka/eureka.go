@@ -12,6 +12,11 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
+const (
+	SourceName = "eureka"
+	HttpPath   = "/eureka"
+)
+
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "eureka")
 
 type EurekaMetadata map[string]string
