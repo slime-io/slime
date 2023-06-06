@@ -163,7 +163,8 @@ func isHttp(port corev1.ServicePort) bool {
 		return false
 	}
 	p := strings.Split(port.Name, "-")[0]
-	return PortProtocol(p) == HTTP
+	protocol := PortProtocol(p)
+	return protocol == HTTP || protocol == GRPC || protocol == HTTP2
 }
 
 func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
