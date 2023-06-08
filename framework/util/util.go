@@ -11,6 +11,7 @@ import (
 const (
 	slimeLogLevel  = "info"
 	slimeKLogLevel = 5
+	slimeILogLevel = "warn"
 )
 
 var fs *flag.FlagSet

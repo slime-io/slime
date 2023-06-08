@@ -13,6 +13,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
+	ilog "istio.io/pkg/log"
 	"k8s.io/klog"
 )
 
@@ -28,6 +29,11 @@ func InitLog(logConfig *bootconfig.Log) error {
 	if logConfig.KlogLevel == 0 {
 		logConfig.KlogLevel = slimeKLogLevel
 	}
+
+	if logConfig.IlogLevel == "" {
+		logConfig.IlogLevel = slimeILogLevel
+	}
+
 	level, err := log.ParseLevel(logConfig.LogLevel)
 	if err != nil {
 		return err
@@ -35,7 +41,7 @@ func InitLog(logConfig *bootconfig.Log) error {
 	log.SetLevel(level)
 	log.SetFormatter(&log.TextFormatter{
 		TimestampFormat: time.RFC3339,
-		DisableQuote: !logConfig.EnableQuote,
+		DisableQuote:    !logConfig.EnableQuote,
 	})
 
 	var output io.Writer
@@ -52,6 +58,8 @@ func InitLog(logConfig *bootconfig.Log) error {
 
 	log.SetOutput(output)
 	initKlog(logConfig.KlogLevel, output)
+
+	SetiLog(logConfig.IlogLevel)
 
 	return nil
 }
@@ -97,4 +105,20 @@ func SetKlogLevel(number int32) {
 
 func GetKlogLevel() string {
 	return fs.Lookup("v").Value.String()
+}
+
+func SetiLog(iLogLevel string) {
+	var stringToLevel = map[string]ilog.Level{
+		"debug": ilog.DebugLevel,
+		"info":  ilog.InfoLevel,
+		"warn":  ilog.WarnLevel,
+		"error": ilog.ErrorLevel,
+		"fatal": ilog.FatalLevel,
+		"none":  ilog.NoneLevel,
+	}
+
+	scopes := ilog.Scopes()
+	for name, _ := range scopes {
+		scopes[name].SetOutputLevel(stringToLevel[iLogLevel])
+	}
 }

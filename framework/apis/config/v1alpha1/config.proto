@@ -38,7 +38,8 @@ message Log {
   int32 klogLevel = 2;
   bool logRotate = 3;
   LogRotateConfig logRotateConfig = 4;
-  bool enableQuote =5;
+  bool enableQuote = 5;
+  string ilogLevel = 6;
 }
 
 message LogRotateConfig {

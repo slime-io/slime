@@ -189,6 +189,7 @@ func PprofRegister(ph *PathHandler) {
 func LogLevelRegister(ph *PathHandler) {
 	ph.Handle("/log/slime", slimeLogLevelHandler())
 	ph.Handle("/log/k", kLogLevelHandler())
+	ph.Handle("/log/ilog", iLogLevelHandler())
 }
 
 func slimeLogLevelHandler() http.Handler {
@@ -257,6 +258,30 @@ func kLogLevelHandler() http.Handler {
 			util.SetKlogLevel(int32(l))
 			log.Infof("klog level sets to %d successfully", l)
 			if _, err := w.Write([]byte(fmt.Sprintf("Klog level sets to %d successfully.", l))); err != nil {
+				log.Errorf("write klog level response error, %+v", err)
+			}
+			return
+		}
+		if _, err := w.Write([]byte("Wrong request method")); err != nil {
+			log.Errorf("write klog level response error, %+v", err)
+		}
+	})
+}
+
+func iLogLevelHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" || r.Method == "POST" {
+			level, ok := r.URL.Query()["level"]
+			if !ok || len(level) < 1 {
+				log.Errorf("empty ilog level set error")
+				if _, err := w.Write([]byte("Empty ilog level error!")); err != nil {
+					log.Errorf("write ilog level response error, %+v", err)
+				}
+				return
+			}
+			util.SetiLog(level[0])
+			log.Infof("ilog level sets to %s successfully", level[0])
+			if _, err := w.Write([]byte(fmt.Sprintf("ilog level sets to %s successfully.", level[0]))); err != nil {
 				log.Errorf("write klog level response error, %+v", err)
 			}
 			return
