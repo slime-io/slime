@@ -24,6 +24,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
 	istio.io/istio-mcp v0.0.0
+	istio.io/pkg v0.0.0-20200807181912-d97bc429be20
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
