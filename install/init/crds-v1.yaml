@@ -679,7 +679,7 @@ spec:
                                       inclusive. Note: these bounds are computed from:
                                       60 sec/min * 60 min/hr * 24 hr/day * 365.25
                                       days/year * 10000 years'
-                                      format: int64
+                                      format: int32
                                       type: integer
                                   type: object
                                 quota:

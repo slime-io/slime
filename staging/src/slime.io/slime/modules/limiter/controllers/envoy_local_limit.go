@@ -438,7 +438,7 @@ func generateTokenBucket(item *microservicev1alpha2.SmartLimitDescriptor) *envoy
 	return &envoy_type_v3.TokenBucket{
 		MaxTokens: uint32(i),
 		FillInterval: &duration.Duration{
-			Seconds: item.Action.FillInterval.Seconds,
+			Seconds: int64(item.Action.FillInterval.Seconds),
 			Nanos:   item.Action.FillInterval.Nanos,
 		},
 		TokensPerFill: &wrappers.UInt32Value{Value: uint32(i)},
@@ -504,7 +504,8 @@ func generateEnvoyLocalRateLimitEnabled() *envoy_core_v3.RuntimeFractionalPercen
 	}
 }
 
-//  % of requests that will enforce the local rate limit decision for a given route_key specified in the local rate limit configuration.
+//	% of requests that will enforce the local rate limit decision for a given route_key specified in the local rate limit configuration.
+//
 // Defaults to 0. This can be used to test what would happen before fully enforcing the outcome.
 func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPercent {
 	return &envoy_core_v3.RuntimeFractionalPercent{
