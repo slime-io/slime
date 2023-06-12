@@ -1,6 +1,7 @@
 package nacos
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gogo/protobuf/proto"
@@ -33,16 +34,19 @@ func (s *Source) refresh() {
 	}()
 	s.started = true
 	log.Infof("nacos refresh start : %d", time.Now().UnixNano())
-	s.updateServiceInfo()
+	if err := s.updateServiceInfo(); err != nil {
+		log.Errorf("eureka update service info failed: %v", err)
+		return
+	}
 	log.Infof("nacos refresh finsh : %d", time.Now().UnixNano())
 	s.markServiceEntryInitDone()
 }
 
-func (s *Source) updateServiceInfo() {
+func (s *Source) updateServiceInfo() error {
 	instances, err := s.client.Instances()
 	if err != nil {
-		log.Errorf("get nacos instances failed: " + err.Error())
-		return
+		return fmt.Errorf("get nacos instances failed: %v", err)
+
 	}
 	if s.reGroupInstances != nil {
 		instances = s.reGroupInstances(instances)
@@ -51,8 +55,7 @@ func (s *Source) updateServiceInfo() {
 		instances, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix,
 		s.args.InstancePortAsSvcPort, s.args.LabelPatch, s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
-		log.Errorf("convert nacos servceentry map failed: " + err.Error())
-		return
+		return fmt.Errorf("convert nacos servceentry map failed: %v", err)
 	}
 	seMetaModifierFactory := s.getSeMetaModifierFactory()
 	for service, oldEntry := range s.cache {
@@ -92,4 +95,5 @@ func (s *Source) updateServiceInfo() {
 			}
 		}
 	}
+	return nil
 }
