@@ -128,23 +128,26 @@ func (s *Source) refresh() {
 	}()
 	s.started = true
 	log.Infof("eureka refresh start : %d", time.Now().UnixNano())
-	s.updateServiceInfo()
+	if err := s.updateServiceInfo(); err != nil {
+		log.Errorf("eureka update service info failed: %v", err)
+		return
+	}
 	log.Infof("eureka refresh finsh : %d", time.Now().UnixNano())
+
 	s.markServiceEntryInitDone()
 }
 
-func (s *Source) updateServiceInfo() {
+func (s *Source) updateServiceInfo() error {
 	apps, err := s.client.Applications()
 	if err != nil {
-		log.Errorf("get eureka app failed: " + err.Error())
-		return
+		return fmt.Errorf("get eureka app failed: %v", err)
 	}
 	newServiceEntryMap, err := ConvertServiceEntryMap(
 		apps, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.LabelPatch, s.args.SvcPort,
 		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.NsfEureka)
 	if err != nil {
 		log.Errorf("convert eureka servceentry map failed: " + err.Error())
-		return
+		return fmt.Errorf("convert eureka servceentry map failed: %v", err)
 	}
 
 	for service, oldEntry := range s.cache {
@@ -184,6 +187,7 @@ func (s *Source) updateServiceInfo() {
 			}
 		}
 	}
+	return nil
 }
 
 func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
