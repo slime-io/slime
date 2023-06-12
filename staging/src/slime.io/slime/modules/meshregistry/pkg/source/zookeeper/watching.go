@@ -159,6 +159,9 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		default:
 		}
 
+		// When registering a watch for the first time, no matter whether it is successful or not,
+		// we will return the result to the upper layer, so that the upper layer can execute possible
+		// callbacks after determining that the first watch has completed.
 		paths, _, eventCh, err := ew.conn.Load().(*zk.Conn).ChildrenW(path)
 		if err != nil {
 			log.Debugf("endpointWatcher %q watch %q failed: %v", ew.servicePath, path, err)
@@ -177,6 +180,10 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			data: paths,
 			err:  err,
 		}:
+			if first && err != nil { // especially for the first watch failure
+				// When the err is not nil, the eventCh will be nil, need to redo watch,
+				break
+			}
 			first = false
 			select {
 			case <-ew.exit:
@@ -245,6 +252,10 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 			if item.err == nil {
 				consumerCache = item.data
 			}
+		case <-ew.signalExit:
+			ew.serviceDeleteHandler()
+			log.Infof("endpointWatcher %q exit due to service deleted", ew.servicePath)
+			return
 		}
 
 		if providerInit && consumerInit {
