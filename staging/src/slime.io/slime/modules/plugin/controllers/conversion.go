@@ -198,7 +198,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, o
 					if patchCtx == istio.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == istio.EnvoyFilter_GATEWAY {
 						// ':*' is appended if port info is not specified in outbound and gateway
 						// it will match all port in same host after istio adapted
-						if strings.Index(t.host, ":") == -1 {
+						if len(t.host) > 0 && strings.Index(t.host, ":") == -1 {
 							host += ":*"
 						}
 					}
