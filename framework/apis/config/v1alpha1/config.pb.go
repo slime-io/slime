@@ -225,15 +225,17 @@ func (m *Global) GetIstioConfigSource() *ConfigSource {
 }
 
 type Log struct {
-	LogLevel             string           `protobuf:"bytes,1,opt,name=logLevel,proto3" json:"logLevel,omitempty"`
-	KlogLevel            int32            `protobuf:"varint,2,opt,name=klogLevel,proto3" json:"klogLevel,omitempty"`
-	LogRotate            bool             `protobuf:"varint,3,opt,name=logRotate,proto3" json:"logRotate,omitempty"`
-	LogRotateConfig      *LogRotateConfig `protobuf:"bytes,4,opt,name=logRotateConfig,proto3" json:"logRotateConfig,omitempty"`
-	EnableQuote          bool             `protobuf:"varint,5,opt,name=enableQuote,proto3" json:"enableQuote,omitempty"`
-	IlogLevel            string           `protobuf:"bytes,6,opt,name=ilogLevel,proto3" json:"ilogLevel,omitempty"`
-	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
-	XXX_unrecognized     []byte           `json:"-"`
-	XXX_sizecache        int32            `json:"-"`
+	LogLevel        string           `protobuf:"bytes,1,opt,name=logLevel,proto3" json:"logLevel,omitempty"`
+	KlogLevel       int32            `protobuf:"varint,2,opt,name=klogLevel,proto3" json:"klogLevel,omitempty"`
+	LogRotate       bool             `protobuf:"varint,3,opt,name=logRotate,proto3" json:"logRotate,omitempty"`
+	LogRotateConfig *LogRotateConfig `protobuf:"bytes,4,opt,name=logRotateConfig,proto3" json:"logRotateConfig,omitempty"`
+	EnableQuote     bool             `protobuf:"varint,5,opt,name=enableQuote,proto3" json:"enableQuote,omitempty"`
+	// define ilog scope level
+	// default:info,xdsc:warn,mcpc:warn
+	IlogLevel            string   `protobuf:"bytes,6,opt,name=ilogLevel,proto3" json:"ilogLevel,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
 func (m *Log) Reset()         { *m = Log{} }

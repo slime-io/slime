@@ -7,6 +7,7 @@ import (
 	"net/http/pprof"
 	"slime.io/slime/framework/bootstrap/resource"
 	"strconv"
+	"strings"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -279,8 +280,23 @@ func iLogLevelHandler() http.Handler {
 				}
 				return
 			}
-			util.SetiLog(level[0])
+
+			scopes := make(map[string]string)
+			if level[0] != "" {
+				log.Infof("get ilog level setting %s", level[0])
+				parts := strings.Split(level[0], ",")
+				for i, _ := range parts {
+					items := strings.Split(parts[i], ":")
+					if len(items) != 2 {
+						continue
+					}
+					scopes[items[0]] = items[1]
+				}
+			}
+
+			util.SetiLog(scopes)
 			log.Infof("ilog level sets to %s successfully", level[0])
+
 			if _, err := w.Write([]byte(fmt.Sprintf("ilog level sets to %s successfully.", level[0]))); err != nil {
 				log.Errorf("write klog level response error, %+v", err)
 			}

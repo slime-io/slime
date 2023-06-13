@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	slimeLogLevel  = "info"
-	slimeKLogLevel = 5
-	slimeILogLevel = "warn"
+	slimeLogLevel         = "info"
+	slimeKLogLevel        = 5
+	slimeDefaultILogLevel = "info"
+	slimeDefaultScopeName = "default"
 )
 
 var fs *flag.FlagSet
