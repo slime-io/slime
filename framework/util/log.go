@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -30,8 +31,16 @@ func InitLog(logConfig *bootconfig.Log) error {
 		logConfig.KlogLevel = slimeKLogLevel
 	}
 
-	if logConfig.IlogLevel == "" {
-		logConfig.IlogLevel = slimeILogLevel
+	scopes := make(map[string]string)
+	if logConfig.IlogLevel != "" {
+		parts := strings.Split(logConfig.IlogLevel, ",")
+		for i, _ := range parts {
+			items := strings.Split(parts[i], ":")
+			if len(items) != 2 {
+				continue
+			}
+			scopes[items[0]] = items[1]
+		}
 	}
 
 	level, err := log.ParseLevel(logConfig.LogLevel)
@@ -59,7 +68,7 @@ func InitLog(logConfig *bootconfig.Log) error {
 	log.SetOutput(output)
 	initKlog(logConfig.KlogLevel, output)
 
-	SetiLog(logConfig.IlogLevel)
+	SetiLog(scopes)
 
 	return nil
 }
@@ -107,7 +116,12 @@ func GetKlogLevel() string {
 	return fs.Lookup("v").Value.String()
 }
 
-func SetiLog(iLogLevel string) {
+func SetiLog(settings map[string]string) {
+
+	if len(settings) == 0 {
+		return
+	}
+
 	var stringToLevel = map[string]ilog.Level{
 		"debug": ilog.DebugLevel,
 		"info":  ilog.InfoLevel,
@@ -117,8 +131,18 @@ func SetiLog(iLogLevel string) {
 		"none":  ilog.NoneLevel,
 	}
 
-	scopes := ilog.Scopes()
-	for name, _ := range scopes {
-		scopes[name].SetOutputLevel(stringToLevel[iLogLevel])
+	defaultLevel := slimeDefaultILogLevel
+	if v, ok := settings[slimeDefaultScopeName]; ok {
+		defaultLevel = v
+	}
+
+	for name, scope := range ilog.Scopes() {
+
+		level := stringToLevel[defaultLevel]
+		if v, ok := settings[name]; ok {
+			level = stringToLevel[v]
+		}
+		scope.SetOutputLevel(level)
+		log.Infof("set ilog scope %s:%d", name, level)
 	}
 }

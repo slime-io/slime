@@ -39,6 +39,8 @@ message Log {
   bool logRotate = 3;
   LogRotateConfig logRotateConfig = 4;
   bool enableQuote = 5;
+  // define ilog scope level
+  // default:info,xdsc:warn,mcpc:warn
   string ilogLevel = 6;
 }
 
