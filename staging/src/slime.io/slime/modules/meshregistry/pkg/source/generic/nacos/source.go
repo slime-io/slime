@@ -35,7 +35,11 @@ func Source(
 	if len(servers) == 0 {
 		servers = []bootstrap.NacosServer{args.NacosServer}
 	}
-	client := Clients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
+	var clis []generic.Client[*Instance, *Application]
+	for _, cli := range clients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers) {
+		clis = append(clis, cli)
+	}
+	client := generic.NewClient[*Instance, *Application](clis...)
 	s, err := generic.NewSource[*Instance, *Application](&args.SourceArgs,
 		"nacos", nsHost, k8sDomainSuffix, delay, readyCallback, client, options...)
 	if err != nil {

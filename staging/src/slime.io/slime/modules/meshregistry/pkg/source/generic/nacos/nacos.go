@@ -126,42 +126,15 @@ func (app *Application) New(dom string, hosts []*Instance) *Application {
 	}
 }
 
-type clients []*client
-
-func Clients(
+func clients(
 	servers []bootstrap.NacosServer,
 	metaKeyNamespace, metaKeyGroup string,
-	headers map[string]string) clients {
-	clis := make(clients, 0, len(servers))
+	headers map[string]string) []*client {
+	clis := make([]*client, 0, len(servers))
 	for _, server := range servers {
 		clis = append(clis, newClient(server, metaKeyNamespace, metaKeyGroup, headers))
 	}
 	return clis
-}
-
-func (clis clients) Applications() ([]*Application, error) {
-	if len(clis) == 1 {
-		return clis[0].Instances()
-	}
-	cache := make(map[string][]*Instance)
-	for _, cli := range clis {
-		insts, err := cli.Instances()
-		if err != nil {
-			log.Warningf("fetch instances from server %v failed: %v", cli.urls, err)
-			continue
-		}
-		for _, instResp := range insts {
-			cache[instResp.Dom] = append([]*Instance(cache[instResp.Dom]), instResp.Hosts...)
-		}
-	}
-	ret := make([]*Application, 0, len(cache))
-	for dom, hosts := range cache {
-		ret = append(ret, &Application{
-			Dom:   dom,
-			Hosts: hosts,
-		})
-	}
-	return ret, nil
 }
 
 type client struct {
@@ -287,7 +260,7 @@ func (c *client) doCall(url string, method string, header map[string]string, bod
 	return io.ReadAll(resp.Body)
 }
 
-func (c *client) Instances() ([]*Application, error) {
+func (c *client) Applications() ([]*Application, error) {
 	var fetcher func() (map[string][]*Instance, error)
 	if c.fetchAllNamespaces {
 		fetcher = c.allNamespacesInstances
@@ -558,4 +531,8 @@ func (c *client) injectAuthParam(param map[string]string) {
 	if ok {
 		param["accessToken"] = token
 	}
+}
+
+func (c *client) ServerInfo() string {
+	return strings.Join(c.urls, ",")
 }

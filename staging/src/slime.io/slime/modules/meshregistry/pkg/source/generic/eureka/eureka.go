@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	frameworkmodel "slime.io/slime/framework/model"
@@ -92,39 +93,12 @@ func (app *Application) New(name string, insts []*Instance) *Application {
 	return &Application{Name: name, Instances: insts}
 }
 
-type clients []*client
-
-func Clients(servers []bootstrap.EurekaServer) clients {
-	clis := make(clients, 0, len(servers))
+func clients(servers []bootstrap.EurekaServer) []*client {
+	clis := make([]*client, 0, len(servers))
 	for _, server := range servers {
 		clis = append(clis, newClient(server.Address))
 	}
 	return clis
-}
-
-func (clis clients) Applications() ([]*Application, error) {
-	if len(clis) == 1 {
-		return clis[0].Applications()
-	}
-	cache := make(map[string][]*Instance)
-	for _, cli := range clis {
-		insts, err := cli.Applications()
-		if err != nil {
-			log.Warningf("fetch instances from server %v failed: %v", cli.urls, err)
-			continue
-		}
-		for _, instResp := range insts {
-			cache[instResp.Name] = append([]*Instance(cache[instResp.Name]), instResp.Instances...)
-		}
-	}
-	ret := make([]*Application, 0, len(cache))
-	for dom, hosts := range cache {
-		ret = append(ret, &Application{
-			Name:      dom,
-			Instances: hosts,
-		})
-	}
-	return ret, nil
 }
 
 // Minimal client for Eureka server's REST APIs.
@@ -195,4 +169,8 @@ func (c *client) Applications() ([]*Application, error) {
 		return nil, err
 	}
 	return apps.Applications.Applications, nil
+}
+
+func (c *client) ServerInfo() string {
+	return strings.Join(c.urls, ",")
 }

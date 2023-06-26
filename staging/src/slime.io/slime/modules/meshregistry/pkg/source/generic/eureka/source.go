@@ -22,7 +22,11 @@ func Source(
 	if len(servers) == 0 {
 		servers = []bootstrap.EurekaServer{args.EurekaServer}
 	}
-	client := Clients(servers)
+	var clis []generic.Client[*Instance, *Application]
+	for _, cli := range clients(servers) {
+		clis = append(clis, cli)
+	}
+	client := generic.NewClient[*Instance, *Application](clis...)
 	s, err := generic.NewSource[*Instance, *Application](&args.SourceArgs,
 		"eureka", nsHost, k8sDomainSuffix, delay, readyCallback, client, options...)
 	if err != nil {
