@@ -146,7 +146,7 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (*config.SlimeBoot, map[string]interface{}, error) {
 
 	// Deserialize to config.SlimeBoot
-	slimeBoot, err := getSlimeboot(env)
+	specRaw, slimeBoot, err := getSlimeboot(env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get slimeboot error: %v", err)
 	}
@@ -168,22 +168,40 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 		return nil, nil, fmt.Errorf("marshal slimeboot spec error: %v", err)
 	}
 
-	// Insert wormholeport into general.wormholePort
+	// Insert general and general.wormholeport into general
 	if len(wormholePort) > 0 {
+		var pos string
 		wp, err := json.Marshal(wormholePort)
 		if err != nil {
 			return nil, nil, fmt.Errorf("marshal wormholePort err %s", err)
 		}
+
 		for idx, _ := range slimeBoot.Spec.Module {
 			if slimeBoot.Spec.Module[idx].Kind == "lazyload" {
-				pos := fmt.Sprintf("[%d]", idx)
-				spec, err = jsonparser.Set(spec, wp, "module", pos, "general", "wormholePort")
-				if err != nil {
-					return nil, nil, fmt.Errorf("use jsonparser to set slimeboot general wormholePort get err %s", err)
-				}
-				log.Infof("set slimeboot spec.module%s.general.wormholePort: %s succeed", pos, wp)
+				pos = fmt.Sprintf("[%d]", idx)
+				break
 			}
 		}
+		// get lazyload general
+		general, _, _, err := jsonparser.Get([]byte(specRaw), "module", pos, "general")
+		if err != nil {
+			log.Errorf("get slimeboot module%s.general err %s", pos, err)
+			return slimeBoot, nil, nil
+		}
+		log.Debugf("get slimeboot module%s.general: %s", pos, general)
+
+		// set general and general.wormholeport into general
+		spec, err = jsonparser.Set(spec, general, "module", pos, "general")
+		if err != nil {
+			return nil, nil, fmt.Errorf("use jsonparser to set slimeboot general get err %s", err)
+		}
+		log.Debugf("set slimeboot spec.module%s.general: %s succeed", pos, general)
+
+		spec, err = jsonparser.Set(spec, wp, "module", pos, "general", "wormholePort")
+		if err != nil {
+			return nil, nil, fmt.Errorf("use jsonparser to set slimeboot general wormholePort get err %s", err)
+		}
+		log.Debugf("set slimeboot spec.module%s.general.wormholePort: %s succeed", pos, wp)
 	}
 
 	// Deserialize values to map[string]interface{}
@@ -198,7 +216,7 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 	return slimeBoot, values, nil
 }
 
-func getSlimeboot(env *bootstrap.Environment) (*config.SlimeBoot, error) {
+func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error) {
 	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
 	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
 
@@ -208,17 +226,23 @@ func getSlimeboot(env *bootstrap.Environment) (*config.SlimeBoot, error) {
 		utd, err = getSlimebootByLabelSelector(slimeBootNs, deployName, env)
 		if err != nil {
 			log.Infof("get slimeboot by labelselector failed with %q", err)
-			return nil, fmt.Errorf("try to get slimeboot in namespace %s failed", slimeBootNs)
+			return "", nil, fmt.Errorf("try to get slimeboot in namespace %s failed", slimeBootNs)
 		}
 	}
 
 	// Unstructured -> SlimeBoot
 	var slimeBoot config.SlimeBoot
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {
-		return nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, utd.GetName(), err)
+		return "", nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, utd.GetName(), err)
 	}
 
-	return &slimeBoot, nil
+	raw, err := json.Marshal(utd.UnstructuredContent()["spec"])
+	if err != nil {
+		return "", nil, fmt.Errorf("marshal slimeboot %s/%s error: %v", slimeBootNs, utd.GetName(), err)
+	}
+
+	log.Debugf("get raw slimeboot spec: %s", string(raw))
+	return string(raw), &slimeBoot, nil
 }
 
 func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Environment) (*unstructured.Unstructured, error) {
