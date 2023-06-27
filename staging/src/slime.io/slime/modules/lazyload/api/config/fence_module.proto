@@ -32,11 +32,14 @@ message Fence {
   string fenceLabelKeyAlias = 9;
   // enableShortDomain, it will generate fqdn and short domain if enabled, otherwise only fqdn is generated in svf and sidecar
   bool enableShortDomain = 10;
+  // deprecated
   // disable ipv4 passthrough
   // mainly deal with compatibility issues with older versions of istio
   // if set true, all ipv4 request will route to global-sidecar
   // default is false, all ipv4 request will route to global-sidecar
   bool disableIpv4Passthrough = 11;
+  // passthroughByDefault, if set true, all request will route to PassthroughCluster
+  bool passthroughByDefault = 12;
 }
 
 // The general idea is to assign different default traffic to different targets
@@ -48,6 +51,9 @@ message Dispatch {
   repeated string domains = 2;
   // target cluster
   string cluster = 3;
+  // google re2 regex expression
+  // forward matching request to the cluster
+  string domainRegex = 4;
 }
 
 // DomainAlias regexp expression, which is alias for target domain

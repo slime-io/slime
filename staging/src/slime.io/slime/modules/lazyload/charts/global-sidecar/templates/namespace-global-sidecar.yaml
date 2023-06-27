@@ -13,6 +13,7 @@
           {{ $gsSvcPorts := list }}
           {{ $hasGsPort := false }}
           {{ $autoPort := .general.autoPort }}
+          {{ $passthroughByDefault := .general.passthroughByDefault | default false }}
           {{- range $f.wormholePort }}
              {{- if eq (int .) (int $gsPort) }}
                  {{ $hasGsPort = true }}
@@ -279,6 +280,7 @@ metadata:
 spec:
   configPatches:
     {{- range $gsSvcPorts}}
+    {{- with $wormholePort := . }}
     - applyTo: VIRTUAL_HOST
       match:
         context: SIDECAR_OUTBOUND
@@ -299,6 +301,7 @@ spec:
           virtual_hosts:
               {{- if $f.dispatches }}
               {{- range $f.dispatches }}
+              {{- if or (not .domainRegex) (eq .domainRegex "") }}
               - domains:
               {{- toYaml .domains | nindent 14 }}
                 name: {{ .name }}
@@ -311,29 +314,43 @@ spec:
                       {{- else }}
                       cluster: {{ tpl .cluster $ }}
                       {{- end }}
+                      timeout: 0s
+              {{- end }}
               {{- end }}
               {{- end }}
               - domains:
                   - '*'
-                name: to_global_sidecar
+                name: allow_all
                 routes:
-                  {{- if (ne $f.disableIpv4Passthrough true) }}
+                 {{- if $f.dispatches }}
+                 {{- range $f.dispatches }}
+                 {{- if .domainRegex }}
                   - match:
                       prefix: /
                       headers:
                         - name: ':authority'
                           string_match:
                             safe_regex:
-                              google_re2: { }
-                              regex: '^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?::([1-9]|[1-9]\d{1,3}|[1-5]\d{4}|6[0-5][0-5][0-3][0-5]))?$'
+                              google_re2: {}
+                              regex: {{ .domainRegex }}
                     route:
-                      cluster: PassthroughCluster
+                      {{- if eq .cluster "_GLOBAL_SIDECAR" }}
+                      cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      {{- else }}
+                      cluster: {{ tpl .cluster $ }}
+                      {{- end }}
                       timeout: 0s
+                  {{- end }}
+                  {{- end }}
                   {{- end }}
                   - match:
                       prefix: /
                     route:
+                      {{- if $passthroughByDefault }}
+                      cluster: PassthroughCluster
+                      {{- else }}
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                      {{- end }}
                       timeout: 0s
           request_headers_to_add:
             - header:
@@ -353,9 +370,27 @@ spec:
         routeConfiguration:
           name: "{{ . }}"
           vhost:
-            name: to_global_sidecar
+            name: allow_all
       patch:
         operation: REMOVE
+    {{- if $f.dispatches }}
+    {{- range $f.dispatches }}
+    {{- if or (not .domainRegex) (eq .domainRegex "") }}
+    - applyTo: VIRTUAL_HOST
+      match:
+        proxy:
+          metadata:
+            SLIME_APP: LAZYLOAD_GLOBAL_SIDECAR
+        context: SIDECAR_OUTBOUND
+        routeConfiguration:
+          name: '{{ $wormholePort }}'
+          vhost:
+            name: {{ .name }}
+      patch:
+        operation: REMOVE
+    {{- end }}
+    {{- end }}
+    {{- end }}
     - applyTo: ROUTE_CONFIGURATION
       match:
         proxy:
@@ -377,6 +412,7 @@ spec:
                   route:
                     cluster: PassthroughCluster
                     timeout: 0s
+    {{- end }}
     {{- end }}
 {{- end }}
 {{- if (eq $g.misc.metricSourceType "accesslog") }}
