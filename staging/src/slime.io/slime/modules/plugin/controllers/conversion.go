@@ -140,6 +140,9 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, o
 			Labels: in.WorkloadSelector.Labels,
 		}
 	}
+
+	out.Priority = in.Priority
+
 	out.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 
 	var targets []target
@@ -252,6 +255,9 @@ func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta,
 	out.WorkloadSelector = &istio.WorkloadSelector{
 		Labels: in.WorkloadLabels,
 	}
+
+	out.Priority = in.Priority
+
 	out.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	for _, p := range in.Plugin {
 		if !p.Enable {

@@ -74,6 +74,11 @@ spec:
                       type: string
                   type: object
                 type: array
+              priority:
+                description: priority defines the order in which patch sets are applied
+                  within a context.
+                format: int32
+                type: integer
               workload_labels:
                 additionalProperties:
                   type: string
