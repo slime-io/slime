@@ -366,6 +366,11 @@ spec:
                             type: string
                     type: object
                   type: array
+                priority:
+                  description: priority defines the order in which patch sets are applied
+                    within a context.
+                  format: int32
+                  type: integer
                 workloadLabels:
                   description: '`WorkloadSelector` specifies the criteria used to determine
                   if the `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry` configuration
@@ -584,6 +589,11 @@ spec:
                   items:
                     type: string
                   type: array
+                priority:
+                  description: priority defines the order in which patch sets are applied
+                    within a context.
+                  format: int32
+                  type: integer
                 workloadSelector:
                   description: '`WorkloadSelector` specifies the criteria used to determine
                   if the `Gateway`, `Sidecar`, or `EnvoyFilter` or `ServiceEntry` configuration

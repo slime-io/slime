@@ -67,8 +67,6 @@ message WorkloadSelector {
 }
 
 message EnvoyPluginSpec {
-    WorkloadSelector workload_selector = 9;
-
     // route level plugin
     repeated string route = 1;
 
@@ -96,4 +94,9 @@ message EnvoyPluginSpec {
 
     // listener level
     repeated Listener listener = 8;
+
+    // workload selector
+    WorkloadSelector workload_selector = 9;
+    // priority defines the order in which patch sets are applied within a context.
+    int32 priority = 10;
 }

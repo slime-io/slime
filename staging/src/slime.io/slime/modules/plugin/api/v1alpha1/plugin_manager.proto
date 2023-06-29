@@ -62,6 +62,9 @@ message PluginManagerSpec {
     // at the top of the VirtualService (if any) are overridden. The gateway
     // match is independent of sourceLabels.
     repeated string gateways = 3;
+
+    // priority defines the order in which patch sets are applied within a context.
+    int32 priority = 4;
 }
 
 message Plugin {
