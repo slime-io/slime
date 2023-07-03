@@ -547,7 +547,7 @@ data:
                 "endpoint": {
                   "address": {
                     "socket_address": {
-                      {{- if (eq (default $g.misc.enableLeaderElection "off") "on") }}
+                      {{- if (eq (default "off" $g.misc.enableLeaderElection ) "on") }}
                       "address": "{{ .name }}-leader.{{ $g.slimeNamespace }}",
                       {{- else }}
                       "address": "{{ .name }}.{{ $g.slimeNamespace }}",
