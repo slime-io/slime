@@ -107,8 +107,8 @@ func (r *ServicefenceReconciler) StartSvcCache(ctx context.Context) {
 							portProtos = make(map[Protocol]uint)
 							r.portProtocolCache.Data[p] = portProtos
 						}
-						if isHttp(port) {
-							portProtos[ProtocolHTTP]++
+						if isHttp(port, r.cfg.SupportH2) {
+							portProtos[ListenerProtocolHTTP]++
 						}
 					}
 					r.portProtocolCache.Unlock()
@@ -158,13 +158,26 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 	}()
 }
 
-func isHttp(port corev1.ServicePort) bool {
+// shielding differences, uniformly use http
+func isHttp(port corev1.ServicePort, supportH2 bool) bool {
 	if port.Protocol != "TCP" {
 		return false
 	}
 	p := strings.Split(port.Name, "-")[0]
 	protocol := PortProtocol(p)
-	return protocol == HTTP || protocol == GRPC || protocol == HTTP2
+
+	filter := []PortProtocol{HTTP}
+	// grpc-web-xx is also split into grpc
+	if supportH2 {
+		filter = append(filter, GRPC, HTTP2)
+	}
+
+	for _, f := range filter {
+		if protocol == f {
+			return true
+		}
+	}
+	return false
 }
 
 func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
@@ -180,7 +193,7 @@ func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCa
 
 	for port, proto := range portProtocolCache.Data {
 		p := strconv.Itoa(int(port))
-		if proto[ProtocolHTTP] > 0 && !wormPortMap[p] {
+		if proto[ListenerProtocolHTTP] > 0 && !wormPortMap[p] {
 			add = append(add, p)
 		}
 	}

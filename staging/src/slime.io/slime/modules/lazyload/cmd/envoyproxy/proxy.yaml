@@ -54,6 +54,7 @@ static_resources:
           route_config:
             name: proxy 
             request_headers_to_remove:
+            - "Slime-Source-Ns"
             - "Slime-Orig-Dest"
             virtual_hosts:
             - name: all

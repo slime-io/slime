@@ -89,7 +89,7 @@ const (
 type Protocol int
 
 const (
-	ProtocolUnknown = iota
-	ProtocolTCP
-	ProtocolHTTP
+	ListenerProtocolUnknown = iota
+	ListenerProtocolTCP
+	ListenerProtocolHTTP
 )

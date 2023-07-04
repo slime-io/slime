@@ -27,20 +27,37 @@ func (r *ServicefenceReconciler) RegisterSeHandler() {
 }
 
 func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
+
+	filter := []model.Instance{model.HTTP}
+	if r.cfg.SupportH2 {
+		filter = append(filter, model.HTTP2, model.GRPC, model.GRPCWeb)
+	}
+
 	for _, svc := range istioSvcs {
 		for _, port := range svc.Ports {
-			if port.Protocol != model.HTTP && port.Protocol != model.GRPC && port.Protocol != model.HTTP2 {
+
+			if !protocolFilter(filter, port.Protocol) {
 				continue
 			}
+			
 			p := int32(port.Port)
 			r.portProtocolCache.Lock()
 
 			if _, ok := r.portProtocolCache.Data[p]; !ok {
 				r.portProtocolCache.Data[p] = make(map[Protocol]uint)
 			}
-			r.portProtocolCache.Data[p][ProtocolHTTP]++
+			r.portProtocolCache.Data[p][ListenerProtocolHTTP]++
 			log.Debugf("get serviceentry http port %d", p)
 			r.portProtocolCache.Unlock()
 		}
 	}
+}
+
+func protocolFilter(arr []model.Instance, val model.Instance) bool {
+	for _, v := range arr {
+		if v == val {
+			return true
+		}
+	}
+	return false
 }
