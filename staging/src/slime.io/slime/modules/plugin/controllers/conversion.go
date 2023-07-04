@@ -6,8 +6,12 @@
 package controllers
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"net/url"
+	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"strings"
 	"time"
 
@@ -22,7 +26,6 @@ import (
 	"google.golang.org/protobuf/types/known/durationpb"
 	istio "istio.io/api/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/plugin/api/v1alpha1"
 )
@@ -132,18 +135,19 @@ func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *
 	return patch
 }
 
-func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, out *istio.EnvoyFilter) {
+func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) translateOutput {
 	in := cr.Spec.DeepCopy()
+	envoyFilter := &istio.EnvoyFilter{}
 
 	if in.WorkloadSelector != nil {
-		out.WorkloadSelector = &istio.WorkloadSelector{
+		envoyFilter.WorkloadSelector = &istio.WorkloadSelector{
 			Labels: in.WorkloadSelector.Labels,
 		}
 	}
 
-	out.Priority = in.Priority
+	envoyFilter.Priority = in.Priority
 
-	out.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	var configPatched []translateOutputConfigPatch
 
 	var targets []target
 	for _, h := range in.Host {
@@ -189,13 +193,18 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, o
 			}
 
 			switch m := p.PluginSettings.(type) {
-			case *v1alpha1.Plugin_Wasm:
-				log.Errorf("implentment, cause wasm not been support in envoyplugin settings, skip plugin build, plugin: %s")
+			case *v1alpha1.Plugin_Wasm, *v1alpha1.Plugin_Rider:
+				log.Errorf("implentment, cause wasm/rider not been support in envoyplugin settings, skip plugin build, plugin: %s")
 				continue
 			case *v1alpha1.Plugin_Inline:
 				if len(in.Gateway) > 0 && genGatewayCfps != nil {
 					cfps := genGatewayCfps(in, cr.Namespace, t, patchCtx, p, m)
-					out.ConfigPatches = append(out.ConfigPatches, cfps...)
+					for _, cfp := range cfps {
+						configPatched = append(configPatched, translateOutputConfigPatch{
+							envoyPatch: cfp,
+							plugin:     p,
+						})
+					}
 				} else {
 					host := t.host
 					if patchCtx == istio.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == istio.EnvoyFilter_GATEWAY {
@@ -216,12 +225,20 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin, o
 						}
 					}
 					cfp := generateCfp(t, patchCtx, vhost, p, m)
-					out.ConfigPatches = append(out.ConfigPatches, cfp)
+					configPatched = append(configPatched, translateOutputConfigPatch{
+						envoyPatch: cfp,
+						plugin:     p,
+					})
 				}
 			}
 		}
 	}
-	log.Debugf("translate EnvoyPlugin to Envoyfilter: %v", out)
+	log.Debugf("translate EnvoyPlugin to Envoyfilter: %v", envoyFilter)
+
+	return translateOutput{
+		envoyFilter:   envoyFilter,
+		configPatches: configPatched,
+	}
 }
 
 func generateCfp(t target, patchCtx istio.EnvoyFilter_PatchContext, vhost *istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch,
@@ -250,15 +267,85 @@ func generateCfp(t target, patchCtx istio.EnvoyFilter_PatchContext, vhost *istio
 	return cfp
 }
 
+type translateOutputConfigPatch struct {
+	envoyPatch *istio.EnvoyFilter_EnvoyConfigObjectPatch
+	plugin     *v1alpha1.Plugin
+}
+
+type translateOutput struct {
+	envoyFilter   *istio.EnvoyFilter
+	configPatches []translateOutputConfigPatch
+}
+
+func translateOutputToEnvoyFilterWrapper(out translateOutput) (*v1alpha3.EnvoyFilter, error) {
+	if out.envoyFilter == nil {
+		return nil, nil
+	}
+	envoyFilterWrapper := &v1alpha3.EnvoyFilter{}
+
+	m, err := util.ProtoToMap(out.envoyFilter)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(out.configPatches) > 0 {
+		var appliedPatches []interface{}
+		for _, configPatch := range out.configPatches {
+			v, err := applyRawPatch(configPatch)
+			if err != nil {
+				return nil, err
+			}
+			appliedPatches = append(appliedPatches, v)
+		}
+
+		m["configPatches"] = appliedPatches
+	}
+
+	envoyFilterWrapper.Spec = m
+	return envoyFilterWrapper, nil
+}
+
+func applyRawPatch(outputPatch translateOutputConfigPatch) (interface{}, error) {
+	m := &gogojsonpb.Marshaler{}
+	var buf bytes.Buffer
+	if err := m.Marshal(&buf, outputPatch.envoyPatch); err != nil {
+		return nil, err
+	}
+	envoyPatchBytes := buf.Bytes()
+
+	if rawPatch := outputPatch.plugin.GetRawPatch(); rawPatch != nil {
+		var rawPatchBuf bytes.Buffer
+		if err := m.Marshal(&rawPatchBuf, rawPatch); err != nil {
+			return nil, err
+		}
+
+		bs, err := jsonpatch.MergePatch(envoyPatchBytes, rawPatchBuf.Bytes())
+		if err != nil {
+			return nil, nil
+		}
+		envoyPatchBytes = bs
+	}
+
+	var ret interface{}
+	if err := json.Unmarshal(envoyPatchBytes, &ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 // translate PluginManager
-func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec, out *istio.EnvoyFilter) {
-	out.WorkloadSelector = &istio.WorkloadSelector{
+func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec) translateOutput {
+	var (
+		envoyFilter   = &istio.EnvoyFilter{}
+		configPatches []translateOutputConfigPatch
+	)
+	envoyFilter.WorkloadSelector = &istio.WorkloadSelector{
 		Labels: in.WorkloadLabels,
 	}
 
-	out.Priority = in.Priority
+	envoyFilter.Priority = in.Priority
 
-	out.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	envoyFilter.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	for _, p := range in.Plugin {
 		if !p.Enable {
 			continue
@@ -269,7 +356,17 @@ func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta,
 			continue
 		}
 
-		out.ConfigPatches = append(out.ConfigPatches, patches...)
+		for _, patch := range patches {
+			configPatches = append(configPatches, translateOutputConfigPatch{
+				envoyPatch: patch,
+				plugin:     p,
+			})
+		}
+	}
+
+	return translateOutput{
+		envoyFilter:   envoyFilter,
+		configPatches: configPatches,
 	}
 }
 

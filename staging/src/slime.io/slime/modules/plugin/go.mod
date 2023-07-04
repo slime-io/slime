@@ -4,6 +4,7 @@ go 1.13
 
 require (
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
+	github.com/evanphx/json-patch/v5 v5.6.0
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/protobuf v1.5.2
 	github.com/onsi/ginkgo v1.16.4

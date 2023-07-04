@@ -86,6 +86,8 @@ message Plugin {
         Rider rider = 9;
     }
     uint32 port = 8;
+    // rawPatch will patch to the generated final envoy filter config patch (EnvoyFilter_EnvoyConfigObjectPatch)
+    google.protobuf.Struct rawPatch = 10;
 }
 
 message Wasm {
