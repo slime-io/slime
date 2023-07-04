@@ -19,9 +19,7 @@ package controllers
 import (
 	"context"
 
-	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +30,6 @@ import (
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
-	"slime.io/slime/framework/util"
 	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
@@ -116,23 +113,13 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 }
 
 func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin) *v1alpha3.EnvoyFilter {
-	envoyFilter := &istio.EnvoyFilter{}
-	r.translateEnvoyPlugin(cr, envoyFilter)
-	if envoyFilter == nil {
-		return nil
-	}
-	envoyFilterWrapper := &v1alpha3.EnvoyFilter{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
-		},
-	}
-
-	m, err := util.ProtoToMap(envoyFilter)
+	out := r.translateEnvoyPlugin(cr)
+	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {
-		return nil
+		log.Errorf("translateOutputToEnvoyFilterWrapper for envoyfilter %s/%s met err %v", cr.Namespace, cr.Name, err)
 	}
-	envoyFilterWrapper.Spec = m
+	envoyFilterWrapper.Name, envoyFilterWrapper.Namespace = cr.Name, cr.Namespace
+
 	return envoyFilterWrapper
 }
 

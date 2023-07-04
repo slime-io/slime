@@ -20,9 +20,7 @@ import (
 	"context"
 	"sync"
 
-	istio "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
@@ -150,22 +148,14 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 }
 
 func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alpha1.PluginManager, pluginManager *v1alpha1.PluginManagerSpec) *v1alpha3.EnvoyFilter {
-	envoyFilter := &istio.EnvoyFilter{}
-	r.translatePluginManager(cr.ObjectMeta, pluginManager, envoyFilter)
-
-	m, err := util.ProtoToMap(envoyFilter)
+	out := r.translatePluginManager(cr.ObjectMeta, pluginManager)
+	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {
-		log.Errorf("ProtoToMap for envoyfilter %s/%s met err %v", cr.Namespace, cr.Name, err)
+		log.Errorf("translateOutputToEnvoyFilterWrapper for envoyfilter %s/%s met err %v", cr.Namespace, cr.Name, err)
 		return nil
 	}
-
-	return &v1alpha3.EnvoyFilter{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name,
-			Namespace: cr.Namespace,
-		},
-		Spec: m,
-	}
+	envoyFilterWrapper.Name, envoyFilterWrapper.Namespace = cr.Name, cr.Namespace
+	return envoyFilterWrapper
 }
 
 func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
