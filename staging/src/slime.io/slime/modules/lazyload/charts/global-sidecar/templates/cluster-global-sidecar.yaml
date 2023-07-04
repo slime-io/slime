@@ -15,6 +15,7 @@
           {{ $addEnvHeaderViaLua := .global.misc.addEnvHeaderViaLua }}
           {{ $autoPort := .general.autoPort }}
           {{ $passthroughByDefault := .general.passthroughByDefault | default false }}
+          {{ $supportH2 := .general.supportH2 | default false }}
           {{ $clusterGsNamespace := .general.clusterGsNamespace | default $.Values.namespace }}
           {{- range $f.wormholePort }}
              {{- if eq (int .) (int $gsPort) }}
@@ -43,7 +44,7 @@ metadata:
 spec:
   ports:
     {{- range $gsSvcPorts }}
-    - name: http2-{{ . }}
+    - name: http-{{ . }}
       port: {{ int . }}
       protocol: TCP
       targetPort: {{ int . }}
@@ -53,7 +54,9 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 {{- end }}
+
 ---
+{{- if $supportH2 }}
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
@@ -65,6 +68,7 @@ spec:
     connectionPool:
       http:
         useClientProtocol: true
+{{- end }}
 ---
 apiVersion: v1
 kind: ServiceAccount

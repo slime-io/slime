@@ -40,6 +40,8 @@ message Fence {
   bool disableIpv4Passthrough = 11;
   // passthroughByDefault, if set true, all request will route to PassthroughCluster
   bool passthroughByDefault = 12;
+  // grpc and http2 will be supported
+  bool supportH2 = 13;
 }
 
 // The general idea is to assign different default traffic to different targets
