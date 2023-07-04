@@ -6,3 +6,4 @@
 - [ ] 兜底路由特性文档(如何将流量转发到global-sidecar)
 - [ ] 特征流量透传特性文档
 - [ ] 非k8s svc的workload特性
+- [X] [grcp服务懒加载特性文档](./grpc懒加载.md)
