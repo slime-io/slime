@@ -61,8 +61,13 @@ func addDefaultModuleValue(module *config.Config) {
 	}
 	if module.Global.Misc == nil {
 		module.Global.Misc = make(map[string]string)
+		module.Global.Misc["enableLeaderElection"] = "off"
 	}
-	module.Global.Misc["render"] = "lazyload"
+	if module.Global.Log == nil {
+		module.Global.Log = &config.Log{
+			LogLevel: "info",
+		}
+	}
 }
 
 func addDefaultSpecValue(spec *config.SlimeBootSpec) {
@@ -182,26 +187,10 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 				break
 			}
 		}
-		// get lazyload general
-		general, _, _, err := jsonparser.Get([]byte(specRaw), "module", pos, "general")
+		spec, err = patchSlimeboot(spec, wp, specRaw, pos)
 		if err != nil {
-			log.Errorf("get slimeboot module%s.general err %s", pos, err)
-			return slimeBoot, nil, nil
+			return nil, nil, fmt.Errorf("patch slimeboot err %s", err)
 		}
-		log.Debugf("get slimeboot module%s.general: %s", pos, general)
-
-		// set general and general.wormholeport into general
-		spec, err = jsonparser.Set(spec, general, "module", pos, "general")
-		if err != nil {
-			return nil, nil, fmt.Errorf("use jsonparser to set slimeboot general get err %s", err)
-		}
-		log.Debugf("set slimeboot spec.module%s.general: %s succeed", pos, general)
-
-		spec, err = jsonparser.Set(spec, wp, "module", pos, "general", "wormholePort")
-		if err != nil {
-			return nil, nil, fmt.Errorf("use jsonparser to set slimeboot general wormholePort get err %s", err)
-		}
-		log.Debugf("set slimeboot spec.module%s.general.wormholePort: %s succeed", pos, wp)
 	}
 
 	// Deserialize values to map[string]interface{}
@@ -214,6 +203,35 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 	log.Debugf("get slimeboot values %+v", values)
 
 	return slimeBoot, values, nil
+}
+
+func patchSlimeboot(spec, wp []byte, specRaw, pos string) ([]byte, error) {
+
+	general, _, _, err := jsonparser.Get([]byte(specRaw), "module", pos, "general")
+	if err != nil {
+		return nil, fmt.Errorf("get slimeboot module%s.general err %s", pos, err)
+	}
+	log.Debugf("get raw slimeboot module%s.general: %s", pos, general)
+
+	// set general and general.wormholeport into general
+	spec, err = jsonparser.Set(spec, general, "module", pos, "general")
+	if err != nil {
+		return nil, fmt.Errorf("set slimeboot general get err %s", err)
+	}
+	log.Debugf("set slimeboot spec.module%s.general : %s succeed", pos, general)
+
+	spec, err = jsonparser.Set(spec, wp, "module", pos, "general", "wormholePort")
+	if err != nil {
+		return nil, fmt.Errorf("set slimeboot general wormholePort get err %s", err)
+	}
+	log.Debugf("set slimeboot spec.module%s.general.wormholePort: %s succeed", pos, wp)
+
+	// set general.render into general
+	spec, err = jsonparser.Set(spec, []byte(`"lazyload"`), "module", pos, "general", "render")
+	if err != nil {
+		return nil, fmt.Errorf("set slimeboot general render get err %s", err)
+	}
+	return spec, nil
 }
 
 func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error) {

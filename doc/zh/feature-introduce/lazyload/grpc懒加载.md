@@ -44,12 +44,11 @@ spec:
         defaultFence: true
         wormholePort:
           - "9080"
+        globalSidecarMode: cluster
+        metricSourceType: accesslog
       global:
         log:
           logLevel: info
-        misc:
-          globalSidecarMode: cluster
-          metricSourceType: accesslog 
         slimeNamespace: mesh-operator
   resources:
     requests:

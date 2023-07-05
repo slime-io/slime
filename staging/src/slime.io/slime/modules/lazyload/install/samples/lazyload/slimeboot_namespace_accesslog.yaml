@@ -23,12 +23,11 @@ spec:
           - "9080"
         namespace: # replace to your service's namespace which will use lazyload, and extend the list in case of multi namespaces
           - default
+        globalSidecarMode: namespace # the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source
       global:
         log:
           logLevel: info
-        misc:
-          globalSidecarMode: namespace # the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
   resources:
     requests:

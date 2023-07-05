@@ -5,14 +5,14 @@
   {{ $gsPort := $gs.port | default 80 }}
   {{- range $.Values.module }}
     {{- if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
-      {{- if and .global .global.misc }}
-        {{- if eq .global.misc.globalSidecarMode "cluster" }}
+      {{- if .general }}
+        {{- if eq (default "cluster" .general.globalSidecarMode) "cluster" }}
           {{ $f := .general }}
           {{ $g := .global }}
           {{ $name := .name }}
           {{ $gsSvcPorts := list }}
           {{ $hasGsPort := false }}
-          {{ $addEnvHeaderViaLua := .global.misc.addEnvHeaderViaLua }}
+          {{ $addEnvHeaderViaLua := .general.addEnvHeaderViaLua | default false }}
           {{ $autoPort := .general.autoPort }}
           {{ $passthroughByDefault := .general.passthroughByDefault | default false }}
           {{ $supportH2 := .general.supportH2 | default false }}
@@ -30,7 +30,7 @@
 {{- /*
 Now, we will render all the resources of the global-sidecar, reset indentation for readability.
 */}}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: Service
@@ -133,7 +133,7 @@ subjects:
 - kind: ServiceAccount
   name: global-sidecar
   namespace: {{ $clusterGsNamespace }}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -171,7 +171,7 @@ spec:
               LAZYLOAD_GLOBAL_SIDECAR
             ISTIO_META_ISTIO_VERSION:
               "999.0.0"
-        {{- if (eq $g.misc.metricSourceType "accesslog") }}
+        {{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
         sidecar.istio.io/bootstrapOverride: "lazyload-accesslog-source"
         {{- end }}
         {{- if $gs.sidecarInject }}
@@ -211,11 +211,7 @@ spec:
             - name: PROBE_PORT
               value: {{ default 18181 $gs.probePort | quote }}
             - name: LOG_LEVEL
-              {{- if $g.log }}
-              value: {{ default "info" $g.log.logLevel }}
-              {{- else }}
-              value: "info"
-              {{- end }}
+              value: {{ if $g.log }}{{ default "info" $g.log.logLevel }}{{ else }}{{ "info" }}{{ end }}
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -255,7 +251,7 @@ spec:
             {{- toYaml $gs.resources | nindent 12 }}
           securityContext:
             privileged: true
-{{- if or (not $g) (not $g.misc) (eq (default "prometheus" $g.misc.metricSourceType) "prometheus") }}
+{{- if eq (default "accesslog" $f.metricSourceType) "prometheus" }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -307,7 +303,7 @@ spec:
       patch:
         operation: REMOVE
 {{- end }}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -338,7 +334,7 @@ spec:
           virtual_hosts:
             {{- if $f.dispatches }}
             {{- range $f.dispatches }}
-            {{- if or (not .domainRegex) (eq .domainRegex "") }}
+            {{- if or (not .domainRegex) (eq (default "" .domainRegex) "") }}
             - domains:
               {{- toYaml .domains | nindent 14 }}
               name: {{ .name }}
@@ -394,13 +390,13 @@ spec:
                 key: "Slime-Orig-Dest"
                 value: "%DOWNSTREAM_LOCAL_ADDRESS%"
               append: false
-          {{- if ne $addEnvHeaderViaLua "true" }}
+          {{- if ne $addEnvHeaderViaLua true }}
             - header:
                 key: "Slime-Source-Ns"
                 value: "%ENVIRONMENT(POD_NAMESPACE)%"
               append: false
           {{- end }}
-{{- if eq $addEnvHeaderViaLua "true" }}
+{{- if eq $addEnvHeaderViaLua true }}
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_OUTBOUND
@@ -461,7 +457,7 @@ spec:
         operation: REMOVE
     {{- if $f.dispatches }}
     {{- range $f.dispatches }}
-    {{- if or (not .domainRegex) (eq .domainRegex "") }}
+    {{- if or (not .domainRegex) (eq (default "" .domainRegex) "") }}
     - applyTo: VIRTUAL_HOST
       match:
         proxy:
@@ -501,7 +497,7 @@ spec:
     {{- end }}
     {{- end }}
 {{- end }}
-{{- if (eq $g.misc.metricSourceType "accesslog") }}
+{{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -541,7 +537,7 @@ spec:
                         cluster_name: lazyload-accesslog-source
 {{- end }}
 ---
-{{- if (eq $g.misc.metricSourceType "accesslog") }}
+{{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -564,8 +560,12 @@ data:
                 "endpoint": {
                   "address": {
                     "socket_address": {
-                      {{- if (eq (default "off" $g.misc.enableLeaderElection ) "on") }}
+                      {{- if $g.misc }}
+                      {{- if eq (default "off" $g.misc.enableLeaderElection ) "on" }}
                       "address": "{{ .name }}-leader.{{ $g.slimeNamespace }}",
+                      {{- else }}
+                      "address": "{{ .name }}.{{ $g.slimeNamespace }}",
+                      {{- end }}
                       {{- else }}
                       "address": "{{ .name }}.{{ $g.slimeNamespace }}",
                       {{- end }}

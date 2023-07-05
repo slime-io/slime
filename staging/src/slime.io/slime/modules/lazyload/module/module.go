@@ -61,7 +61,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	log.Debugf("lazyload setup begin")
 
 	env, mgr, le := opts.Env, opts.Manager, opts.LeaderElectionCbs
-	pc, err := controllers.NewProducerConfig(env)
+	pc, err := controllers.NewProducerConfig(env, m.config)
 	if err != nil {
 		return fmt.Errorf("unable to create ProducerConfig, %+v", err)
 	}
@@ -167,7 +167,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	}
 
 	if env.Config.Metric != nil ||
-		env.Config.Global.Misc["metricSourceType"] == controllers.MetricSourceTypeAccesslog {
+		m.config.MetricSourceType == controllers.MetricSourceTypeAccesslog {
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			go sfReconciler.WatchMetric(ctx)
 		})

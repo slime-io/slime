@@ -40,8 +40,6 @@ var defaultModuleConfig = &bootconfig.Config{
 			"metrics-addr":         ":8080",
 			"aux-addr":             ":8081",
 			"enableLeaderElection": "off",
-			"globalSidecarMode":    "namespace",
-			"metricSourceType":     "prometheus", // can be prometheus or accesslog
 			"logSourcePort":        ":8082",
 			// which label keys of serviceEntry select endpoints
 			// will take effect when serviceEntry does not have workloadSelector field
