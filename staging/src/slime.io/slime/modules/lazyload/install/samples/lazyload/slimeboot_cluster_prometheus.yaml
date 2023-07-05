@@ -22,12 +22,11 @@ spec:
         defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
+        globalSidecarMode: cluster # the mode of global-sidecar
+        metricSourceType: prometheus
       global:
         log:
           logLevel: info
-        misc:
-          globalSidecarMode: cluster # the mode of global-sidecar
-          metricSourceType: prometheus
         slimeNamespace: mesh-operator
       metric: # indicate the metric source
         prometheus:

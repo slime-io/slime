@@ -154,12 +154,11 @@ spec:
         defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
+        globalSidecarMode: cluster # the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source          
       global:
         log:
           logLevel: info
-        misc:
-          globalSidecarMode: cluster # the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
   resources:
     requests:
@@ -448,10 +447,8 @@ spec:
       enable: true
       general:
         autoPort: true
-      global:
-        misc:
-          globalSidecarMode: cluster # inform the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
+        globalSidecarMode: cluster # inform the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source        
  # ...
 ```
 
@@ -482,9 +479,7 @@ spec:
       general: # replace previous "fence" field
         wormholePort: # replace to your application svc ports
           - "9080"
-      global:
-        misc:
-          metricSourceType: accesslog
+        metricSourceType: accesslog
 ```
 
 

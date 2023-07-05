@@ -19,9 +19,7 @@ spec:
           - "9080"
         namespace: # replace to your service's namespace which will use lazyload, and extend the list in case of multi namespaces
           - default
-      global:
-        misc:
-          globalSidecarMode: namespace # inform the mode of global-sidecar
+      globalSidecarMode: namespace # inform the mode of global-sidecar
       metric: # indicate the metric source
         prometheus:
           address: http://prometheus.istio-system:9090

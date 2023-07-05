@@ -5,8 +5,8 @@
   {{ $gsPort := $gs.port | default 80 }}
   {{- range $.Values.module }}
     {{- if or (eq (default "" .name) "lazyload") (eq (default "" .kind) "lazyload") }}
-      {{- if and .global .global.misc }}
-        {{- if eq .global.misc.globalSidecarMode "namespace" }}
+      {{- if .general }}
+        {{- if eq (default "cluster" .general.globalSidecarMode) "namespace" }}
           {{ $f := .general }}
           {{ $g := .global }}
           {{ $name := .name }}
@@ -29,7 +29,7 @@
 {{- /*
 Now, we will render all the resources of the global-sidecar, reset indentation for readability.
 */}}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: Service
@@ -107,7 +107,7 @@ subjects:
 - kind: ServiceAccount
   name: global-sidecar
   namespace: {{ $ns }}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -145,14 +145,8 @@ spec:
               LAZYLOAD_GLOBAL_SIDECAR
             ISTIO_META_ISTIO_VERSION:
               "999.0.0"
-        {{- if $g }}
-        {{- if $g.misc }}
-        {{- if $g.misc.metricSourceType }}
-        {{- if (eq $g.misc.metricSourceType "accesslog") }}
+        {{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
         sidecar.istio.io/bootstrapOverride: "lazyload-accesslog-source"
-        {{- end }}
-        {{- end }}
-        {{- end }}
         {{- end }}
         {{- if $gs.sidecarInject }}
         {{- if $gs.sidecarInject.enable }}
@@ -191,11 +185,7 @@ spec:
             - name: PROBE_PORT
               value: {{ default 18181 $gs.probePort | quote }}
             - name: LOG_LEVEL
-              {{- if $g.log }}
-              value: {{ default "info" $g.log.logLevel }}
-              {{- else }}
-              value: "info"
-              {{- end }}
+              value: {{ if $g.log }}{{ default "info" $g.log.logLevel }}{{ else }}{{ "info" }}{{ end }}
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
@@ -235,7 +225,8 @@ spec:
             {{- toYaml $gs.resources | nindent 12 }}
           securityContext:
             privileged: true
-{{- if or (not $g) (not $g.misc) (eq (default "prometheus" $g.misc.metricSourceType) "prometheus") }}
+
+{{- if eq (default "accesslog" $f.metricSourceType) "prometheus" }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -287,7 +278,7 @@ spec:
       patch:
         operation: REMOVE
 {{- end }}
-{{- if or (not $autoPort) (eq (default "" $g.misc.render) "lazyload") }}
+{{- if or (not $autoPort) (eq (default "" $f.render) "lazyload") }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -318,7 +309,7 @@ spec:
           virtual_hosts:
               {{- if $f.dispatches }}
               {{- range $f.dispatches }}
-              {{- if or (not .domainRegex) (eq .domainRegex "") }}
+              {{- if or (not .domainRegex) (eq (default "" .domainRegex) "") }}
               - domains:
               {{- toYaml .domains | nindent 14 }}
                 name: {{ .name }}
@@ -392,7 +383,7 @@ spec:
         operation: REMOVE
     {{- if $f.dispatches }}
     {{- range $f.dispatches }}
-    {{- if or (not .domainRegex) (eq .domainRegex "") }}
+    {{- if or (not .domainRegex) (eq (default "" .domainRegex) "") }}
     - applyTo: VIRTUAL_HOST
       match:
         proxy:
@@ -432,7 +423,7 @@ spec:
     {{- end }}
     {{- end }}
 {{- end }}
-{{- if (eq $g.misc.metricSourceType "accesslog") }}
+{{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
 ---
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
@@ -471,7 +462,7 @@ spec:
                       envoy_grpc:
                         cluster_name: lazyload-accesslog-source
 {{- end }}
-{{- if (eq $g.misc.metricSourceType "accesslog") }}
+{{- if eq (default "accesslog" $f.metricSourceType) "accesslog" }}
 ---
 apiVersion: v1
 kind: ConfigMap

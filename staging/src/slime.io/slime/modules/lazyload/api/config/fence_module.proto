@@ -42,6 +42,15 @@ message Fence {
   bool passthroughByDefault = 12;
   // grpc and http2 will be supported
   bool supportH2 = 13;
+  // addEnvHeaderViaLua, if set true
+  // add header Slime-Orig-Dest Slime-Source-Ns via lua
+  bool addEnvHeaderViaLua = 14;
+  // global sidecar mode, cluster or namespace
+  string globalSidecarMode = 15;
+  // if value is "lazyload", render chart by itself
+  string render = 16;
+  // metric source type, prometheus or accesslog
+  string metricSourceType = 17;
 }
 
 // The general idea is to assign different default traffic to different targets

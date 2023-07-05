@@ -21,6 +21,8 @@ spec:
         defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
+        globalSidecarMode: cluster # the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source
       global:
         log:
           logRotate: true
@@ -30,9 +32,6 @@ spec:
             maxBackups: 10
             maxAgeDay: 10
             compress: true
-        misc:
-          globalSidecarMode: cluster # the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
   resources:
     requests:

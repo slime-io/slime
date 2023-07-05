@@ -162,12 +162,11 @@ spec:
         defaultFence: true
         wormholePort: # replace to your application service ports, and extend the list in case of multi ports
           - "9080"
+        globalSidecarMode: cluster # the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source          
       global:
         log:
           logLevel: info
-        misc:
-          globalSidecarMode: cluster # the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
         slimeNamespace: mesh-operator
   resources:
     requests:
@@ -482,10 +481,8 @@ spec:
       enable: true
       general:
         autoPort: true
-      global:
-        misc:
-          globalSidecarMode: cluster # inform the mode of global-sidecar
-          metricSourceType: accesslog # indicate the metric source
+        globalSidecarMode: cluster # inform the mode of global-sidecar
+        metricSourceType: accesslog # indicate the metric source        
  # ...
 ```
 
@@ -495,7 +492,7 @@ spec:
 
 ### 基于Accesslog开启懒加载
 
-指定SlimeBoot CR资源中`spec.module.global.misc.metricSourceType`等于`accesslog`会使用Accesslog获取服务调用关系，等于`prometheus`则使用Prometheus。
+指定SlimeBoot CR资源中`spec.module.general.metricSourceType`等于`accesslog`会使用Accesslog获取服务调用关系，等于`prometheus`则使用Prometheus。
 
 使用Accesslog获取服务调用关系的大概过程：
 
@@ -516,9 +513,7 @@ spec:
       general: # replace previous "fence" field
         wormholePort: # replace to your application svc ports
           - "9080"
-      global:
-        misc:
-          metricSourceType: accesslog
+      metricSourceType: accesslog
 ```
 
 

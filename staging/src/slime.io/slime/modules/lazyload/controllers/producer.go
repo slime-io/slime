@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"k8s.io/apimachinery/pkg/types"
 	"net"
+	"slime.io/slime/modules/lazyload/api/config"
 	"strconv"
 	"strings"
 	"time"
@@ -52,7 +53,7 @@ func (r *ServicefenceReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 	var hs []metric.Handler
 
 	// check metric source type
-	switch r.env.Config.Global.Misc["metricSourceType"] {
+	switch r.cfg.MetricSourceType {
 	case MetricSourceTypePrometheus:
 		for pName, pHandler := range r.env.Config.Metric.Prometheus.Handlers {
 			hs = append(hs, generateHandler(event.NN.Name, event.NN.Namespace, pName, pHandler))
@@ -78,7 +79,7 @@ func (r *ServicefenceReconciler) handleTickerEvent(event trigger.TickerEvent) me
 	// check metric source type
 	qm := make(map[string][]metric.Handler)
 
-	switch r.env.Config.Global.Misc["metricSourceType"] {
+	switch r.cfg.MetricSourceType {
 	case MetricSourceTypePrometheus:
 		for meta := range r.getInterestMeta() {
 			namespace, name := strings.Split(meta, "/")[0], strings.Split(meta, "/")[1]
@@ -108,14 +109,14 @@ func generateHandler(name, namespace, pName string, pHandler *v1alpha1.Prometheu
 	return metric.Handler{Name: pName, Query: query}
 }
 
-func NewProducerConfig(env bootstrap.Environment) (*metric.ProducerConfig, error) {
+func NewProducerConfig(env bootstrap.Environment, cfg config.Fence) (*metric.ProducerConfig, error) {
 	// init metric source
 	var enablePrometheusSource bool
 	var prometheusSourceConfig metric.PrometheusSourceConfig
 	var accessLogSourceConfig metric.AccessLogSourceConfig
 	var err error
 
-	switch env.Config.Global.Misc["metricSourceType"] {
+	switch cfg.MetricSourceType {
 	case MetricSourceTypePrometheus:
 		enablePrometheusSource = true
 		prometheusSourceConfig, err = newPrometheusSourceConfig(env)
