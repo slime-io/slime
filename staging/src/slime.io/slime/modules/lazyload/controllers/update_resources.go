@@ -53,6 +53,11 @@ func loadGlobalSidecarChart() *chart.Chart {
 }
 
 func addDefaultModuleValue(module *config.Config) {
+
+	if module.Global == nil {
+		module.Global = &config.Global{}
+	}
+
 	if module.Global.IstioNamespace == "" {
 		module.Global.IstioNamespace = defaultIstioNs
 	}
@@ -77,6 +82,13 @@ func addDefaultSpecValue(spec *config.SlimeBootSpec) {
 	if spec.IstioNamespace == "" {
 		spec.IstioNamespace = defaultIstioNs
 	}
+
+	if spec.Component == nil {
+		spec.Component = &config.Component{
+			GlobalSidecar: &config.GlobalSidecar{},
+		}
+	}
+
 	if spec.Component.GlobalSidecar.Port == 0 {
 		spec.Component.GlobalSidecar.Port = int32(defaultPort)
 	}
@@ -151,7 +163,7 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (*config.SlimeBoot, map[string]interface{}, error) {
 
 	// Deserialize to config.SlimeBoot
-	specRaw, slimeBoot, err := getSlimeboot(env)
+	specJson, slimeBoot, err := getSlimeboot(env)
 	if err != nil {
 		return nil, nil, fmt.Errorf("get slimeboot error: %v", err)
 	}
@@ -187,7 +199,7 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 				break
 			}
 		}
-		spec, err = patchSlimeboot(spec, wp, specRaw, pos)
+		spec, err = patchSlimeboot(spec, wp, specJson, pos)
 		if err != nil {
 			return nil, nil, fmt.Errorf("patch slimeboot err %s", err)
 		}
@@ -247,7 +259,6 @@ func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error)
 			return "", nil, fmt.Errorf("try to get slimeboot in namespace %s failed", slimeBootNs)
 		}
 	}
-
 	// Unstructured -> SlimeBoot
 	var slimeBoot config.SlimeBoot
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(utd.UnstructuredContent(), &slimeBoot); err != nil {

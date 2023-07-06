@@ -98,11 +98,8 @@ message Config {
   bool enable = 7;
   General general = 8;  // general module config
   Bundle bundle = 9;
-  enum Mode {
-    Module = 0;
-    BundleItem = 1;
-  }
-  Mode mode = 10;
+
+  string mode = 10;
   // like bundle item kind, necessary if not bundle
   string kind = 11;
 }

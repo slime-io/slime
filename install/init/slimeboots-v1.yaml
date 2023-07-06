@@ -253,9 +253,6 @@ spec:
                                   type: string
                       mode:
                         type: string
-                        enum:
-                          - Module
-                          - BundleItem
                       kind:
                         type: string
                 component:
