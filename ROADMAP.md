@@ -169,13 +169,25 @@
 
 详见RELEASE NOTE [V0.7.0](https://github.com/slime-io/slime/releases/tag/v0.7.0)
 
-## Slime v0.7.1（发布中）
+## Slime v0.7.1（已发布）
 
 - 优化处理了很多实践过程中遇到的问题
 
 详见RELEASE NOTE [V0.7.1](https://github.com/slime-io/slime/releases/tag/v0.7.1)
 
-## Slime v0.8.0（规划中）
+## Slime v0.7.2（已发布）
+
+- 优化处理了很多实践过程中遇到的问题
+
+详见RELEASE NOTE [V0.7.2](https://github.com/slime-io/slime/releases/tag/v0.7.2)
+
+
+# Slime v0.8.0（发布中）
+- 支持grpc懒加载
+- 特征流量分发
+  详见RELEASE NOTE [V0.8.0](https://github.com/slime-io/slime/releases/tag/v0.8.0)
+
+## Slime v0.9.0（规划中）
 
 **流量管理**
 
