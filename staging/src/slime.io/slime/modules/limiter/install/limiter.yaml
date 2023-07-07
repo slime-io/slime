@@ -6,7 +6,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.7.2
+    tag: v0.8.0
   module:
     - name: limiter
       kind: limiter

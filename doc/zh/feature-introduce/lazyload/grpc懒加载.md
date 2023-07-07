@@ -14,9 +14,9 @@ slime目前在v0.7.2及之前不支持grpc懒加载, 如果grpc服务注入envoy
 
 **如未开启，默认使用global-sidecar模式，不支持grpc懒加载。**
 
-1. 设置lazyload镜像 > v0.7.2
+1. 设置lazyload镜像 >= v0.8.0
 2. 设置`supportH2: true`
-3. 设置slime-global-sidecar > v0.7.2
+3. 设置slime-global-sidecar为experimental版本
 
 支持grpc懒加载的完整SlimeBoot配置如下, 注意镜像部分需替换:
 
@@ -30,7 +30,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: xxx  # 1
+    tag: v0.8.0 # 1
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -74,7 +74,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: xxx  # 3
+        tag: v0.8.0-experimental # 3 experimental version
       probePort: 20000
 ```
 
