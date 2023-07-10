@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	EnvProbePort         = "PROBE_PORT"
-	EnvLogLevel          = "LOG_LEVEL"
-	EnvPodNamespace      = "POD_NAMESPACE"
-	DisableSvcController = "DISABLE_SVC_CONTROLLER"
+	EnvProbePort                   = "PROBE_PORT"
+	EnvLogLevel                    = "LOG_LEVEL"
+	EnvPodNamespace                = "POD_NAMESPACE"
+	EnvDisableSvcController        = "DISABLE_SVC_CONTROLLER"
+	EnvWormHolePortPriorToHostPort = "WORMHOLE_PORT_PRIOR_TO_HOST_PORT"
 )
 
 var (
@@ -38,7 +39,8 @@ var (
 	probePort = os.Getenv(EnvProbePort)
 	logLevel  = os.Getenv(EnvLogLevel)
 
-	disableSvcController = os.Getenv(DisableSvcController) == "true"
+	disableSvcController        = os.Getenv(EnvDisableSvcController) == "true"
+	wormHolePortPriorToHostPort = os.Getenv(EnvWormHolePortPriorToHostPort) == "true"
 
 	configLabelSelector = "lazyload.slime.io/config=global-sidecar"
 
@@ -167,8 +169,9 @@ func startListenAndServe(wormholePorts map[int]struct{}) {
 			srv := &http.Server{
 				Addr: "0.0.0.0" + ":" + strconv.Itoa(whPort),
 				Handler: &proxy.Proxy{
-					WormholePort: whPort,
-					SvcCache:     Cache,
+					WormholePortPriorToHostPort: wormHolePortPriorToHostPort,
+					WormholePort:                whPort,
+					SvcCache:                    Cache,
 				},
 			}
 			servers[whPort] = srv
