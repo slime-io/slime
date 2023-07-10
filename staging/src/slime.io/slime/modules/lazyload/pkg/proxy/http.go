@@ -17,6 +17,8 @@ import (
 const (
 	HeaderSourceNs = "Slime-Source-Ns"
 	HeaderOrigDest = "Slime-Orig-Dest"
+
+	defaultHTTPPort = 80
 )
 
 type HealthzProxy struct{}
@@ -26,20 +28,21 @@ func (p *HealthzProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 type Proxy struct {
-	WormholePort int
-	SvcCache     *Cache
+	WormholePort                int
+	SvcCache                    *Cache
+	WormholePortPriorToHostPort bool
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	var (
-		reqCtx               = req.Context()
-		reqHost              = req.Host
-		origDest, origDestIp string
-		origDestPort         = p.WormholePort
+		reqCtx           = req.Context()
+		reqHost          = req.Host
+		origDest, destIp string
+		destPort         = p.WormholePort
 	)
 	log.Debugf("proxy received request, reqHost: %s", reqHost)
 
-	if values := req.Header[HeaderSourceNs]; len(values) > 0 && values[0] != "" {
+	if srcNs := req.Header.Get(HeaderSourceNs); srcNs != "" {
 		req.Header.Del(HeaderSourceNs)
 
 		// we do not sure if reqHost is k8s short name or no ns service
@@ -49,7 +52,6 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		if !strings.Contains(reqHost, ".") {
 			// short name
 			var (
-				ns      = values[0]
 				svcName = reqHost
 				port    string
 			)
@@ -62,7 +64,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 
 			nn := types.NamespacedName{
-				Namespace: ns,
+				Namespace: srcNs,
 				Name:      svcName,
 			}
 
@@ -79,35 +81,45 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		log.Debugf("handle request header [Slime-Source-Ns]: %s", values[0])
+		log.Debugf("handle request header [Slime-Source-Ns]: %s", srcNs)
 	}
 
-	if values := req.Header[HeaderOrigDest]; len(values) > 0 {
-		origDest = values[0]
+	if origDest = req.Header.Get(HeaderOrigDest); origDest != "" {
 		req.Header.Del(HeaderOrigDest)
 
 		if idx := strings.LastIndex(origDest, ":"); idx >= 0 {
-			origDestIp = origDest[:idx]
+			destIp = origDest[:idx]
 			if v, err := strconv.Atoi(origDest[idx+1:]); err != nil {
 				http.Error(w, fmt.Sprintf("invalid header %s value: %s", HeaderOrigDest, origDest), http.StatusBadRequest)
 				return
 			} else {
-				origDestPort = v
+				destPort = v
 			}
 		} else {
-			origDestIp = origDest
+			destIp = origDest
 		}
-		log.Debugf("handle request header [Slime-Orig-Dest]: %s", values[0])
+		log.Debugf("handle request header [Slime-Orig-Dest]: %s", origDest)
+	} else {
+		var reqPort int
+		if idx := strings.LastIndex(reqHost, ":"); idx >= 0 {
+			destIp = reqHost[:idx]
+			if v, err := strconv.Atoi(reqHost[idx+1:]); err != nil {
+				http.Error(w, fmt.Sprintf("invalid host %s value: %s", reqHost, reqHost), http.StatusBadRequest)
+				return
+			} else {
+				reqPort = v
+			}
+		} else {
+			destIp = reqHost
+			reqPort = defaultHTTPPort
+		}
+
+		if !p.WormholePortPriorToHostPort {
+			destPort = reqPort
+		}
 	}
 
-	if origDest == "" {
-		if idx := strings.LastIndex(reqHost, ":"); idx >= 0 {
-			origDestIp = reqHost[:idx]
-		} else {
-			origDestIp = reqHost
-		}
-	}
-	log.Debugf("proxy forward request to: %s:%d", origDestIp, origDestPort)
+	log.Debugf("proxy forward request to: %s:%d", destIp, destPort)
 
 	if req.URL.Scheme == "" {
 		req.URL.Scheme = "http"
@@ -125,7 +137,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			addr = fmt.Sprintf("%s:%d", origDestIp, origDestPort)
+			addr = fmt.Sprintf("%s:%d", destIp, destPort)
 			return dialer.DialContext(ctx, network, addr)
 		},
 		MaxIdleConns:          100,
