@@ -389,7 +389,7 @@ func reGroupInstances(rl *bootstrap.InstanceMetaRelabel,
 							v = nv
 						}
 					}
-					if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwirte {
+					if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwrite {
 						inst.Metadata[item.TargetKey] = v
 					}
 				}

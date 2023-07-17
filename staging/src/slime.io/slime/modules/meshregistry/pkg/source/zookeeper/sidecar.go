@@ -126,7 +126,7 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 	prevCallModels := s.dubboCallModels
 	s.mut.RUnlock()
-	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, false)
+	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, false, s.args.SelfConsume)
 
 	diff := diffDubboCallModels(prevCallModels, mergedCallModels)
 	if len(diff) == 0 {
@@ -217,12 +217,12 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 }
 
-func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel, includeProvider bool) map[string]DubboCallModel {
+func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel, includeProvider, selfConsume bool) map[string]DubboCallModel {
 	ret := make(map[string]DubboCallModel, len(seCallModels))
 
 	for _, curCallModels := range seCallModels {
 		for app, callModel := range curCallModels {
-			ret[app] = mergeToDubboCallModel(callModel, ret[app], includeProvider)
+			ret[app] = mergeToDubboCallModel(callModel, ret[app], includeProvider, selfConsume)
 		}
 	}
 
@@ -324,7 +324,7 @@ func (s *Source) recordAppSidecarUpdateTime(diff map[string]DubboCallModel) {
 	}
 }
 
-func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvider bool) DubboCallModel {
+func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvider bool, selfConsume bool) DubboCallModel {
 	if to.Application == "" {
 		to.Application = from.Application
 	}
@@ -334,6 +334,11 @@ func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvid
 
 	for svc := range from.ConsumeServices {
 		to.ConsumeServices[svc] = struct{}{}
+	}
+	if selfConsume {
+		for svc := range from.ProvideServices {
+			to.ConsumeServices[svc] = struct{}{}
+		}
 	}
 
 	if includeProvider {
@@ -468,7 +473,7 @@ func (s *Source) HandleDubboCallModel(w http.ResponseWriter, request *http.Reque
 		seCallModelsCopy[k] = v
 	}
 	s.mut.RUnlock()
-	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, true)
+	mergedCallModels := mergeDubboCallModels(seCallModelsCopy, true, s.args.SelfConsume)
 
 	if mergedCallModels != nil && app != "" {
 		mergedCallModels = map[string]DubboCallModel{
