@@ -193,7 +193,7 @@ type InstanceMetaRelabelItem struct {
 	// TargetKey is the new key to be added to the instance metadata based on the original key.
 	TargetKey string `json:"TargetKey,omitempty"`
 	// Whether to overwrite the value of the TargetKey if it already exists in the instance metadata.
-	Overwirte bool `json:"Overwirte,omitempty"`
+	Overwrite bool `json:"Overwrite,omitempty"`
 	// ValuesMapping is a map that associates values of the Key to values of the TargetKey.
 	// If the Key's value is found in the map, the corresponding value is used for the TargetKey.
 	// If not, the original value is used for the TargetKey.
@@ -236,6 +236,8 @@ type ZookeeperSourceArgs struct {
 	TrimDubboRemoveDepInterval util.Duration `json:"TrimDubboRemoveDepInterval,omitempty"`
 	// specify how to map `app` to label key:value pair
 	DubboWorkloadAppLabel string `json:"DubboWorkloadAppLabel,omitempty"`
+	// if true, will consider self-provided services as consumed services and add them to `Sidecar`
+	SelfConsume bool `json:"SelfConsume,omitempty"`
 
 	// mcp configs
 }
