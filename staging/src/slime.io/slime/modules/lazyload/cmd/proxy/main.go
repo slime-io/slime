@@ -30,6 +30,7 @@ const (
 	EnvPodNamespace                = "POD_NAMESPACE"
 	EnvDisableSvcController        = "DISABLE_SVC_CONTROLLER"
 	EnvWormHolePortPriorToHostPort = "WORMHOLE_PORT_PRIOR_TO_HOST_PORT"
+	EnvCleanupWormholePort         = "CLEAN_UP_WORMHOLE_PORT"
 )
 
 var (
@@ -41,6 +42,7 @@ var (
 
 	disableSvcController        = os.Getenv(EnvDisableSvcController) == "true"
 	wormHolePortPriorToHostPort = os.Getenv(EnvWormHolePortPriorToHostPort) == "true"
+	cleanupWormholePort         = os.Getenv(EnvCleanupWormholePort) == "true"
 
 	configLabelSelector = "lazyload.slime.io/config=global-sidecar"
 
@@ -178,15 +180,17 @@ func startListenAndServe(wormholePorts map[int]struct{}) {
 			go startServer(srv)
 		}
 	}
-
-	// ports will only be automatically increased when auto managing.
-	// more info can be found at: https://github.com/slime-io/slime/pull/157
-	// for whPort, srv := range servers {
-	// 	if _, exist := wormholePorts[whPort]; !exist {
-	// 		delete(servers, whPort)
-	// 		go shutdownServer(srv)
-	// 	}
-	// }
+	log.Infof("parameter cleanupWormholePort is: %v", cleanupWormholePort)
+	// it will clean up wormholeport if the port is deleted
+	if cleanupWormholePort {
+		for whPort, srv := range servers {
+			if _, exist := wormholePorts[whPort]; !exist {
+				log.Infof("remove wormhole port %d", whPort)
+				delete(servers, whPort)
+				go shutdownServer(srv)
+			}
+		}
+	}
 }
 
 func startServer(srv *http.Server) {

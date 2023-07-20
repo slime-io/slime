@@ -114,7 +114,7 @@ func NewReconciler(opts ...ReconcilerOpts) *ServicefenceReconciler {
 		interestMetaCopy:  map[string]bool{},
 		nsSvcCache:        &NsSvcCache{Data: map[string]map[string]struct{}{}},
 		labelSvcCache:     &LabelSvcCache{Data: map[LabelItem]map[string]struct{}{}},
-		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]uint{}},
+		portProtocolCache: &PortProtocolCache{Data: map[int32]map[Protocol]int32{}},
 		ipTofence:         &IpTofence{Data: map[string]types.NamespacedName{}},
 		fenceToIp:         &FenceToIp{Data: map[types.NamespacedName]map[string]struct{}{}},
 		ipToSvcCache:      &IpToSvcCache{Data: map[string]map[string]struct{}{}},
@@ -142,7 +142,6 @@ func (r *ServicefenceReconciler) Clear() {
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences/status,verbs=get;update;patch
 
 func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	log := modmodel.ModuleLog.WithField(model.LogFieldKeyResource, req.NamespacedName)
 
 	// Fetch the ServiceFence instance

@@ -51,6 +51,8 @@ message Fence {
   string render = 16;
   // metric source type, prometheus or accesslog
   string metricSourceType = 17;
+  // it will clean up wormholeport if the port is deleted when value is true
+  bool cleanupWormholePort = 18;
 }
 
 // The general idea is to assign different default traffic to different targets

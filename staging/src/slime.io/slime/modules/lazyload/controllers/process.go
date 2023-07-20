@@ -186,8 +186,7 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 }
 
 func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if r.inSpecialNs(req.Namespace) {
-		//log.Debugf("auto fence does not apply to specifical namespace: %s, skip", req.NamespacedName)
+	if r.isNamespaceManaged(req.Namespace) {
 		return ctrl.Result{}, nil
 	}
 
@@ -198,9 +197,7 @@ func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.
 }
 
 func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ret ctrl.Result, err error) {
-
-	if r.inSpecialNs(req.Name) {
-		//log.Debugf("auto fence does not apply to specifical namespace: %s, skip", req.NamespacedName)
+	if r.isNamespaceManaged(req.Name) {
 		return reconcile.Result{}, nil
 	}
 
@@ -350,13 +347,12 @@ func (r *ServicefenceReconciler) handlePodAdd(ctx context.Context, obj interface
 }
 
 func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj interface{}) {
-
 	pod, ok := obj.(*corev1.Pod)
 	if !ok {
 		return
 	}
 
-	if r.inSpecialNs(pod.Namespace) {
+	if r.isNamespaceManaged(pod.Namespace) {
 		return
 	}
 
@@ -424,7 +420,8 @@ func (r *ServicefenceReconciler) handlePodDelete(ctx context.Context, obj interf
 		sf := &lazyloadv1alpha1.ServiceFence{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace: namespacedName.Namespace,
-				Name:      namespacedName.Name},
+				Name:      namespacedName.Name,
+			},
 		}
 		if err := r.Client.Delete(ctx, sf); err != nil {
 			log.Errorf("delete fence %s failed: %s", namespacedName, err)
@@ -498,9 +495,9 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 	return false
 }
 
-// inSpecialNs slimeNamespace/istioNamespace/ClusterGsNamespace/kube-system is special, servicefence will not be generated
-func (r *ServicefenceReconciler) inSpecialNs(ns string) bool {
-
+// IsNamespaceManaged servicefence will not be generated in slimeNamespace/istioNamespace/ClusterGsNamespace/kube-system
+// port will also not manage in these namespaces
+func (r *ServicefenceReconciler) isNamespaceManaged(ns string) bool {
 	if ns == "kube-system" {
 		return true
 	}

@@ -17,6 +17,7 @@
           {{ $passthroughByDefault := .general.passthroughByDefault | default false }}
           {{ $supportH2 := .general.supportH2 | default false }}
           {{ $clusterGsNamespace := .general.clusterGsNamespace | default $.Values.namespace }}
+          {{ $cleanupWormholePort := .general.cleanupWormholePort | default false }}
           {{- range $f.wormholePort }}
              {{- if eq (int .) (int $gsPort) }}
                  {{ $hasGsPort = true }}
@@ -208,6 +209,8 @@ spec:
       containers:
         - name: global-sidecar
           env:
+            - name: CLEAN_UP_WORMHOLE_PORT
+              value: "{{ $cleanupWormholePort }}"
             - name: PROBE_PORT
               value: {{ default 18181 $gs.probePort | quote }}
             - name: LOG_LEVEL

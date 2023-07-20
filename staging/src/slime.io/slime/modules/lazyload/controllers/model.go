@@ -6,10 +6,12 @@
 package controllers
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"regexp"
-	"slime.io/slime/framework/model"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/types"
+
+	"slime.io/slime/framework/model"
 
 	modmodel "slime.io/slime/modules/lazyload/model"
 )
@@ -37,7 +39,7 @@ type LabelSvcCache struct {
 }
 
 type PortProtocolCache struct {
-	Data map[int32]map[Protocol]uint
+	Data map[int32]map[Protocol]int32
 	sync.RWMutex
 }
 
