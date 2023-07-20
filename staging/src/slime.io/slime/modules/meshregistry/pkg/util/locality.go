@@ -89,7 +89,18 @@ func (l IstioLocality) string(sep string) string {
 	if l == emptyIstioLocality {
 		return ""
 	}
-	return l.Region + sep + l.Zone + sep + l.Subzone // Format: "%s<sep>%s<sep>%s"
+	localitys := []string{}
+	if len(l.Region) > 0 {
+		localitys = append(localitys, l.Region)
+	}
+	if len(l.Zone) > 0 {
+		localitys = append(localitys, l.Zone)
+	}
+	if len(l.Subzone) > 0 {
+		localitys = append(localitys, l.Subzone)
+	}
+	// Format: "%s<sep>%s<sep>%s"
+	return strings.Join(localitys, sep)
 }
 
 func (l IstioLocality) LabelString() string {
