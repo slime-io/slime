@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/buger/jsonparser"
-	"k8s.io/apimachinery/pkg/runtime"
 	"os"
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/buger/jsonparser"
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -53,7 +54,6 @@ func loadGlobalSidecarChart() *chart.Chart {
 }
 
 func addDefaultModuleValue(module *config.Config) {
-
 	if module.Global == nil {
 		module.Global = &config.Global{}
 	}
@@ -125,7 +125,7 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 		log.Errorf("generate new resources error: %v", err)
 		return false
 	}
-	var ctx = context.Background()
+	ctx := context.Background()
 	for gvr, resList := range resources {
 		for _, res := range resList {
 			ns, name := res.GetNamespace(), res.GetName()
@@ -161,7 +161,6 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 }
 
 func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (*config.SlimeBoot, map[string]interface{}, error) {
-
 	// Deserialize to config.SlimeBoot
 	specJson, slimeBoot, err := getSlimeboot(env)
 	if err != nil {
@@ -193,7 +192,7 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 			return nil, nil, fmt.Errorf("marshal wormholePort err %s", err)
 		}
 
-		for idx, _ := range slimeBoot.Spec.Module {
+		for idx := range slimeBoot.Spec.Module {
 			if slimeBoot.Spec.Module[idx].Kind == "lazyload" {
 				pos = fmt.Sprintf("[%d]", idx)
 				break
@@ -218,7 +217,6 @@ func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environme
 }
 
 func patchSlimeboot(spec, wp []byte, specRaw, pos string) ([]byte, error) {
-
 	general, _, _, err := jsonparser.Get([]byte(specRaw), "module", pos, "general")
 	if err != nil {
 		return nil, fmt.Errorf("get slimeboot module%s.general err %s", pos, err)
@@ -285,7 +283,6 @@ func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Envir
 	}
 	if len(deploy.OwnerReferences) == 0 {
 		return nil, fmt.Errorf("lazyload deployment [%s/%s] does not have any ownerReferences", slimeBootNs, deployName)
-
 	}
 	slimeBootName := deploy.OwnerReferences[0].Name
 

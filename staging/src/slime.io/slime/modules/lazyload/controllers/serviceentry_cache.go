@@ -8,7 +8,7 @@ import (
 )
 
 func (r *ServicefenceReconciler) RegisterSeHandler() {
-
+	// TODO: add delete event
 	// only add, not delete
 	sePortToCache := func(old resource.Config, cfg resource.Config, e bootstrap.Event) {
 		switch e {
@@ -27,7 +27,6 @@ func (r *ServicefenceReconciler) RegisterSeHandler() {
 }
 
 func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
-
 	filter := []model.Instance{model.HTTP}
 	if r.cfg.SupportH2 {
 		filter = append(filter, model.HTTP2, model.GRPC, model.GRPCWeb)
@@ -39,12 +38,12 @@ func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
 			if !protocolFilter(filter, port.Protocol) {
 				continue
 			}
-			
+
 			p := int32(port.Port)
 			r.portProtocolCache.Lock()
 
 			if _, ok := r.portProtocolCache.Data[p]; !ok {
-				r.portProtocolCache.Data[p] = make(map[Protocol]uint)
+				r.portProtocolCache.Data[p] = make(map[Protocol]int32)
 			}
 			r.portProtocolCache.Data[p][ListenerProtocolHTTP]++
 			log.Debugf("get serviceentry http port %d", p)

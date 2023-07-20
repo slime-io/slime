@@ -4,12 +4,14 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"net"
-	"slime.io/slime/modules/lazyload/api/config"
 	"strconv"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/types"
+
+	"slime.io/slime/modules/lazyload/api/config"
 
 	envoy_config_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
@@ -242,7 +244,6 @@ func NewCache(env bootstrap.Environment) (map[string]map[string]string, error) {
 func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCache *IpToSvcCache,
 	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, fenceToIpCache *FenceToIp, enableShortDomain bool,
 ) (map[string]map[string]string, error) {
-
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
 	result := make(map[string]map[string]string)
 	tmpResult := make(map[string]map[string]int)

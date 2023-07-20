@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -12,110 +14,188 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
-	watchtools "k8s.io/client-go/tools/watch"
 )
 
 func (r *ServicefenceReconciler) StartSvcCache(ctx context.Context) {
-	clientSet := r.env.K8SClient
-	log := log.WithField("function", "newSvcCache")
-	// init service watcher
-	servicesClient := clientSet.CoreV1().Services("")
+	log := log.WithField("function", "svcCache")
+	client := r.env.K8SClient
+
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return servicesClient.List(ctx, options)
+			return client.CoreV1().Services("").List(ctx, metav1.ListOptions{})
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return servicesClient.Watch(ctx, options)
+			return client.CoreV1().Services("").Watch(ctx, metav1.ListOptions{})
 		},
 	}
-	_, cacheSync, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &corev1.Service{})
-	r.svcSynced = cacheSync.HasSynced
-	go func() {
-		// wait for svc cache synced
-		cache.WaitForCacheSync(ctx.Done(), r.svcSynced)
-		log.Infof("Service cacher is running")
-		for {
-			select {
-			case <-ctx.Done():
-				log.Infof("context is closed, break process loop")
-				return
-			case e, ok := <-watcher.ResultChan():
-				if !ok {
-					log.Warningf("a result chan of service watcher is closed, break process loop")
-					return
-				}
 
-				service, ok := e.Object.(*corev1.Service)
-				if !ok {
-					log.Errorf("invalid type of object in service watcher event")
-					continue
-				}
-				ns := service.GetNamespace()
-				name := service.GetName()
-				eventSvc := ns + "/" + name
-				// delete eventSvc from labelSvcCache to ensure final consistency
-				r.labelSvcCache.Lock()
-				for label, m := range r.labelSvcCache.Data {
-					delete(m, eventSvc)
-					if len(m) == 0 {
-						delete(r.labelSvcCache.Data, label)
-					}
-				}
-				r.labelSvcCache.Unlock()
+	_, controller := cache.NewInformer(lw, &corev1.Service{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { r.handleSvcAdd(ctx, obj) },
+		UpdateFunc: func(oldObj, newObj interface{}) { r.handleSvcUpdate(ctx, oldObj, newObj) },
+		DeleteFunc: func(obj interface{}) { r.handleSvcDelete(ctx, obj) },
+	})
 
-				// TODO delete eventSvcPort from portProtocolCache
+	r.svcSynced = controller.HasSynced
+	log.Infof("run svc controller")
+	go controller.Run(ctx.Done())
+}
 
-				// delete event
-				// delete eventSvc from ns->svc map
-				if e.Type == watch.Deleted {
-					r.nsSvcCache.Lock()
-					delete(r.nsSvcCache.Data[ns], eventSvc)
-					r.nsSvcCache.Unlock()
-					// labelSvcCache already deleted, skip
-					continue
-				}
+func (r *ServicefenceReconciler) handleSvcAdd(ctx context.Context, obj interface{}) {
+	svc, ok := obj.(*corev1.Service)
+	if !ok {
+		return
+	}
 
-				// add, update event
-				// add eventSvc to nsSvcCache
-				r.nsSvcCache.Lock()
-				if r.nsSvcCache.Data[ns] == nil {
-					r.nsSvcCache.Data[ns] = make(map[string]struct{})
-				}
-				r.nsSvcCache.Data[ns][eventSvc] = struct{}{}
-				r.nsSvcCache.Unlock()
-				// add eventSvc to labelSvcCache again
-				r.labelSvcCache.Lock()
-				for k, v := range service.GetLabels() {
-					label := LabelItem{
-						Name:  k,
-						Value: v,
-					}
-					if r.labelSvcCache.Data[label] == nil {
-						r.labelSvcCache.Data[label] = make(map[string]struct{})
-					}
-					r.labelSvcCache.Data[label][eventSvc] = struct{}{}
-				}
-				r.labelSvcCache.Unlock()
+	if r.isNamespaceManaged(svc.GetNamespace()) {
+		return
+	}
 
-				// add eventSvc ports to portProtocolCache again
-				if ns != r.env.Config.Global.IstioNamespace {
-					r.portProtocolCache.Lock()
-					for _, port := range service.Spec.Ports {
-						p := port.Port
-						portProtos := r.portProtocolCache.Data[p]
-						if portProtos == nil {
-							portProtos = make(map[Protocol]uint)
-							r.portProtocolCache.Data[p] = portProtos
-						}
-						if isHttp(port, r.cfg.SupportH2) {
-							portProtos[ListenerProtocolHTTP]++
-						}
-					}
-					r.portProtocolCache.Unlock()
-				}
-			}
+	r.addLabelSvcCache(svc)
+	r.addNsSvcCache(svc)
+	r.addPortProtocolCache(svc)
+}
+
+func (r *ServicefenceReconciler) handleSvcUpdate(ctx context.Context, old, obj interface{}) {
+	svc, ok := obj.(*corev1.Service)
+	if !ok {
+		return
+	}
+	if r.isNamespaceManaged(svc.GetNamespace()) {
+		return
+	}
+
+	oldSvc, ok := old.(*corev1.Service)
+	if !ok {
+		return
+	}
+
+	if reflect.DeepEqual(svc.Spec, oldSvc.Spec) {
+		return
+	}
+
+	r.deleteLabelSvcCache(oldSvc)
+	r.addLabelSvcCache(svc)
+
+	r.deleteNsSvcCache(oldSvc)
+	r.addNsSvcCache(svc)
+
+	r.deletePortProtocolCache(oldSvc)
+	r.addPortProtocolCache(svc)
+}
+
+func (r *ServicefenceReconciler) handleSvcDelete(ctx context.Context, obj interface{}) {
+	svc, ok := obj.(*corev1.Service)
+	if !ok {
+		return
+	}
+
+	if r.isNamespaceManaged(svc.GetNamespace()) {
+		return
+	}
+
+	r.deleteLabelSvcCache(svc)
+
+	r.deleteNsSvcCache(svc)
+
+	r.deletePortProtocolCache(svc)
+}
+
+func (r *ServicefenceReconciler) addLabelSvcCache(svc *corev1.Service) {
+	ns := svc.GetNamespace()
+	nn := fmt.Sprintf("%s/%s", ns, svc.GetName())
+
+	r.labelSvcCache.Lock()
+	defer r.labelSvcCache.Unlock()
+	for k, v := range svc.GetLabels() {
+		label := LabelItem{Name: k, Value: v}
+
+		if r.labelSvcCache.Data[label] == nil {
+			r.labelSvcCache.Data[label] = make(map[string]struct{})
 		}
-	}()
+		r.labelSvcCache.Data[label][nn] = struct{}{}
+	}
+}
+
+func (r *ServicefenceReconciler) deleteLabelSvcCache(svc *corev1.Service) {
+	ns := svc.GetNamespace()
+	nn := fmt.Sprintf("%s/%s", ns, svc.GetName())
+	r.labelSvcCache.Lock()
+	defer r.labelSvcCache.Unlock()
+	for label, m := range r.labelSvcCache.Data {
+		delete(m, nn)
+		if len(m) == 0 {
+			delete(r.labelSvcCache.Data, label)
+		}
+	}
+}
+
+func (r *ServicefenceReconciler) addNsSvcCache(svc *corev1.Service) {
+	ns := svc.GetNamespace()
+	nn := fmt.Sprintf("%s/%s", ns, svc.GetName())
+
+	r.nsSvcCache.Lock()
+	defer r.nsSvcCache.Unlock()
+	if r.nsSvcCache.Data[ns] == nil {
+		r.nsSvcCache.Data[ns] = make(map[string]struct{})
+	}
+	r.nsSvcCache.Data[ns][nn] = struct{}{}
+}
+
+func (r *ServicefenceReconciler) deleteNsSvcCache(svc *corev1.Service) {
+	ns := svc.GetNamespace()
+	nn := fmt.Sprintf("%s/%s", ns, svc.GetName())
+
+	r.nsSvcCache.Lock()
+	defer r.nsSvcCache.Unlock()
+	delete(r.nsSvcCache.Data[ns], nn)
+}
+
+func (r *ServicefenceReconciler) addPortProtocolCache(svc *corev1.Service) {
+
+	if r.isNamespaceManaged(svc.GetNamespace()) {
+		return
+	}
+
+	r.portProtocolCache.Lock()
+	for _, port := range svc.Spec.Ports {
+		if !isHttp(port, r.cfg.SupportH2) {
+			continue
+		}
+		p := port.Port
+		portProtos := r.portProtocolCache.Data[p]
+		if portProtos == nil {
+			portProtos = make(map[Protocol]int32)
+			r.portProtocolCache.Data[p] = portProtos
+		}
+		portProtos[ListenerProtocolHTTP]++
+	}
+	r.portProtocolCache.Unlock()
+
+	log.Debugf("protocol cache: %+v", r.portProtocolCache.Data)
+}
+
+func (r *ServicefenceReconciler) deletePortProtocolCache(svc *corev1.Service) {
+
+	if !r.cfg.GetCleanupWormholePort() {
+		return
+	}
+	if r.isNamespaceManaged(svc.GetNamespace()) {
+		return
+	}
+
+	r.portProtocolCache.Lock()
+	for _, port := range svc.Spec.Ports {
+		p := port.Port
+		if !isHttp(port, r.cfg.SupportH2) {
+			continue
+		}
+		if _, exist := r.portProtocolCache.Data[p]; exist {
+			r.portProtocolCache.Data[p][ListenerProtocolHTTP]--
+		}
+	}
+	r.portProtocolCache.Unlock()
+
+	log.Debugf("protocol cache: %+v", r.portProtocolCache.Data)
 }
 
 func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
@@ -143,7 +223,7 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 			// update wormholePort
 			log.Debugf("got timer event for updating wormholePort")
 
-			wormholePort, needUpdate = updateWormholePort(wormholePort, r.portProtocolCache)
+			wormholePort, needUpdate = reloadWormholePort(wormholePort, r.portProtocolCache)
 			if needUpdate || !successUpdate {
 				log.Debugf("need to update resources")
 				successUpdate = updateResources(wormholePort, &r.env)
@@ -180,32 +260,49 @@ func isHttp(port corev1.ServicePort, supportH2 bool) bool {
 	return false
 }
 
-func updateWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
+func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
+	updated := false
+	sort.Strings(wormholePort)
+	log.Infof("old wormPort is: %v", wormholePort)
+
+	oldPortList := wormholePort
+	oldPortMap := make(map[string]bool)
+	for _, p := range oldPortList {
+		oldPortMap[p] = true
+	}
+
+	curPortList := make([]string, 0)
+	curPortMap := make(map[string]bool)
+
 	portProtocolCache.RLock()
 	defer portProtocolCache.RUnlock()
 
-	var add []string
-	wormPortMap := make(map[string]bool)
-
-	for _, p := range wormholePort {
-		wormPortMap[p] = true
-	}
-
 	for port, proto := range portProtocolCache.Data {
 		p := strconv.Itoa(int(port))
-		if proto[ListenerProtocolHTTP] > 0 && !wormPortMap[p] {
-			add = append(add, p)
+		if proto[ListenerProtocolHTTP] > 0 {
+			curPortList = append(curPortList, p)
+			curPortMap[p] = true
+			if !oldPortMap[p] {
+				// port is not in oldPortList, added
+				updated = true
+			}
+		}
+	}
+	// curPortList is constructed, need to check deleted
+	if !updated {
+		for port := range oldPortMap {
+			if !curPortMap[port] {
+				// port is not in curPortList, deleted
+				updated = true
+				break
+			}
 		}
 	}
 
-	// todo delete wormholePort in future
-
-	wormholePort = append(wormholePort, add...)
-	return wormholePort, len(add) > 0
+	return curPortList, updated
 }
 
 func (r *ServicefenceReconciler) StartIpToSvcCache(ctx context.Context) {
-
 	client := r.env.K8SClient
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
@@ -235,7 +332,6 @@ func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{
 }
 
 func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj interface{}) {
-
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -254,7 +350,6 @@ func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj in
 }
 
 func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interface{}) {
-
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -263,7 +358,6 @@ func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interfa
 }
 
 func (r *ServicefenceReconciler) addIpWithEp(ep *corev1.Endpoints) {
-
 	svc := ep.GetNamespace() + "/" + ep.GetName()
 	ipToSvcCache := r.ipToSvcCache
 	svcToIpsCache := r.svcToIpsCache
@@ -287,7 +381,6 @@ func (r *ServicefenceReconciler) addIpWithEp(ep *corev1.Endpoints) {
 }
 
 func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
-
 	svc := ep.GetNamespace() + "/" + ep.GetName()
 	ipToSvcCache := r.ipToSvcCache
 	svcToIpsCache := r.svcToIpsCache
