@@ -31,6 +31,8 @@ message Global {
   string selfResourceRev = 13;
   // specify the istio-config-source from which we can get a configs-mirror of relevant istiod.
   ConfigSource istioConfigSource = 14;
+  // deploy rev specified by user, used to define the deploy version of slime
+  string deployRev = 15;
 }
 
 message Log {
