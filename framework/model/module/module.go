@@ -312,6 +312,12 @@ func Main(bundle string, modules []Module) {
 
 	// setup for leaderelection
 	if mainModConfig.Global.Misc["enableLeaderElection"] == "on" {
+
+		deployRev := mainModConfig.Global.GetDeployRev()
+		if deployRev != "" {
+			bundle = fmt.Sprintf("%s-%s", bundle, deployRev)
+		}
+
 		// create a resource lock in the same namespace as the workload instance
 		rl, err := leaderelection.NewKubeResourceLock(conf, os.Getenv("WATCH_NAMESPACE"), bundle)
 		if err != nil {
