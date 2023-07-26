@@ -4,9 +4,14 @@
 */
 
 syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
 package slime.microservice.plugin.config;
 
 option go_package = "slime.io/slime/modules/plugin/api/config";
 
 message PluginModule {
+  // by typeURL
+  map<string, google.protobuf.Struct> configDiscoveryDefaultConfig = 1;
 }
