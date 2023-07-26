@@ -320,12 +320,21 @@ spec:
                   - match:
                       prefix: /
                     route:
+                      timeout: 0s
                       {{- if eq .cluster "_GLOBAL_SIDECAR" }}
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                    request_headers_to_add:
+                      - header:
+                          key: "Slime-Orig-Dest"
+                          value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                        append: false
+                      - header:
+                          key: "Slime-Source-Ns"
+                          value: {{ $ns }}
+                        append: false
                       {{- else }}
                       cluster: {{ tpl .cluster $ }}
                       {{- end }}
-                      timeout: 0s
               {{- end }}
               {{- end }}
               {{- end }}
@@ -345,33 +354,42 @@ spec:
                               google_re2: {}
                               regex: {{ .domainRegex }}
                     route:
+                      timeout: 0s
                       {{- if eq .cluster "_GLOBAL_SIDECAR" }}
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                    request_headers_to_add:
+                      - header:
+                          key: "Slime-Orig-Dest"
+                          value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                        append: false
+                      - header:
+                          key: "Slime-Source-Ns"
+                          value: {{ $ns }}
+                        append: false
                       {{- else }}
                       cluster: {{ tpl .cluster $ }}
                       {{- end }}
-                      timeout: 0s
                   {{- end }}
                   {{- end }}
                   {{- end }}
                   - match:
                       prefix: /
                     route:
+                      timeout: 0s
                       {{- if $passthroughByDefault }}
                       cluster: PassthroughCluster
                       {{- else }}
                       cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $ns }}.svc.cluster.local
+                    request_headers_to_add:
+                      - header:
+                          key: "Slime-Orig-Dest"
+                          value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                        append: false
+                      - header:
+                          key: "Slime-Source-Ns"
+                          value: {{ $ns }}
+                        append: false
                       {{- end }}
-                      timeout: 0s
-          request_headers_to_add:
-            - header:
-                key: "Slime-Orig-Dest"
-                value: "%DOWNSTREAM_LOCAL_ADDRESS%"
-              append: false
-            - header:
-                key: "Slime-Source-Ns"
-                value: {{ $ns }}
-              append: false
     - applyTo: VIRTUAL_HOST
       match:
         proxy:

@@ -345,12 +345,23 @@ spec:
                 - match:
                     prefix: /
                   route:
-                    {{- if eq .cluster "_GLOBAL_SIDECAR" }}
-                    cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
-                    {{- else }}
-                    cluster: {{ tpl .cluster $ }}
-                    {{- end }}
                     timeout: 0s
+                  {{- if eq .cluster "_GLOBAL_SIDECAR" }}
+                    cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
+                  request_headers_to_add:
+                    - header:
+                        key: "Slime-Orig-Dest"
+                        value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                      append: false
+                    {{- if ne $addEnvHeaderViaLua true }}
+                    - header:
+                        key: "Slime-Source-Ns"
+                        value: "%ENVIRONMENT(POD_NAMESPACE)%"
+                      append: false
+                    {{- end }}
+                  {{- else }}
+                    cluster: {{ tpl .cluster $ }}
+                  {{- end }}
             {{- end }}
             {{- end }}
             {{- end }}
@@ -370,35 +381,46 @@ spec:
                           google_re2: {}
                           regex: {{ .domainRegex }}
                   route:
+                    timeout: 0s
                     {{- if eq .cluster "_GLOBAL_SIDECAR" }}
                     cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
+                  request_headers_to_add:
+                    - header:
+                        key: "Slime-Orig-Dest"
+                        value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                      append: false
+                    {{- if ne $addEnvHeaderViaLua true }}
+                    - header:
+                        key: "Slime-Source-Ns"
+                        value: "%ENVIRONMENT(POD_NAMESPACE)%"
+                      append: false
+                    {{- end }}
                     {{- else }}
                     cluster: {{ tpl .cluster $ }}
                     {{- end }}
-                    timeout: 0s
                 {{- end }}
                 {{- end }}
                 {{- end }}
                 - match:
                     prefix: /
                   route:
+                    timeout: 0s
                     {{- if $passthroughByDefault }}
                     cluster: PassthroughCluster
                     {{- else }}
                     cluster: outbound|{{ $gsPort }}||global-sidecar.{{ $clusterGsNamespace }}.svc.cluster.local
+                  request_headers_to_add:
+                    - header:
+                        key: "Slime-Orig-Dest"
+                        value: "%DOWNSTREAM_LOCAL_ADDRESS%"
+                      append: false
+                    {{- if ne $addEnvHeaderViaLua true }}
+                    - header:
+                        key: "Slime-Source-Ns"
+                        value: "%ENVIRONMENT(POD_NAMESPACE)%"
+                      append: false
                     {{- end }}
-                    timeout: 0s
-          request_headers_to_add:
-            - header:
-                key: "Slime-Orig-Dest"
-                value: "%DOWNSTREAM_LOCAL_ADDRESS%"
-              append: false
-          {{- if ne $addEnvHeaderViaLua true }}
-            - header:
-                key: "Slime-Source-Ns"
-                value: "%ENVIRONMENT(POD_NAMESPACE)%"
-              append: false
-          {{- end }}
+                    {{- end }}
 {{- if eq $addEnvHeaderViaLua true }}
     - applyTo: HTTP_FILTER
       match:
