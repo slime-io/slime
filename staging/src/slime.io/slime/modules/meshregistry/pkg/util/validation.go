@@ -239,7 +239,7 @@ func CopySe(item *networking.ServiceEntry) *networking.ServiceEntry {
 	newPorts := make([]*networking.Port, len(item.Ports))
 	copy(newPorts, item.Ports)
 	eps := make([]*networking.WorkloadEntry, len(item.Endpoints))
-	copy(eps, item.Endpoints)
+	copy(eps, item.Endpoints) // XXX deep copy?
 	newSe := &networking.ServiceEntry{
 		Hosts:           newHosts,
 		Addresses:       newAddress,
@@ -262,13 +262,18 @@ func SelectLabels(item *networking.ServiceEntry) map[string]string {
 	return labels
 }
 
-func FillSeLabels(se *networking.ServiceEntry, meta resource.Metadata) {
-	labels := SelectLabels(se)
+func FillSeLabels(se *networking.ServiceEntry, meta resource.Metadata) bool {
+	var (
+		labels  = SelectLabels(se)
+		changed bool
+	)
+
 	for k, v := range labels {
-		meta.Labels[k] = v
+		if exist, ok := meta.Labels[k]; !ok || exist != v {
+			changed = true
+			meta.Labels[k] = v
+		}
 	}
-	annotations := make(map[string]string, 0)
-	for k, v := range annotations {
-		meta.Annotations[k] = v
-	}
+
+	return changed
 }

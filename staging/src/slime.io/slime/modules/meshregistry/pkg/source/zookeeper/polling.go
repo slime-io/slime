@@ -53,7 +53,7 @@ func (s *Source) iface(service string) {
 	} else {
 		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
 		if err != nil {
-			log.Errorf("zk %s get consumer error: %s", service, err.Error())
+			log.Debugf("zk %s get consumer error: %s", service, err.Error())
 		}
 	}
 
@@ -71,13 +71,14 @@ func (s *Source) handleNodeDelete(childrens []string) {
 			deleteKey = append(deleteKey, service)
 		}
 	}
+
 	for _, service := range deleteKey {
 		if seCache, ok := s.pollingCache.Get(service); ok {
 			if ses, castok := seCache.(cmap.ConcurrentMap); castok {
 				for _, v := range ses.Items() {
 					if seValue, ok := v.(*ServiceEntryWithMeta); ok {
-						seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-						if event, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil); err == nil {
+						seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
+						if event, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil); err == nil {
 							log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 							for _, h := range s.handlers {
 								h.Handle(event)

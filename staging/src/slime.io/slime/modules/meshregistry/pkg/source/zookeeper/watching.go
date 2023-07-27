@@ -22,7 +22,7 @@ func (s *Source) ServiceNodeDelete(path string) {
 		if ses, ok := seMap.(cmap.ConcurrentMap); ok {
 			for serviceKey, value := range ses.Items() {
 				if se, ok := value.(*ServiceEntryWithMeta); ok {
-					if event, err := buildSeEvent(event.Deleted, se.ServiceEntry, se.Meta, nil); err == nil {
+					if event, err := buildServiceEntryEvent(event.Deleted, se.ServiceEntry, se.Meta, nil); err == nil {
 						for _, h := range s.handlers {
 							h.Handle(event)
 						}

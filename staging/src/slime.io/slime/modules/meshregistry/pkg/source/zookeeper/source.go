@@ -143,7 +143,8 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 }
 
 func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networking.ServiceEntry) {
-	ev, err := buildSeEvent(event.Updated, se, meta, nil)
+	prepared, _ := prepareServiceEntryWithMeta(se, meta)
+	ev, err := buildServiceEntryEvent(event.Updated, prepared.ServiceEntry, prepared.Meta, nil)
 	if err != nil {
 		log.Errorf("buildSeEvent met err %v", err)
 		return
@@ -492,24 +493,22 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
-		newSeWithMeta := &ServiceEntryWithMeta{
-			ServiceEntry: se,
-			Meta: resource.Metadata{
-				FullName:   resource.FullName{Namespace: resource.Namespace(s.args.ResourceNs), Name: resource.LocalName(serviceKey)},
-				CreateTime: now,
-				Version:    resource.Version(now.String()),
-				Labels: map[string]string{
-					"path":     dubboInterface,
-					"registry": "zookeeper",
-				},
-				Annotations: map[string]string{},
-			},
-		}
 
+		meta := resource.Metadata{
+			FullName:   resource.FullName{Namespace: resource.Namespace(s.args.ResourceNs), Name: resource.LocalName(serviceKey)},
+			CreateTime: now,
+			Version:    resource.Version(now.String()),
+			Labels: map[string]string{
+				"path":     dubboInterface,
+				"registry": "zookeeper",
+			},
+			Annotations: map[string]string{},
+		}
 		if !convertedSe.methodsEqual {
 			// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
-			newSeWithMeta.Meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
+			meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
 		}
+		newSeWithMeta, _ := prepareServiceEntryWithMeta(se, meta)
 
 		s.mut.Lock()
 		s.serviceMethods[serviceKey] = convertedSe.methodsLabel
@@ -519,16 +518,16 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		if !ok {
 			continue
 		}
-		seCache, ok := v.(cmap.ConcurrentMap)
+		interfaceSeCache, ok := v.(cmap.ConcurrentMap)
 		if !ok {
 			continue
 		}
 
 		callModel := convertDubboCallModel(se, convertedSe.InboundEndPoints)
 
-		if value, exist := seCache.Get(serviceKey); !exist {
-			seCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildSeEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+		if value, exist := interfaceSeCache.Get(serviceKey); !exist {
+			interfaceSeCache.Set(serviceKey, newSeWithMeta)
+			if ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
 				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
@@ -538,8 +537,8 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 			if existSeWithMeta.Equals(*newSeWithMeta) {
 				continue
 			}
-			seCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildSeEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+			interfaceSeCache.Set(serviceKey, newSeWithMeta)
+			if ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
 				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
@@ -570,8 +569,9 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		}
 
 		// del event -> empty-ep update event
-		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-		ev, err := buildSeEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
+		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
+
+		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
 		if err != nil {
 			log.Errorf("delete svc failed, case: %v", err.Error())
 			continue
@@ -587,10 +587,30 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 	}
 }
 
-func buildSeEvent(kind event.Kind, item *networking.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
-	se := util.CopySe(item)
-	source.FillRevision(meta)
-	util.FillSeLabels(se, meta)
+// prepareServiceEntryWithMeta prepare service entry with meta. Will perform cloning to obtain unrelated copies of the
+// data, and the event handlers can safely modify its contents.
+// In addition, certain metadata will also be populated.
+// Returns the prepared service entry with meta and whether the data has been changed.
+func prepareServiceEntryWithMeta(se *networking.ServiceEntry, meta resource.Metadata) (*ServiceEntryWithMeta, bool) {
+	se = util.CopySe(se)
+	meta = meta.Clone()
+
+	var changed bool
+	if source.FillRevision(meta) {
+		changed = true
+	}
+	if util.FillSeLabels(se, meta) {
+		changed = true
+	}
+
+	return &ServiceEntryWithMeta{
+		ServiceEntry: se,
+		Meta:         meta,
+	}, changed
+}
+
+// buildServiceEntryEvent assembled the incoming data into an event. Event handle should not modify the data.
+func buildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
 	return event.Event{
 		Kind:   kind,
 		Source: collections.K8SNetworkingIstioIoV1Alpha3Serviceentries,
@@ -602,7 +622,9 @@ func buildSeEvent(kind event.Kind, item *networking.ServiceEntry, meta resource.
 	}, nil
 }
 
+// buildSidecarEvent assembled the incoming data into an event. Event handle should not modify the data.
 func buildSidecarEvent(kind event.Kind, item *networking.Sidecar, meta resource.Metadata) event.Event {
+	meta = meta.Clone()
 	source.FillRevision(meta)
 	return event.Event{
 		Kind:   kind,
