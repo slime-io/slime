@@ -65,6 +65,7 @@ const (
 	StructHttpFilterName            = "name"
 	StructHttpFilterConfigDiscovery = "config_discovery"
 	StructHttpFilterConfigSource    = "config_source"
+	StructHttpFilterDefaultConfig   = "default_config"
 	StructHttpFilterAds             = "ads"
 	StructHttpFilterTypeURLs        = "type_urls"
 

@@ -626,7 +626,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		resourceName, pluginTypeURL string,
 		converter func(name string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error)) error {
 		fullResourceName := fmt.Sprintf("%s.%s", meta.Namespace, resourceName)
-		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, out.Patch.Value); err != nil {
+		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, r.getConfigDiscoveryDefaultConfig(pluginTypeURL), out.Patch.Value); err != nil {
 			return err
 		}
 		filterConfigStruct, err := converter(fullResourceName, meta, in)
@@ -700,23 +700,28 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 	return nil
 }
 
-func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, out *types.Struct) error {
+func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, defaultConfig *types.Struct, out *types.Struct) error {
 	out.Fields[util.StructHttpFilterName] = &types.Value{
 		Kind: &types.Value_StringValue{
 			StringValue: filterName,
 		},
 	}
+
+	configDiscoveryFields := map[string]*types.Value{
+		util.StructHttpFilterConfigSource: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{
+			util.StructHttpFilterAds: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{}}}},
+		}}}},
+		util.StructHttpFilterTypeURLs: {Kind: &types.Value_ListValue{ListValue: &types.ListValue{Values: []*types.Value{
+			{Kind: &types.Value_StringValue{StringValue: typeURL}},
+		}}}},
+	}
+	if defaultConfig != nil {
+		configDiscoveryFields[util.StructHttpFilterDefaultConfig] = &types.Value{
+			Kind: &types.Value_StructValue{StructValue: defaultConfig},
+		}
+	}
 	out.Fields[util.StructHttpFilterConfigDiscovery] = &types.Value{
-		Kind: &types.Value_StructValue{
-			StructValue: &types.Struct{Fields: map[string]*types.Value{
-				util.StructHttpFilterConfigSource: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{
-					util.StructHttpFilterAds: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{}}}},
-				}}}},
-				util.StructHttpFilterTypeURLs: {Kind: &types.Value_ListValue{ListValue: &types.ListValue{Values: []*types.Value{
-					{Kind: &types.Value_StringValue{StringValue: typeURL}},
-				}}}},
-			}},
-		},
+		Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: configDiscoveryFields}},
 	}
 
 	return nil
