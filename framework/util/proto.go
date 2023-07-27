@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"github.com/ghodss/yaml"
 	gogojsonpb "github.com/gogo/protobuf/jsonpb"
-	"github.com/gogo/protobuf/proto"
-	"github.com/gogo/protobuf/types"
+	gogoproto "github.com/gogo/protobuf/proto"
+	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/hashicorp/go-multierror"
 	yaml2 "gopkg.in/yaml.v2"
@@ -20,7 +20,7 @@ import (
 // Deprecated
 // WARN:
 // the callers which use this func to convert envoy api to gogo struct should mirgate to MessageToGogoStruct and do test
-func MessageToStruct(msg proto.Message) (*types.Struct, error) {
+func MessageToStruct(msg gogoproto.Message) (*gogotypes.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
 	}
@@ -30,7 +30,7 @@ func MessageToStruct(msg proto.Message) (*types.Struct, error) {
 		return nil, err
 	}
 
-	pbs := &types.Struct{}
+	pbs := &gogotypes.Struct{}
 	if err := gogojsonpb.Unmarshal(buf, pbs); err != nil {
 		return nil, err
 	}
@@ -38,7 +38,7 @@ func MessageToStruct(msg proto.Message) (*types.Struct, error) {
 }
 
 // MessageToGogoStruct converts golang proto msg to gogo struct
-func MessageToGogoStruct(msg proto.Message) (*types.Struct, error) {
+func MessageToGogoStruct(msg gogoproto.Message) (*gogotypes.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
 	}
@@ -48,14 +48,14 @@ func MessageToGogoStruct(msg proto.Message) (*types.Struct, error) {
 		return nil, err
 	}
 
-	pbs := &types.Struct{}
+	pbs := &gogotypes.Struct{}
 	if err := gogojsonpb.Unmarshal(buf, pbs); err != nil {
 		return nil, err
 	}
 	return pbs, nil
 }
 
-func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
+func ProtoToMap(pb gogoproto.Message) (map[string]interface{}, error) {
 	m := &gogojsonpb.Marshaler{}
 	var buf bytes.Buffer
 	if err := m.Marshal(&buf, pb); err == nil {
@@ -71,15 +71,15 @@ func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
 	}
 }
 
-func Make(messageName string) (proto.Message, error) {
-	pbt := proto.MessageType(messageName)
+func Make(messageName string) (gogoproto.Message, error) {
+	pbt := gogoproto.MessageType(messageName)
 	if pbt == nil {
 		return nil, fmt.Errorf("unknown type %q", messageName)
 	}
-	return reflect.New(pbt.Elem()).Interface().(proto.Message), nil
+	return reflect.New(pbt.Elem()).Interface().(gogoproto.Message), nil
 }
 
-func FromJSONMapToMessage(data interface{}, msg proto.Message) error {
+func FromJSONMapToMessage(data interface{}, msg gogoproto.Message) error {
 	js, err := json.Marshal(data)
 	if err != nil {
 		return err
@@ -88,7 +88,7 @@ func FromJSONMapToMessage(data interface{}, msg proto.Message) error {
 	return ApplyJSON(bytes.NewReader(js), msg)
 }
 
-func FromJSONMap(messageName string, data interface{}) (proto.Message, error) {
+func FromJSONMap(messageName string, data interface{}) (gogoproto.Message, error) {
 	// Marshal to YAML bytes
 	str, err := yaml2.Marshal(data)
 	if err != nil {
@@ -102,7 +102,7 @@ func FromJSONMap(messageName string, data interface{}) (proto.Message, error) {
 }
 
 // FromYAML converts a canonical YAML to a proto message
-func FromYAML(messageName string, yml string) (proto.Message, error) {
+func FromYAML(messageName string, yml string) (gogoproto.Message, error) {
 	pb, err := Make(messageName)
 	if err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func FromYAML(messageName string, yml string) (proto.Message, error) {
 
 // ApplyYAML unmarshals a YAML string into a proto message.
 // Unknown fields are allowed.
-func ApplyYAML(yml string, pb proto.Message) error {
+func ApplyYAML(yml string, pb gogoproto.Message) error {
 	js, err := yaml.YAMLToJSON([]byte(yml))
 	if err != nil {
 		return err
@@ -124,13 +124,13 @@ func ApplyYAML(yml string, pb proto.Message) error {
 }
 
 // ApplyJSON unmarshals a JSON string into a proto message.
-func ApplyJSON(r io.Reader, pb proto.Message) error {
+func ApplyJSON(r io.Reader, pb gogoproto.Message) error {
 	m := gogojsonpb.Unmarshaler{AllowUnknownFields: true}
 	return m.Unmarshal(r, pb)
 }
 
 // StructToMessage decodes a protobuf Message from a Struct.
-func StructToMessage(pbst *types.Struct, out proto.Message) error {
+func StructToMessage(pbst *gogotypes.Struct, out gogoproto.Message) error {
 	if pbst == nil {
 		return errors.New("nil struct")
 	}
@@ -143,10 +143,10 @@ func StructToMessage(pbst *types.Struct, out proto.Message) error {
 	return gogojsonpb.Unmarshal(buf, out)
 }
 
-func ToTypedStruct(typeURL string, value *types.Struct) *types.Struct {
-	return &types.Struct{Fields: map[string]*types.Value{
-		StructAnyAtType:  {Kind: &types.Value_StringValue{StringValue: TypeURLUDPATypedStruct}},
-		StructAnyTypeURL: {Kind: &types.Value_StringValue{StringValue: typeURL}},
-		StructAnyValue:   {Kind: &types.Value_StructValue{StructValue: value}},
+func ToTypedStruct(typeURL string, value *gogotypes.Struct) *gogotypes.Struct {
+	return &gogotypes.Struct{Fields: map[string]*gogotypes.Value{
+		StructAnyAtType:  {Kind: &gogotypes.Value_StringValue{StringValue: TypeURLUDPATypedStruct}},
+		StructAnyTypeURL: {Kind: &gogotypes.Value_StringValue{StringValue: typeURL}},
+		StructAnyValue:   {Kind: &gogotypes.Value_StructValue{StructValue: value}},
 	}}
 }

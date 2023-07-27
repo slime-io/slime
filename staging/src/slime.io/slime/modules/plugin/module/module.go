@@ -48,13 +48,11 @@ func (m *Module) Clone() module.Module {
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
 	cfg := &m.config
-	_ = cfg // unused until now
-
 	env := opts.Env
 	mgr := opts.Manager
 
 	var err error
-	pmr := controllers.NewPluginManagerReconciler(env, mgr.GetClient(), mgr.GetScheme())
+	pmr := controllers.NewPluginManagerReconciler(env, mgr.GetClient(), mgr.GetScheme(), cfg)
 	if opts.LeaderElectionCbs != nil {
 		opts.LeaderElectionCbs.AddOnStartedLeading(pmr.OnStartLeading)
 	}

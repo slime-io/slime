@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	structpb "github.com/gogo/protobuf/types"
+	"slime.io/slime/modules/plugin/api/config"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -44,6 +46,7 @@ type PluginManagerReconciler struct {
 
 	credController *CredentialsController
 	env            bootstrap.Environment
+	cfg            *config.PluginModule
 
 	mut                  sync.RWMutex
 	secretWatchers       map[types.NamespacedName]map[types.NamespacedName]struct{}
@@ -52,11 +55,12 @@ type PluginManagerReconciler struct {
 	leaderCtx            context.Context
 }
 
-func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client, scheme *runtime.Scheme) *PluginManagerReconciler {
+func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client, scheme *runtime.Scheme, cfg *config.PluginModule) *PluginManagerReconciler {
 	return &PluginManagerReconciler{
 		client:               client,
 		scheme:               scheme,
 		env:                  env,
+		cfg:                  cfg,
 		secretWatchers:       map[types.NamespacedName]map[types.NamespacedName]struct{}{},
 		changeSecrets:        map[types.NamespacedName]struct{}{},
 		changeSecretNotifyCh: make(chan struct{}, 1),
@@ -262,6 +266,11 @@ func (r *PluginManagerReconciler) OnStartLeading(ctx context.Context) {
 
 	// resync
 	r.notifySecretChange(emptyNN)
+}
+
+func (r *PluginManagerReconciler) getConfigDiscoveryDefaultConfig(url string) *structpb.Struct {
+	defaultConfig := r.cfg.ConfigDiscoveryDefaultConfig[url]
+	return defaultConfig
 }
 
 func getPluginManagerWatchSecrets(ns string, in *v1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {
