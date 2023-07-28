@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"strings"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
+	lazyloadconfig "slime.io/slime/modules/lazyload/api/config"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 )
 
@@ -186,10 +188,8 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 }
 
 func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	if r.isNamespaceManaged(req.Namespace) {
-		return ctrl.Result{}, nil
-	}
 
+	log.Debugf("reconcile service %s", req.NamespacedName)
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
 
@@ -197,10 +197,8 @@ func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.
 }
 
 func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ret ctrl.Result, err error) {
-	if r.isNamespaceManaged(req.Name) {
-		return reconcile.Result{}, nil
-	}
 
+	log.Debugf("reconcile namespace %s", req.Name)
 	// Fetch the namespace instance
 	ns := &corev1.Namespace{}
 	err = r.Client.Get(ctx, req.NamespacedName, ns)
@@ -235,34 +233,45 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 }
 
 // refreshFenceStatusOfService caller should hold the reconcile lock.
-func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context, svc *corev1.Service, nsName types.NamespacedName) (reconcile.Result, error) {
+func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context, svc *corev1.Service, nn types.NamespacedName) (reconcile.Result, error) {
+
+	// if ns not in scope, clean related svf and return
+	if in, err := r.nsInScope(ctx, svc, nn); err != nil {
+		log.Errorf("nsFilterAndClean error, %+v", err)
+		return reconcile.Result{}, err
+	} else if !in {
+		return reconcile.Result{}, nil
+	}
+
 	if svc == nil {
 		// Fetch the Service instance
 		svc = &corev1.Service{}
-		err := r.Client.Get(ctx, nsName, svc)
+		err := r.Client.Get(ctx, nn, svc)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				svc = nil
 			} else {
-				log.Errorf("get service %s error, %+v", nsName, err)
+				log.Errorf("get service %s error, %+v", nn, err)
 				return reconcile.Result{}, err
 			}
 		}
 	} else {
-		nsName = types.NamespacedName{
+		nn = types.NamespacedName{
 			Namespace: svc.Namespace,
 			Name:      svc.Name,
 		}
 	}
+	log.Infof("process namespacename %+v in refreshFenceStatusOfService", nn)
 
 	// Fetch the ServiceFence instance
 	sf := &lazyloadv1alpha1.ServiceFence{}
-	err := r.Client.Get(ctx, nsName, sf)
+	err := r.Client.Get(ctx, nn, sf)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			log.Infof("serviceFence %s is not found", nn)
 			sf = nil
 		} else {
-			log.Errorf("get serviceFence %s error, %+v", nsName, err)
+			log.Errorf("get serviceFence %s error, %+v", nn, err)
 			return reconcile.Result{}, err
 		}
 	}
@@ -292,22 +301,24 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				markFenceCreatedByController(sf)
 				model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
 				if err = r.Client.Create(ctx, sf); err != nil {
-					log.Errorf("create fence %s failed, %+v", nsName, err)
+					log.Errorf("create fence %s failed, %+v", nn, err)
 					return reconcile.Result{}, err
 				}
 				log.Infof("create fence succeed %s:%s in refreshFenceStatusOfService", sf.Namespace, sf.Name)
+			} else {
+				log.Infof("service %s is not fenced, skip create servicefence", nn)
 			}
 		}
 	} else if rev := model.IstioRevFromLabel(sf.Labels); !r.env.RevInScope(rev) {
 		// check if svc needs auto fence created
 		log.Errorf("existed fence %v istioRev %s but our rev %s, skip ...",
-			nsName, rev, r.env.IstioRev())
+			nn, rev, r.env.IstioRev())
 	} else if isFenceCreatedByController(sf) {
 
 		if svc == nil {
 			log.Infof("svc is nil and delete svf %s:%s", sf.Namespace, sf.Name)
 			if err := r.Client.Delete(ctx, sf); err != nil {
-				log.Errorf("delete fence %s failed, %+v", nsName, err)
+				log.Errorf("delete fence %s failed, %+v", nn, err)
 				return reconcile.Result{}, err
 			}
 			return reconcile.Result{}, nil
@@ -318,7 +329,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 		} else if !fenced {
 			log.Infof("svc is not fenced and delete svf %s:%s", svc.Namespace, svc.Name)
 			if err := r.Client.Delete(ctx, sf); err != nil {
-				log.Errorf("delete fence %s failed, %+v", nsName, err)
+				log.Errorf("delete fence %s failed, %+v", nn, err)
 			}
 		}
 	}
@@ -352,7 +363,7 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 		return
 	}
 
-	if r.isNamespaceManaged(pod.Namespace) {
+	if !r.isNamespaceManaged(pod.Namespace) {
 		return
 	}
 
@@ -409,9 +420,15 @@ func (r *ServicefenceReconciler) handlePodDelete(ctx context.Context, obj interf
 	if !ok {
 		return
 	}
+
+	if !r.isNamespaceManaged(pod.Namespace) {
+		return
+	}
+
 	if pod.Status.PodIP == "" {
 		return
 	}
+
 	namespacedName := r.getServicefenceNameByIp(pod.Status.PodIP)
 	if namespacedName.Namespace == "" || namespacedName.Name == "" {
 		return
@@ -495,25 +512,113 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 	return false
 }
 
-// IsNamespaceManaged servicefence will not be generated in slimeNamespace/istioNamespace/ClusterGsNamespace/kube-system
-// port will also not manage in these namespaces
-func (r *ServicefenceReconciler) isNamespaceManaged(ns string) bool {
-	if ns == "kube-system" {
+// there are two cases where this function is called
+// 1. in our custom controller to cache svc and ep info
+// 2. in reconcile() to generate a new svf
+func (r *ServicefenceReconciler) inScope(ns string, detailNs *corev1.Namespace) bool {
+
+	// namespace list is set
+	if r.cfg.GetNamespaceList() != nil {
+		switch list := r.cfg.NamespaceList.(type) {
+		case *lazyloadconfig.Fence_BlackNamespaceList:
+			if inList(list.BlackNamespaceList, ns) {
+				return false
+			}
+		case *lazyloadconfig.Fence_WhiteNamespaceList:
+			if !inList(list.WhiteNamespaceList, ns) {
+				return false
+			}
+		}
+	}
+
+	// namespace selectors is set
+	if r.cfg.GetManagementSelectors() != nil && detailNs != nil {
+		return r.managementSelectorsMatch(r.cfg.GetManagementSelectors(), detailNs.Labels)
+	}
+
+	return true
+}
+
+func inList(list string, ns string) bool {
+	parts := strings.Split(list, ",")
+	for _, v := range parts {
+		if v == ns {
+			return true
+		}
+	}
+	return false
+}
+
+func (r *ServicefenceReconciler) managementSelectorsMatch(selectors []*metav1.LabelSelector, nsLabel labels.Set) bool {
+	// ManagementSelectors is not set
+	if selectors == nil {
 		return true
 	}
 
-	if r.env.Config != nil && r.env.Config.Global != nil {
-		if ns == r.env.Config.Global.IstioNamespace || ns == r.env.Config.Global.SlimeNamespace {
+	// convert LabelSelectors to Selectors
+	for _, selector := range selectors {
+		ls, err := metav1.LabelSelectorAsSelector(selector)
+		if err != nil {
+			log.Errorf("convert LabelSelector to Selector failed: %s", err)
+			return false
+		}
+		if ls.Matches(nsLabel) {
 			return true
 		}
 	}
-
-	// global-sidecar may deploy different from slimeNamespace
-	if r.cfg != nil {
-		if ns == r.cfg.ClusterGsNamespace {
-			return true
-		}
-	}
-
 	return false
+}
+
+func (r *ServicefenceReconciler) nsInScope(ctx context.Context, svc *corev1.Service, nn types.NamespacedName) (bool, error) {
+
+	validNN := nn
+	if svc != nil {
+		validNN.Namespace = svc.Namespace
+		validNN.Name = svc.Name
+	}
+
+	var ns *corev1.Namespace
+	if r.cfg.GetManagementSelectors() != nil {
+		detailNs := &corev1.Namespace{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: validNN.Namespace}, detailNs)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.Warnf("refreshFenceStatusOfService: namespace %s is not found", validNN.Namespace)
+				return false, nil // deleted
+			} else {
+				return false, fmt.Errorf("refreshFenceStatusOfService: get namespace %s error %+v", validNN.Namespace, err)
+			}
+		}
+		ns = detailNs
+	}
+
+	// if ns is not in scope, svf created by lazy load should be deleted
+	if !r.inScope(validNN.Namespace, ns) {
+		log.Infof("refreshFenceStatusOfService: namespacename %v not in scope", validNN)
+
+		sf := &lazyloadv1alpha1.ServiceFence{}
+		err := r.Client.Get(ctx, validNN, sf)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				sf = nil
+				return false, nil
+			} else {
+				log.Errorf("refreshFenceStatusOfService: get serviceFence %s error, %+v", validNN, err)
+				return false, err
+			}
+		}
+
+		// if fence is created by controller, delete it
+		if sf != nil && isFenceCreatedByController(sf) {
+			log.Infof("refreshFenceStatusOfService: ns %s not in scope, delete fence %s", validNN.Namespace, validNN)
+			if err = r.Client.Delete(ctx, sf); err != nil {
+				log.Errorf("refreshFenceStatusOfService: delete serviceFence %s error, %+v", validNN, err)
+				return false, err
+			}
+		}
+
+		return false, nil
+	}
+	// in scope, do nothing
+	return true, nil
 }

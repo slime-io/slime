@@ -49,7 +49,6 @@ func (r *ServicefenceReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 	if !invalidEvent {
 		return nil
 	}
-
 	// generate query map for producer
 	qm := make(map[string][]metric.Handler)
 	var hs []metric.Handler
@@ -365,7 +364,7 @@ func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs [
 	upstreamCluster := entry.CommonProperties.UpstreamCluster
 	parts := strings.Split(upstreamCluster, "|")
 	if len(parts) != 4 {
-		log.Errorf("UpstreamCluster is wrong: parts number is not 4, skip")
+		log.Warnf("UpstreamCluster is wrong: parts number is not 4, skip")
 		return destSvcs
 	}
 	// only handle inbound access log

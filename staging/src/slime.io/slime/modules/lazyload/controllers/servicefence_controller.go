@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/informers"
 	"reflect"
 	"sort"
 	"strings"
@@ -59,7 +60,6 @@ type ServicefenceReconciler struct {
 	watcherMetricChan          <-chan metric.Metric
 	tickerMetricChan           <-chan metric.Metric
 	reconcileLock              sync.RWMutex
-	svcSynced                  func() bool
 	nsSvcCache                 *NsSvcCache
 	labelSvcCache              *LabelSvcCache
 	portProtocolCache          *PortProtocolCache
@@ -71,6 +71,7 @@ type ServicefenceReconciler struct {
 	workloadFenceLabelKeyAlias string
 	ipToSvcCache               *IpToSvcCache
 	svcToIpsCache              *SvcToIpsCache
+	factory                    informers.SharedInformerFactory
 }
 
 type ReconcilerOpts func(*ServicefenceReconciler)
@@ -144,6 +145,7 @@ func (r *ServicefenceReconciler) Clear() {
 func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := modmodel.ModuleLog.WithField(model.LogFieldKeyResource, req.NamespacedName)
 
+	log.Debugf("reconcile svf %s", req)
 	// Fetch the ServiceFence instance
 	instance := &lazyloadv1alpha1.ServiceFence{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -151,12 +153,10 @@ func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
 
-	// TODO watch sidecar
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// TODO should be recovered? maybe we should call refreshFenceStatusOfService here
-			log.Info("serviceFence is deleted")
-			// r.interestMeta.Pop(req.NamespacedName.String())
+			// we should delete info in interestMeta if svf is deleted
+			log.Infof("serviceFence %+v is deleted", req.NamespacedName)
 			delete(r.interestMeta, req.NamespacedName.String())
 			r.updateInterestMetaCopy()
 			return r.refreshFenceStatusOfService(context.TODO(), nil, req.NamespacedName)
