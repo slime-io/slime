@@ -81,8 +81,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	podName := os.Getenv("POD_NAME")
 
 	opts.InitCbs.AddStartup(func(ctx context.Context) {
-		sfReconciler.StartSvcCache(ctx)
-		sfReconciler.StartIpToSvcCache(ctx)
+		sfReconciler.StartCache(ctx)
 		if env.Config.Global != nil && env.Config.Global.Misc["enableLeaderElection"] == "on" {
 			log.Infof("delete leader labels before working")
 			deleteLeaderLabelUntilSucceed(env.K8SClient, podNs, podName)

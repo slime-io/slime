@@ -3,50 +3,58 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/client-go/informers"
 	"reflect"
+	"slime.io/slime/modules/lazyload/model"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/tools/cache"
 )
 
-func (r *ServicefenceReconciler) StartSvcCache(ctx context.Context) {
-	log := log.WithField("function", "svcCache")
-	client := r.env.K8SClient
+func (r *ServicefenceReconciler) StartCache(ctx context.Context) {
 
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Services("").List(ctx, metav1.ListOptions{})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Services("").Watch(ctx, metav1.ListOptions{})
-		},
-	}
+	factory := informers.NewSharedInformerFactory(r.env.K8SClient, 0)
+	r.factory = factory
 
-	_, controller := cache.NewInformer(lw, &corev1.Service{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { r.handleSvcAdd(ctx, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { r.handleSvcUpdate(ctx, oldObj, newObj) },
-		DeleteFunc: func(obj interface{}) { r.handleSvcDelete(ctx, obj) },
+	svcInformer := factory.Core().V1().Services().Informer()
+	epInformer := factory.Core().V1().Endpoints().Informer()
+	_ = factory.Core().V1().Namespaces().Informer()
+
+	svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			r.handleSvcAdd(ctx, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			r.handleSvcUpdate(ctx, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			r.handleSvcDelete(ctx, obj)
+		},
 	})
 
-	r.svcSynced = controller.HasSynced
-	log.Infof("run svc controller")
-	go controller.Run(ctx.Done())
+	epInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			r.handleEpAdd(ctx, obj)
+		},
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			r.handleEpUpdate(ctx, oldObj, newObj)
+		},
+		DeleteFunc: func(obj interface{}) {
+			r.handleEpDelete(ctx, obj)
+		},
+	})
+	go factory.Start(ctx.Done())
+	factory.WaitForCacheSync(ctx.Done())
+	log.Infof("factory has synced in startCache")
 }
 
 func (r *ServicefenceReconciler) handleSvcAdd(ctx context.Context, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
-		return
-	}
-
-	if r.isNamespaceManaged(svc.GetNamespace()) {
 		return
 	}
 
@@ -58,9 +66,6 @@ func (r *ServicefenceReconciler) handleSvcAdd(ctx context.Context, obj interface
 func (r *ServicefenceReconciler) handleSvcUpdate(ctx context.Context, old, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
-		return
-	}
-	if r.isNamespaceManaged(svc.GetNamespace()) {
 		return
 	}
 
@@ -86,10 +91,6 @@ func (r *ServicefenceReconciler) handleSvcUpdate(ctx context.Context, old, obj i
 func (r *ServicefenceReconciler) handleSvcDelete(ctx context.Context, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
-		return
-	}
-
-	if r.isNamespaceManaged(svc.GetNamespace()) {
 		return
 	}
 
@@ -152,7 +153,8 @@ func (r *ServicefenceReconciler) deleteNsSvcCache(svc *corev1.Service) {
 
 func (r *ServicefenceReconciler) addPortProtocolCache(svc *corev1.Service) {
 
-	if r.isNamespaceManaged(svc.GetNamespace()) {
+	// portProtocolCache have all ports of all services except global-sidecar
+	if svc.Name == model.GlobalSidecar {
 		return
 	}
 
@@ -176,10 +178,12 @@ func (r *ServicefenceReconciler) addPortProtocolCache(svc *corev1.Service) {
 
 func (r *ServicefenceReconciler) deletePortProtocolCache(svc *corev1.Service) {
 
-	if !r.cfg.GetCleanupWormholePort() {
+	// portProtocolCache have all ports of all services except global-sidecar
+	if svc.Name == model.GlobalSidecar {
 		return
 	}
-	if r.isNamespaceManaged(svc.GetNamespace()) {
+
+	if !r.cfg.GetCleanupWormholePort() {
 		return
 	}
 
@@ -204,7 +208,7 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 	needUpdate, successUpdate := false, true
 	go func() {
 		// wait for svc cache synced
-		cache.WaitForCacheSync(ctx.Done(), r.svcSynced)
+		cache.WaitForCacheSync(ctx.Done(), r.factory.Core().V1().Services().Informer().HasSynced)
 		log.Infof("Lazyload port auto management is running")
 		// polling request
 		pollTicker := time.NewTicker(10 * time.Second)
@@ -302,32 +306,12 @@ func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCa
 	return curPortList, updated
 }
 
-func (r *ServicefenceReconciler) StartIpToSvcCache(ctx context.Context) {
-	client := r.env.K8SClient
-	lw := &cache.ListWatch{
-		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().Endpoints("").List(ctx, metav1.ListOptions{})
-		},
-		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().Endpoints("").Watch(ctx, metav1.ListOptions{})
-		},
-	}
-
-	_, controller := cache.NewInformer(lw, &corev1.Endpoints{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { r.handleEpAdd(ctx, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { r.handleEpUpdate(ctx, oldObj, newObj) },
-		DeleteFunc: func(obj interface{}) { r.handleEpDelete(ctx, obj) },
-	})
-
-	log.Infof("run endpoints controller to construct ipToSvcCache and svcToIpsCache")
-	go controller.Run(ctx.Done())
-}
-
 func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{}) {
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
 	}
+
 	r.addIpWithEp(ep)
 }
 
@@ -336,6 +320,7 @@ func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj in
 	if !ok {
 		return
 	}
+
 	oldEp, ok := old.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -354,6 +339,7 @@ func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interfa
 	if !ok {
 		return
 	}
+
 	r.deleteIpFromEp(ep)
 }
 
@@ -397,4 +383,19 @@ func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
 		delete(ipToSvcCache.Data, ip)
 	}
 	ipToSvcCache.Unlock()
+}
+
+func (r *ServicefenceReconciler) isNamespaceManaged(ns string) bool {
+
+	obj, exists, err := r.factory.Core().V1().Namespaces().Informer().GetIndexer().GetByKey(ns)
+	if err != nil {
+		log.Errorf("get namespace %s from cache failed: %v", ns, err)
+		return false
+	}
+	if !exists {
+		log.Errorf("namespace %s does not exist in cache", ns)
+		return false
+	}
+
+	return r.inScope(ns, obj.(*corev1.Namespace))
 }
