@@ -16,7 +16,6 @@ import (
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
@@ -153,7 +152,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		ret.initWg.Add(1)
 	}
 
-	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
+	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
 	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
 	ret.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
 	ret.reGroupInstances = reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
@@ -168,15 +167,28 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 }
 
 func generateInstanceFilter(
-	svcSel map[string][]*metav1.LabelSelector, epSel []*metav1.LabelSelector, emptySelectorsReturn bool) func(*instance) bool {
-	selectHookStore := source.NewSelectHookStore(svcSel, emptySelectorsReturn)
-	selectHookStore[defaultServiceFilter] = source.NewSelectHook(epSel, emptySelectorsReturn)
+	svcSel map[string][]*bootstrap.EndpointSelector,
+	epSel []*bootstrap.EndpointSelector,
+	emptySelectorsReturn bool,
+	alwaysUseSourceScopedEpSelectors bool) func(*instance) bool {
+	cfgs := make(map[string]source.HookConfig, len(svcSel))
+	for svc, selectors := range svcSel {
+		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	}
+	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	hookStore := source.NewHookStore(cfgs)
 	return func(i *instance) bool {
-		filter := selectHookStore[i.ServiceName]
+		param := source.NewHookParam(source.HookParamWithLabels(i.Metadata))
+		filter := hookStore[i.ServiceName]
 		if filter == nil {
-			filter = selectHookStore[defaultServiceFilter]
+			filter = hookStore[defaultServiceFilter]
+			return filter(param)
 		}
-		return filter(i.Metadata)
+		if alwaysUseSourceScopedEpSelectors {
+			sourceScopedFilter := hookStore[defaultServiceFilter]
+			return sourceScopedFilter(param) && filter(param)
+		}
+		return filter(param)
 	}
 }
 
@@ -243,7 +255,7 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
-		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll)
+		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
 		s.instanceFilter = newInstSel
 	}
 
