@@ -112,14 +112,19 @@ type SourceArgs struct {
 	// if empty, those endpoints with ns attr will be aggregated into a no-ns service like "foo"
 	DefaultServiceNs string `json:"DefaultServiceNs,omitempty"`
 	ResourceNs       string `json:"ResourceNs,omitempty"`
-	// A list of selectors that specify the set of service instances to be processed,
-	// configured in the same way as the k8s label selector.
-	EndpointSelectors []*metav1.LabelSelector `json:"EndpointSelectors,omitempty"`
+	// A list of selectors that specify the set of service instances to be processed.
+	// The selectors are ORed together.
+	EndpointSelectors []*EndpointSelector `json:"EndpointSelectors,omitempty"`
 	// Endpoint selectors for specific service, the key of the map is the service name.
-	// If a service matched a ServicedEndpointSelector the source scoped EndpointSelectors should be ignore.
-	ServicedEndpointSelectors map[string][]*metav1.LabelSelector `json:"ServicedEndpointSelectors,omitempty"`
+	// The selectors of each service are ORed together.
+	// If the service matches ServicedEndpointSelector, the source scoped EndpointSelectors should be ignored,
+	// unless AlwaysUseSourceScopedEpSelectors is set to true.
+	ServicedEndpointSelectors map[string][]*EndpointSelector `json:"ServicedEndpointSelectors,omitempty"`
 	// EmptyEpSelectorsExcludeAll if set to true, when no ep selectors are configured, the source should exclude all eps.
 	EmptyEpSelectorsExcludeAll bool `json:"EmptyEpSelectorsExcludeAll,omitempty"`
+	// AlwaysUseSourceScopedEpSelectors if set to true, the source scoped EndpointSelectors should be processed
+	// even if the service matches ServicedEndpointSelector
+	AlwaysUseSourceScopedEpSelectors bool `json:"AlwaysUseSourceScopedEpSelectors,omitempty"`
 
 	MockServiceName              string `json:"MockServiceName,omitempty"`
 	MockServiceEntryName         string `json:"MockServiceEntryName,omitempty"`
@@ -135,6 +140,22 @@ type SourceArgs struct {
 	// InstanceMetaRelabel is used to adjust the metadata of the instance.
 	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs to be processed before ServiceNaming
 	InstanceMetaRelabel *InstanceMetaRelabel `json:"InstanceMetaRelabel,omitempty"`
+}
+
+// IPRanges defines a set of ip with ip list and cidr list
+type IPRanges struct {
+	IPs   []string `json:"IPs,omitempty"`
+	CIDRs []string `json:"CIDRs,omitempty"`
+}
+
+// EndpointSelector specifies which endpoints should be processed.
+// Currently, endpoints are specified by the label and ip of the instance.
+// The labelselector is the same as the label selector of k8s.
+// The exclude ip ranges is used to exclude endpoints with the specified ip in the ip ranges.
+// The label selector and exclude ip selector are ANDed.
+type EndpointSelector struct {
+	*metav1.LabelSelector
+	ExcludeIPRanges *IPRanges `json:"ExcludeIPRanges,omitempty"`
 }
 
 type MetadataWrapper struct {
