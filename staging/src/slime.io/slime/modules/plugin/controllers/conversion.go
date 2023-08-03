@@ -574,39 +574,50 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 		},
 	}
 
-	if settings := pluginWasm.Wasm.Settings; settings != nil {
-		var (
-			anyType  string
-			anyValue *wrappers.StringValue // != Value_StringValue
-		)
-
-		// string类型的配置解析为 google.protobuf.StringValue
-		if strField := settings.Fields["_string"]; strField != nil && len(settings.Fields) == 1 {
-			if _, ok := strField.Kind.(*types.Value_StringValue); ok {
-				anyType = util.TypeURLStringValue
-				anyValue = &wrappers.StringValue{Value: strField.GetStringValue()}
-			}
+	pluginSettings := pluginWasm.Wasm.Settings
+	if pluginSettings == nil { // use empty struct json string as wasm does not allow nil `configuration`
+		pluginSettings = &types.Struct{
+			Fields: map[string]*types.Value{
+				"_string": {
+					Kind: &types.Value_StringValue{
+						StringValue: "{}",
+					},
+				},
+			},
 		}
+	}
 
-		// to json string to align with istio behaviour
-		if anyValue == nil {
+	var (
+		anyType  string
+		anyValue *wrappers.StringValue // != Value_StringValue
+	)
+
+	// string类型的配置解析为 google.protobuf.StringValue
+	if strField := pluginSettings.Fields["_string"]; strField != nil && len(pluginSettings.Fields) == 1 {
+		if _, ok := strField.Kind.(*types.Value_StringValue); ok {
 			anyType = util.TypeURLStringValue
-			if s, err := (&gogojsonpb.Marshaler{OrigName: true}).MarshalToString(settings); err != nil {
-				return nil, err
-			} else {
-				anyValue = &wrappers.StringValue{Value: s}
-			}
+			anyValue = &wrappers.StringValue{Value: strField.GetStringValue()}
 		}
+	}
 
-		valueBytes, err := proto.Marshal(anyValue)
-		if err != nil {
+	// to json string to align with istio behaviour
+	if anyValue == nil {
+		anyType = util.TypeURLStringValue
+		if s, err := (&gogojsonpb.Marshaler{OrigName: true}).MarshalToString(pluginSettings); err != nil {
 			return nil, err
+		} else {
+			anyValue = &wrappers.StringValue{Value: s}
 		}
+	}
 
-		pluginConfig.Configuration = &any.Any{
-			TypeUrl: anyType,
-			Value:   valueBytes,
-		}
+	valueBytes, err := proto.Marshal(anyValue)
+	if err != nil {
+		return nil, err
+	}
+
+	pluginConfig.Configuration = &any.Any{
+		TypeUrl: anyType,
+		Value:   valueBytes,
 	}
 
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
