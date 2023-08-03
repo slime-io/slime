@@ -140,7 +140,8 @@ type convertedServiceEntry struct {
 
 func convertServiceEntry(
 	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
-	ignoreLabels map[string]string, gatewayMode bool) map[string]*convertedServiceEntry {
+	ignoreLabels map[string]string, gatewayMode bool,
+	filter func(*dubboInstance) bool) map[string]*convertedServiceEntry {
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
 
@@ -174,16 +175,11 @@ func convertServiceEntry(
 			continue
 		}
 
-		svcPortInUse := svcPort
 		addr, portNum, err := parseAddr(providerParts[2])
 		if err != nil {
 			log.Errorf("invalid provider ip or port %s of %s", provider, service)
 			continue
 		}
-		if instancePortAsSvcPort {
-			svcPortInUse = portNum
-		}
-		instPort := convertPort(svcPortInUse, portNum)
 
 		var (
 			methods       = map[string]struct{}{}
@@ -199,6 +195,24 @@ func convertServiceEntry(
 
 		serviceKey := buildServiceKey(service, meta) // istio service host
 
+		svcPortInUse := svcPort
+		if instancePortAsSvcPort {
+			svcPortInUse = portNum
+		}
+
+		// now we have the necessary info to build the dubboinstance,
+		// so we can filter out the instance if needed
+		instance := &dubboInstance{
+			addr:     addr,
+			port:     portNum,
+			service:  service,
+			metadata: meta,
+		}
+		if filter != nil && !filter(instance) {
+			continue
+		}
+
+		instPort := convertPort(svcPortInUse, portNum)
 		if len(methods) > 0 {
 			serviceMethods := methodsByServiceKey[serviceKey]
 			if serviceMethods == nil {
