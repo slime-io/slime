@@ -78,3 +78,11 @@ type ServiceInstancePayload struct {
 	Name     string            `json:"name"`
 	Metadata map[string]string `json:"metadata"`
 }
+
+// dubboInstance is a simple combination of dubbo dubboInstance information, currently used in dubboInstance filtering
+type dubboInstance struct {
+	service  string
+	addr     string
+	port     uint32
+	metadata map[string]string
+}

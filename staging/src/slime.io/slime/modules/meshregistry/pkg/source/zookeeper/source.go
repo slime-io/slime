@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -42,6 +43,8 @@ const (
 	Polling                   = "polling"
 
 	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
+
+	defaultServiceFilter = ""
 )
 
 type Source struct {
@@ -73,9 +76,22 @@ type Source struct {
 
 	Con               *atomic.Value // store *zk.Conn
 	seMergePortMocker *source.ServiceEntryMergePortMocker
+
+	// instanceFilter fitler which instance of a service should be include
+	// Updates are only allowed when the configuration is loaded or reloaded.
+	instanceFilter func(*dubboInstance) bool
 }
 
-func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
+type Option func(s *Source) error
+
+func WithDynamicConfigOption(addCb func(func(*bootstrap.ZookeeperSourceArgs))) Option {
+	return func(s *Source) error {
+		addCb(s.onConfig)
+		return nil
+	}
+}
+
+func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	// XXX refactor to config
 	if zkSrc := args; zkSrc != nil && zkSrc.GatewayModel {
 		zkSrc.SvcPort = 80
@@ -137,6 +153,14 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
 		svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
 		ret.initWg.Add(1) // merge ports se init-sync ready
+	}
+
+	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+
+	for _, op := range options {
+		if err := op(ret); err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
@@ -482,6 +506,19 @@ func (s *Source) markServiceEntryInitDone() {
 	}
 }
 
+func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
+	var prevArgs *bootstrap.ZookeeperSourceArgs
+	prevArgs, s.args = s.args, args
+
+	s.mut.Lock()
+	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
+		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
+		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+		s.instanceFilter = newInstSel
+	}
+	s.mut.Unlock()
+}
+
 func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, dubboInterface string) {
 	if _, ok := cacheInUse.Get(dubboInterface); !ok {
 		cacheInUse.Set(dubboInterface, cmap.New())
@@ -489,7 +526,7 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 	freshSeMap := convertServiceEntry(
 		provider, consumer, dubboInterface, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
-		s.ignoreLabelsMap, s.args.GatewayModel)
+		s.ignoreLabelsMap, s.args.GatewayModel, s.getInstanceFilter())
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
@@ -584,6 +621,41 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 
 	for _, key := range deleteKey {
 		seCache.Remove(key)
+	}
+}
+
+func (s *Source) getInstanceFilter() func(*dubboInstance) bool {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	return s.instanceFilter
+}
+
+func generateInstanceFilter(
+	svcSel map[string][]*bootstrap.EndpointSelector,
+	epSel []*bootstrap.EndpointSelector,
+	emptySelectorsReturn bool,
+	alwaysUseSourceScopedEpSelectors bool) func(*dubboInstance) bool {
+	cfgs := make(map[string]source.HookConfig, len(svcSel))
+	for svc, selectors := range svcSel {
+		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	}
+	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	hookStore := source.NewHookStore(cfgs)
+	return func(i *dubboInstance) bool {
+		param := source.NewHookParam(
+			source.HookParamWithLabels(i.metadata),
+			source.HookParamWithIP(i.addr),
+		)
+		filter := hookStore[i.service]
+		if filter == nil {
+			filter = hookStore[defaultServiceFilter]
+			return filter(param)
+		}
+		if alwaysUseSourceScopedEpSelectors {
+			sourceScopedFilter := hookStore[defaultServiceFilter]
+			return sourceScopedFilter(param) && filter(param)
+		}
+		return filter(param)
 	}
 }
 

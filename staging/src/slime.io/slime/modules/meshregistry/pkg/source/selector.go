@@ -207,11 +207,13 @@ func ConvertEndpointSelectorToHookConfig(sels []*bootstrap.EndpointSelector, opt
 		if sel.LabelSelector != nil {
 			labelSelectors = append(labelSelectors, sel.LabelSelector)
 		}
-		if len(sel.ExcludeIPRanges.IPs) != 0 {
-			ips = append(ips, sel.ExcludeIPRanges.IPs...)
-		}
-		if len(sel.ExcludeIPRanges.CIDRs) != 0 {
-			cidrs = append(cidrs, sel.ExcludeIPRanges.CIDRs...)
+		if sel.ExcludeIPRanges != nil {
+			if len(sel.ExcludeIPRanges.IPs) != 0 {
+				ips = append(ips, sel.ExcludeIPRanges.IPs...)
+			}
+			if len(sel.ExcludeIPRanges.CIDRs) != 0 {
+				cidrs = append(cidrs, sel.ExcludeIPRanges.CIDRs...)
+			}
 		}
 	}
 	cfg := HookConfig{

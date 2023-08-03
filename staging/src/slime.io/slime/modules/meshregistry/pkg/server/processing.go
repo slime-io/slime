@@ -149,7 +149,15 @@ func (p *Processing) Start() (err error) {
 	clusterCache := false
 
 	if srcArgs := p.regArgs.ZookeeperSource.SourceArgs; srcArgs.Enabled {
-		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.New(p.regArgs.ZookeeperSource, kubeResources.All(), time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
+		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.New(
+			p.regArgs.ZookeeperSource, kubeResources.All(), time.Duration(p.regArgs.RegistryStartDelay),
+			p.httpServer.SourceReadyCallBack, zookeeper.WithDynamicConfigOption(func(onZookeeperArgs func(*bootstrap.ZookeeperSourceArgs)) {
+				if p.addOnRegArgs != nil {
+					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
+						onZookeeperArgs(args.ZookeeperSource)
+					})
+				}
+			})); err != nil {
 			return
 		}
 		p.httpServer.HandleFunc(zookeeper.ZkPath, httpHandle)
