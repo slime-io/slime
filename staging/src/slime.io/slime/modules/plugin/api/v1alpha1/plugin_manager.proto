@@ -88,6 +88,13 @@ message Plugin {
     uint32 port = 8;
     // rawPatch will patch to the generated final envoy filter config patch (EnvoyFilter_EnvoyConfigObjectPatch)
     google.protobuf.Struct rawPatch = 10;
+    enum Protocol {
+        HTTP = 0;
+        Dubbo = 1;
+        Generic = 2;
+    }
+    Protocol protocol = 11;
+    string generic_app_protocol = 12;
 }
 
 message Wasm {
