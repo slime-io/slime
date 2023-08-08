@@ -38,16 +38,27 @@ func NewHookParam(opts ...func(*HookParam)) HookParam {
 	return p
 }
 
+type orHooks []hook
+
+func (s orHooks) Select(p HookParam) bool {
+	for idx := range s {
+		if s[idx].Select(p) {
+			return true
+		}
+	}
+	return false
+}
+
 type hook struct {
-	SelectHook
-	IPSelectHook
+	labelSelectHook
+	ipSelectHook
 }
 
 func (h hook) Select(p HookParam) bool {
-	if p.Label != nil && h.SelectHook != nil && !h.SelectHook(p.Label) {
+	if p.Label != nil && h.labelSelectHook != nil && !h.labelSelectHook(p.Label) {
 		return false
 	}
-	if p.IP != nil && h.IPSelectHook != nil && !h.IPSelectHook(*p.IP) {
+	if p.IP != nil && h.ipSelectHook != nil && !h.ipSelectHook(*p.IP) {
 		return false
 	}
 	return true
@@ -59,18 +70,21 @@ type IPSelector struct {
 	CIDRs     []string
 }
 
+// Selector is used to build a single hook
+// The relationship between IPSelectors in the list is ANDed
+// The relationship between LabelSelector and IPSelectors list is ANDed
+type Selector struct {
+	LabelSelector *metav1.LabelSelector
+	IPSelectors   []*IPSelector
+}
+
 // HookConfig is used to build Hook
-// The relationship between LabelSelectors in the list is OR
-// The relationship between IPSelectors in the list is OR
-// The relationship between LabelSelectors and IPSelectors is AND
-// If LabelSelectors and IPSelectors are both empty, EmptySelectorsReturn is returned
+// The relationship between Selectors is ORed
 type HookConfig struct {
-	// EmptySelectorsReturn is returned when LabelSelectors, IPs, CIDRs are all empty
+	// EmptySelectorsReturn is returned when both LabelSelector and IPSelectors of a Selector are empty
 	EmptySelectorsReturn bool
 
-	LabelSelectors []*metav1.LabelSelector
-
-	IPSelectors []*IPSelector
+	Selectors []*Selector
 }
 
 func HookConfigWithEmptySelectorsReturn(emptySelectorsReturn bool) func(*HookConfig) {
@@ -82,24 +96,25 @@ func HookConfigWithEmptySelectorsReturn(emptySelectorsReturn bool) func(*HookCon
 func NewHookStore(cfgs map[string]HookConfig) HookStore {
 	m := make(map[string]Hook, len(cfgs))
 	for key, cfg := range cfgs {
-		h := hook{
-			SelectHook:   NewSelectHook(cfg.LabelSelectors, cfg.EmptySelectorsReturn),
-			IPSelectHook: NewIPSelectHook(cfg.IPSelectors, cfg.EmptySelectorsReturn),
+		var hooks orHooks
+		for _, selector := range cfg.Selectors {
+			hooks = append(hooks, hook{
+				labelSelectHook: newLabelSelectHook([]*metav1.LabelSelector{selector.LabelSelector}, cfg.EmptySelectorsReturn),
+				ipSelectHook:    newIPSelectHook(selector.IPSelectors, cfg.EmptySelectorsReturn),
+			})
 		}
-		m[key] = h.Select
+		m[key] = hooks.Select
 	}
 	return m
 }
 
-type SelectHookStore map[string]SelectHook
+// labelSelectHook returns TRUE if matched
+type labelSelectHook func(map[string]string) bool
 
-// SelectHook returns TRUE if matched
-type SelectHook func(map[string]string) bool
-
-// NewSelectHook build a SelectHook by the input LabelSelectors.
+// newLabelSelectHook build a SelectHook by the input LabelSelectors.
 // If the input LabelSelectors is nil, the returned hook returns
 // the emptySelectorsReturn.
-func NewSelectHook(labelSelectors []*metav1.LabelSelector, emptySelectorsReturn bool) SelectHook {
+func newLabelSelectHook(labelSelectors []*metav1.LabelSelector, emptySelectorsReturn bool) labelSelectHook {
 	if len(labelSelectors) == 0 {
 		return func(_ map[string]string) bool { return emptySelectorsReturn }
 	}
@@ -125,30 +140,21 @@ func NewSelectHook(labelSelectors []*metav1.LabelSelector, emptySelectorsReturn 
 	}
 }
 
-// NewSelectHookStore returns a SelectHookStore
-func NewSelectHookStore(groupedSelectors map[string][]*metav1.LabelSelector, emptySelectorsReturn bool) SelectHookStore {
-	m := make(map[string]SelectHook, len(groupedSelectors))
-	for key, sels := range groupedSelectors {
-		m[key] = NewSelectHook(sels, emptySelectorsReturn)
-	}
-	return m
-}
+// ipSelectHook returns TRUE if matched
+type ipSelectHook func(string) bool
 
-// IPSelectHook returns TRUE if matched
-type IPSelectHook func(string) bool
-
-// NewIPSelectHook builds an IPSelectHook by the input IPs and CIDRs.
+// newIPSelectHook builds an IPSelectHook by the input IPs and CIDRs.
 // If the input IPs and CIDRs is nil, the returned hook returns
 // the emptySelectorsReturn.
 // If at least one of the input IPs and CIDRs is not nil, the input IP
 // returns include when it is in IPs or CIDRs.
-func NewIPSelectHook(cfgs []*IPSelector, emptySelectorsReturn bool) IPSelectHook {
+func newIPSelectHook(cfgs []*IPSelector, emptySelectorsReturn bool) ipSelectHook {
 	if len(cfgs) == 0 {
 		return func(_ string) bool { return emptySelectorsReturn }
 	}
-	hooks := make([]IPSelectHook, 0, len(cfgs))
+	hooks := make([]ipSelectHook, 0, len(cfgs))
 	for _, cfg := range cfgs {
-		hooks = append(hooks, newIPSelectHook(cfg, emptySelectorsReturn))
+		hooks = append(hooks, singleIPSelectHook(cfg, emptySelectorsReturn))
 	}
 
 	return func(inputIP string) bool {
@@ -164,7 +170,7 @@ func NewIPSelectHook(cfgs []*IPSelector, emptySelectorsReturn bool) IPSelectHook
 	}
 }
 
-func newIPSelectHook(cfg *IPSelector, emptySelectorsReturn bool) IPSelectHook {
+func singleIPSelectHook(cfg *IPSelector, emptySelectorsReturn bool) ipSelectHook {
 	if cfg == nil ||
 		(len(cfg.IPs) == 0 && len(cfg.CIDRs) == 0) {
 		return func(_ string) bool { return emptySelectorsReturn }
@@ -200,36 +206,32 @@ func newIPSelectHook(cfg *IPSelector, emptySelectorsReturn bool) IPSelectHook {
 }
 
 func ConvertEndpointSelectorToHookConfig(sels []*bootstrap.EndpointSelector, opts ...func(*HookConfig)) HookConfig {
-	labelSelectors := make([]*metav1.LabelSelector, 0, len(sels))
-	ips := make([]string, 0, len(sels))
-	cidrs := make([]string, 0, len(sels))
+	list := make([]*Selector, 0, len(sels))
 	for _, sel := range sels {
+		var cfg Selector
 		if sel.LabelSelector != nil {
-			labelSelectors = append(labelSelectors, sel.LabelSelector)
+			cfg.LabelSelector = sel.LabelSelector
 		}
 		if sel.ExcludeIPRanges != nil {
+			var ipSel = IPSelector{IncludeIP: false}
 			if len(sel.ExcludeIPRanges.IPs) != 0 {
-				ips = append(ips, sel.ExcludeIPRanges.IPs...)
+				ipSel.IPs = append(ipSel.IPs, sel.ExcludeIPRanges.IPs...)
 			}
 			if len(sel.ExcludeIPRanges.CIDRs) != 0 {
-				cidrs = append(cidrs, sel.ExcludeIPRanges.CIDRs...)
+				ipSel.CIDRs = append(ipSel.CIDRs, sel.ExcludeIPRanges.CIDRs...)
 			}
 		}
+		if cfg.LabelSelector != nil || len(cfg.IPSelectors) > 0 {
+			list = append(list, &cfg)
+		}
 	}
-	cfg := HookConfig{
-		LabelSelectors: labelSelectors,
-		IPSelectors: []*IPSelector{
-			{
-				IncludeIP: false,
-				IPs:       ips,
-				CIDRs:     cidrs,
-			},
-		},
+	ret := HookConfig{
+		Selectors: list,
 	}
 
 	for _, opt := range opts {
-		opt(&cfg)
+		opt(&ret)
 	}
 
-	return cfg
+	return ret
 }
