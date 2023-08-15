@@ -6,22 +6,28 @@ import (
 
 var (
 	EnvoyHTTPRateLimit         string
-	EnvoyRoute                 string
+	EnvoyHTTPRouter            string
 	EnvoyHTTPConnectionManager string
-	EnvoyCors                  string
+	EnvoyHTTPCors              string
+
+	EnvoyGenericProxyRouter = "envoy.filters.generic.router"
+	EnvoyDubboRouter        = "envoy.filters.dubbo.router"
+
+	EnvoyGenericProxy = "meta"
+	EnvoyDubboProxy   = "envoy.filters.network.dubbo_proxy"
 )
 
 func init() {
 	if os.Getenv("ENVOY_FILTER_NAME_LEGACY") != "" {
 		EnvoyHTTPRateLimit = EnvoyHTTPRateLimitV1
-		EnvoyRoute = EnvoyRouteV1
+		EnvoyHTTPRouter = EnvoyRouteV1
 		EnvoyHTTPConnectionManager = EnvoyHTTPConnectionManagerV1
-		EnvoyCors = EnvoyCorsV1
+		EnvoyHTTPCors = EnvoyCorsV1
 	} else {
 		EnvoyHTTPRateLimit = EnvoyHTTPRateLimitV2
-		EnvoyRoute = EnvoyRouteV2
+		EnvoyHTTPRouter = EnvoyRouteV2
 		EnvoyHTTPConnectionManager = EnvoyHTTPConnectionManagerV2
-		EnvoyCors = EnvoyCorsV2
+		EnvoyHTTPCors = EnvoyCorsV2
 	}
 }
 
@@ -55,23 +61,26 @@ const (
 	StructAnyAtType  = "@type"
 	StructAnyValue   = "value"
 
-	StructHttpFilterTypedConfig          = "typed_config"
-	StructHttpFilterName                 = "name"
-	StructHttpFilterConfigDiscovery      = "config_discovery"
-	StructHttpFilterConfigSource         = "config_source"
-	StructHttpFilterAds                  = "ads"
-	StructHttpFilterTypeURLs             = "type_urls"
-	StructHttpFilterTypedPerFilterConfig = "typedPerFilterConfig"
+	StructHttpFilterTypedConfig     = "typed_config"
+	StructHttpFilterName            = "name"
+	StructHttpFilterConfigDiscovery = "config_discovery"
+	StructHttpFilterConfigSource    = "config_source"
+	StructHttpFilterAds             = "ads"
+	StructHttpFilterTypeURLs        = "type_urls"
+
+	StructFilterTypedPerFilterConfig = "typedPerFilterConfig"
+	StructFilterPerFilterConfig      = "perFilterConfig"
 
 	StructEnvoyLocalRateLimitLimiter  = "http_local_rate_limiter"
 	StructEnvoyLocalRateLimitEnabled  = "local_rate_limit_enabled"
 	StructEnvoyLocalRateLimitEnforced = "local_rate_limit_enforced"
 
-	TypeURLEnvoyFilterHTTPWasm  = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
-	TypeURLEnvoyFilterHTTPRider = "type.googleapis.com/proxy.filters.http.rider.v3alpha1.FilterConfig"
-	TypeURLStringValue          = "type.googleapis.com/google.protobuf.StringValue"
-	TypeURLUDPATypedStruct      = "type.googleapis.com/udpa.type.v1.TypedStruct"
-	TypeURLEnvoyLocalRateLimit  = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
+	TypeURLEnvoyFilterHTTPWasm     = "type.googleapis.com/envoy.extensions.filters.http.wasm.v3.Wasm"
+	TypeURLEnvoyFilterHTTPRider    = "type.googleapis.com/proxy.filters.http.rider.v3alpha1.FilterConfig"
+	TypeURLStringValue             = "type.googleapis.com/google.protobuf.StringValue"
+	TypeURLUDPATypedStruct         = "type.googleapis.com/udpa.type.v1.TypedStruct"
+	TypeURLEnvoyLocalRateLimit     = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
+	TypeURLGenericProxyRouteAction = "type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction"
 
 	EnvoyFilterGlobalSidecar = "to_global_sidecar"
 

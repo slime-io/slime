@@ -159,8 +159,6 @@ func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alph
 }
 
 func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	//_ = r.kubeInformer.Core().V1().Secrets().Informer()
-
 	r.credController = NewCredentialsController(r.kubeInformer)
 	r.credController.AddEventHandler(func(name string, namespace string) {
 		r.notifySecretChange(types.NamespacedName{

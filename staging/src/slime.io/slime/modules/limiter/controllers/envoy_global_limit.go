@@ -61,7 +61,7 @@ func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyC
 					Filter: &networking.EnvoyFilter_ListenerMatch_FilterMatch{
 						Name: util.EnvoyHTTPConnectionManager,
 						SubFilter: &networking.EnvoyFilter_ListenerMatch_SubFilterMatch{
-							Name: util.EnvoyRoute,
+							Name: util.EnvoyHTTPRouter,
 						},
 					},
 				},
