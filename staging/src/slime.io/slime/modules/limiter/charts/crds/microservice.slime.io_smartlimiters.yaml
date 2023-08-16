@@ -1,3 +1,4 @@
+
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -71,13 +72,18 @@ spec:
                                       inclusive. Note: these bounds are computed from:
                                       60 sec/min * 60 min/hr * 24 hr/day * 365.25
                                       days/year * 10000 years'
-                                    format: int64
+                                    format: int32
                                     type: integer
                                 type: object
                               headers_to_add:
-                                additionalProperties:
-                                  type: string
-                                type: object
+                                items:
+                                  properties:
+                                    key:
+                                      type: string
+                                    value:
+                                      type: string
+                                  type: object
+                                type: array
                               quota:
                                 type: string
                               strategy:
@@ -106,6 +112,11 @@ spec:
                                   description: if specified, the exact match the value
                                     ""
                                   type: boolean
+                                matchSource:
+                                  description: match source, from header or query
+                                    or json body
+                                  format: int32
+                                  type: integer
                                 name:
                                   type: string
                                 prefix_match:
@@ -137,8 +148,8 @@ spec:
                                     *xyzabcd*, but not for *xyzbcd*.'
                                   type: string
                                 useQueryMatch:
-                                  description: if query_match is true, ues query match
-                                    instead of header match
+                                  description: deprecated if query_match is true,
+                                    ues query match instead of header match
                                   type: boolean
                               type: object
                             type: array
@@ -220,13 +231,18 @@ spec:
                                       inclusive. Note: these bounds are computed from:
                                       60 sec/min * 60 min/hr * 24 hr/day * 365.25
                                       days/year * 10000 years'
-                                    format: int64
+                                    format: int32
                                     type: integer
                                 type: object
                               headers_to_add:
-                                additionalProperties:
-                                  type: string
-                                type: object
+                                items:
+                                  properties:
+                                    key:
+                                      type: string
+                                    value:
+                                      type: string
+                                  type: object
+                                type: array
                               quota:
                                 type: string
                               strategy:
@@ -255,6 +271,11 @@ spec:
                                   description: if specified, the exact match the value
                                     ""
                                   type: boolean
+                                matchSource:
+                                  description: match source, from header or query
+                                    or json body
+                                  format: int32
+                                  type: integer
                                 name:
                                   type: string
                                 prefix_match:
@@ -286,8 +307,8 @@ spec:
                                     *xyzabcd*, but not for *xyzbcd*.'
                                   type: string
                                 useQueryMatch:
-                                  description: if query_match is true, ues query match
-                                    instead of header match
+                                  description: deprecated if query_match is true,
+                                    ues query match instead of header match
                                   type: boolean
                               type: object
                             type: array

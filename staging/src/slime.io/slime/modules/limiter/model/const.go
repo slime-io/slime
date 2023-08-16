@@ -11,6 +11,18 @@ const (
 
 	QueryMatch = "query_match"
 
+	BodyMatch = "body_match"
+
+	DescriptiorValue = "descriptior_value"
+
+	Bodies = "bodies"
+
+	RateLimits = "rate_limits"
+
+	RateLimitActions = "actions"
+
+	Route = "route"
+
 	Domain = "slime"
 
 	Inbound = "inbound"

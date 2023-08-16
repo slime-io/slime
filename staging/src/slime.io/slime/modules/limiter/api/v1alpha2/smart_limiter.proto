@@ -94,7 +94,7 @@ message SmartLimiterStatus {
 }
 
 message SmartLimitDescriptor {
-    message HeaderMatcher {
+    message Matcher {
         string name = 1;
         // If specified, this regex string is a regular expression rule which implies the entire request
         // header value must match the regex. The rule will not match if only a subsequence of the
@@ -125,8 +125,21 @@ message SmartLimitDescriptor {
         // while present_match shares token
         // it only works in envoy.filters.http.ratelimit (global)
         bool present_match_separate = 9;
+
+        // deprecated
         // if query_match is true, ues query match instead of header match
         bool useQueryMatch = 10;
+
+        enum Source{
+            // headers
+            HeadMatch = 0;
+            // query params
+            QueryMatch = 1;
+            // json body
+            JsonBodyMatch = 2;
+        }
+        // match source, from header or query or json body
+        Source matchSource = 11;
     }
 
     message Action {
@@ -140,7 +153,7 @@ message SmartLimitDescriptor {
 
     Action action = 2;
 
-    repeated HeaderMatcher match = 3;
+    repeated Matcher match = 3;
 
     Target target = 4;
 
