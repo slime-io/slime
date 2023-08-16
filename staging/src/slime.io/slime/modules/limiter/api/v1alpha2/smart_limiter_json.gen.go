@@ -49,14 +49,14 @@ func (this *SmartLimitDescriptor) UnmarshalJSON(b []byte) error {
 	return SmartLimiterUnmarshaler.Unmarshal(bytes.NewReader(b), this)
 }
 
-// MarshalJSON is a custom marshaler for SmartLimitDescriptor_HeaderMatcher
-func (this *SmartLimitDescriptor_HeaderMatcher) MarshalJSON() ([]byte, error) {
+// MarshalJSON is a custom marshaler for SmartLimitDescriptor_Matcher
+func (this *SmartLimitDescriptor_Matcher) MarshalJSON() ([]byte, error) {
 	str, err := SmartLimiterMarshaler.MarshalToString(this)
 	return []byte(str), err
 }
 
-// UnmarshalJSON is a custom unmarshaler for SmartLimitDescriptor_HeaderMatcher
-func (this *SmartLimitDescriptor_HeaderMatcher) UnmarshalJSON(b []byte) error {
+// UnmarshalJSON is a custom unmarshaler for SmartLimitDescriptor_Matcher
+func (this *SmartLimitDescriptor_Matcher) UnmarshalJSON(b []byte) error {
 	return SmartLimiterUnmarshaler.Unmarshal(bytes.NewReader(b), this)
 }
 
