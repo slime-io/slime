@@ -79,4 +79,6 @@ const (
 	WellknownRootpath  = "/"
 	WellknownBaseSet   = "_base"
 	WellknownK8sSuffix = ".svc.cluster.local"
+
+	GlobalSidecar = "global-sidecar"
 )
