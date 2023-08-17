@@ -353,10 +353,11 @@ func (r *ServicefenceReconciler) addIpWithEp(ep *corev1.Endpoints) {
 	for _, subset := range ep.Subsets {
 		for _, address := range subset.Addresses {
 			addresses = append(addresses, address.IP)
-			if _, ok := ipToSvcCache.Data[address.IP]; !ok {
-				ipToSvcCache.Data[address.IP] = make(map[string]struct{})
-			}
-			ipToSvcCache.Data[address.IP][svc] = struct{}{}
+			r.addIpToSvcCache(svc, address.IP)
+		}
+		for _, address := range subset.NotReadyAddresses {
+			addresses = append(addresses, address.IP)
+			r.addIpToSvcCache(svc, address.IP)
 		}
 	}
 	ipToSvcCache.Unlock()
@@ -364,6 +365,14 @@ func (r *ServicefenceReconciler) addIpWithEp(ep *corev1.Endpoints) {
 	svcToIpsCache.Lock()
 	svcToIpsCache.Data[svc] = addresses
 	svcToIpsCache.Unlock()
+}
+
+// addIpToCache is unsafe
+func (r *ServicefenceReconciler) addIpToSvcCache(svc string, ip string) {
+	if _, ok := r.ipToSvcCache.Data[ip]; !ok {
+		r.ipToSvcCache.Data[ip] = make(map[string]struct{})
+	}
+	r.ipToSvcCache.Data[ip][svc] = struct{}{}
 }
 
 func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
