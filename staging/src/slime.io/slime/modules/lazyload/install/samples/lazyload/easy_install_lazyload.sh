@@ -14,7 +14,7 @@ fi
 
 crds_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds-v1.yaml"
 deployment_slimeboot_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
-slimeboot_lazyload_url="https://raw.githubusercontent.com/slime-io/slime/$slime_tag_or_commit/staging/src/slime.io/slime/modules/lazyload/install/samples/lazyload/slimeboot_cluster_accesslog.yaml"
+slimeboot_lazyload_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/staging/src/slime.io/slime/modules/lazyload/install/samples/lazyload/slimeboot_cluster_accesslog.yaml"
 
 kubectl create ns mesh-operator
 kubectl apply -f "${crds_url}"

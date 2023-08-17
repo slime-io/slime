@@ -14,10 +14,12 @@ fi
 
 crds_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/crds-v1.yaml"
 deployment_slimeboot_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/install/init/deployment_slime-boot.yaml"
-slimeboot_lazyload_url="https://raw.githubusercontent.com/slime-io/slime/$slime_tag_or_commit/staging/src/slime.io/slime/modules/lazyload/install/samples/lazyload/slimeboot_cluster_accesslog.yaml"
+slimeboot_lazyload_url="https://raw.githubusercontent.com/slime-io/slime/$tag_or_commit/staging/src/slime.io/slime/modules/lazyload/install/samples/lazyload/slimeboot_cluster_accesslog.yaml"
 
-for i in $(kubectl get ns --no-headers |awk '{print $1}');do kubectl delete servicefence -n $i --all;done
+
 kubectl delete -f "${slimeboot_lazyload_url}"
 kubectl delete -f "${deployment_slimeboot_url}"
 kubectl delete -f "${crds_url}"
+kubectl get slimeboot --all-namespaces | awk 'NR>1 {print "kubectl delete "$2" slimeboot -n "$1""}' | bash
+for i in $(kubectl get ns --no-headers |awk '{print $1}');do kubectl delete servicefence -n $i --all;done
 kubectl delete ns mesh-operator
