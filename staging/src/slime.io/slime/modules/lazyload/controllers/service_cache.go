@@ -3,6 +3,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"reflect"
 	"slime.io/slime/modules/lazyload/model"
@@ -204,21 +205,55 @@ func (r *ServicefenceReconciler) deletePortProtocolCache(svc *corev1.Service) {
 
 func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 	log := log.WithField("function", "StartAutoPort")
-	wormholePort := r.cfg.WormholePort
+	initPort := r.cfg.WormholePort
 	needUpdate, successUpdate := false, true
+
+	wormholePort := make([]string, 0)
+	sets := make(map[string]struct{})
+	for _, port := range initPort {
+		sets[port] = struct{}{}
+	}
+
 	go func() {
 		// wait for svc cache synced
 		cache.WaitForCacheSync(ctx.Done(), r.factory.Core().V1().Services().Informer().HasSynced)
-		log.Infof("Lazyload port auto management is running")
+		log.Infof("Lazyload port auto management is running, init gs wormholePort: %v", initPort)
+
+		// list all svc and get http port
+		svcs, err := r.factory.Core().V1().Services().Lister().List(labels.NewSelector())
+		if err == nil {
+			for _, svc := range svcs {
+				for _, port := range svc.Spec.Ports {
+					if !isHttp(port, r.cfg.SupportH2) {
+						continue
+					}
+					sets[strconv.Itoa(int(port.Port))] = struct{}{}
+				}
+			}
+		} else {
+			// if list all svc failed, use initPort
+			log.Errorf("list all svc failed in autoport: %v", err)
+		}
+
+		for port := range sets {
+			wormholePort = append(wormholePort, port)
+		}
+		sort.Strings(wormholePort)
+		log.Infof("all wormholeport from initport and informer : %v", wormholePort)
+
 		// polling request
 		pollTicker := time.NewTicker(10 * time.Second)
 		// init and retry request
 		retryCh := time.After(5 * time.Second)
+		first := make(chan struct{}, 1)
+		first <- struct{}{}
 		for {
 			select {
 			case <-ctx.Done():
 				log.Infof("Lazyload port auto management is terminated")
 				return
+			case <-first:
+				log.Infof("first time to run reloadWormholePort")
 			case <-pollTicker.C:
 			case <-retryCh:
 				retryCh = nil
@@ -227,7 +262,7 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 			// update wormholePort
 			log.Debugf("got timer event for updating wormholePort")
 
-			wormholePort, needUpdate = reloadWormholePort(wormholePort, r.portProtocolCache)
+			wormholePort, needUpdate = reloadWormholePort(wormholePort, r.portProtocolCache, r.cfg.GetCleanupWormholePort())
 			if needUpdate || !successUpdate {
 				log.Debugf("need to update resources")
 				successUpdate = updateResources(wormholePort, &r.env)
@@ -264,46 +299,53 @@ func isHttp(port corev1.ServicePort, supportH2 bool) bool {
 	return false
 }
 
-func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache) ([]string, bool) {
-	updated := false
-	sort.Strings(wormholePort)
-	log.Infof("old wormPort is: %v", wormholePort)
+func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache, cleaupWormholePort bool) ([]string, bool) {
 
-	oldPortList := wormholePort
-	oldPortMap := make(map[string]bool)
-	for _, p := range oldPortList {
-		oldPortMap[p] = true
+	updated := false
+	ports := make([]string, 0)
+
+	wormholePortMap := make(map[string]bool)
+	for _, p := range wormholePort {
+		wormholePortMap[p] = true
 	}
 
-	curPortList := make([]string, 0)
-	curPortMap := make(map[string]bool)
+	cachePorts := make([]string, 0)
+	cachePortMap := make(map[string]bool)
 
 	portProtocolCache.RLock()
-	defer portProtocolCache.RUnlock()
-
 	for port, proto := range portProtocolCache.Data {
 		p := strconv.Itoa(int(port))
 		if proto[ListenerProtocolHTTP] > 0 {
-			curPortList = append(curPortList, p)
-			curPortMap[p] = true
-			if !oldPortMap[p] {
-				// port is not in oldPortList, added
-				updated = true
-			}
+			cachePorts = append(cachePorts, p)
+			cachePortMap[p] = true
 		}
 	}
-	// curPortList is constructed, need to check deleted
-	if !updated {
-		for port := range oldPortMap {
-			if !curPortMap[port] {
-				// port is not in curPortList, deleted
-				updated = true
-				break
+	portProtocolCache.RUnlock()
+
+	// not to clean up wormhole port, merge cache ports and wormhole ports
+	if !cleaupWormholePort {
+		// add cache ports that are not in the wormholePort
+		ports = append(ports, wormholePort...)
+		for p := range cachePortMap {
+			if !wormholePortMap[p] {
+				ports = append(ports, p)
 			}
 		}
+	} else {
+		// port in wormholePort maybe cleanup
+		// and only add cache ports
+		ports = append(ports, cachePorts...)
 	}
 
-	return curPortList, updated
+	sort.Strings(ports)
+	sort.Strings(wormholePort)
+
+	if !StringSlicesEqual(ports, wormholePort) {
+		updated = true
+		wormholePort = ports
+	}
+
+	return wormholePort, updated
 }
 
 func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{}) {
@@ -407,4 +449,16 @@ func (r *ServicefenceReconciler) isNamespaceManaged(ns string) bool {
 	}
 
 	return r.inScope(ns, obj.(*corev1.Namespace))
+}
+
+func StringSlicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i, v := range a {
+		if v != b[i] {
+			return false
+		}
+	}
+	return true
 }
