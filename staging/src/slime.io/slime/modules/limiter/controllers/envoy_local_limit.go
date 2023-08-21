@@ -8,6 +8,7 @@ package controllers
 import (
 	"fmt"
 	"hash/adler32"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -156,15 +157,20 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			continue
 		}
 
+		record := make(map[int]int)
 		bodyactions := make([]*rlBodyAction, 0)
 		rateLimits := make([]*envoy_config_route_v3.RateLimit, 0)
+
 		for _, rc := range rcs {
 			if len(rc.action) > 0 {
 				rateLimits = append(rateLimits, &envoy_config_route_v3.RateLimit{Actions: rc.action})
 			}
-
 			if rc.bodyAction != nil {
 				bodyactions = append(bodyactions, rc.bodyAction)
+				// if rc action is exist
+				if len(rc.action) > 0 {
+					record[len(rateLimits)-1] = len(bodyactions) - 1
+				}
 			}
 		}
 
@@ -213,60 +219,83 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			patch.Patch.Value = routeStruct
 		}
 
-		// add extra body action
 		if len(bodyactions) > 0 {
-			ppv := patch.Patch.Value
-			m, err := util.ProtoToMap(ppv)
-			if err != nil {
-				log.Errorf("can not be here, convert proto to map err,%+v", err.Error())
-				return nil, err
-			}
-
-			if patch2vhost {
-				if value, ok := m[model.RateLimits]; ok {
-					if actions, ok := value.([]interface{}); ok {
-						actions = append(actions, map[string]interface{}{
-							model.RateLimitActions: bodyactions,
-						})
-						m[model.RateLimits] = actions
-					}
-				} else {
-					m[model.RateLimits] = map[string]interface{}{
-						model.RateLimitActions: bodyactions,
-					}
-				}
-			} else {
-
-				if m[model.Route] == nil {
-					return nil, fmt.Errorf("route not found when patch to body action")
-				}
-
-				if route, ok := m[model.Route].(map[string]interface{}); ok {
-					if rl, ok := route[model.RateLimits]; ok {
-						if actions, ok := rl.([]interface{}); ok {
-							actions = append(actions, map[string]interface{}{
-								model.RateLimitActions: bodyactions,
-							})
-							route[model.RateLimits] = actions
-						}
-					} else {
-						log.Infof("not exist rate_limits when patch to route")
-						route[model.RateLimits] = []interface{}{
-							map[string]interface{}{
-								model.RateLimitActions: bodyactions,
-							},
-						}
-					}
-				}
-			}
-			ts := &structpb.Struct{}
-			util.FromJSONMapToMessage(m, ts)
-			patch.Patch.Value = ts
+			patchBodyActions(patch, patch2vhost, record, bodyactions)
 		}
 
 		patches = append(patches, patch)
 	}
 	return patches, nil
+}
+
+func patchBodyActions(patch *networking.EnvoyFilter_EnvoyConfigObjectPatch, patch2vhost bool, record map[int]int, bodyactions []*rlBodyAction) error {
+	ppv := patch.Patch.Value
+	m, err := util.ProtoToMap(ppv)
+	if err != nil {
+		return fmt.Errorf("convert rate_limits proto to map err,%+v", err.Error())
+	}
+
+	if patch2vhost {
+		if rls, ok := m[model.RateLimits].([]interface{}); ok {
+			rls = patchBodyActionToRate(rls, bodyactions, record)
+			m[model.RateLimits] = rls
+		}
+	} else {
+		if route, ok := m[model.Route].(map[string]interface{}); !ok {
+			return fmt.Errorf("convert route to map[string]interface{} failed")
+		} else if rls, ok := route[model.RateLimits].([]interface{}); !ok {
+			return fmt.Errorf("convert rate_limits to []interface{} failed")
+		} else {
+			rls = patchBodyActionToRate(rls, bodyactions, record)
+			route[model.RateLimits] = rls
+		}
+	}
+
+	ts := &structpb.Struct{}
+	err = util.FromJSONMapToMessage(m, ts)
+	if err == nil {
+		patch.Patch.Value = ts
+	} else {
+		return fmt.Errorf("convert map to struct err,%+v", err.Error())
+	}
+	return nil
+}
+
+func patchBodyActionToRate(rls []interface{}, bodyactions []*rlBodyAction, record map[int]int) []interface{} {
+
+	log.Debugf("rls is %+v, bodyactions is %+v, record is %+v", rls, bodyactions, record)
+	deleted := make([]int, 0)
+
+	for i := range rls {
+		if actions, ok := rls[i].(map[string]interface{}); ok {
+			if specifier, ok := actions[model.RateLimitActions].([]interface{}); ok {
+				if val, ok := record[i]; ok && val < len(bodyactions) {
+					specifier = append(specifier, bodyactions[val])
+					deleted = append(deleted, val)
+				}
+				actions[model.RateLimitActions] = specifier
+			}
+		}
+	}
+
+	bodyactions = deleteAtIndex(bodyactions, deleted)
+
+	for i := range bodyactions {
+		rls = append(rls, map[string]interface{}{
+			model.RateLimitActions: []*rlBodyAction{bodyactions[i]},
+		})
+	}
+	return rls
+}
+
+func deleteAtIndex(slice []*rlBodyAction, indices []int) []*rlBodyAction {
+	sort.Sort(sort.Reverse(sort.IntSlice(indices)))
+	for _, idx := range indices {
+		if idx >= 0 && idx < len(slice) {
+			slice = append(slice[:idx], slice[idx+1:]...)
+		}
+	}
+	return slice
 }
 
 // only enable local rate limit
@@ -351,7 +380,7 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		}
 
 		// build token bucket
-		localRateLimitDescriptors := generateLocalRateLimitDescriptors(desc, params.loc)
+		localRateLimitDescriptors, existBodyMatch := generateLocalRateLimitDescriptors(desc, params.loc)
 		localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
 			TokenBucket:    generateCustomTokenBucket(100000, 100000, 1),
 			Descriptors:    localRateLimitDescriptors,
@@ -369,6 +398,14 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 			return nil
 		}
 
+		if existBodyMatch {
+			local, err = patchBodyMatchToRateLimitDescriptors(local)
+			if err != nil {
+				log.Errorf("patch body match to rate limit descriptors err,%+v", err.Error())
+				return nil
+			}
+		}
+
 		patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
 			Match: generateEnvoyVhostMatch(rcs[0]),
 			Patch: generatePerFilterPatch(local),
@@ -381,6 +418,21 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		patches = append(patches, patch)
 	}
 	return patches
+}
+
+func patchBodyMatchToRateLimitDescriptors(ss *structpb.Struct) (*structpb.Struct, error) {
+	m, err := util.ProtoToMap(ss)
+	if err != nil {
+		return nil, fmt.Errorf("convert ratelimiter descriptors proto to map err,%+v", err.Error())
+	}
+	// set body_match to true
+	m[model.BodyMatch] = true
+	res := &structpb.Struct{}
+	err = util.FromJSONMapToMessage(m, res)
+	if err != nil {
+		return nil, fmt.Errorf("convert ratelimiter descriptors map to proto err,%+v", err.Error())
+	}
+	return res, nil
 }
 
 /*
@@ -480,22 +532,27 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 	return actions, bodyAction
 }
 
-func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.LocalRateLimitDescriptor {
+func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) ([]*envoy_ratelimit_v3.LocalRateLimitDescriptor, bool) {
 	localRateLimitDescriptors := make([]*envoy_ratelimit_v3.LocalRateLimitDescriptor, 0)
+	existBodyMatch := false
 	for _, item := range descriptors {
-		entries := generateLocalRateLimitDescriptorEntries(item, loc)
+		entries, exist := generateLocalRateLimitDescriptorEntries(item, loc)
+		if exist {
+			existBodyMatch = true
+		}
 		tokenBucket := generateTokenBucket(item)
 		localRateLimitDescriptors = append(localRateLimitDescriptors, &envoy_ratelimit_v3.LocalRateLimitDescriptor{
 			Entries:     entries,
 			TokenBucket: tokenBucket,
 		})
 	}
-	return localRateLimitDescriptors
+	return localRateLimitDescriptors, existBodyMatch
 }
 
 // generateLocalRateLimitDescriptorEntries gen entries like above
-func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*envoy_ratelimit_v3.RateLimitDescriptor_Entry {
+func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) ([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, bool) {
 
+	var useJsonBody, useQuery, useHeader bool
 	entry := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 	entries := make([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, 0)
 	if des.CustomKey != "" && des.CustomValue != "" {
@@ -507,7 +564,6 @@ func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimi
 		entry.Value = generateDescriptorValue(des, loc)
 		entries = append(entries, entry)
 	} else {
-		var useJsonBody, useQuery, useHeader bool
 		for _, match := range des.Match {
 			switch match.MatchSource {
 			case microservicev1alpha2.SmartLimitDescriptor_Matcher_JsonBodyMatch:
@@ -517,13 +573,6 @@ func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimi
 			case microservicev1alpha2.SmartLimitDescriptor_Matcher_HeadMatch:
 				useHeader = true
 			}
-		}
-
-		if useJsonBody {
-			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
-			item.Key = model.BodyMatch
-			item.Value = generateDescriptorValue(des, loc)
-			entries = append(entries, item)
 		}
 
 		if useQuery {
@@ -539,8 +588,15 @@ func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimi
 			item.Value = generateDescriptorValue(des, loc)
 			entries = append(entries, item)
 		}
+
+		if useJsonBody {
+			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
+			item.Key = model.BodyMatch
+			item.Value = generateDescriptorValue(des, loc)
+			entries = append(entries, item)
+		}
 	}
-	return entries
+	return entries, useJsonBody
 }
 
 func generateTokenBucket(item *microservicev1alpha2.SmartLimitDescriptor) *envoy_type_v3.TokenBucket {
@@ -722,8 +778,8 @@ type rlBodyAction struct {
 }
 
 type rlBodyMatch struct {
-	Name         string            `json:"name,omitempty"`
-	String_match map[string]string `json:"string_match,omitempty"`
+	Name         string                 `json:"name,omitempty"`
+	String_match map[string]interface{} `json:"string_match,omitempty"`
 }
 
 // support exact|prefix|suffix
@@ -733,16 +789,23 @@ func generateBodyMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher)
 
 	switch {
 	case match.ExactMatch != "":
-		val.String_match = map[string]string{
+		val.String_match = map[string]interface{}{
 			"exact": match.ExactMatch,
 		}
 	case match.PrefixMatch != "":
-		val.String_match = map[string]string{
+		val.String_match = map[string]interface{}{
 			"prefix": match.PrefixMatch,
 		}
 	case match.SuffixMatch != "":
-		val.String_match = map[string]string{
+		val.String_match = map[string]interface{}{
 			"suffix": match.SuffixMatch,
+		}
+	case match.RegexMatch != "":
+		val.String_match = map[string]interface{}{
+			"safe_regex": map[string]interface{}{
+				"google_re2": map[string]interface{}{},
+				"regex":      match.RegexMatch,
+			},
 		}
 	default:
 		err = fmt.Errorf("unsupport %s in body match", match.Name)
