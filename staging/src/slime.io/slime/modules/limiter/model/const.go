@@ -13,7 +13,7 @@ const (
 
 	BodyMatch = "body_match"
 
-	DescriptiorValue = "descriptior_value"
+	DescriptiorValue = "descriptor_value"
 
 	Bodies = "bodies"
 
