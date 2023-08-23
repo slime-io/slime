@@ -53,7 +53,7 @@ func (s *Source) updateServiceInfo() error {
 	}
 	newServiceEntryMap, err := ConvertServiceEntryMap(
 		instances, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix,
-		s.args.InstancePortAsSvcPort, s.args.LabelPatch, s.getInstanceFilters(), s.getServiceHostAlias())
+		s.args.InstancePortAsSvcPort, s.args.LabelPatch, s.args.NsfNacos, s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
 		return fmt.Errorf("convert nacos servceentry map failed: %v", err)
 	}
