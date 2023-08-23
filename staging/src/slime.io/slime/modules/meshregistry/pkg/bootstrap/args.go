@@ -316,6 +316,8 @@ func (eurekaArgs *EurekaSourceArgs) Validate() error {
 type NacosSourceArgs struct {
 	SourceArgs
 	NacosServer
+	// NacosSource address belongs to nsf or not
+	NsfNacos bool `json:"NsfNacos,omitempty"`
 	// nacos mode for get nacos info
 	Mode string `json:"Mode,omitempty"`
 	// nacos service name is like name.ns

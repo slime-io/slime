@@ -22,7 +22,7 @@ func (e Error) Error() string {
 
 func ConvertServiceEntryMap(
 	instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost, k8sDomainSuffix,
-	instancePortAsSvcPort, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string,
+	instancePortAsSvcPort, patchLabel, nsfNacos bool, filter func(*instance) bool, hostAliases map[string][]string,
 ) (map[string]*networking.ServiceEntry, error) {
 	seMap := make(map[string]*networking.ServiceEntry, 0)
 	if len(instances) == 0 {
@@ -30,7 +30,14 @@ func ConvertServiceEntryMap(
 	}
 	for _, ins := range instances {
 		if gatewayModel {
-			seMap[ins.Dom] = convertServiceEntry(ins, nsHost, patchLabel, filter, hostAliases)
+			if nsfNacos {
+				//支持租户隔离
+				for _, projectCode := range getProjectCode(ins) {
+					seMap[ins.Dom+"-"+projectCode] = convertServiceEntryWithProjectCode(ins, nsHost, patchLabel, filter, hostAliases, projectCode)
+				}
+			} else {
+				seMap[ins.Dom] = convertServiceEntryWithProjectCode(ins, nsHost, patchLabel, filter, hostAliases, "")
+			}
 		} else {
 			for k, v := range convertServiceEntryWithNs(
 				ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel, filter,
@@ -48,13 +55,17 @@ func ConvertServiceEntryMap(
 }
 
 // -------- for gateway mode --------
-func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string) *networking.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filter)
+func convertServiceEntryWithProjectCode(instanceResp *instanceResp, nsHost bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string, projectCode string) *networking.ServiceEntry {
+	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filter, projectCode)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".nacos"
 	}
-	host := strings.ReplaceAll(strings.ToLower(instanceResp.Dom), "_", "-") + nsSuffix
+	host := strings.ReplaceAll(instanceResp.Dom, "_", "-")
+	if projectCode != "" {
+		host += ".nsf." + projectCode
+	}
+	host = strings.ToLower(host) + nsSuffix
 	hosts := []string{host}
 	if hostAliases != nil {
 		hosts = append(hosts, hostAliases[host]...)
@@ -71,7 +82,7 @@ func convertServiceEntry(instanceResp *instanceResp, nsHost bool, patchLabel boo
 	return ret
 }
 
-func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
+func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool, projectCode string) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
 	var (
 		endpoints      = make([]*networking.WorkloadEntry, 0)
 		ports          = make([]*networking.Port, 0)
@@ -99,6 +110,10 @@ func convertEndpoints(instances []*instance, patchLabel bool, filter func(*insta
 		}
 		if ins.Port > math.MaxUint16 {
 			log.Errorf("instance port illegal %v", ins)
+			continue
+		}
+
+		if projectCode != "" && projectCode != ins.Metadata["projectCode"] {
 			continue
 		}
 
@@ -298,4 +313,21 @@ func convertInstanceId(labels map[string]string) {
 	if ok {
 		labels["instanceId"] = strings.ReplaceAll(v, ":", "_")
 	}
+}
+
+func getProjectCode(ins *instanceResp) []string {
+	projectCode := make([]string, 0)
+	projectCodeMap := make(map[string]string)
+	for _, instance := range ins.Hosts {
+		for k, v := range instance.Metadata {
+			if k == "projectCode" {
+				projectCodeMap[v] = ""
+			}
+		}
+	}
+
+	for k := range projectCodeMap {
+		projectCode = append(projectCode, k)
+	}
+	return projectCode
 }
