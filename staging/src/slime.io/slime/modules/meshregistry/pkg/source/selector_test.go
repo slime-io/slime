@@ -25,7 +25,58 @@ func TestEndpointSelector(t *testing.T) {
 		}
 	}{
 		{
-			name: "test label selector",
+			name: "test empty selector with emptySelectorsReturn=false",
+			endpointSelectors: map[string][]*bootstrap.EndpointSelector{
+				"foo": nil,
+			},
+			emptySelectorsReturn: false,
+			cases: []struct {
+				name      string
+				svc       string
+				hookParam HookParam
+				expected  bool
+			}{
+				{
+					name: "default empty selector return true",
+					svc:  "foo",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "foo",
+						},
+						IP: getPointerOfStr("1.1.1.1"),
+					},
+					expected: false,
+				},
+			},
+		},
+		{
+			name: "test empty selector with emptySelectorsReturn=true",
+			endpointSelectors: map[string][]*bootstrap.EndpointSelector{
+				"foo": nil,
+			},
+			emptySelectorsReturn: true,
+			cases: []struct {
+				name      string
+				svc       string
+				hookParam HookParam
+				expected  bool
+			}{
+				{
+					name: "default empty selector return true",
+					svc:  "foo",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "foo",
+						},
+						IP: getPointerOfStr("1.1.1.1"),
+					},
+					expected: true,
+				},
+			},
+		},
+		{
+			name:                 "test normal selector with emptySelectorsReturn=true",
+			emptySelectorsReturn: true,
 			endpointSelectors: map[string][]*bootstrap.EndpointSelector{
 				"foo": {
 					{
@@ -48,8 +99,13 @@ func TestEndpointSelector(t *testing.T) {
 								"app": "bar",
 							},
 						},
+					},
+				},
+				"baz": {
+					{
 						ExcludeIPRanges: &bootstrap.IPRanges{
 							IPs: []string{
+								"1.1.1.1",
 								"2.2.2.2",
 							},
 						},
@@ -63,43 +119,29 @@ func TestEndpointSelector(t *testing.T) {
 				expected  bool
 			}{
 				{
-					name: "label match",
+					name: "label match, ip match",
 					svc:  "foo",
 					hookParam: HookParam{
 						Label: map[string]string{
 							"app": "foo",
 						},
+						// empty ip never can be excluded
 					},
 					expected: true,
 				},
 				{
-					name: "label not match",
+					name: "label not match, ip match",
 					svc:  "foo",
 					hookParam: HookParam{
 						Label: map[string]string{
 							"app": "test",
 						},
+						// empty ip never can be excluded
 					},
 					expected: false,
 				},
 				{
-					name: "ip match",
-					svc:  "foo",
-					hookParam: HookParam{
-						IP: getPointerOfStr("2.2.2.2"),
-					},
-					expected: true,
-				},
-				{
-					name: "ip not match",
-					svc:  "foo",
-					hookParam: HookParam{
-						IP: getPointerOfStr("1.1.1.1"),
-					},
-					expected: false,
-				},
-				{
-					name: "label match and ip match",
+					name: "label match, ip match 2",
 					svc:  "foo",
 					hookParam: HookParam{
 						Label: map[string]string{
@@ -110,11 +152,76 @@ func TestEndpointSelector(t *testing.T) {
 					expected: true,
 				},
 				{
-					name: "label match and ip not match",
+					name: "label match, ip not match",
 					svc:  "foo",
 					hookParam: HookParam{
 						Label: map[string]string{
 							"app": "foo",
+						},
+						IP: getPointerOfStr("1.1.1.1"),
+					},
+					expected: false,
+				},
+				{
+					name: "label not match, ip not match",
+					svc:  "foo",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "test",
+						},
+						IP: getPointerOfStr("1.1.1.1"),
+					},
+					expected: false,
+				},
+				{
+					name: "label match, wihout ip selector",
+					svc:  "bar",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "bar",
+						},
+						IP: getPointerOfStr("2.2.2.2"),
+					},
+					expected: true,
+				},
+				{
+					name: "label match, wihout ip selector 2",
+					svc:  "bar",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "bar",
+						},
+					},
+					expected: true,
+				},
+				{
+					name: "label not match, wihout ip selector",
+					svc:  "bar",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "foo",
+						},
+						IP: getPointerOfStr("2.2.2.2"),
+					},
+					expected: false,
+				},
+				{
+					name: "ip match, wihout label selector",
+					svc:  "baz",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "baz",
+						},
+						IP: getPointerOfStr("3.3.3.3"),
+					},
+					expected: true,
+				},
+				{
+					name: "ip not match, wihout label selector",
+					svc:  "baz",
+					hookParam: HookParam{
+						Label: map[string]string{
+							"app": "baz",
 						},
 						IP: getPointerOfStr("1.1.1.1"),
 					},
@@ -130,6 +237,7 @@ func TestEndpointSelector(t *testing.T) {
 			for k, v := range arg.endpointSelectors {
 				cfgs[k] = ConvertEndpointSelectorToHookConfig(v, HookConfigWithEmptySelectorsReturn(arg.emptySelectorsReturn))
 			}
+			store = NewHookStore(cfgs)
 			for _, c := range arg.cases {
 				t.Run(c.name, func(t *testing.T) {
 					if h, ok := store[c.svc]; ok {
