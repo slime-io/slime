@@ -83,33 +83,36 @@ func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.Qu
 		return queryMap
 	}
 
-	// only single limiter is support in outbound scenario, so metric is meaningless, just record it's namespacename
-	if meta.outbound {
-		sm := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
-		queryMap[sm.String()] = []metric.Handler{}
-		return queryMap
-	}
-
 	// handle loc which is in interest map in inbound scenario
 	if !r.cfg.GetDisableAdaptive() {
 		return r.handlePrometheusEvent(meta, loc)
 	} else {
+		// unify mesh and gateway in local event
 		return r.handleLocalEvent(meta, loc)
 	}
 	return nil
 }
 
-func (r *SmartLimiterReconciler) handleLocalEvent(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
+func (r *SmartLimiterReconciler) handleLocalEvent(meta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
 	queryMap := make(map[string][]metric.Handler, 0)
 
-	if len(LimiterMeta.workloadSelector) > 0 {
+	if len(meta.workloadSelector) > 0 {
 		// workloadSelector is specified
-		queryMap = r.genQuerymapWithWorkloadSelector(LimiterMeta, loc)
-	} else if host := LimiterMeta.seHost; host != "" {
+		queryMap = r.genQuerymapWithWorkloadSelector(meta, loc)
+	} else if host := meta.seHost; host != "" {
 		// se host is specified
 		queryMap = r.genQuerymapWithServiceEntry(host, loc)
 	} else {
-		// otherwise, use k8s svc
+		// no workloadSelector and se host
+
+		// in gateway, workloadSelector can be not specified
+		// just build querymap with empty handler
+		if meta.gateway {
+			sm := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
+			queryMap[sm.String()] = []metric.Handler{}
+			return queryMap
+		}
+		// no workloadSelector and se host, not gateway, use k8s service
 		queryMap = r.genQuerymapWithService(loc)
 	}
 	return queryMap
@@ -176,7 +179,7 @@ func queryPodsWithWorkloadSelector(c client.Client, workloadSelector map[string]
 		}
 		if item.Status.Phase != v1.PodRunning {
 			// pods not running
-			log.Debugf("pod %s/%s is not running. Status=%v. skip", item.Namespace, item.Name, item.Status.Phase)
+			log.Infof("pod %s/%s is not running. Status=%v. skip", item.Namespace, item.Name, item.Status.Phase)
 			continue
 		}
 		pods = append(pods, item)
