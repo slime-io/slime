@@ -74,7 +74,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	}
 
 	// subset is only queried when there is a `service` in inbound
-	if meta.outbound == false && len(meta.workloadSelector) == 0 {
+	if !meta.sidecarOutbound && !meta.gateway && len(meta.workloadSelector) == 0 {
 		host := meta.host
 		if meta.seHost != "" {
 			host = meta.seHost

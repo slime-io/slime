@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/apimachinery/pkg/types"
-	"strconv"
 	"sync"
 	"time"
 
@@ -97,11 +96,11 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			return ctrl.Result{}, nil
 		}
 
-		if out, err := r.Validate(instance); err != nil {
+		if sidecarOutbound, gateway, err := r.Validate(instance); err != nil {
 			log.Errorf("invalid smartlimiter, %s", err)
 			return reconcile.Result{}, nil
 		} else {
-			r.RegisterInterest(instance, req, out)
+			r.RegisterInterest(instance, req, sidecarOutbound, gateway)
 		}
 		log.Debugf("update start")
 		r.RefreshResource(instance)
@@ -181,11 +180,12 @@ func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.
 	return pc, nil
 }
 
-func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, outbound bool) {
+func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, sidecarOutbound, gateway bool) {
 
 	// set interest mapping
 	meta := SmartLimiterMeta{}
-	meta.outbound = outbound
+	meta.gateway = gateway
+	meta.sidecarOutbound = sidecarOutbound
 	meta.workloadSelector = instance.Spec.WorkloadSelector
 	meta.seHost = instance.Spec.Host
 	meta.host = util.UnityHost(instance.Name, instance.Namespace)
@@ -196,12 +196,12 @@ func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2
 }
 
 type SmartLimiterMeta struct {
-	// outbound: mesh outbound or gateway
-	outbound bool
-	// inbound: use host or workloadSelector
 	host             string
 	seHost           string
 	workloadSelector map[string]string
+
+	sidecarOutbound bool
+	gateway         bool
 }
 
 func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
@@ -219,44 +219,44 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 	}
 }
 
-func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, error) {
-	var out bool
-	gw := instance.Spec.Gateway
+func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, bool, error) {
+
+	gateway := instance.Spec.Gateway
+	sidecarOutbound := false
+
 	var target *microservicev1alpha2.Target
 
 	for _, descriptors := range instance.Spec.Sets {
 		for _, descriptor := range descriptors.Descriptor_ {
 
 			if descriptor.Target == nil && instance.Spec.Target == nil {
-				return out, fmt.Errorf("invalid target")
+				return sidecarOutbound, gateway, fmt.Errorf("invalid target")
 			}
 			if descriptor.Action == nil {
-				return out, fmt.Errorf("invalid action")
+				return sidecarOutbound, gateway, fmt.Errorf("invalid action")
 			}
 			if descriptor.Condition == "" {
-				return out, fmt.Errorf("invalid condition")
+				return sidecarOutbound, gateway, fmt.Errorf("invalid condition")
 			}
 
 			condition := descriptor.Condition
 			direction := target.GetDirection()
 
-			quota := descriptor.Action.Quota
-			if gw || direction == model.Outbound {
-				out = true
-				if !r.cfg.GetDisableAdaptive() {
-					return out, fmt.Errorf("outbound/gw must disable adaptive limiter")
-				}
+			if direction == model.Outbound {
+				sidecarOutbound = true
+			}
 
-				if condition != "true" {
-					return out, fmt.Errorf("condition must true in outbound")
+			if gateway || sidecarOutbound {
+				if !r.cfg.GetDisableAdaptive() {
+					return sidecarOutbound, gateway, fmt.Errorf("outbound/gw must disable adaptive limiter")
 				}
-				if _, err := strconv.Atoi(quota); err != nil {
-					return out, fmt.Errorf("quota must be number in outbound")
+				if condition != "true" {
+					return sidecarOutbound, gateway, fmt.Errorf("condition must true in outbound/siddecar")
 				}
 			}
 		}
 	}
-	return out, nil
+	return sidecarOutbound, gateway, nil
 }
 
 // RefreshResource refresh smartlimiter and ef on time
