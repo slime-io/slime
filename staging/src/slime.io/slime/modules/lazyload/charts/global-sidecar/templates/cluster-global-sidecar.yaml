@@ -433,7 +433,6 @@ spec:
         context: SIDECAR_OUTBOUND
         proxy:
           proxyVersion: {{ $g.misc.proxyVersion }}
-      patch:
         listener:
           name: 0.0.0.0_{{ . }}
           filterChain:
