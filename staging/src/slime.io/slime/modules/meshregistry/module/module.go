@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/mitchellh/copystructure"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/watch"
@@ -25,6 +27,7 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/util"
+	meshregv1alpha1 "slime.io/slime/modules/meshregistry/api/v1alpha1"
 	"slime.io/slime/modules/meshregistry/model"
 	meshregbootstrap "slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/server"
@@ -121,16 +124,112 @@ func configMapModuleKey(name string) string {
 	return "cfg_" + name
 }
 
-func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*meshregbootstrap.RegistryArgs, error) {
-	dynConfigMapName := os.Getenv("DYNAMIC_CONFIG_MAP")
-	if dynConfigMapName == "" {
+func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions, staticRegArgs *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
+	// TODO:
+	// We define and use two types of configuration Configurator for hot updates:
+	//   - FullConfigurator for replace behavior
+	//   - PatchConfigurator for patch behavior
+	// Currently, instead of providing a common framework for registering and executing these configuration events,
+	// We directly 'hardcode' in the `prepareDynamicConfigController` method. It is expected that a universal
+	// configuration hot update framework will be implemented in the Framework module to replace the internal implementation
+	// of the meshregistry module and can be used by other module.
+
+	// 1. init full configuration Configurator
+	//    - load dynamic config from ConfigMap specified by env var DYNAMIC_CONFIG_MAP
+	//    - or return original static config
+	// 2. init patch configuration Configurator
+	// 	  - watching RegistrySource CR specified by env var WATCHING_REGISTRYSOURCE
+	dynConfigMapName, dynRegistrySource := os.Getenv("DYNAMIC_CONFIG_MAP"), os.Getenv("WATCHING_REGISTRYSOURCE")
+	if dynConfigMapName == "" && dynRegistrySource == "" {
 		return nil, nil
 	}
 
+	changeNotifyCh := make(chan struct{}, 1)
+
+	var (
+		fullConfigurator  func() (*meshregbootstrap.RegistryArgs, error)
+		patchConfigurator func(*meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error)
+		wait              func() bool
+	)
+
+	if dynConfigMapName != "" {
+		fullConfigurator, wait = m.prepareCmDynamicConfigController(dynConfigMapName, changeNotifyCh, opts, staticRegArgs)
+		if !wait() {
+			return nil, fmt.Errorf("failed to wait for configmap cache sync")
+		}
+
+	} else {
+		fullConfigurator = func() (*meshregbootstrap.RegistryArgs, error) {
+			cp, err := copystructure.Copy(staticRegArgs)
+			return cp.(*meshregbootstrap.RegistryArgs), err
+		}
+	}
+
+	if dynRegistrySource != "" {
+		patchConfigurator, wait = m.prepareCrDynamicConfigController(dynRegistrySource, changeNotifyCh, opts)
+		if !wait() {
+			return nil, fmt.Errorf("failed to wait for configmap cache sync")
+		}
+	}
+
+	reloadArg := func() (*meshregbootstrap.RegistryArgs, error) {
+		args, err := fullConfigurator()
+		if err != nil {
+			return nil, err
+		}
+		if patchConfigurator != nil {
+			args, err = patchConfigurator(args)
+			if err != nil {
+				return nil, err
+			}
+		}
+		return args, nil
+	}
+
+	m.reloadDynamicConfigTask = func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-changeNotifyCh:
+				log.Infof("reloadDynamicConfigTask get notified")
+				regArgs, err := reloadArg()
+				if err != nil {
+					log.Errorf("load arg from cache met err %v, skip...", err)
+					continue
+				}
+
+				m.mut.RLock()
+				handlers := m.dynConfigHandlers
+				m.mut.RUnlock()
+
+				for _, h := range handlers {
+					h(regArgs)
+				}
+			}
+		}
+	}
+
+	select {
+	case <-changeNotifyCh:
+		log.Infof("cm notify: will get dynamic config and replace the original one")
+		return reloadArg()
+	default:
+	}
+
+	return nil, nil
+}
+
+func (m *Module) prepareCmDynamicConfigController(
+	name string,
+	changeNotifyCh chan struct{},
+	opts module.ModuleOptions,
+	staticRegArgs *meshregbootstrap.RegistryArgs,
+) (func() (*meshregbootstrap.RegistryArgs, error), func() bool) {
 	client := opts.Env.K8SClient
 	ctx := context.Background() // TODO
 
-	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": dynConfigMapName}.AsSelector().String()}
+	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String()}
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 			return client.CoreV1().ConfigMaps(PodNamespace).List(ctx, listOptions)
@@ -140,13 +239,13 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 		},
 	}
 
-	changeNotifyCh := make(chan struct{}, 1)
 	cmCache := &singleConfigMapCache{}
 
 	loadArgFromCache := func() (*meshregbootstrap.RegistryArgs, error) {
 		cm := cmCache.Get()
 		if cm == nil {
-			return nil, nil
+			cp, err := copystructure.Copy(staticRegArgs)
+			return cp.(*meshregbootstrap.RegistryArgs), err
 		}
 
 		var cmValue []byte
@@ -201,6 +300,7 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 		default:
 		}
 	}
+
 	_, controller := cache.NewInformer(lw, &corev1.ConfigMap{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
 		AddFunc:    func(obj interface{}) { notify(nil, obj) },
 		UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
@@ -208,42 +308,73 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions) (*mes
 	})
 	go controller.Run(ctx.Done())
 
-	if !cache.WaitForCacheSync(ctx.Done(), controller.HasSynced) {
-		return nil, fmt.Errorf("failed to wait for configmap cache sync")
+	return loadArgFromCache, func() bool {
+		return cache.WaitForCacheSync(ctx.Done(), controller.HasSynced)
+	}
+}
+
+func (m *Module) prepareCrDynamicConfigController(name string, changeNotifyCh chan struct{}, opts module.ModuleOptions) (func(*meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error), func() bool) {
+	client := opts.Env.DynamicClient
+	ctx := context.Background() // TODO
+
+	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String()}
+	lw := &cache.ListWatch{
+		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).List(ctx, listOptions)
+		},
+		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).Watch(ctx, listOptions)
+		},
 	}
 
-	m.reloadDynamicConfigTask = func(ctx context.Context) {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-changeNotifyCh:
-				log.Infof("reloadDynamicConfigTask get notified")
-				regArgs, err := loadArgFromCache()
-				if err != nil {
-					log.Errorf("load arg from cache met err %v, skip...", err)
-					continue
-				}
-
-				m.mut.RLock()
-				handlers := m.dynConfigHandlers
-				m.mut.RUnlock()
-
-				for _, h := range handlers {
-					h(regArgs)
-				}
-			}
+	notify := func(obj, newObj interface{}) {
+		select {
+		case changeNotifyCh <- struct{}{}:
+		default:
 		}
 	}
 
-	select {
-	case <-changeNotifyCh:
-		log.Infof("cm notify: will get dynamic config and replace the original one")
-		return loadArgFromCache()
-	default:
+	store, controller := cache.NewInformer(lw, &unstructured.Unstructured{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
+		AddFunc:    func(obj interface{}) { notify(nil, obj) },
+		UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
+		DeleteFunc: func(obj interface{}) { notify(obj, nil) },
+	})
+	go controller.Run(ctx.Done())
+
+	patcher := func(src *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
+		got, exist, err := store.GetByKey(PodNamespace + "/" + name)
+		if err != nil {
+			return nil, err
+		}
+		if !exist {
+			return src, nil
+		}
+		u, ok := got.(*unstructured.Unstructured)
+		if !ok {
+			return nil, fmt.Errorf("not unstructured")
+		}
+
+		var rs meshregv1alpha1.RegistrySource
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(u.UnstructuredContent(), &rs); err != nil {
+			return nil, err
+		}
+
+		var patch meshregbootstrap.RegistryArgs
+		meshregv1alpha1.ConvertRegistrySourceToArgs(&rs, &patch)
+		return patchRegistryArgs(src, &patch)
 	}
 
-	return nil, nil
+	return patcher, func() bool {
+		return cache.WaitForCacheSync(ctx.Done(), controller.HasSynced)
+	}
+}
+
+func patchRegistryArgs(src, patch *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
+	if patch == nil {
+		return src, nil
+	}
+	meshregbootstrap.Patch(src, patch)
+	return src, nil
 }
 
 func parseModuleConfig(data []byte) (*util.AnyMessage, error) {
@@ -271,7 +402,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		return fmt.Errorf("nil registry args")
 	}
 
-	dynRegArgs, err := m.prepareDynamicConfigController(opts)
+	dynRegArgs, err := m.prepareDynamicConfigController(opts, regArgs)
 	if err != nil {
 		return err
 	}

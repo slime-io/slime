@@ -15,6 +15,8 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -219,6 +221,13 @@ func (p *Processing) Start() (err error) {
 		p.initMulticluster()
 	}
 
+	p.httpServer.HandleFunc("/args", p.cacheRegArgs)
+	if p.addOnRegArgs != nil {
+		p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
+			p.regArgs = args
+		})
+	}
+
 	if meshConfigFileSrc != nil {
 		csrc = append(csrc, meshConfigFileSrc)
 	}
@@ -387,4 +396,15 @@ func (p *Processing) initMulticluster() {
 			log.Errorf("start multicluster controller met err %v", err)
 		}
 	}
+}
+
+func (p *Processing) cacheRegArgs(w http.ResponseWriter, r *http.Request) {
+	regArgs := p.regArgs
+	b, err := json.MarshalIndent(regArgs, "", "  ")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = fmt.Fprintf(w, "unable to marshal config: %v", err)
+		return
+	}
+	_, _ = w.Write(b)
 }

@@ -8,6 +8,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/jpillora/backoff v1.0.0
+	github.com/mitchellh/copystructure v1.2.0
 	github.com/nacos-group/nacos-sdk-go/v2 v2.1.2
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/sirupsen/logrus v1.8.1
@@ -21,6 +22,7 @@ require (
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
 	k8s.io/kube-openapi v0.0.0-20210421082810-95288971da7e
+	sigs.k8s.io/controller-runtime v0.10.3
 	sigs.k8s.io/yaml v1.2.0
 	slime.io/pkg v0.0.0-00010101000000-000000000000
 	slime.io/slime/framework v0.0.0
@@ -63,7 +65,6 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/mailru/easyjson v0.7.6 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
-	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
@@ -100,7 +101,6 @@ require (
 	k8s.io/klog v1.0.0 // indirect
 	k8s.io/klog/v2 v2.9.0 // indirect
 	k8s.io/utils v0.0.0-20210819203725-bdf08cb9a70a // indirect
-	sigs.k8s.io/controller-runtime v0.10.3 // indirect
 	sigs.k8s.io/service-apis v0.0.0-20200227172328-b9010cfacdbe // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.1.2 // indirect
 )

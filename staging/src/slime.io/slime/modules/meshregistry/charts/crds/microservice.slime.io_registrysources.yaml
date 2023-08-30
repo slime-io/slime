@@ -1,0 +1,87 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: registrysources.microservice.slime.io
+spec:
+  group: microservice.slime.io
+  names:
+    kind: RegistrySource
+    listKind: RegistrySourceList
+    plural: registrysources
+    singular: registrysource
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: RegistrySource is the Schema for the RegistrySource API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: RegistrySourceSpec defines the desired state of RegistrySource
+            properties:
+              zookeeper:
+                description: Zookeeper all about zookeeper registry
+                properties:
+                  AbnormalInstanceIPs:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: 'AbnormalInstanceIPs   - key: name of the dubbo interface,
+                      format: interface:group:version   - value: abnormal instance
+                      ip list of the specified interface'
+                    type: object
+                  availableInterfaces:
+                    description: AvailableInterfaces is the list of interfaces that
+                      are available in the zk registry
+                    items:
+                      properties:
+                        group:
+                          type: string
+                        interface:
+                          type: string
+                        version:
+                          type: string
+                      type: object
+                    type: array
+                  globalAbnormalInstanceIPs:
+                    additionalProperties:
+                      items:
+                        type: string
+                      type: array
+                    description: 'GlobalAbnormalInstanceIPs   - key: name of the ip
+                      sets   - value: abnormal instance ip list'
+                    type: object
+                type: object
+            type: object
+          status:
+            description: RegistrySourceStatus defines the observed state of RegistrySource
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
