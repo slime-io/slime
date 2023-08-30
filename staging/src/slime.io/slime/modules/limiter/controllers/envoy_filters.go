@@ -33,6 +33,8 @@ type LimiterSpec struct {
 
 	domain       string
 	rlsConfigmap *config.RlsConfigMap
+
+	proxyVersion string
 }
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
@@ -55,6 +57,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		target:                       spec.Target,
 		domain:                       r.cfg.GetDomain(),
 		rlsConfigmap:                 r.cfg.GetRlsConfigMap(),
+		proxyVersion:                 r.cfg.GetProxyVersion(),
 	}
 
 	var sets []*networking.Subset
@@ -189,7 +192,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 				log.Errorf("getRateLimiterService err: %s, skip", err.Error())
 			}
 			domain := getDomain(params.domain)
-			httpFilterEnvoyRateLimitPatch := generateEnvoyHttpFilterGlobalRateLimitPatch(params.context, server, domain)
+			httpFilterEnvoyRateLimitPatch := generateEnvoyHttpFilterGlobalRateLimitPatch(params.context, server, domain, params.proxyVersion)
 			if httpFilterEnvoyRateLimitPatch != nil {
 				ef.ConfigPatches = append(ef.ConfigPatches, httpFilterEnvoyRateLimitPatch)
 			}
@@ -203,7 +206,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 		// if disableInsertLocalRateLimit=false in gw, multi smartlimiter will patch duplicate configurations, This will lead dysfunctional behavior.
 		// so disable it, and apply envoyfilter like staging/src/slime.io/slime/modules/limiter/install/gw_limiter_envoyfilter.yaml to your gw pilot
 		if !params.disableInsertLocalRateLimit {
-			httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch(params.context)
+			httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch(params.context, params.proxyVersion)
 			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterLocalRateLimitPatch)
 		} else {
 			log.Debugf("disableInsertLocalRateLimit set true, skip")

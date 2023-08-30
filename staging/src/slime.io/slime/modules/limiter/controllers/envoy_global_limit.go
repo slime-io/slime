@@ -25,7 +25,7 @@ import (
 	"slime.io/slime/modules/limiter/model"
 )
 
-func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
 	rateLimitServiceConfig := generateRateLimitService(server)
 	rs, err := util.MessageToStruct(rateLimitServiceConfig)
 	if err != nil {
@@ -34,7 +34,7 @@ func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain string)
 	}
 	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
-		Match:   generateEnvoyHttpFilterMatch(context),
+		Match:   generateEnvoyHttpFilterMatch(context, proxyVersion),
 		Patch:   generateEnvoyHttpFilterRateLimitServicePatch(rs, domain),
 	}
 	return patch
@@ -52,7 +52,7 @@ func generateRateLimitService(clusterName string) *envoy_config_ratelimit_v3.Rat
 	return rateLimitServiceConfig
 }
 
-func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
+func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
 	match := &networking.EnvoyFilter_EnvoyConfigObjectMatch{
 		Context: networking.EnvoyFilter_SIDECAR_INBOUND,
 		ObjectTypes: &networking.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
@@ -68,6 +68,13 @@ func generateEnvoyHttpFilterMatch(context string) *networking.EnvoyFilter_EnvoyC
 			},
 		},
 	}
+
+	if proxyVersion != "" {
+		match.Proxy = &networking.EnvoyFilter_ProxyMatch{
+			ProxyVersion: proxyVersion,
+		}
+	}
+
 	if context == model.Gateway {
 		match.Context = networking.EnvoyFilter_GATEWAY
 	} else if context == model.Outbound {
