@@ -179,7 +179,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			continue
 		}
 
-		match := generateEnvoyVhostMatch(rcs[0])
+		match := generateEnvoyVhostMatch(rcs[0], params.proxyVersion)
 		if match.Context == networking.EnvoyFilter_GATEWAY {
 			params.context = model.Gateway
 		} else if match.Context == networking.EnvoyFilter_SIDECAR_OUTBOUND {
@@ -299,7 +299,7 @@ func deleteAtIndex(slice []*rlBodyAction, indices []int) []*rlBodyAction {
 }
 
 // only enable local rate limit
-func generateHttpFilterLocalRateLimitPatch(context string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
 	localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
 		StatPrefix: util.StructEnvoyLocalRateLimitLimiter,
 	}
@@ -311,7 +311,7 @@ func generateHttpFilterLocalRateLimitPatch(context string) *networking.EnvoyFilt
 
 	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
-		Match:   generateEnvoyHttpFilterMatch(context),
+		Match:   generateEnvoyHttpFilterMatch(context, proxyVersion),
 		Patch: &networking.EnvoyFilter_Patch{
 			Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
 			Value: &structpb.Struct{
@@ -407,7 +407,7 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 		}
 
 		patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
-			Match: generateEnvoyVhostMatch(rcs[0]),
+			Match: generateEnvoyVhostMatch(rcs[0], params.proxyVersion),
 			Patch: generatePerFilterPatch(local),
 		}
 		if rcs[0].routeName == "" {
@@ -701,7 +701,7 @@ func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescrip
 	return headers
 }
 
-func generateEnvoyVhostMatch(rc *routeConfig) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
+func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
 	// default context is inbound
 	match := &networking.EnvoyFilter_EnvoyConfigObjectMatch{
 		Context: networking.EnvoyFilter_SIDECAR_INBOUND,
@@ -715,6 +715,13 @@ func generateEnvoyVhostMatch(rc *routeConfig) *networking.EnvoyFilter_EnvoyConfi
 			},
 		},
 	}
+
+	if proxyVersion != "" {
+		match.Proxy = &networking.EnvoyFilter_ProxyMatch{
+			ProxyVersion: proxyVersion,
+		}
+	}
+
 	// if gateway is enabled, match context should be EnvoyFilter_GATEWAY
 	if rc.gw {
 		match.Context = networking.EnvoyFilter_GATEWAY

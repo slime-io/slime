@@ -33,6 +33,9 @@ message Limiter {
   string domain =11;
   // specify rls server address, if disableInsertGlobalRateLimit if false
   RateLimitService rls =12;
+  // A regular expression in golang regex format (RE2) that can be used to select proxies using a specific version of istio proxy to apply the ratelimit envoyfilter.
+  // refer to https://istio.io/latest/docs/reference/config/networking/envoy-filter/#EnvoyFilter-ProxyMatch
+  string proxyVersion = 13;
 }
 
 // configmap will mount to RateLimitService '/data/ratelimit/config'
