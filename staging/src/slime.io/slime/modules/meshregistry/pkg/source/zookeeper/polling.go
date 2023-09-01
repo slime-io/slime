@@ -16,10 +16,12 @@ func (s *Source) Polling() {
 		for {
 			s.refresh()
 
+			forceUpdateTrigger := s.forceUpdateTrigger.Load().(chan struct{})
 			select {
 			case <-s.stop:
 				return
 			case <-ticker.C:
+			case <-forceUpdateTrigger:
 			}
 		}
 	}()
