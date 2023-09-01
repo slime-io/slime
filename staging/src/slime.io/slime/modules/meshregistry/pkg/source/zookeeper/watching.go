@@ -48,6 +48,7 @@ func (s *Source) Watching() {
 		serviceDeleteFunc:  s.ServiceNodeDelete,
 		gatewatModel:       s.args.GatewayModel,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
+		forceUpdateTrigger: s.forceUpdateTrigger,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -82,6 +83,7 @@ type EndpointWatcherOpts struct {
 	serviceDeleteFunc   func(path string)
 	gatewayMode         bool
 	initCallbackFactory func() func()
+	forceUpdateTrigger  *atomic.Value
 }
 
 func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointWatcher {
@@ -99,6 +101,7 @@ func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointW
 		exit:         make(chan struct{}),
 		initCallback: opts.initCallbackFactory(),
 	}
+	ew.forceUpdateTrigger = opts.forceUpdateTrigger
 	return ew
 }
 
@@ -120,6 +123,8 @@ type EndpointWatcher struct {
 	signalExit, exit chan struct{}
 
 	initCallback func()
+
+	forceUpdateTrigger *atomic.Value
 }
 
 // Start should not block
@@ -174,7 +179,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		}
 
 		log.Debugf("endpointWatcher %q watch %q got: %v", ew.servicePath, path, paths)
-
+		forceUpdateTrigger := ew.forceUpdateTrigger.Load().(chan struct{})
 		select {
 		case ch <- simpleWatchItem{
 			data: paths,
@@ -189,10 +194,12 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			case <-ew.exit:
 				return
 			case <-eventCh:
+			case <-forceUpdateTrigger: // force update
 			}
 		case <-ew.exit:
 			return
 		case <-eventCh: // frequent change may delay the data(`paths`) distribute
+		case <-forceUpdateTrigger: // force update
 		}
 	}
 }
@@ -308,7 +315,8 @@ func NewServiceWorker(conn *atomic.Value,
 	endpointUpdateFunc func([]string, []string, string),
 	serviceDeleteFunc func(string),
 	gatewatModel bool,
-	initCallbackFactory func() func()) *worker {
+	initCallbackFactory func() func(),
+	forceUpdateTrigger *atomic.Value) *worker {
 	return &worker{
 		q:     NewQueue(),
 		cache: cmap.New(),
@@ -318,6 +326,7 @@ func NewServiceWorker(conn *atomic.Value,
 			serviceDeleteFunc:   serviceDeleteFunc,
 			gatewayMode:         gatewatModel,
 			initCallbackFactory: initCallbackFactory,
+			forceUpdateTrigger:  forceUpdateTrigger,
 		},
 	}
 }
@@ -389,6 +398,8 @@ type ServiceWatcher struct {
 	initLock               sync.Mutex
 	initWait               sync.WaitGroup
 	initCnt, initThreshold int
+
+	forceUpdateTrigger *atomic.Value
 }
 
 // block until initialized
@@ -438,11 +449,12 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 				}()
 			}
 			sw.handleSvcs(svcs)
-
+			forceUpdateTrigger := sw.forceUpdateTrigger.Load().(chan struct{})
 			select {
 			case <-ctx.Done():
 				return
 			case <-e:
+			case <-forceUpdateTrigger:
 			}
 		}
 	}()
@@ -473,7 +485,7 @@ func (sw *ServiceWatcher) handleSvcs(svcs []string) {
 func (sw *ServiceWatcher) dispatch(e ServiceEvent) {
 	workerIdx := fnv32(e.path) % uint32(len(sw.workers))
 	if sw.workers[workerIdx] == nil {
-		w := NewServiceWorker(sw.conn, sw.endpointUpdateFunc, sw.serviceDeleteFunc, sw.gatewatModel, sw.initCallbackFactory)
+		w := NewServiceWorker(sw.conn, sw.endpointUpdateFunc, sw.serviceDeleteFunc, sw.gatewatModel, sw.initCallbackFactory, sw.forceUpdateTrigger)
 		w.Start(sw.ctx)
 		sw.workers[workerIdx] = w
 	}

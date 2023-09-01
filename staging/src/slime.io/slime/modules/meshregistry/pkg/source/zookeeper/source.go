@@ -80,6 +80,8 @@ type Source struct {
 	// instanceFilter fitler which instance of a service should be include
 	// Updates are only allowed when the configuration is loaded or reloaded.
 	instanceFilter func(*dubboInstance) bool
+
+	forceUpdateTrigger *atomic.Value // store chan struct{}
 }
 
 type Option func(s *Source) error
@@ -136,9 +138,11 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
 
-		Con:               &atomic.Value{},
-		seMergePortMocker: svcMocker,
+		Con:                &atomic.Value{},
+		seMergePortMocker:  svcMocker,
+		forceUpdateTrigger: &atomic.Value{},
 	}
+	ret.forceUpdateTrigger.Store(make(chan struct{}))
 
 	ret.handlers = append(
 		ret.handlers,
@@ -509,14 +513,19 @@ func (s *Source) markServiceEntryInitDone() {
 func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 	var prevArgs *bootstrap.ZookeeperSourceArgs
 	prevArgs, s.args = s.args, args
+	updated := false
 
 	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
 		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
 		s.instanceFilter = newInstSel
+		updated = true
 	}
 	s.mut.Unlock()
+	if updated {
+		s.forceUpdate()
+	}
 }
 
 func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, dubboInterface string) {
@@ -657,6 +666,12 @@ func generateInstanceFilter(
 		}
 		return filter(param)
 	}
+}
+
+func (s *Source) forceUpdate() {
+	forceUpdateTrigger := s.forceUpdateTrigger.Load().(chan struct{})
+	s.forceUpdateTrigger.Store(make(chan struct{}))
+	close(forceUpdateTrigger)
 }
 
 // prepareServiceEntryWithMeta prepare service entry with meta. Will perform cloning to obtain unrelated copies of the
