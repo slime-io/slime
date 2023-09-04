@@ -33,7 +33,7 @@ func Test_generateInstanceFilter(t *testing.T) {
 				alwaysUseSourceScopedEpSelectors: false,
 			},
 			inst: &dubboInstance{
-				metadata: map[string]string{
+				Metadata: map[string]string{
 					"interface": "interface1",
 				},
 			},
@@ -46,7 +46,7 @@ func Test_generateInstanceFilter(t *testing.T) {
 				alwaysUseSourceScopedEpSelectors: false,
 			},
 			inst: &dubboInstance{
-				metadata: map[string]string{
+				Metadata: map[string]string{
 					"interface": "interface1",
 				},
 			},
@@ -68,7 +68,7 @@ func Test_generateInstanceFilter(t *testing.T) {
 				},
 			},
 			inst: &dubboInstance{
-				metadata: map[string]string{
+				Metadata: map[string]string{
 					"interface": "interface1",
 				},
 			},
