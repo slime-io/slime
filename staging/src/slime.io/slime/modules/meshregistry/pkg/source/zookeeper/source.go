@@ -55,6 +55,7 @@ type Source struct {
 	watchingRoot      bool // TODO useless?
 
 	serviceMethods       map[string]string
+	registryServiceCache cmap.ConcurrentMap // string-interface: cmap(string-host: []dubboInstance)
 	cache                cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
 	pollingCache         cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
 	sidecarCache         map[resource.FullName]SidecarWithMeta
@@ -127,6 +128,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		initedCallback: readyCallback,
 
 		serviceMethods:       map[string]string{},
+		registryServiceCache: cmap.New(),
 		cache:                cmap.New(),
 		pollingCache:         cmap.New(),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
@@ -260,9 +262,9 @@ func (s *Source) simpleCacheJson(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
-	temp := s.cacheInUse()
-	cacheData := map[string]map[string]*ServiceEntryWithMeta{}
+func (s *Source) internalCacheJson(w http.ResponseWriter, req *http.Request, cache cmap.ConcurrentMap) {
+	temp := cache
+	cacheData := map[string]map[string]interface{}{}
 	var result interface{}
 
 	interfaceName := req.URL.Query().Get("interfaceName")
@@ -273,7 +275,6 @@ func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 		}
 		temp = newTemp
 	}
-
 	temp.IterCb(func(dubboInterface string, v interface{}) {
 		if v == nil {
 			return
@@ -286,30 +287,33 @@ func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 
 		interfaceCacheData := cacheData[dubboInterface]
 		if interfaceCacheData == nil {
-			interfaceCacheData = map[string]*ServiceEntryWithMeta{}
+			interfaceCacheData = map[string]interface{}{}
 			cacheData[dubboInterface] = interfaceCacheData
 		}
 		inner.IterCb(func(host string, v interface{}) {
-			sem := v.(*ServiceEntryWithMeta)
-			s.mut.RLock()
-			methods, ok := s.serviceMethods[host]
-			s.mut.RUnlock()
-
-			if ok && sem.Meta.Labels[dubboParamMethods] != methods {
-				semCopy := *sem
-				labelCopy := make(map[string]string, len(sem.Meta.Labels))
-				for k, v := range sem.Meta.Labels {
-					labelCopy[k] = v
+			switch val := v.(type) {
+			case *ServiceEntryWithMeta:
+				sem := val
+				s.mut.RLock()
+				methods, ok := s.serviceMethods[host]
+				s.mut.RUnlock()
+				if ok && sem.Meta.Labels[dubboParamMethods] != methods {
+					semCopy := *sem
+					labelCopy := make(map[string]string, len(sem.Meta.Labels))
+					for k, v := range sem.Meta.Labels {
+						labelCopy[k] = v
+					}
+					labelCopy[dubboParamMethods] = methods
+					semCopy.Meta.Labels = labelCopy
+					sem = &semCopy
 				}
-				labelCopy[dubboParamMethods] = methods
-				semCopy.Meta.Labels = labelCopy
-				sem = &semCopy
+				interfaceCacheData[host] = sem
+			case []dubboInstance:
+				services := val
+				interfaceCacheData[host] = services
 			}
-
-			interfaceCacheData[host] = sem
 		})
 	})
-
 	if interfaceName != "" {
 		result = cacheData[interfaceName]
 	} else {
@@ -322,6 +326,15 @@ func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	_, _ = w.Write(b)
+}
+
+func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
+	temp := s.cacheInUse()
+	registrySvc := req.URL.Query().Get("registry_services")
+	if ok, _ := strconv.ParseBool(registrySvc); ok {
+		temp = s.registryServiceCache
+	}
+	s.internalCacheJson(w, req, temp)
 }
 
 func (s *Source) isPollingMode() bool {
@@ -533,9 +546,61 @@ func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, cons
 		cacheInUse.Set(dubboInterface, cmap.New())
 	}
 
-	freshSeMap := convertServiceEntry(
+	freshSvcMap, freshSeMap := convertServiceEntry(
 		provider, consumer, dubboInterface, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
 		s.ignoreLabelsMap, s.args.GatewayModel, s.getInstanceFilter())
+
+	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
+	s.updateSeCache(cacheInUse, freshSeMap, dubboInterface)
+
+}
+
+func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap map[string][]dubboInstance) {
+	if _, ok := s.registryServiceCache.Get(dubboInterface); !ok {
+		s.registryServiceCache.Set(dubboInterface, cmap.New())
+	}
+	for serviceKey, instances := range freshSvcMap {
+		v, ok := s.registryServiceCache.Get(dubboInterface)
+		if !ok {
+			continue
+		}
+		svcCache, ok := v.(cmap.ConcurrentMap)
+		if !ok {
+			continue
+		}
+		svcCache.Set(serviceKey, instances)
+	}
+
+	// check if svc deleted
+	deleteKey := make([]string, 0)
+	v, ok := s.registryServiceCache.Get(dubboInterface)
+	if !ok {
+		return
+	}
+	svcCache, ok := v.(cmap.ConcurrentMap)
+	if !ok {
+		return
+	}
+
+	for serviceKey := range svcCache.Items() {
+		_, exist := freshSvcMap[serviceKey]
+		if exist {
+			continue
+		}
+		deleteKey = append(deleteKey, serviceKey)
+	}
+
+	for _, key := range deleteKey {
+		svcCache.Remove(key)
+	}
+
+}
+
+func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[string]*convertedServiceEntry, dubboInterface string) {
+	if _, ok := cacheInUse.Get(dubboInterface); !ok {
+		cacheInUse.Set(dubboInterface, cmap.New())
+	}
+
 	for serviceKey, convertedSe := range freshSeMap {
 		se := convertedSe.se
 		now := time.Now()
@@ -652,10 +717,10 @@ func generateInstanceFilter(
 	hookStore := source.NewHookStore(cfgs)
 	return func(i *dubboInstance) bool {
 		param := source.NewHookParam(
-			source.HookParamWithLabels(i.metadata),
-			source.HookParamWithIP(i.addr),
+			source.HookParamWithLabels(i.Metadata),
+			source.HookParamWithIP(i.Addr),
 		)
-		filter := hookStore[i.service]
+		filter := hookStore[i.Service]
 		if filter == nil {
 			filter = hookStore[defaultServiceFilter]
 			return filter(param)

@@ -141,7 +141,8 @@ type convertedServiceEntry struct {
 func convertServiceEntry(
 	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
 	ignoreLabels map[string]string, gatewayMode bool,
-	filter func(*dubboInstance) bool) map[string]*convertedServiceEntry {
+	filter func(*dubboInstance) bool) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
+	registryServicesByServiceKey := make(map[string][]dubboInstance)
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
 
@@ -163,7 +164,7 @@ func convertServiceEntry(
 
 	if providers == nil || len(providers) == 0 {
 		log.Debugf("%s no provider", service)
-		return serviceEntryByServiceKey
+		return registryServicesByServiceKey, serviceEntryByServiceKey
 	}
 
 	uniquePort := make(map[string]map[uint32]struct{})
@@ -202,13 +203,14 @@ func convertServiceEntry(
 
 		// now we have the necessary info to build the dubboinstance,
 		// so we can filter out the instance if needed
-		instance := &dubboInstance{
-			addr:     addr,
-			port:     portNum,
-			service:  service,
-			metadata: meta,
+		instance := dubboInstance{
+			Addr:     addr,
+			Port:     portNum,
+			Service:  service,
+			Metadata: meta,
 		}
-		if filter != nil && !filter(instance) {
+		registryServicesByServiceKey[serviceKey] = append(registryServicesByServiceKey[serviceKey], instance)
+		if filter != nil && !filter(&instance) {
 			continue
 		}
 
@@ -298,7 +300,7 @@ func convertServiceEntry(
 		source.RectifyServiceEntry(cse.se)
 	}
 
-	return serviceEntryByServiceKey
+	return registryServicesByServiceKey, serviceEntryByServiceKey
 }
 
 func buildServiceKey(service string, meta map[string]string) string {
