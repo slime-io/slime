@@ -168,6 +168,7 @@ func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *
 func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) translateOutput {
 	in := cr.Spec.DeepCopy()
 	envoyFilter := &istio.EnvoyFilter{}
+	proxyVersion := r.Cfg.GetProxyVersion()
 
 	if in.WorkloadSelector != nil {
 		envoyFilter.WorkloadSelector = &istio.WorkloadSelector{
@@ -283,7 +284,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 					}
 				}
 
-				cfp := generateInlineCfp(t, patchCtx, &pluginInUse, inline)
+				cfp := generateInlineCfp(t, patchCtx, &pluginInUse, inline, proxyVersion)
 				configPatched = append(configPatched, cfp)
 			}
 		}
@@ -297,7 +298,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 }
 
 func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
-	p *v1alpha1.Plugin, inline *v1alpha1.Inline) translateOutputConfigPatch {
+	p *v1alpha1.Plugin, inline *v1alpha1.Inline, proxyVersion string) translateOutputConfigPatch {
 	var (
 		extraPatch *types.Struct
 		cfp        = &istio.EnvoyFilter_EnvoyConfigObjectPatch{}
@@ -321,6 +322,14 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 			Context: patchCtx,
 			ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
 				RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch}},
+		}
+
+		// only apply to protocol http
+		// dubbo or other support will be considered later
+		if proxyVersion != "" {
+			cfp.Match.Proxy = &istio.EnvoyFilter_ProxyMatch{
+				ProxyVersion: proxyVersion,
+			}
 		}
 		if t.applyToVh {
 			cfp.ApplyTo = istio.EnvoyFilter_VIRTUAL_HOST
@@ -620,6 +629,14 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 			},
 		},
 	}
+
+	// if proxyVersion is set, apply specified proxyVersion
+	if proxyVersion := r.cfg.GetProxyVersion(); proxyVersion != "" {
+		out.Match.Proxy = &istio.EnvoyFilter_ProxyMatch{
+			ProxyVersion: proxyVersion,
+		}
+	}
+
 	var extraPatch *types.Struct
 	if applyTo := r.getApplyTo(in); applyTo != defaultApplyTo.String() {
 		if extraPatch == nil {

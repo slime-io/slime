@@ -6,6 +6,7 @@ package config
 import (
 	fmt "fmt"
 	proto "github.com/gogo/protobuf/proto"
+	_ "google.golang.org/protobuf/types/known/structpb"
 	math "math"
 )
 

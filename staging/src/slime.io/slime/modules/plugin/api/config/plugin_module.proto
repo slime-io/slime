@@ -14,4 +14,8 @@ option go_package = "slime.io/slime/modules/plugin/api/config";
 message PluginModule {
   // by typeURL
   map<string, google.protobuf.Struct> configDiscoveryDefaultConfig = 1;
+
+  // A regular expression in golang regex format (RE2) that can be used to select proxies using a specific version of istio proxy to apply plugin envoyfilter.
+  // refer to https://istio.io/latest/docs/reference/config/networking/envoy-filter/#EnvoyFilter-ProxyMatch
+  string proxyVersion = 2;
 }

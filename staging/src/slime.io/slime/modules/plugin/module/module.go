@@ -63,6 +63,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		Env:    &env,
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Cfg:    cfg,
 	}).SetupWithManager(mgr); err != nil {
 		return fmt.Errorf("unable to create EnvoyPlugin controller, %+v", err)
 	}

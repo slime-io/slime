@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"slime.io/slime/modules/plugin/api/config"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -38,6 +39,7 @@ type EnvoyPluginReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 	Env    *bootstrap.Environment
+	Cfg    *config.PluginModule
 }
 
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=envoyplugins,verbs=get;list;watch;create;update;patch;delete
