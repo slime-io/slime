@@ -240,30 +240,21 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 		}
 		sort.Strings(wormholePort)
 		log.Infof("all wormholeport from initport and informer : %v", wormholePort)
-
+		firstUpdate := true
 		// polling request
 		pollTicker := time.NewTicker(10 * time.Second)
 		// init and retry request
 		retryCh := time.After(5 * time.Second)
-		first := make(chan struct{}, 1)
-		first <- struct{}{}
+
 		for {
-			select {
-			case <-ctx.Done():
-				log.Infof("Lazyload port auto management is terminated")
-				return
-			case <-first:
-				log.Infof("first time to run reloadWormholePort")
-			case <-pollTicker.C:
-			case <-retryCh:
-				retryCh = nil
-			}
-
-			// update wormholePort
-			log.Debugf("got timer event for updating wormholePort")
-
+			// update wormholePort at first time or needUpdate or update failed
 			wormholePort, needUpdate = reloadWormholePort(wormholePort, r.portProtocolCache, r.cfg.GetCleanupWormholePort())
-			if needUpdate || !successUpdate {
+			// hits firstUpdate at first time
+			if firstUpdate || needUpdate || !successUpdate {
+				if firstUpdate {
+					log.Infof("first time to update resources")
+					firstUpdate = false
+				}
 				log.Debugf("need to update resources")
 				successUpdate = updateResources(wormholePort, &r.env)
 				if !successUpdate {
@@ -272,6 +263,15 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 				}
 			} else {
 				log.Debugf("no need to update resources")
+			}
+
+			select {
+			case <-ctx.Done():
+				log.Infof("Lazyload port auto management is terminated")
+				return
+			case <-pollTicker.C:
+			case <-retryCh:
+				retryCh = nil
 			}
 		}
 	}()
