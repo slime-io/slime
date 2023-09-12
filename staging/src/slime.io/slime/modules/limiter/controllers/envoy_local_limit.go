@@ -571,7 +571,12 @@ func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimi
 			case microservicev1alpha2.SmartLimitDescriptor_Matcher_QueryMatch:
 				useQuery = true
 			case microservicev1alpha2.SmartLimitDescriptor_Matcher_HeadMatch:
-				useHeader = true
+				// compatible with old version
+				if match.UseQueryMatch {
+					useQuery = true
+				} else {
+					useHeader = true
+				}
 			}
 		}
 
