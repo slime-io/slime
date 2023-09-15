@@ -68,12 +68,12 @@
 - Standardize issue processing, pr processing, posting, community meeting mechanism and other content
 - Improve tutorials to help new users join the community
 
-## Slime v0.7.0
+## Slime v0.7.0(Released)
 
 - Optimized many of the problems encountered in practice
 
 
-## Slime v0.8.0 (In Planning)
+## Slime v0.8.0 (Released)
 
 **Traffic Management**
 
@@ -88,6 +88,9 @@
 
 - [Plugin] Support for service level plugin distribution
 
+## Slime v0.8.1(Processing)
+
+- Optimized many of the problems encountered in practice
 
 # 路线图
 
@@ -182,10 +185,14 @@
 详见RELEASE NOTE [V0.7.2](https://github.com/slime-io/slime/releases/tag/v0.7.2)
 
 
-# Slime v0.8.0（发布中）
+# Slime v0.8.0（已发布）
 - 支持grpc懒加载
 - 特征流量分发
   详见RELEASE NOTE [V0.8.0](https://github.com/slime-io/slime/releases/tag/v0.8.0)
+
+# Slime v0.8.1（发布中）
+- 优化处理了很多实践过程中遇到的问题
+  详见RELEASE NOTE [V0.8.1](https://github.com/slime-io/slime/releases/tag/v0.8.1)
 
 ## Slime v0.9.0（规划中）
 
