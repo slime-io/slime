@@ -186,6 +186,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			err:  err,
 		}:
 			if first && err != nil { // especially for the first watch failure
+				first = false
 				// When the err is not nil, the eventCh will be nil, need to redo watch,
 				break
 			}
