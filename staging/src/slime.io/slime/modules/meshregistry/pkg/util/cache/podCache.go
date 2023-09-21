@@ -74,7 +74,11 @@ func (pc *podCache) add(obj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			// log.Warnf("pod %s has no ip when add", pod.Name)
+			// log.Warnf("pod %s/%s has no ip when add", pod.Namespace, pod.Name)
+			return
+		}
+		if pod.Status.Phase != v1.PodRunning {
+			// log.Warnf("pod %s/%s is not running when add", pod.Namespace, pod.Name)
 			return
 		}
 		pc.cache.Set(ip, &podWrapper{&pod.ObjectMeta, pod.Spec.NodeName})
@@ -86,7 +90,11 @@ func (pc *podCache) update(oldObj, newObj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			// log.Warnf("pod %s has no ip when update", pod.Name)
+			// log.Warnf("pod %s/%s has no ip when update", pod.Namespace, pod.Name)
+			return
+		}
+		if pod.Status.Phase != v1.PodRunning {
+			// log.Warnf("pod %s/%s is not running when update", pod.Namespace, pod.Name)
 			return
 		}
 		pc.cache.Set(ip, &podWrapper{&pod.ObjectMeta, pod.Spec.NodeName})
@@ -98,7 +106,7 @@ func (pc *podCache) delete(obj interface{}) {
 	if ok {
 		ip := pod.Status.PodIP
 		if ip == "" {
-			// log.Warnf("pod %s has no ip when delete", pod.Name)
+			// log.Warnf("pod %s/%s has no ip when delete", pod.Namespace, pod.Name)
 			return
 		}
 		pc.cache.Remove(ip)
