@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
+	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	log "github.com/sirupsen/logrus"
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	mcpresource "istio.io/istio-mcp/pkg/config/schema/resource"
@@ -125,226 +126,227 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 	vs := cc.viewerStore
 	stop := cc.stop
 	mcs := cc.monitorControllers
-
 	seLabelSelectorKeys := config.Global.Misc["seLabelSelectorKeys"]
 	configRevision := config.Global.ConfigRev
 	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
 
 	// use cc to register handler for istio resources
-	// TODO divide serviceEntry handler to config handler and service handler, like istio
-	seToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
-		switch e {
-		case EventAdd:
-			istioSvcs, istioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
-			for _, istioSvc := range istioSvcs {
-				_, err = imc.Create(istioSvc.ConvertConfig())
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventAdd] for IstioService error: %+v", err)
-					return
-				}
-			}
-			for _, istioEp := range istioEps {
-				if _, err = imc.Create(istioEp.ConvertConfig()); err != nil {
-					log.Errorf("[seToIstioResHandler] [EventAdd] for IstioEndpoint error: %+v", err)
-					return
-				}
-			}
-		case EventUpdate:
-			oldIstioSvcs, oldIstioEps := serviceentry.ConvertSvcsAndEps(old, seLabelSelectorKeys)
-			for _, oldIstioSvc := range oldIstioSvcs {
-				c := oldIstioSvc.ConvertConfig()
-				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventUpdate] delete old IstioService error: %+v", err)
-					return
-				}
-			}
-			for _, oldIstioEp := range oldIstioEps {
-				c := oldIstioEp.ConvertConfig()
-				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventUpdate] delete old IstioEndpoint error: %+v", err)
-					return
-				}
-			}
-			newIstioSvcs, newIstioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
-			for _, newIstioSvc := range newIstioSvcs {
-				_, err = imc.Create(newIstioSvc.ConvertConfig())
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventUpdate] create new IstioService error: %+v", err)
-					return
-				}
-			}
-			for _, newIstioEp := range newIstioEps {
-				_, err = imc.Create(newIstioEp.ConvertConfig())
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventUpdate] create new IstioEndpoint error: %+v", err)
-					return
-				}
-			}
-		case EventDelete:
-			istioSvcs, istioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
-			for _, istioSvc := range istioSvcs {
-				c := istioSvc.ConvertConfig()
-				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventDelete] for IstioService error: %+v", err)
-					return
-				}
-			}
-			for _, istioEp := range istioEps {
-				c := istioEp.ConvertConfig()
-				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-				if err != nil {
-					log.Errorf("[seToIstioResHandler] [EventDelete] for IstioEndpoint error: %+v", err)
-					return
-				}
-			}
-		}
-	}
+	if config.Global.EnableConvertSeToIstioRes {
 
-	svcToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
-		switch e {
-		case EventAdd:
-			service, eps, err := kube.ConvertSvcAndEps(cfg, vs)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventAdd] ConvertSvcAndEps error: %+v", err)
-				return
-			}
-			_, err = imc.Create(service.ConvertConfig())
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventAdd] for service error: %+v", err)
-				return
-			}
-			for _, ep := range eps {
-				if _, err = imc.Create(ep.ConvertConfig()); err != nil {
-					log.Errorf("[svcToIstioResHandler] [EventAdd] for endpoint error: %+v", err)
-					return
+		seToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
+			switch e {
+			case EventAdd:
+				istioSvcs, istioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
+				for _, istioSvc := range istioSvcs {
+					_, err = imc.Create(istioSvc.ConvertConfig())
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventAdd] for IstioService error: %+v", err)
+						return
+					}
 				}
-			}
-		case EventUpdate:
-			oldService, oldEps, err := kube.ConvertSvcAndEps(old, vs)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
-				return
-			}
-			c := oldService.ConvertConfig()
-			err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventUpdate] delete old service error: %+v", err)
-				return
-			}
-			for _, oldEp := range oldEps {
-				c = oldEp.ConvertConfig()
-				if err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace); err != nil {
-					log.Errorf("[svcToIstioResHandler] [EventUpdate] delete old endpoint error: %+v", err)
-					return
+				for _, istioEp := range istioEps {
+					if _, err = imc.Create(istioEp.ConvertConfig()); err != nil {
+						log.Errorf("[seToIstioResHandler] [EventAdd] for IstioEndpoint error: %+v", err)
+						return
+					}
 				}
-			}
-
-			newService, newEps, err := kube.ConvertSvcAndEps(cfg, vs)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
-				return
-			}
-			_, err = imc.Create(newService.ConvertConfig())
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventUpdate] create new service error: %+v", err)
-				return
-			}
-			for _, newEp := range newEps {
-				if _, err = imc.Create(newEp.ConvertConfig()); err != nil {
-					log.Errorf("[svcToIstioResHandler] [EventUpdate] create new endpoint error: %+v", err)
-					return
+			case EventUpdate:
+				oldIstioSvcs, oldIstioEps := serviceentry.ConvertSvcsAndEps(old, seLabelSelectorKeys)
+				for _, oldIstioSvc := range oldIstioSvcs {
+					c := oldIstioSvc.ConvertConfig()
+					err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventUpdate] delete old IstioService error: %+v", err)
+						return
+					}
 				}
-			}
-		case EventDelete:
-			service, eps, err := kube.ConvertSvcAndEps(cfg, vs)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
-				return
-			}
-			c := service.ConvertConfig()
-			err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
-			if err != nil {
-				log.Errorf("[svcToIstioResHandler] [EventDelete] for service error: %+v", err)
-				return
-			}
-			for _, ep := range eps {
-				c = ep.ConvertConfig()
-				if err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace); err != nil {
-					log.Errorf("[svcToIstioResHandler] [EventDelete] for endpoint error: %+v", err)
-					return
+				for _, oldIstioEp := range oldIstioEps {
+					c := oldIstioEp.ConvertConfig()
+					err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventUpdate] delete old IstioEndpoint error: %+v", err)
+						return
+					}
 				}
-			}
-		}
-	}
-
-	epsToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
-		ep := cfg.Spec.(*v1.Endpoints)
-		hostname := kube.ServiceHostname(cfg.Name, cfg.Namespace, model.DefaultTrustDomain)
-
-		switch e {
-		case EventAdd:
-			// handle by svcHandler
-		case EventUpdate:
-			isCfg := imc.Get(resource.IstioService, string(hostname), cfg.Namespace)
-			if isCfg == nil {
-				return
-			}
-			is := isCfg.Spec.(*model.Service)
-
-			oldEp := old.Spec.(*v1.Endpoints)
-			oldIeps, err := kube.ConvertIstioEndpoints(oldEp, hostname, old.Name, old.Namespace, vs)
-			if err != nil {
-				log.Errorf("[epsToIstioResHandler] [EventUpdate] ConvertIstioEndpoints error: %+v", err)
-				return
-			}
-			for _, oldIep := range oldIeps {
-				oldIepName := oldIep.ServiceName + "/" + oldIep.ServicePortName + "/" + oldIep.Address + ":" + strconv.Itoa(int(oldIep.EndpointPort))
-				if err = imc.Delete(resource.IstioEndpoint, oldIepName, oldIep.Namespace); err != nil {
-					log.Errorf("[epsToIstioResHandler] [EventUpdate] delete old IstioEndpoint error: %+v", err)
-					return
+				newIstioSvcs, newIstioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
+				for _, newIstioSvc := range newIstioSvcs {
+					_, err = imc.Create(newIstioSvc.ConvertConfig())
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventUpdate] create new IstioService error: %+v", err)
+						return
+					}
 				}
-				// delete related istioService.Endpoints
-				for i, ep := range is.Endpoints {
-					if ep.Address == oldIep.Address && ep.EndpointPort == oldIep.EndpointPort {
-						l := len(is.Endpoints)
-						if i != l-1 {
-							is.Endpoints[i], is.Endpoints[l-1] = is.Endpoints[l-1], is.Endpoints[i]
-						}
-						is.Endpoints = is.Endpoints[:l-1]
-						break
+				for _, newIstioEp := range newIstioEps {
+					_, err = imc.Create(newIstioEp.ConvertConfig())
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventUpdate] create new IstioEndpoint error: %+v", err)
+						return
+					}
+				}
+			case EventDelete:
+				istioSvcs, istioEps := serviceentry.ConvertSvcsAndEps(cfg, seLabelSelectorKeys)
+				for _, istioSvc := range istioSvcs {
+					c := istioSvc.ConvertConfig()
+					err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventDelete] for IstioService error: %+v", err)
+						return
+					}
+				}
+				for _, istioEp := range istioEps {
+					c := istioEp.ConvertConfig()
+					err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+					if err != nil {
+						log.Errorf("[seToIstioResHandler] [EventDelete] for IstioEndpoint error: %+v", err)
+						return
 					}
 				}
 			}
+		}
 
-			newIeps, err := kube.ConvertIstioEndpoints(ep, hostname, cfg.Name, cfg.Namespace, vs)
-			if err != nil {
-				log.Errorf("[epsToIstioResHandler] [EventUpdate] ConvertIstioEndpoints error: %+v", err)
-				return
-			}
-			for _, newIep := range newIeps {
-				if _, err = imc.Create(newIep.ConvertConfig()); err != nil {
-					log.Errorf("[epsToIstioResHandler] [EventUpdate] create new IstioEndpoint error: %+v", err)
+		svcToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
+			switch e {
+			case EventAdd:
+				service, eps, err := kube.ConvertSvcAndEps(cfg, vs)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventAdd] ConvertSvcAndEps error: %+v", err)
 					return
 				}
-				// add related istioService.Endpoints
-				is.Endpoints = append(is.Endpoints, newIep)
-			}
+				_, err = imc.Create(service.ConvertConfig())
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventAdd] for service error: %+v", err)
+					return
+				}
+				for _, ep := range eps {
+					if _, err = imc.Create(ep.ConvertConfig()); err != nil {
+						log.Errorf("[svcToIstioResHandler] [EventAdd] for endpoint error: %+v", err)
+						return
+					}
+				}
+			case EventUpdate:
+				oldService, oldEps, err := kube.ConvertSvcAndEps(old, vs)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
+					return
+				}
+				c := oldService.ConvertConfig()
+				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventUpdate] delete old service error: %+v", err)
+					return
+				}
+				for _, oldEp := range oldEps {
+					c = oldEp.ConvertConfig()
+					if err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace); err != nil {
+						log.Errorf("[svcToIstioResHandler] [EventUpdate] delete old endpoint error: %+v", err)
+						return
+					}
+				}
 
-			if _, err := imc.Update(is.ConvertConfig()); err != nil {
-				log.Errorf("[epsToIstioResHandler] [EventUpdate] update IstioService error: %+v", err)
-				return
+				newService, newEps, err := kube.ConvertSvcAndEps(cfg, vs)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
+					return
+				}
+				_, err = imc.Create(newService.ConvertConfig())
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventUpdate] create new service error: %+v", err)
+					return
+				}
+				for _, newEp := range newEps {
+					if _, err = imc.Create(newEp.ConvertConfig()); err != nil {
+						log.Errorf("[svcToIstioResHandler] [EventUpdate] create new endpoint error: %+v", err)
+						return
+					}
+				}
+			case EventDelete:
+				service, eps, err := kube.ConvertSvcAndEps(cfg, vs)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventUpdate] ConvertSvcAndEps error: %+v", err)
+					return
+				}
+				c := service.ConvertConfig()
+				err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace)
+				if err != nil {
+					log.Errorf("[svcToIstioResHandler] [EventDelete] for service error: %+v", err)
+					return
+				}
+				for _, ep := range eps {
+					c = ep.ConvertConfig()
+					if err = imc.Delete(c.GroupVersionKind, c.Name, c.Namespace); err != nil {
+						log.Errorf("[svcToIstioResHandler] [EventDelete] for endpoint error: %+v", err)
+						return
+					}
+				}
 			}
-		case EventDelete:
-			// handle by svcHandler
 		}
-	}
 
-	cc.RegisterEventHandler(resource.ServiceEntry, seToIstioResHandler)
-	cc.RegisterEventHandler(resource.Service, svcToIstioResHandler)
-	cc.RegisterEventHandler(resource.Endpoints, epsToIstioResHandler)
+		epsToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
+			ep := cfg.Spec.(*v1.Endpoints)
+			hostname := kube.ServiceHostname(cfg.Name, cfg.Namespace, model.DefaultTrustDomain)
+
+			switch e {
+			case EventAdd:
+				// handle by svcHandler
+			case EventUpdate:
+				isCfg := imc.Get(resource.IstioService, string(hostname), cfg.Namespace)
+				if isCfg == nil {
+					return
+				}
+				is := isCfg.Spec.(*model.Service)
+
+				oldEp := old.Spec.(*v1.Endpoints)
+				oldIeps, err := kube.ConvertIstioEndpoints(oldEp, hostname, old.Name, old.Namespace, vs)
+				if err != nil {
+					log.Errorf("[epsToIstioResHandler] [EventUpdate] ConvertIstioEndpoints error: %+v", err)
+					return
+				}
+				for _, oldIep := range oldIeps {
+					oldIepName := oldIep.ServiceName + "/" + oldIep.ServicePortName + "/" + oldIep.Address + ":" + strconv.Itoa(int(oldIep.EndpointPort))
+					if err = imc.Delete(resource.IstioEndpoint, oldIepName, oldIep.Namespace); err != nil {
+						log.Errorf("[epsToIstioResHandler] [EventUpdate] delete old IstioEndpoint error: %+v", err)
+						return
+					}
+					// delete related istioService.Endpoints
+					for i, ep := range is.Endpoints {
+						if ep.Address == oldIep.Address && ep.EndpointPort == oldIep.EndpointPort {
+							l := len(is.Endpoints)
+							if i != l-1 {
+								is.Endpoints[i], is.Endpoints[l-1] = is.Endpoints[l-1], is.Endpoints[i]
+							}
+							is.Endpoints = is.Endpoints[:l-1]
+							break
+						}
+					}
+				}
+
+				newIeps, err := kube.ConvertIstioEndpoints(ep, hostname, cfg.Name, cfg.Namespace, vs)
+				if err != nil {
+					log.Errorf("[epsToIstioResHandler] [EventUpdate] ConvertIstioEndpoints error: %+v", err)
+					return
+				}
+				for _, newIep := range newIeps {
+					if _, err = imc.Create(newIep.ConvertConfig()); err != nil {
+						log.Errorf("[epsToIstioResHandler] [EventUpdate] create new IstioEndpoint error: %+v", err)
+						return
+					}
+					// add related istioService.Endpoints
+					is.Endpoints = append(is.Endpoints, newIep)
+				}
+
+				if _, err := imc.Update(is.ConvertConfig()); err != nil {
+					log.Errorf("[epsToIstioResHandler] [EventUpdate] update IstioService error: %+v", err)
+					return
+				}
+			case EventDelete:
+				// handle by svcHandler
+			}
+		}
+
+		cc.RegisterEventHandler(resource.ServiceEntry, seToIstioResHandler)
+		cc.RegisterEventHandler(resource.Service, svcToIstioResHandler)
+		cc.RegisterEventHandler(resource.Endpoints, epsToIstioResHandler)
+	}
 
 	go cc.Run(stop)
 
@@ -427,8 +429,31 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 	if err != nil {
 		return fmt.Errorf("invalid xds config source %s: %v", mc.configSource.Address, err)
 	}
+	types := srcAddress.Query()["types"]
 
 	initReqs := adsc.ConfigInitialRequests()
+	if types != nil {
+		var filteredReqs []*discovery.DiscoveryRequest
+		for _, req := range initReqs {
+			var match bool
+			gvk, err := resource.ParseGroupVersionKind(req.TypeUrl)
+			if err != nil {
+				log.Errorf("parse req.TypeUrl %s error: %+v", err)
+				continue
+			}
+			for _, t := range types {
+				if t == req.TypeUrl || strings.EqualFold(gvk.Kind, t) {
+					match = true
+					break
+				}
+			}
+			if match {
+				filteredReqs = append(filteredReqs, req)
+			}
+		}
+		initReqs = filteredReqs
+	}
+
 	var initReqTypes []string
 	for _, r := range initReqs {
 		initReqTypes = append(initReqTypes, r.TypeUrl)

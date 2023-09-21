@@ -33,6 +33,8 @@ message Global {
   ConfigSource istioConfigSource = 14;
   // deploy rev specified by user, used to define the deploy version of slime
   string deployRev = 15;
+  // enable/disable convert serviceentry to istio res when configsource is specified
+  bool enableConvertSeToIstioRes = 16;
 }
 
 message Log {
