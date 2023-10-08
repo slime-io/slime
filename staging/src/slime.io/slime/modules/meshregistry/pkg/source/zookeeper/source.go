@@ -199,17 +199,29 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	}
 
 	for {
-		con, _, err := zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout),
+		var con *zk.Conn
+		var err error
+		var once sync.Once
+		con, _, err = zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout),
 			zk.WithNoRetryHosts(), // https://github.com/slime-io/go-zk/pull/1
 			zk.WithEventCallback(func(ev zk.Event) {
 				if ev.Type != zk.EventDisconnected {
 					return
 				}
 
-				// notify recon
-				select {
-				case reconCh <- struct{}{}:
+				// use the reconnection mechanism of the current client first
+				time.Sleep(time.Duration(len(s.args.Address)+1) * time.Second)
+				switch con.State() {
+				case zk.StateConnected, zk.StateHasSession:
+					return
 				default:
+					// ensure that each zk connection triggers only one reconnect
+					once.Do(func() {
+						select {
+						case reconCh <- struct{}{}:
+						default:
+						}
+					})
 				}
 			}))
 		if err != nil {
@@ -219,7 +231,7 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 			// TODO: this should be done in go-zk
 			connected := false
 			for {
-				time.Sleep(time.Second) // Wait for connecting. When go-zk connects to zk, the timeout is one second.
+				time.Sleep(1500 * time.Millisecond) // Wait for connecting. When go-zk connects to zk, the timeout is one second.
 				connState := con.State()
 				if connState == zk.StateConnected || connState == zk.StateHasSession {
 					connected = true
@@ -227,13 +239,15 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 				}
 				if connState != zk.StateConnecting {
 					// connect failed
+					log.Debugf("wait for connected failed with current state: %s", connState)
+					con.Close()
 					break
 				}
-				// try connecting another zk instance
 			}
 			if connected {
 				// replace the connection
 				s.Con.Store(con)
+				log.Infof("reconnect to zk successfully")
 				break
 			}
 		}
