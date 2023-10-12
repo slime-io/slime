@@ -69,8 +69,11 @@ const (
 	StructHttpFilterAds             = "ads"
 	StructHttpFilterTypeURLs        = "type_urls"
 
+	StructMetadata = "metadata"
+
 	StructFilterTypedPerFilterConfig = "typedPerFilterConfig"
 	StructFilterPerFilterConfig      = "perFilterConfig"
+	StructFilterTypedFilterMetadata  = "typedFilterMetadata"
 
 	StructEnvoyLocalRateLimitLimiter  = "http_local_rate_limiter"
 	StructEnvoyLocalRateLimitEnabled  = "local_rate_limit_enabled"
