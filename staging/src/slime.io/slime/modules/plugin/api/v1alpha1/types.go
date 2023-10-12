@@ -39,7 +39,7 @@ type PluginManager struct {
 type PluginManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EnvoyPlugin `json:"items"`
+	Items           []PluginManager `json:"items"`
 }
 
 func init() {
