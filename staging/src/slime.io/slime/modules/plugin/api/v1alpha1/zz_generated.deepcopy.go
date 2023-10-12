@@ -116,7 +116,7 @@ func (in *PluginManagerList) DeepCopyInto(out *PluginManagerList) {
 	in.ListMeta.DeepCopyInto(&out.ListMeta)
 	if in.Items != nil {
 		in, out := &in.Items, &out.Items
-		*out = make([]EnvoyPlugin, len(*in))
+		*out = make([]PluginManager, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
