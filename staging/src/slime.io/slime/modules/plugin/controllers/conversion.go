@@ -9,12 +9,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"net/url"
+	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"strings"
 	"time"
-
-	jsonpatch "github.com/evanphx/json-patch/v5"
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 
 	envoyconfigcorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
@@ -82,7 +81,7 @@ func directPatching(name string) bool {
 
 // translate EnvoyPlugin
 func translatePluginToPatch(name, typeURL string, setting *types.Struct) *istio.EnvoyFilter_Patch {
-	return &istio.EnvoyFilter_Patch{Value: wrapPluginSettingsToPerFilterConfig(name, typeURL, setting)}
+	return &istio.EnvoyFilter_Patch{Value: translatePluginToPatchValue(name, typeURL, setting)}
 }
 
 func stringValueToStruct(strValue *wrappers.StringValue) *types.Struct {
@@ -117,17 +116,22 @@ func valueToTypedStructValue(typeURL string, setting *types.Struct) *types.Struc
 	}
 }
 
-func wrapPluginSettingsToFilterMetadata(name string, setting *types.Struct) *types.Struct {
-	return wrapStructToStruct(
-		util.StructMetadata, wrapStructToStruct(
-			util.StructFilterTypedFilterMetadata, wrapStructToStruct(
-				name, setting)))
-}
-
-func wrapPluginSettingsToPerFilterConfig(name, typeURL string, setting *types.Struct) *types.Struct {
-	return wrapStructToStruct(
-		util.StructFilterTypedPerFilterConfig, wrapStructToStruct(
-			name, valueToTypedStructValue(typeURL, setting)))
+func translatePluginToPatchValue(name, typeURL string, setting *types.Struct) *types.Struct {
+	return &types.Struct{
+		Fields: map[string]*types.Value{
+			util.StructFilterTypedPerFilterConfig: {
+				Kind: &types.Value_StructValue{
+					StructValue: &types.Struct{
+						Fields: map[string]*types.Value{
+							name: {
+								Kind: &types.Value_StructValue{StructValue: valueToTypedStructValue(typeURL, setting)},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func translateRlsAndCorsToDirectPatch(settings *types.Struct, applyToHTTPRoute bool) *istio.EnvoyFilter_Patch {
@@ -234,18 +238,15 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 					log.Errorf("convert wasm configuration to string value failed, skip plugin build, plugin: %s", p.Name)
 					continue
 				}
-				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, p.Name)
 				// ```yaml
-				// metadata:
-				//   typedFilterMetadata:
-				//     ns1.test-wasm:
-				//       '@type': type.googleapis.com/google.protobuf.StringValue
-				//       value: '{}'
+				// configuration:
+				//   '@type': type.googleapis.com/google.protobuf.StringValue
+				//   value: '{}'
 				// ```
 				inline = &v1alpha1.Inline{
-					DirectPatch: true,
-					Settings:    wrapPluginSettingsToFilterMetadata(pluginInUse.Name, stringValueToStruct(strValue)),
+					Settings: wrapStructToStruct("configuration", stringValueToStruct(strValue)),
 				}
+				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, p.Name)
 			case *v1alpha1.Plugin_Rider:
 				// ```yaml
 				// plugins:
