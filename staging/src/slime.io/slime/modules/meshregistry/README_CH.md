@@ -122,7 +122,7 @@
      image:
        pullPolicy: Always
        repository: docker.io/slimeio/slime-meshregistry
-       tag: v0.8.1
+       tag: v0.8.2
      module:
      - name: meshregistry
        kind: meshregistry
