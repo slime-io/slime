@@ -88,9 +88,15 @@
 
 - [Plugin] Support for service level plugin distribution
 
-## Slime v0.8.1(Processing)
+## Slime v0.8.1(Released)
 
 - Optimized many of the problems encountered in practice
+
+
+## Slime v0.8.2(Processing)
+
+- Optimized many of the problems encountered in practice
+
 
 # 路线图
 
@@ -190,27 +196,18 @@
 - 特征流量分发
   详见RELEASE NOTE [V0.8.0](https://github.com/slime-io/slime/releases/tag/v0.8.0)
 
-# Slime v0.8.1（发布中）
+# Slime v0.8.1（已发布）
 - 优化处理了很多实践过程中遇到的问题
   详见RELEASE NOTE [V0.8.1](https://github.com/slime-io/slime/releases/tag/v0.8.1)
 
+# Slime v0.8.2（发布中）
+- 优化处理了很多实践过程中遇到的问题
+  详见RELEASE NOTE [V0.8.2](https://github.com/slime-io/slime/releases/tag/v0.8.2)
+
 ## Slime v0.9.0（规划中）
-
-**流量管理**
-
-- 【智能降级】发布服务网格降级标准 API
-- 【智能降级】发布智能降级新模块
-
-**运维管理**
-
-- 【配置懒加载】发布服务网格配置精准推送标准 API
 
 **扩展管理**
-
-- 【插件管理】支持服务级别插件下发
-
-
-## Slime v0.9.0（规划中）
+- 支持服务级别插件下发
 
 **运维管理**
 - 前端控制台
