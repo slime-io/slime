@@ -155,22 +155,31 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 			desc = append(desc, item)
 
 		} else {
-
 			var useQuery, useHeader bool
+
 			for _, match := range descriptor.Match {
-				if match.UseQueryMatch {
+				switch match.MatchSource {
+				case microservicev1alpha2.SmartLimitDescriptor_Matcher_QueryMatch:
 					useQuery = true
-				} else {
+				case microservicev1alpha2.SmartLimitDescriptor_Matcher_HeadMatch:
+					// compatible with old version
+					if match.UseQueryMatch {
+						useQuery = true
+					} else {
+						useHeader = true
+					}
+				default:
 					useHeader = true
 				}
 			}
 
+			// if header match and querymatch both exist, generate it by request header and query
 			if useHeader && useQuery {
 				headerItem := &model.Descriptor{}
 				headerItem.Key = model.HeaderValueMatch
 				headerItem.Value = generateDescriptorValue(descriptor, loc)
 				headerItem.Descriptors = []model.Descriptor{
-					model.Descriptor{
+					{
 						Key:         model.QueryMatch,
 						Value:       generateDescriptorValue(descriptor, loc),
 						RateLimit:   ratelimit,
