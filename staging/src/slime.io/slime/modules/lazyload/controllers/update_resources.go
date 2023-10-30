@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slime.io/slime/framework/model"
 	"sort"
 	"strings"
 	"sync"
@@ -140,6 +141,12 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 				//   Resources located in other namespaces cannot be set ownerReferences,
 				//   and we need other ways to clean up these resources.
 				setOwnerReference(owner, res)
+
+				// only envoyfilter is need to set istio revision label when create
+				if gvr == kube.EnvoyFilterGVR && env.SelfResourceRev() != "" {
+					res.SetLabels(map[string]string{model.IstioRevLabel: env.SelfResourceRev()})
+				}
+
 				_, err = dynCli.Resource(gvr).Namespace(ns).Create(ctx, res, metav1.CreateOptions{})
 				if err != nil {
 					log.Errorf("create resource %s %s/%s error: %v", gvr.String(), ns, name, err)
