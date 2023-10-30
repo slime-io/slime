@@ -384,13 +384,9 @@ func (c *McpController) convert(e event.Event) (*mcpmodel.Config, string, string
 
 	var (
 		gvk = resource.TypeUrlToGvk(e.Source.Resource().GroupVersionKind().String())
-		ver = e.Resource.Metadata.Version
+		ver resource2.Version
 	)
-	if source.IsInternalResource(gvk) {
-		c.verMut.Lock()
-		ver = resource2.Version(time.Now().String())
-		c.verMut.Unlock()
-	} else {
+	if !source.IsInternalResource(gvk) {
 		k8sVer, err := strconv.ParseUint(string(ver), 10, 64)
 		if err != nil {
 			return nil, "", "", fmt.Errorf("k8s resource event %v version %v not uint", e.Resource.Metadata, ver)
@@ -413,10 +409,7 @@ func (c *McpController) convert(e event.Event) (*mcpmodel.Config, string, string
 		Spec:       e.Resource.Message,
 	}
 
-	if c.mcpArgs.EnableAnnoResVer {
-		if meta.ResourceVersion == "" {
-			return nil, "", "", fmt.Errorf("res ver empty but anno res ver enabled")
-		}
+	if c.mcpArgs.EnableAnnoResVer && meta.ResourceVersion != "" {
 		conf.UpdateAnnotationResourceVersion()
 	}
 
