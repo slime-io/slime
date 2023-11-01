@@ -176,11 +176,11 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 			// if header match and querymatch both exist, generate it by request header and query
 			if useHeader && useQuery {
 				headerItem := &model.Descriptor{}
-				headerItem.Key = model.HeaderValueMatch
+				headerItem.Key = model.QueryMatch
 				headerItem.Value = generateDescriptorValue(descriptor, loc)
 				headerItem.Descriptors = []model.Descriptor{
 					{
-						Key:         model.QueryMatch,
+						Key:         model.HeaderValueMatch,
 						Value:       generateDescriptorValue(descriptor, loc),
 						RateLimit:   ratelimit,
 						Descriptors: nil,
