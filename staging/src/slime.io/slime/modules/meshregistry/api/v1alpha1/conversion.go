@@ -19,6 +19,8 @@ func ConvertRegistrySourceToArgs(in *RegistrySource, out *bootstrap.RegistryArgs
 	return nil
 }
 
+var postCovertZookeeperSourceHook func(out *bootstrap.ZookeeperSourceArgs)
+
 func convertZookeeperSource(in *Zookeeper, out *bootstrap.ZookeeperSourceArgs) {
 	var sourcedEpSelectors []*bootstrap.EndpointSelector
 	for _, i := range in.AvailableInterfaces {
@@ -58,7 +60,7 @@ func convertZookeeperSource(in *Zookeeper, out *bootstrap.ZookeeperSourceArgs) {
 		}
 	}
 
-	var servicedEndpointSelector = map[string][]*bootstrap.EndpointSelector{}
+	servicedEndpointSelector := map[string][]*bootstrap.EndpointSelector{}
 	for igv, ips := range in.AbnormalInstanceIPs {
 		if len(ips) > 0 {
 			servicedEndpointSelector[igv] = []*bootstrap.EndpointSelector{
@@ -72,4 +74,7 @@ func convertZookeeperSource(in *Zookeeper, out *bootstrap.ZookeeperSourceArgs) {
 	}
 	out.EndpointSelectors = sourcedEpSelectors
 	out.ServicedEndpointSelectors = servicedEndpointSelector
+	if postCovertZookeeperSourceHook != nil {
+		postCovertZookeeperSourceHook(out)
+	}
 }
