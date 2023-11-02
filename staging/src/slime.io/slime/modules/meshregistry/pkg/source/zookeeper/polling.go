@@ -43,23 +43,31 @@ func (s *Source) refresh() {
 }
 
 func (s *Source) iface(service string) {
-	providerChild, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ProviderNode)
+	providers, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ProviderNode)
 	if err != nil {
 		log.Errorf("zk %s get provider error: %s", service, err.Error())
 		return
 	}
 
-	var consumerChild []string
+	var consumers []string
 	if s.args.GatewayModel {
-		consumerChild = make([]string, 0)
+		consumers = make([]string, 0)
 	} else {
-		consumerChild, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
+		consumers, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
 		if err != nil {
 			log.Debugf("zk %s get consumer error: %s", service, err.Error())
 		}
 	}
 
-	s.handleServiceData(s.pollingCache, providerChild, consumerChild, service)
+	var configurators []string
+	if s.args.EnableConfiguratorMeta {
+		configurators, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConfiguratorNode)
+		if err != nil {
+			log.Debugf("zk %s get configurator error: %s", service, err.Error())
+		}
+	}
+
+	s.handleServiceData(s.pollingCache, providers, consumers, configurators, service)
 }
 
 func (s *Source) handleNodeDelete(childrens []string) {

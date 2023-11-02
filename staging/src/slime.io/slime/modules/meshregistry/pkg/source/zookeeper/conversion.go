@@ -139,9 +139,17 @@ type convertedServiceEntry struct {
 }
 
 func convertServiceEntry(
-	providers, consumers []string, service string, svcPort uint32, instancePortAsSvcPort, patchLabel bool,
-	ignoreLabels map[string]string, gatewayMode bool,
-	filter func(*dubboInstance) bool) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
+	providers, consumers, configurators []string, service string, s *Source,
+) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
+	var (
+		svcPort               = s.args.SvcPort
+		instancePortAsSvcPort = s.args.InstancePortAsSvcPort
+		patchLabel            = s.args.LabelPatch
+		ignoreLabels          = s.ignoreLabelsMap
+		gatewayMode           = s.args.GatewayModel
+		filter                = s.getInstanceFilter()
+	)
+
 	registryServicesByServiceKey := make(map[string][]dubboInstance)
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
@@ -162,9 +170,14 @@ func convertServiceEntry(
 		}
 	}()
 
-	if providers == nil || len(providers) == 0 {
+	if len(providers) == 0 {
 		log.Debugf("%s no provider", service)
 		return registryServicesByServiceKey, serviceEntryByServiceKey
+	}
+
+	var extraMeta map[configuratorMetaKey]map[string]string
+	if len(configurators) > 0 && defaultExtraMetaPatcher != nil {
+		extraMeta = defaultExtraMetaPatcher.parseExtraMeta(configurators, service)
 	}
 
 	uniquePort := make(map[string]map[uint32]struct{})
@@ -189,7 +202,7 @@ func convertServiceEntry(
 			}
 		)
 
-		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, patchLabel, ignoreLabels, methodApplier)
+		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, portNum, service, patchLabel, ignoreLabels, methodApplier, extraMeta)
 		if !ok {
 			continue
 		}
@@ -266,7 +279,7 @@ func convertServiceEntry(
 				}
 
 				// XXX optimize inbound ep meta calculation
-				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, patchLabel, ignoreLabels, nil); ok {
+				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, portNum, "", patchLabel, ignoreLabels, nil, nil); ok {
 					meta = consumerMeta(meta)
 					consumerServiceKey := buildServiceKey(service, meta)
 					if consumerServiceKey == serviceKey {
@@ -303,16 +316,24 @@ func convertServiceEntry(
 	return registryServicesByServiceKey, serviceEntryByServiceKey
 }
 
-func buildServiceKey(service string, meta map[string]string) string {
-	group := meta[dubboParamGroupKey]
-	if len(group) == 0 {
-		group = meta[dubboParamDefaultGroupKey]
+func extractGroup(meta map[string]string) string {
+	g := meta[dubboParamGroupKey]
+	if len(g) == 0 {
+		g = meta[dubboParamDefaultGroupKey]
 	}
-	version := meta[dubboParamVersionKey]
-	if len(version) == 0 {
-		version = meta[dubboParamDefaultVersionKey]
-	}
+	return g
+}
 
+func extractVersion(meta map[string]string) string {
+	v := meta[dubboParamVersionKey]
+	if len(v) == 0 {
+		v = meta[dubboParamDefaultVersionKey]
+	}
+	return v
+}
+
+func buildServiceKey(service string, meta map[string]string) string {
+	group, version := extractGroup(meta), extractVersion(meta)
 	parts := []string{service, group, version}
 	// trim trailing empty parts
 	i := len(parts) - 1
@@ -371,7 +392,9 @@ func consumerMeta(labels map[string]string) map[string]string {
 	return labels
 }
 
-func verifyMeta(url string, ip string, patchLabel bool, ignoreLabels map[string]string, methodApplier func(string)) (map[string]string, bool) {
+func verifyMeta(url string, ip string, port uint32, service string, patchLabel bool, ignoreLabels map[string]string,
+	methodApplier func(string), extraMeta map[configuratorMetaKey]map[string]string,
+) (map[string]string, bool) {
 	if !strings.Contains(url, "?") {
 		log.Errorf("Invaild dubbo url, missing '?' %s", url)
 		return nil, false
@@ -417,6 +440,18 @@ func verifyMeta(url string, ip string, patchLabel bool, ignoreLabels map[string]
 					log.Warnf("invalid tag value: %s", kv[1])
 				}*/
 	}
+
+	if extraMeta != nil && defaultExtraMetaPatcher != nil {
+		metaKey := configuratorMetaKey{
+			ip:      ip,
+			port:    port,
+			service: service,
+			group:   extractGroup(meta),
+			version: extractVersion(meta),
+		}
+		defaultExtraMetaPatcher.patchExtraMeta(metaKey, meta, extraMeta)
+	}
+
 	util.FilterLabels(meta, patchLabel, ip, "zookeeper:"+ip)
 	return meta, true
 }
@@ -494,3 +529,20 @@ func splitUrl(zkChild string) []string {
 	}
 	return ss
 }
+
+type configuratorMetaKey struct {
+	ip   string
+	port uint32
+
+	// dubbo interface、group、version
+	service string
+	group   string
+	version string
+}
+
+type configuratorMetaPatcher interface {
+	parseExtraMeta(configurators []string, dubboInterface string) map[configuratorMetaKey]map[string]string
+	patchExtraMeta(key configuratorMetaKey, meta map[string]string, extraMeta map[configuratorMetaKey]map[string]string)
+}
+
+var defaultExtraMetaPatcher configuratorMetaPatcher

@@ -35,8 +35,8 @@ func (s *Source) ServiceNodeDelete(path string) {
 	}
 }
 
-func (s *Source) EndpointUpdate(provider, consumer []string, path string) {
-	s.handleServiceData(s.cache, provider, consumer, strings.Split(path, "/")[2])
+func (s *Source) EndpointUpdate(providers, consumers, configurators []string, path string) {
+	s.handleServiceData(s.cache, providers, consumers, configurators, strings.Split(path, "/")[2])
 }
 
 func (s *Source) Watching() {
@@ -47,6 +47,7 @@ func (s *Source) Watching() {
 		endpointUpdateFunc: s.EndpointUpdate,
 		serviceDeleteFunc:  s.ServiceNodeDelete,
 		gatewatModel:       s.args.GatewayModel,
+		watchConfigurators: s.args.EnableConfiguratorMeta,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
 		forceUpdateTrigger: s.forceUpdateTrigger,
 	}
@@ -63,6 +64,7 @@ func (s *Source) Watching() {
 const (
 	providerPathSuffix = "/providers"
 	consumerPathSuffix = "/consumers"
+	configuratorSuffix = "/configurators"
 )
 
 type EventType int
@@ -79,11 +81,12 @@ type ServiceEvent struct {
 
 type EndpointWatcherOpts struct {
 	conn                *atomic.Value
-	endpointUpdateFunc  func(providers, consumers []string, serverPath string)
+	endpointUpdateFunc  func(providers, consumers, configurators []string, serverPath string)
 	serviceDeleteFunc   func(path string)
 	gatewayMode         bool
 	initCallbackFactory func() func()
 	forceUpdateTrigger  *atomic.Value
+	watchConfigurators  bool
 }
 
 func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointWatcher {
@@ -91,15 +94,16 @@ func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointW
 		conn:        opts.conn,
 		servicePath: servicePath,
 		gatewayMode: opts.gatewayMode,
-		handler: func(providers, consumers []string) {
-			opts.endpointUpdateFunc(providers, consumers, servicePath)
+		handler: func(providers, consumers, configurators []string) {
+			opts.endpointUpdateFunc(providers, consumers, configurators, servicePath)
 		},
 		serviceDeleteHandler: func() {
 			opts.serviceDeleteFunc(servicePath)
 		},
-		signalExit:   make(chan struct{}),
-		exit:         make(chan struct{}),
-		initCallback: opts.initCallbackFactory(),
+		signalExit:         make(chan struct{}),
+		exit:               make(chan struct{}),
+		initCallback:       opts.initCallbackFactory(),
+		watchConfigurators: opts.watchConfigurators,
 	}
 	ew.forceUpdateTrigger = opts.forceUpdateTrigger
 	return ew
@@ -114,11 +118,12 @@ type EndpointWatcher struct {
 	servicePath string
 
 	// update by current status
-	handler func(providers, consumers []string)
+	handler func(providers, consumers, configurators []string)
 
 	serviceDeleteHandler func()
 
-	gatewayMode bool
+	gatewayMode        bool
+	watchConfigurators bool
 
 	signalExit, exit chan struct{}
 
@@ -208,13 +213,13 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 // watchService empty path means ignore ...
 func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consumerPath string) {
 	var (
-		providerCache, consumerCache []string
+		providerCache, consumerCache, configuratorCache []string
 		// Try to initialize, but it is not required to be completed,
 		// because the service may have been deleted or for others.
 		// So we consider both either valid data or fetch-err as init-done.
-		providerInit, consumerInit       = providerPath == "", consumerPath == ""
-		initCallBack                     = ew.initCallback
-		providerEventCh, consumerEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem)
+		providerInit, consumerInit, configuratorInit          = providerPath == "", consumerPath == "", !ew.watchConfigurators
+		initCallBack                                          = ew.initCallback
+		providerEventCh, consumerEventCh, configuratorEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem), make(chan simpleWatchItem)
 	)
 
 	defer func() {
@@ -229,6 +234,9 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 	}
 	if consumerPath != "" {
 		go ew.simpleWatch(ew.servicePath+consumerPath, consumerEventCh)
+	}
+	if ew.watchConfigurators {
+		go ew.simpleWatch(ew.servicePath+configuratorSuffix, configuratorEventCh)
 	}
 
 	for {
@@ -260,14 +268,19 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 			if item.err == nil {
 				consumerCache = item.data
 			}
+		case item := <-configuratorEventCh:
+			configuratorInit = true
+			if item.err == nil {
+				configuratorCache = item.data
+			}
 		case <-ew.signalExit:
 			ew.serviceDeleteHandler()
 			log.Infof("endpointWatcher %q exit due to service deleted", ew.servicePath)
 			return
 		}
 
-		if providerInit && consumerInit {
-			ew.handler(providerCache, consumerCache)
+		if providerInit && consumerInit && configuratorInit {
+			ew.handler(providerCache, consumerCache, configuratorCache)
 			if initCallBack != nil { // not-init -> init
 				initCallBack()
 				initCallBack = nil
@@ -313,11 +326,13 @@ func (q *eventQueue) Pop() (item ServiceEvent) {
 }
 
 func NewServiceWorker(conn *atomic.Value,
-	endpointUpdateFunc func([]string, []string, string),
+	endpointUpdateFunc func([]string, []string, []string, string),
 	serviceDeleteFunc func(string),
 	gatewatModel bool,
 	initCallbackFactory func() func(),
-	forceUpdateTrigger *atomic.Value) *worker {
+	forceUpdateTrigger *atomic.Value,
+	watchConfigurators bool,
+) *worker {
 	return &worker{
 		q:     NewQueue(),
 		cache: cmap.New(),
@@ -328,6 +343,7 @@ func NewServiceWorker(conn *atomic.Value,
 			gatewayMode:         gatewatModel,
 			initCallbackFactory: initCallbackFactory,
 			forceUpdateTrigger:  forceUpdateTrigger,
+			watchConfigurators:  watchConfigurators,
 		},
 	}
 }
@@ -388,9 +404,10 @@ type ServiceWatcher struct {
 
 	conn               *atomic.Value
 	rootPath           string
-	endpointUpdateFunc func([]string, []string, string)
+	endpointUpdateFunc func([]string, []string, []string, string)
 	serviceDeleteFunc  func(string)
 	gatewatModel       bool
+	watchConfigurators bool
 
 	svcs []string
 
@@ -486,7 +503,7 @@ func (sw *ServiceWatcher) handleSvcs(svcs []string) {
 func (sw *ServiceWatcher) dispatch(e ServiceEvent) {
 	workerIdx := fnv32(e.path) % uint32(len(sw.workers))
 	if sw.workers[workerIdx] == nil {
-		w := NewServiceWorker(sw.conn, sw.endpointUpdateFunc, sw.serviceDeleteFunc, sw.gatewatModel, sw.initCallbackFactory, sw.forceUpdateTrigger)
+		w := NewServiceWorker(sw.conn, sw.endpointUpdateFunc, sw.serviceDeleteFunc, sw.gatewatModel, sw.initCallbackFactory, sw.forceUpdateTrigger, sw.watchConfigurators)
 		w.Start(sw.ctx)
 		sw.workers[workerIdx] = w
 	}

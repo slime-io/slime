@@ -40,6 +40,7 @@ const (
 	SidecarDubboCallModelPath = "/sidecarDubboCallModel"
 	ConsumerNode              = "consumers"
 	ProviderNode              = "providers"
+	ConfiguratorNode          = "configurators"
 	Polling                   = "polling"
 
 	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
@@ -555,18 +556,18 @@ func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 	}
 }
 
-func (s *Source) handleServiceData(cacheInUse cmap.ConcurrentMap, provider, consumer []string, dubboInterface string) {
+func (s *Source) handleServiceData(
+	cacheInUse cmap.ConcurrentMap,
+	providers, consumers, configutators []string,
+	dubboInterface string,
+) {
 	if _, ok := cacheInUse.Get(dubboInterface); !ok {
 		cacheInUse.Set(dubboInterface, cmap.New())
 	}
 
-	freshSvcMap, freshSeMap := convertServiceEntry(
-		provider, consumer, dubboInterface, s.args.SvcPort, s.args.InstancePortAsSvcPort, s.args.LabelPatch,
-		s.ignoreLabelsMap, s.args.GatewayModel, s.getInstanceFilter())
-
+	freshSvcMap, freshSeMap := convertServiceEntry(providers, consumers, configutators, dubboInterface, s)
 	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
 	s.updateSeCache(cacheInUse, freshSeMap, dubboInterface)
-
 }
 
 func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap map[string][]dubboInstance) {
@@ -607,7 +608,6 @@ func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap m
 	for _, key := range deleteKey {
 		svcCache.Remove(key)
 	}
-
 }
 
 func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[string]*convertedServiceEntry, dubboInterface string) {
@@ -722,7 +722,8 @@ func generateInstanceFilter(
 	svcSel map[string][]*bootstrap.EndpointSelector,
 	epSel []*bootstrap.EndpointSelector,
 	emptySelectorsReturn bool,
-	alwaysUseSourceScopedEpSelectors bool) func(*dubboInstance) bool {
+	alwaysUseSourceScopedEpSelectors bool,
+) func(*dubboInstance) bool {
 	cfgs := make(map[string]source.HookConfig, len(svcSel))
 	for svc, selectors := range svcSel {
 		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
