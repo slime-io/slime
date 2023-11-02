@@ -250,6 +250,8 @@ type ZookeeperSourceArgs struct {
 	WatchingWorkerCount int    `json:"WatchingWorkerCount,omitempty"`
 
 	// dubbo configs
+	// configurator configs
+	EnableConfiguratorMeta bool `json:"EnableConfiguratorMeta,omitempty"`
 
 	// whether to gen dubbo `Sidecar`
 	EnableDubboSidecar bool `json:"EnableDubboSidecar,omitempty"`
