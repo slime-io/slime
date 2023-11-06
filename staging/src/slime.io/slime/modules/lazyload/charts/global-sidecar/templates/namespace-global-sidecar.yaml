@@ -302,7 +302,7 @@ spec:
           vhost:
             name: allow_any
         proxy:
-          proxyVersion: {{ $g.misc.proxyVersion }}
+          proxyVersion: {{ $f.proxyVersion }}
       patch:
         operation: REMOVE
     - applyTo: ROUTE_CONFIGURATION
@@ -311,7 +311,7 @@ spec:
         routeConfiguration:
           name: "{{ . }}"
         proxy:
-          proxyVersion: {{ $g.misc.proxyVersion }}
+          proxyVersion: {{ $f.proxyVersion }}
       patch:
         operation: MERGE
         value:
