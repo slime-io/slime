@@ -326,6 +326,8 @@ spec:
           name: "{{ . }}"
           vhost:
             name: allow_any
+        proxy:
+          proxyVersion: {{ $g.misc.proxyVersion }}
       patch:
         operation: REMOVE
     - applyTo: ROUTE_CONFIGURATION
@@ -333,6 +335,8 @@ spec:
         context: SIDECAR_OUTBOUND
         routeConfiguration:
           name: "{{ . }}"
+        proxy:
+          proxyVersion: {{ $g.misc.proxyVersion }}
       patch:
         operation: MERGE
         value:
@@ -427,6 +431,9 @@ spec:
     - applyTo: HTTP_FILTER
       match:
         context: SIDECAR_OUTBOUND
+        proxy:
+          proxyVersion: {{ $g.misc.proxyVersion }}
+      patch:
         listener:
           name: 0.0.0.0_{{ . }}
           filterChain:
@@ -461,7 +468,13 @@ spec:
         routeConfiguration:
           name: "{{ . }}"
           vhost:
+<<<<<<< HEAD
             name: allow_all
+=======
+            name: to_global_sidecar
+        proxy:
+          proxyVersion: {{ $g.misc.proxyVersion }}
+>>>>>>> 6c231c5 (add proxyVersion match)
       patch:
         operation: MERGE
         value:
