@@ -328,12 +328,8 @@ spec:
             name: allow_any
       {{- if $f.proxyVersion }}
         proxy:
-<<<<<<< HEAD
-          proxyVersion: {{ $g.misc.proxyVersion }}
-=======
           proxyVersion: {{ $f.proxyVersion }}
       {{- end }}
->>>>>>> 12e6483 (fix proxyVersion)
       patch:
         operation: REMOVE
     - applyTo: ROUTE_CONFIGURATION
@@ -343,12 +339,8 @@ spec:
           name: "{{ . }}"
       {{- if $f.proxyVersion }}
         proxy:
-<<<<<<< HEAD
-          proxyVersion: {{ $g.misc.proxyVersion }}
-=======
           proxyVersion: {{ $f.proxyVersion }}
       {{- end }}
->>>>>>> 12e6483 (fix proxyVersion)
       patch:
         operation: MERGE
         value:
@@ -445,13 +437,8 @@ spec:
         context: SIDECAR_OUTBOUND
         {{- if $f.proxyVersion }}
         proxy:
-<<<<<<< HEAD
-          proxyVersion: {{ $g.misc.proxyVersion }}
-      patch:
-=======
           proxyVersion: {{ $f.proxyVersion }}
         {{- end }}
->>>>>>> 12e6483 (fix proxyVersion)
         listener:
           name: 0.0.0.0_{{ . }}
           filterChain:
@@ -489,12 +476,8 @@ spec:
             name: allow_all
       {{- if $f.proxyVersion }}
         proxy:
-<<<<<<< HEAD
-          proxyVersion: {{ $g.misc.proxyVersion }}
-=======
           proxyVersion: {{ $f.proxyVersion }}
       {{- end }}
->>>>>>> 12e6483 (fix proxyVersion)
       patch:
         operation: MERGE
         value:
