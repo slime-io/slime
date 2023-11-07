@@ -690,11 +690,21 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 		deleteKey = append(deleteKey, serviceKey)
 		seValue, ok := v.(*ServiceEntryWithMeta)
 		if !ok {
+			log.Errorf("cast se failed, key: %s", serviceKey)
 			continue
 		}
 
 		// del event -> empty-ep update event
-		seValue.ServiceEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
+
+		if len(seValue.ServiceEntry.Endpoints) == 0 {
+			continue
+		}
+
+		seValueCopy := *seValue
+		seCopy := *seValue.ServiceEntry
+		seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+		seValueCopy.ServiceEntry = &seCopy
+		seCache.Set(serviceKey, &seValueCopy)
 
 		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
 		if err != nil {
