@@ -78,8 +78,15 @@ Slime-module
 
 [E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 
+## Contributing
 
+Slime is an open source project and we love contributions. [CONTRIBUTING_GUILDLINES](./CONTRIBUTING_GUILDLINES.md) is a guide that will help you get started.
 
+[CONTRIBUTING_GUILDLINES]()。
+
+## Who is using Slime
+
+We encourage you to submit a comment on this issue to include your use case: [#190](https://github.com/slime-io/slime/issues/190)
 
 ## Community
 
@@ -91,5 +98,8 @@ Slime-module
 
 ## License
 
-[Apache-2.0](https://choosealicense.com/licenses/apache-2.0/)
+Under [Apache-2.0](https://choosealicense.com/licenses/apache-2.0/)
 
+## Conduct
+
+We follow the [CNCF Community Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).

@@ -64,8 +64,6 @@ Slime架构主要分为三大块：
 
 Slime支持聚合打包，可以将任意模块聚合成一个镜像。所以，Slime可以以一个Deployment形式部署，避免组件过多。
 
-
-
 ## 教程
 
 [slime网站](https://slime-io.github.io/)
@@ -84,19 +82,32 @@ Slime-module
 [E2E测试教程](./doc/zh/slime_e2e_test_zh.md)
 
 
+## 编译构建slime镜像
+
+具体请参考[编译构建slime镜像](./doc/zh/slime-build.md)
+
+
+## 贡献代码
+
+如果您有兴趣向Slime项目贡献代码，请先阅读 [CONTRIBUTING_GUILDLINES](./CONTRIBUTING_GUILDLINES.md)。
+
+## 谁在使用Slime
+
+我们十分期待你提交你的使用案例，让我们一起来完善这个列表。[#190](https://github.com/slime-io/slime/issues/190)
 
 ## 交流
 
 - 微信群： 请添加微信号 `yonka_hust` 进群
-
 - QQ群: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - 邮件：slimedotio@gmail.com
 - 其他有用的信息可以查阅我们的官网 [Slime-Home](https://slime-io.github.io/)
 
-
-
-
 ## 证书
 
 [Apache-2.0](https://choosealicense.com/licenses/apache-2.0/)
+
+
+## 行为准则
+
+我们遵循 [CNCF Community Code of Conduct](https://github.com/cncf/foundation/blob/master/code-of-conduct.md).
