@@ -166,6 +166,16 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	return ret, ret.cacheJson, nil
 }
 
+func (s *Source) cacheShallowCopy() map[string]*networking.ServiceEntry {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	ret := make(map[string]*networking.ServiceEntry, len(s.cache))
+	for k, v := range s.cache {
+		ret[k] = v
+	}
+	return ret
+}
+
 func generateInstanceFilter(
 	svcSel map[string][]*bootstrap.EndpointSelector,
 	epSel []*bootstrap.EndpointSelector,
@@ -297,7 +307,7 @@ func (s *Source) getSeMetaModifierFactory() func(string) func(*resource.Metadata
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
-	b, err := json.MarshalIndent(s.cache, "", "  ")
+	b, err := json.MarshalIndent(s.cacheShallowCopy(), "", "  ")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "unable to marshal nacos se cache: %v", err)
 		return
