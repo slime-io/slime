@@ -110,8 +110,18 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 	return ret, ret.cacheJson, nil
 }
 
+func (s *Source) cacheShallowCopy() map[string]*networking.ServiceEntry {
+	s.mut.RLock()
+	defer s.mut.RUnlock()
+	ret := make(map[string]*networking.ServiceEntry, len(s.cache))
+	for k, v := range s.cache {
+		ret[k] = v
+	}
+	return ret
+}
+
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
-	b, err := json.MarshalIndent(s.cache, "", "  ")
+	b, err := json.MarshalIndent(s.cacheShallowCopy(), "", "  ")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "unable to marshal eureka se cache: %v", err)
 		return
@@ -150,43 +160,55 @@ func (s *Source) updateServiceInfo() error {
 		return fmt.Errorf("convert eureka servceentry map failed: %v", err)
 	}
 
-	for service, oldEntry := range s.cache {
+	cache := s.cacheShallowCopy()
+
+	for service, oldEntry := range cache {
 		if _, ok := newServiceEntryMap[service]; !ok {
-			// DELETE, set ep size to zero
-			delete(s.cache, service)
-			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
-			if event, err := buildEvent(event.Updated, oldEntry, service, s.args.ResourceNs); err == nil {
+			// DELETE ==> set ep size to zero
+			oldEntryCopy := *oldEntry
+			oldEntryCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+			newServiceEntryMap[service] = &oldEntryCopy
+			if event, err := buildEvent(event.Updated, &oldEntryCopy, service, s.args.ResourceNs); err == nil {
 				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
+			} else {
+				log.Errorf("build delete event for %s failed: %v", service, err)
 			}
 		}
 	}
 
 	for service, newEntry := range newServiceEntryMap {
-		if oldEntry, ok := s.cache[service]; !ok {
+		if oldEntry, ok := cache[service]; !ok {
 			// ADD
-			s.cache[service] = newEntry
 			if event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs); err == nil {
 				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
+			} else {
+				log.Errorf("build add event for %s failed: %v", service, err)
 			}
 		} else {
 			if !proto.Equal(oldEntry, newEntry) {
 				// UPDATE
-				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs); err == nil {
 					log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}
+				} else {
+					log.Errorf("build update event for %s failed: %v", service, err)
 				}
 			}
 		}
 	}
+
+	s.mut.Lock()
+	s.cache = newServiceEntryMap
+	s.mut.Unlock()
+
 	return nil
 }
 

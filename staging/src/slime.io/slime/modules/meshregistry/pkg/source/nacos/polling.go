@@ -62,7 +62,7 @@ func (s *Source) updateServiceInfo() error {
 		if _, ok := newServiceEntryMap[service]; !ok {
 			// DELETE, set ep size to zero
 			delete(s.cache, service)
-			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0)
+			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
 			if event, err := buildEvent(event.Updated, oldEntry, service, s.args.ResourceNs, seMetaModifierFactory(service)); err == nil {
 				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
