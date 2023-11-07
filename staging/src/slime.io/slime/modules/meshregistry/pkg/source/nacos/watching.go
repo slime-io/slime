@@ -171,47 +171,75 @@ func (s *Source) updateNacosService() {
 }
 
 func (s *Source) deleteService(serviceName string) {
-	for service, oldEntry := range s.cache {
-		if service == serviceName {
-			// DELETE, set ep size to zero
-			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
-			if event, err := buildEvent(event.Updated, oldEntry, service, s.args.ResourceNs, nil); err == nil {
-				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
-				for _, h := range s.handlers {
-					h.Handle(event)
-				}
+	s.mut.Lock()
+	oldEntry := s.cache[serviceName]
+	if oldEntry != nil {
+		// DELETE ==> set ep size to zero
+		oldEntryCopy := *oldEntry
+		oldEntryCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+		s.cache[serviceName] = &oldEntryCopy
+	}
+	s.mut.Unlock()
+
+	if oldEntry != nil {
+		if event, err := buildEvent(event.Updated, oldEntry, serviceName, s.args.ResourceNs, nil); err == nil {
+			log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
+			for _, h := range s.handlers {
+				h.Handle(event)
 			}
+		} else {
+			log.Errorf("build delete event for %s failed: %v", serviceName, err)
 		}
 	}
 }
 
 func (s *Source) updateService(newServiceEntryMap map[string]*networking.ServiceEntry) {
+	type update struct {
+		service            string
+		oldEntry, newEntry *networking.ServiceEntry
+	}
+
+	var updates []update
+	s.mut.Lock()
 	for service, newEntry := range newServiceEntryMap {
-		if oldEntry, ok := s.cache[service]; !ok {
+		updates = append(updates, update{
+			service:  service,
+			oldEntry: s.cache[service],
+			newEntry: newEntry,
+		})
+		s.cache[service] = newEntry
+	}
+	s.mut.Unlock()
+
+	for _, up := range updates {
+		newEntry := up.newEntry
+		if up.oldEntry == nil {
 			// ADD
-			s.cache[service] = newEntry
-			if event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs, nil); err == nil {
+			if event, err := buildEvent(event.Added, newEntry, up.service, s.args.ResourceNs, nil); err == nil {
 				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
+			} else {
+				log.Errorf("build add event for %s failed: %v", up.service, err)
 			}
 		} else {
-			if !reflect.DeepEqual(oldEntry, newEntry) {
+			if !reflect.DeepEqual(up.oldEntry, newEntry) {
 				// UPDATE
-				s.cache[service] = newEntry
-				if event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs, nil); err == nil {
+				if event, err := buildEvent(event.Updated, newEntry, up.service, s.args.ResourceNs, nil); err == nil {
 					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}
+				} else {
+					log.Errorf("build update event for %s failed: %v", up.service, err)
 				}
 			}
 		}
 	}
 }
 
-// 浦发 servicename 格式： group@@svc@@cluster  or  group@@svc
+// servicename 格式： group@@svc@@cluster  or  group@@svc
 func getServiceName(originName string) string {
 	items := strings.SplitN(originName, "@@", 3)
 	if len(items) > 1 {

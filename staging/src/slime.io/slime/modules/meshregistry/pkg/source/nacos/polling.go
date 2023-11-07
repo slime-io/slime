@@ -48,52 +48,66 @@ func (s *Source) updateServiceInfo() error {
 		return fmt.Errorf("get nacos instances failed: %v", err)
 
 	}
+
 	if s.reGroupInstances != nil {
 		instances = s.reGroupInstances(instances)
 	}
+
 	newServiceEntryMap, err := ConvertServiceEntryMap(
 		instances, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix,
 		s.args.InstancePortAsSvcPort, s.args.LabelPatch, s.args.NsfNacos, s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
 		return fmt.Errorf("convert nacos servceentry map failed: %v", err)
 	}
+
+	cache := s.cacheShallowCopy()
 	seMetaModifierFactory := s.getSeMetaModifierFactory()
-	for service, oldEntry := range s.cache {
+	for service, oldEntry := range cache {
 		if _, ok := newServiceEntryMap[service]; !ok {
-			// DELETE, set ep size to zero
-			delete(s.cache, service)
-			oldEntry.Endpoints = make([]*networking.WorkloadEntry, 0) // XXX not that safe
+			// DELETE ==> set ep size to zero
+			oldEntryCopy := *oldEntry
+			oldEntryCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+			newServiceEntryMap[service] = &oldEntryCopy
 			if event, err := buildEvent(event.Updated, oldEntry, service, s.args.ResourceNs, seMetaModifierFactory(service)); err == nil {
 				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
+			} else {
+				log.Errorf("build delete event for %s failed: %v", service, err)
 			}
 		}
 	}
 
 	for service, newEntry := range newServiceEntryMap {
-		if oldEntry, ok := s.cache[service]; !ok {
+		if oldEntry, ok := cache[service]; !ok {
 			// ADD
-			s.cache[service] = newEntry
 			if event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs, seMetaModifierFactory(service)); err == nil {
 				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
+			} else {
+				log.Errorf("build add event for %s failed: %v", service, err)
 			}
 		} else {
 			if !proto.Equal(oldEntry, newEntry) {
 				// UPDATE
-				s.cache[service] = newEntry
 				if event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs, seMetaModifierFactory(service)); err == nil {
 					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}
 				}
+			} else {
+				log.Errorf("build update event for %s failed: %v", service, err)
 			}
 		}
 	}
+
+	s.mut.Lock()
+	s.cache = newServiceEntryMap
+	s.mut.Unlock()
+
 	return nil
 }
