@@ -431,7 +431,10 @@ func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
 	// delete ips related svc
 	ipToSvcCache.Lock()
 	for _, ip := range ips {
-		delete(ipToSvcCache.Data, ip)
+		// ip maybe related to different svc
+		if _, ok := ipToSvcCache.Data[ip]; ok {
+			delete(ipToSvcCache.Data[ip], svc)
+		}
 	}
 	ipToSvcCache.Unlock()
 }
