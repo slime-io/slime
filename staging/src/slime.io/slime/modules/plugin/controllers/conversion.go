@@ -9,11 +9,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	jsonpatch "github.com/evanphx/json-patch/v5"
 	"net/url"
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"strings"
 	"time"
+
+	jsonpatch "github.com/evanphx/json-patch/v5"
+	"slime.io/slime/framework/apis/networking/v1alpha3"
 
 	envoyconfigcorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
@@ -634,6 +635,12 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 	if proxyVersion := r.cfg.GetProxyVersion(); proxyVersion != "" {
 		out.Match.Proxy = &istio.EnvoyFilter_ProxyMatch{
 			ProxyVersion: proxyVersion,
+		}
+	}
+
+	if in.DisableOnFilterLevel {
+		out.Patch.Value.Fields[util.StructFilterDisabled] = &types.Value{
+			Kind: &types.Value_BoolValue{BoolValue: true},
 		}
 	}
 
