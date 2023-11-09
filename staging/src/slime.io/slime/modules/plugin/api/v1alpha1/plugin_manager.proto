@@ -95,6 +95,7 @@ message Plugin {
     }
     Protocol protocol = 11;
     string generic_app_protocol = 12;
+    bool disable_on_filter_level = 13;
 }
 
 message Wasm {

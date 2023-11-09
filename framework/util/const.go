@@ -71,6 +71,7 @@ const (
 
 	StructFilterTypedPerFilterConfig = "typedPerFilterConfig"
 	StructFilterPerFilterConfig      = "perFilterConfig"
+	StructFilterDisabled             = "disabled"
 
 	StructEnvoyLocalRateLimitLimiter  = "http_local_rate_limiter"
 	StructEnvoyLocalRateLimitEnabled  = "local_rate_limit_enabled"
