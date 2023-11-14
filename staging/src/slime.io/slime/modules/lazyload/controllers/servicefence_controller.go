@@ -235,8 +235,10 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 		log.Infof("Creating a new Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
 		err = r.Client.Create(context.TODO(), sidecar)
 		if err != nil {
+			SidecarFailedCreations.Increment()
 			return err
 		}
+		SidecarCreations.Increment()
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Infof("existed sidecar %v istioRev %s but our rev %s, skip update ...",
 			nsName, foundRev, r.env.IstioRev())
@@ -248,6 +250,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 			if err != nil {
 				return err
 			}
+			SidecarRefreshes.Increment()
 		}
 	}
 	return nil
@@ -270,7 +273,7 @@ func (r *ServicefenceReconciler) updateServicefenceDomain(sf *lazyloadv1alpha1.S
 	sf.Status.Domains = domains
 
 	_ = r.Client.Status().Update(context.TODO(), sf)
-
+	ServiceFenceRefresh.Increment()
 	return
 }
 

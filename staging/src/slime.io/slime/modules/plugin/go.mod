@@ -12,6 +12,7 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.28.1
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
+	istio.io/pkg v0.0.0-20200807181912-d97bc429be20
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2

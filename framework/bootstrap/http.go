@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"contrib.go.opencensus.io/exporter/prometheus"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -102,17 +103,26 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
-func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pathRedirects map[string]string, readyChecker func() error) {
+func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pathRedirects map[string]string,
+	readyChecker func() error, pe *prometheus.Exporter) {
 	// register
 	HealthCheckRegister(ph, readyChecker)
 	PprofRegister(ph)
 	LogLevelRegister(ph)
 	ConfigStoreRegister(env, ph)
+	ExporterRegister(ph, pe)
 
 	log.Infof("aux server is starting to listen %s", addr)
 	if err := http.ListenAndServe(addr, ph.mux); err != nil {
 		log.Errorf("aux server starts error, %+v", err)
 	}
+}
+
+func ExporterRegister(ph *PathHandler, pe *prometheus.Exporter) {
+	if pe == nil {
+		return
+	}
+	ph.Handle("/metrics", pe)
 }
 
 func ConfigStoreRegister(env Environment, ph *PathHandler) {

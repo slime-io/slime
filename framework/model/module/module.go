@@ -8,10 +8,12 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"slime.io/slime/framework/monitoring"
 	"strings"
 	"sync"
 	"unsafe"
 
+	"contrib.go.opencensus.io/exporter/prometheus"
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
@@ -408,6 +410,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	// setup modules
+	monitoring.SubModulesCount.Record(float64(len(mcs)))
 	for _, mc := range mcs {
 		modCfg := mc.config
 		moduleEnv := bootstrap.Environment{
@@ -463,9 +466,17 @@ func Main(bundle string, modules []Module) {
 		}
 	}
 
+	// Create the Prometheus exporter.
+	pe, err := prometheus.NewExporter(prometheus.Options{
+		Namespace: util.MetricPrefix,
+	})
+	if err != nil {
+		log.Fatalf("Failed to create the Prometheus stats exporter: %v", err)
+	}
+
 	go func() {
 		auxAddr := mainModConfig.Global.Misc["aux-addr"]
-		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check)
+		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check, pe)
 	}()
 
 	// Run the runnable function registered by the submodule

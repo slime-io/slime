@@ -3,6 +3,7 @@ module slime.io/slime/framework
 go 1.16
 
 require (
+	contrib.go.opencensus.io/exporter/prometheus v0.4.0
 	github.com/envoyproxy/go-control-plane v0.9.9-0.20210217033140-668b12f5399d
 	github.com/ghodss/yaml v1.0.0
 	github.com/gogo/protobuf v1.3.2
@@ -15,7 +16,7 @@ require (
 	github.com/onsi/gomega v1.15.0
 	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
 	github.com/prometheus/client_golang v1.11.0
-	github.com/prometheus/common v0.26.0
+	github.com/prometheus/common v0.28.0
 	github.com/sirupsen/logrus v1.8.1
 	go.uber.org/zap v1.19.0
 	google.golang.org/grpc v1.38.0

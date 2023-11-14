@@ -47,6 +47,7 @@ type EnvoyPluginReconciler struct {
 
 func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
+	EnvoypluginReconciles.Increment()
 	// Fetch the EnvoyPlugin instance
 	instance := &microserviceslimeiov1alpha1.EnvoyPlugin{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -55,6 +56,7 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
 		} else {
+			EnvoypluginReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
 	}
@@ -89,6 +91,7 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			err = nil
 			found = nil
 		} else {
+			EnvoypluginReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
 	}
@@ -97,8 +100,10 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		err = r.Client.Create(ctx, ef)
 		if err != nil {
+			EnvoypluginReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
+		EnvoyfilterCreations.With(resourceName.Value("envoyplugin")).Increment()
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.Env.RevInScope(foundRev) {
 		log.Debugf("existed envoyfilter %v istioRev %s but our rev %s, skip updating to %+v",
 			req.NamespacedName, found, r.Env.IstioRev(), ef)
@@ -107,8 +112,10 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.Client.Update(ctx, ef)
 		if err != nil {
+			EnvoypluginReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
+		EnvoyfilterRefreshes.With(resourceName.Value("envoyplugin")).Increment()
 	}
 
 	return ctrl.Result{}, nil

@@ -15,6 +15,7 @@ require (
 	golang.org/x/sys v0.0.0-20210817190340-bfb29a6856f2
 	helm.sh/helm/v3 v3.6.2
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
+	istio.io/pkg v0.0.0-20200807181912-d97bc429be20
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
