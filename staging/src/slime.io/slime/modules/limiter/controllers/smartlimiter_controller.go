@@ -70,6 +70,8 @@ type SmartLimiterReconciler struct {
 func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 
 	log.Infof("begin reconcile, get smartlimiter %+v", req)
+	ReconcilesTotal.Increment()
+
 	instance := &microservicev1alpha2.SmartLimiter{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
@@ -98,6 +100,7 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 		if sidecarOutbound, gateway, err := r.Validate(instance); err != nil {
 			log.Errorf("invalid smartlimiter, %s", err)
+			ValidationFailedTotal.Increment()
 			return reconcile.Result{}, nil
 		} else {
 			r.RegisterInterest(instance, req, sidecarOutbound, gateway)
@@ -181,7 +184,6 @@ func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.
 }
 
 func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, sidecarOutbound, gateway bool) {
-
 	// set interest mapping
 	meta := SmartLimiterMeta{}
 	meta.gateway = gateway
@@ -193,6 +195,9 @@ func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2
 	key := FQN(req.Namespace, req.Name)
 	r.interest.Set(key, meta)
 	log.Infof("set %s/%s = %+v", instance.Namespace, instance.Name, meta)
+
+	count := r.interest.Count()
+	CachedLimiter.Record(float64(count))
 }
 
 type SmartLimiterMeta struct {
@@ -210,6 +215,8 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 	r.metricInfo.Pop(key)
 	r.interest.Pop(key)
 	log.Infof("name %s, namespace %s has poped", req.Name, req.Namespace)
+	count := r.interest.Count()
+	CachedLimiter.Record(float64(count))
 	// if contain global smart limiter, should delete info in configmap
 	if !r.cfg.GetDisableGlobalRateLimit() {
 		log.Infof("refresh global rate limiter configmap")

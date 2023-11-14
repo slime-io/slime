@@ -91,4 +91,5 @@ const (
 	WellknownK8sSuffix = ".svc.cluster.local"
 
 	GlobalSidecar = "global-sidecar"
+	MetricPrefix  = "slime"
 )

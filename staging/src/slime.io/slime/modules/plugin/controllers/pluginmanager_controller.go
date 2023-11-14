@@ -72,6 +72,7 @@ func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client,
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=pluginmanagers/status,verbs=get;update;patch
 
 func (r *PluginManagerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	PluginManagerReconciles.Increment()
 	return r.reconcile(ctx, req.NamespacedName)
 }
 
@@ -84,6 +85,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 			// TODO del relevant resource
 			return reconcile.Result{}, nil
 		} else {
+			PluginManagerReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
 	}
@@ -133,8 +135,10 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		err := r.client.Create(ctx, ef)
 		if err != nil {
+			PluginManagerReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
+		EnvoyfilterCreations.With(resourceName.Value("pluginmanager")).Increment()
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
 			nsName, foundRev, r.env.IstioRev())
@@ -144,8 +148,10 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.client.Update(ctx, ef)
 		if err != nil {
+			PluginManagerReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
+		EnvoyfilterRefreshes.With(resourceName.Value("pluginmanager")).Increment()
 	}
 
 	return ctrl.Result{}, nil

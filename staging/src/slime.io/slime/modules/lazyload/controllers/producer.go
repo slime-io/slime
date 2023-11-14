@@ -217,6 +217,8 @@ func NewCache(env bootstrap.Environment) (map[string]map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list servicefence error: %v", err)
 	}
+	ServicefenceLoads.Record(float64(len(svfList.Items)))
+
 	for _, svf := range svfList.Items {
 		meta := svf.GetNamespace() + "/" + svf.GetName()
 		value := make(map[string]string)

@@ -301,9 +301,11 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				markFenceCreatedByController(sf)
 				model.PatchIstioRevLabel(&sf.Labels, r.env.SelfResourceRev())
 				if err = r.Client.Create(ctx, sf); err != nil {
+					ServiceFenceFailedCreations.Increment()
 					log.Errorf("create fence %s failed, %+v", nn, err)
 					return reconcile.Result{}, err
 				}
+				ServiceFenceCreations.Increment()
 				log.Infof("create fence succeed %s:%s in refreshFenceStatusOfService", sf.Namespace, sf.Name)
 			} else {
 				log.Infof("service %s is not fenced, skip create servicefence", nn)
@@ -321,6 +323,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 				log.Errorf("delete fence %s failed, %+v", nn, err)
 				return reconcile.Result{}, err
 			}
+			ServiceFenceDelections.Increment()
 			return reconcile.Result{}, nil
 		}
 
@@ -331,6 +334,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 			if err := r.Client.Delete(ctx, sf); err != nil {
 				log.Errorf("delete fence %s failed, %+v", nn, err)
 			}
+			ServiceFenceDelections.Increment()
 		}
 	}
 
@@ -406,9 +410,11 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 				return
 			}
 			log.Errorf("create fence %s for workload selector by '%s=%s' failed: %s", namespacedName, r.workloadFenceLabelKey, v, err)
+			ServiceFenceFailedCreations.Increment()
 			// Todo: need retry
 			return
 		} else {
+			ServiceFenceCreations.Increment()
 			r.appendIpToFence(namespacedName, pod.Status.PodIP)
 		}
 		log.Infof("create fence %s for workload selector by '%s=%s' ", namespacedName, r.workloadFenceLabelKey, v)
@@ -445,6 +451,7 @@ func (r *ServicefenceReconciler) handlePodDelete(ctx context.Context, obj interf
 			// Todo: need retry
 			return
 		}
+		ServiceFenceDelections.Increment()
 	}
 }
 
@@ -615,6 +622,7 @@ func (r *ServicefenceReconciler) nsInScope(ctx context.Context, svc *corev1.Serv
 				log.Errorf("refreshFenceStatusOfService: delete serviceFence %s error, %+v", validNN, err)
 				return false, err
 			}
+			ServiceFenceDelections.Increment()
 		}
 
 		return false, nil

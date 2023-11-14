@@ -267,8 +267,10 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		// found is nil and obj's spec is not nil , create envoyFilter
 		if obj.Spec != nil {
 			if err := r.Client.Create(context.TODO(), obj); err != nil {
+				EnvoyFilterCreationsFailed.Increment()
 				return reconcile.Result{}, fmt.Errorf("creating a new EnvoyFilter err, %+v", err.Error())
 			}
+			EnvoyFilterCreations.Increment()
 			log.Infof("creating a new EnvoyFilter,%+v", loc)
 			return reconcile.Result{}, nil
 		} else {
@@ -295,6 +297,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 					log.Errorf("update envoyfilter err: %+v", err.Error())
 					return reconcile.Result{}, err
 				}
+				EnvoyfilterRefreshes.Increment()
 				log.Infof("Update a new EnvoyFilter succeed,%v", loc)
 				// Pod created successfully - don't requeue
 				return reconcile.Result{}, nil
@@ -306,6 +309,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 			if errors.IsNotFound(err) {
 				err = nil
 			}
+			EnvoyfilterDeletions.Increment()
 			return reconcile.Result{}, err
 		}
 	}

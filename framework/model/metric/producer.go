@@ -1,8 +1,6 @@
 package metric
 
-import (
-	"github.com/prometheus/common/log"
-)
+import log "github.com/sirupsen/logrus"
 
 func NewProducer(config *ProducerConfig, source Source) {
 	var wp *WatcherProducer

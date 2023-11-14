@@ -258,6 +258,7 @@ func (r *ServicefenceReconciler) StartAutoPort(ctx context.Context) {
 				log.Debugf("need to update resources")
 				successUpdate = updateResources(wormholePort, &r.env)
 				if !successUpdate {
+					UpdateExtraResourceFailed.Increment()
 					log.Infof("retry to update resources")
 					retryCh = time.After(1 * time.Second)
 				}
