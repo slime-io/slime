@@ -145,7 +145,7 @@ func (rm *moduleReadyManager) check() error {
 
 func LoadModule(name string, modGetter func(modCfg *bootconfig.Config) Module, bundleConfig *bootconfig.Config) (Module, *bootstrap.ParsedModuleConfig, error) {
 	pmCfg, err := bootstrap.GetModuleConfig(name)
-	if err != nil {
+	if err != nil || pmCfg == nil {
 		return nil, nil, err
 	}
 
@@ -226,6 +226,10 @@ func Main(bundle string, modules []Module) {
 	mainMod, mainModParsedCfg, err := LoadModule("", modGetter, nil)
 	if err != nil {
 		panic(err)
+	}
+	if mainMod == nil {
+		log.Error("main mod nil")
+		fatal()
 	}
 	mainModConfig, mainModRawJson, mainModGeneralJson := mainModParsedCfg.Config,
 		mainModParsedCfg.RawJson, mainModParsedCfg.GeneralJson
