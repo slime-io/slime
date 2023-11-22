@@ -3,6 +3,7 @@ package zookeeper
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -13,7 +14,23 @@ import (
 	"github.com/jpillora/backoff"
 	cmap "github.com/orcaman/concurrent-map"
 	"istio.io/libistio/pkg/config/event"
+	"istio.io/pkg/env"
 )
+
+var forceUpdateJitterDuration = env.RegisterDurationVar(
+	"FORCE_UPDATE_JITTER_DURATION",
+	time.Minute,
+	"Jitter time window for doing forced updates, default to 1 minute",
+).Get()
+
+func waitDoForceUpdate() {
+	time.Sleep(jitter(forceUpdateJitterDuration))
+}
+
+// jitter returns a random duration between 0 and period
+func jitter(period time.Duration) time.Duration {
+	return time.Duration(float64(period) * rand.Float64())
+}
 
 func (s *Source) ServiceNodeDelete(path string) {
 	ss := strings.Split(path, "/")
@@ -201,11 +218,13 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 				return
 			case <-eventCh:
 			case <-forceUpdateTrigger: // force update
+				waitDoForceUpdate()
 			}
 		case <-ew.exit:
 			return
 		case <-eventCh: // frequent change may delay the data(`paths`) distribute
 		case <-forceUpdateTrigger: // force update
+			waitDoForceUpdate()
 		}
 	}
 }
@@ -473,6 +492,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 				return
 			case <-e:
 			case <-forceUpdateTrigger:
+				waitDoForceUpdate()
 			}
 		}
 	}()
