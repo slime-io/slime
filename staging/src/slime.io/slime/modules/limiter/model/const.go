@@ -9,6 +9,8 @@ const (
 
 	HeaderValueMatch = "header_match"
 
+	RemoteAddress = "remote_address"
+
 	QueryMatch = "query_match"
 
 	BodyMatch = "body_match"
@@ -65,4 +67,6 @@ const (
 	InboundDefaultRoute = "default"
 
 	MockHost = "mock_host"
+
+	MockSourceIp = "240.240.240.240"
 )

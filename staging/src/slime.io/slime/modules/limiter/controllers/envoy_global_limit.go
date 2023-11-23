@@ -153,12 +153,12 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 				RateLimit: ratelimit,
 			})
 			desc = append(desc, item)
-
 		} else {
-			var useQuery, useHeader bool
-
+			var useQuery, useHeader, useSourceIP bool
 			for _, match := range descriptor.Match {
 				switch match.MatchSource {
+				case microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch:
+					useSourceIP = true
 				case microservicev1alpha2.SmartLimitDescriptor_Matcher_QueryMatch:
 					useQuery = true
 				case microservicev1alpha2.SmartLimitDescriptor_Matcher_HeadMatch:
@@ -172,36 +172,63 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 					useHeader = true
 				}
 			}
-
-			// if header match and querymatch both exist, generate it by request header and query
-			if useHeader && useQuery {
-				headerItem := &model.Descriptor{}
-				headerItem.Key = model.QueryMatch
-				headerItem.Value = generateDescriptorValue(descriptor, loc)
-				headerItem.Descriptors = []model.Descriptor{
-					{
-						Key:         model.HeaderValueMatch,
-						Value:       generateDescriptorValue(descriptor, loc),
-						RateLimit:   ratelimit,
-						Descriptors: nil,
-					},
-				}
-				desc = append(desc, headerItem)
-			} else if useHeader {
-				headerItem := &model.Descriptor{}
-				headerItem.Key = model.HeaderValueMatch
-				headerItem.RateLimit = ratelimit
-				headerItem.Value = generateDescriptorValue(descriptor, loc)
-				desc = append(desc, headerItem)
-			} else if useQuery {
-				queryItem := &model.Descriptor{}
-				queryItem.Key = model.QueryMatch
-				queryItem.RateLimit = ratelimit
-				queryItem.Value = generateDescriptorValue(descriptor, loc)
-				desc = append(desc, queryItem)
-			}
+			item := generateDescriptor(descriptor, useQuery, useHeader, useSourceIP, loc, ratelimit)
+			desc = append(desc, item)
 		}
 	}
+	return desc
+}
+
+func generateDescriptor(descriptor *microservicev1alpha2.SmartLimitDescriptor, useQuery, useHeader,
+	useSourceIP bool, loc types.NamespacedName, ratelimit *model.RateLimit,
+) *model.Descriptor {
+	desc := model.Descriptor{}
+	var sourceIPDesc, headerDesc, queryDesc model.Descriptor
+
+	val := generateDescriptorValue(descriptor, loc)
+
+	// suquence:  query > header > sourceIp
+	if useSourceIP {
+		desc = createDescriptor(model.RemoteAddress, generateRemoteAddressDescriptorValue(descriptor), ratelimit)
+		sourceIPDesc = createDescriptor(model.GenericKey, val, nil)
+		sourceIPDesc.Descriptors = []model.Descriptor{desc}
+	}
+
+	if useHeader {
+		headerDesc = createDescriptor(model.HeaderValueMatch, val, nil)
+		if useSourceIP {
+			headerDesc.Descriptors = []model.Descriptor{sourceIPDesc}
+		} else {
+			headerDesc.RateLimit = ratelimit
+		}
+	}
+
+	if useQuery {
+		queryDesc = createDescriptor(model.QueryMatch, val, nil)
+		if useHeader {
+			queryDesc.Descriptors = []model.Descriptor{headerDesc}
+		} else if useSourceIP {
+			queryDesc.Descriptors = []model.Descriptor{sourceIPDesc}
+		} else {
+			queryDesc.RateLimit = ratelimit
+		}
+	}
+
+	if useQuery {
+		desc = queryDesc
+	} else if useHeader {
+		desc = headerDesc
+	} else {
+		desc = sourceIPDesc
+	}
+	return &desc
+}
+
+func createDescriptor(key, value string, ratelimit *model.RateLimit) model.Descriptor {
+	desc := model.Descriptor{}
+	desc.Key = key
+	desc.Value = value
+	desc.RateLimit = ratelimit
 	return desc
 }
 

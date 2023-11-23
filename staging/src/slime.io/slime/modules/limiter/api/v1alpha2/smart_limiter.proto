@@ -137,6 +137,8 @@ message SmartLimitDescriptor {
             QueryMatch = 1;
             // json body
             JsonBodyMatch = 2;
+            // source ip address
+            SourceIpMatch = 3;
         }
         // match source, from header or query or json body
         Source matchSource = 11;
