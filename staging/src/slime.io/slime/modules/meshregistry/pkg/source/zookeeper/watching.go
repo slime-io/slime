@@ -16,6 +16,8 @@ import (
 	"github.com/robfig/cron/v3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/pkg/env"
+
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
 var forceUpdateJitterDuration = env.RegisterDurationVar(
@@ -68,6 +70,7 @@ func (s *Source) Watching() {
 		watchConfigurators: s.args.EnableConfiguratorMeta,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
 		forceUpdateTrigger: s.forceUpdateTrigger,
+		debounceConfig:     s.args.WatchingDebounce,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -129,6 +132,7 @@ type EndpointWatcherOpts struct {
 	initCallbackFactory func() func()
 	forceUpdateTrigger  *atomic.Value
 	watchConfigurators  bool
+	debounceConfig      *bootstrap.WatchingDebounce
 }
 
 func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointWatcher {
@@ -146,6 +150,7 @@ func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointW
 		exit:               make(chan struct{}),
 		initCallback:       opts.initCallbackFactory(),
 		watchConfigurators: opts.watchConfigurators,
+		debounceConfig:     opts.debounceConfig,
 	}
 	ew.forceUpdateTrigger = opts.forceUpdateTrigger
 	return ew
@@ -172,6 +177,7 @@ type EndpointWatcher struct {
 	initCallback func()
 
 	forceUpdateTrigger *atomic.Value
+	debounceConfig     *bootstrap.WatchingDebounce
 }
 
 // Start should not block
@@ -202,6 +208,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			Max: time.Minute,
 		}
 		first = true
+		d     = newDebouncer(ew.debounceConfig)
 	)
 
 	for {
@@ -224,6 +231,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		} else {
 			b.Reset()
 		}
+		d.updateLast()
 
 		log.Debugf("endpointWatcher %q watch %q got: %v", ew.servicePath, path, paths)
 		forceUpdateTrigger := ew.forceUpdateTrigger.Load().(chan struct{})
@@ -242,12 +250,14 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			case <-ew.exit:
 				return
 			case <-eventCh:
+				d.debounce()
 			case <-forceUpdateTrigger: // force update
 				waitDoForceUpdate()
 			}
 		case <-ew.exit:
 			return
 		case <-eventCh: // frequent change may delay the data(`paths`) distribute
+			d.debounce()
 		case <-forceUpdateTrigger: // force update
 			waitDoForceUpdate()
 		}
@@ -369,26 +379,11 @@ func (q *eventQueue) Pop() (item ServiceEvent) {
 	return item
 }
 
-func NewServiceWorker(conn *atomic.Value,
-	endpointUpdateFunc func([]string, []string, []string, string),
-	serviceDeleteFunc func(string),
-	gatewatModel bool,
-	initCallbackFactory func() func(),
-	forceUpdateTrigger *atomic.Value,
-	watchConfigurators bool,
-) *worker {
+func NewServiceWorker(opts EndpointWatcherOpts) *worker {
 	return &worker{
-		q:     NewQueue(),
-		cache: cmap.New(),
-		epWatcherOpts: EndpointWatcherOpts{
-			conn:                conn,
-			endpointUpdateFunc:  endpointUpdateFunc,
-			serviceDeleteFunc:   serviceDeleteFunc,
-			gatewayMode:         gatewatModel,
-			initCallbackFactory: initCallbackFactory,
-			forceUpdateTrigger:  forceUpdateTrigger,
-			watchConfigurators:  watchConfigurators,
-		},
+		q:             NewQueue(),
+		cache:         cmap.New(),
+		epWatcherOpts: opts,
 	}
 }
 
@@ -462,6 +457,7 @@ type ServiceWatcher struct {
 	initCnt, initThreshold int
 
 	forceUpdateTrigger *atomic.Value
+	debounceConfig     *bootstrap.WatchingDebounce
 }
 
 // block until initialized
@@ -469,6 +465,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 	sw.ctx = ctx
 	initCh := make(chan struct{})
 	go func() {
+		d := newDebouncer(sw.debounceConfig)
 		firstLoop := true
 		for {
 			select {
@@ -486,6 +483,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 				}
 				continue
 			}
+			d.updateLast()
 			svcs := make([]string, 0, len(paths))
 		outter:
 			for _, s := range paths {
@@ -516,6 +514,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 			case <-ctx.Done():
 				return
 			case <-e:
+				d.debounce()
 			case <-forceUpdateTrigger:
 				waitDoForceUpdate()
 			}
@@ -548,9 +547,17 @@ func (sw *ServiceWatcher) handleSvcs(svcs []string) {
 func (sw *ServiceWatcher) dispatch(e ServiceEvent) {
 	workerIdx := fnv32(e.path) % uint32(len(sw.workers))
 	if sw.workers[workerIdx] == nil {
-		w := NewServiceWorker(sw.conn, sw.endpointUpdateFunc, sw.serviceDeleteFunc, sw.gatewatModel, sw.initCallbackFactory, sw.forceUpdateTrigger, sw.watchConfigurators)
-		w.Start(sw.ctx)
-		sw.workers[workerIdx] = w
+		sw.workers[workerIdx] = NewServiceWorker(EndpointWatcherOpts{
+			conn:                sw.conn,
+			endpointUpdateFunc:  sw.endpointUpdateFunc,
+			serviceDeleteFunc:   sw.serviceDeleteFunc,
+			gatewayMode:         sw.gatewatModel,
+			initCallbackFactory: sw.initCallbackFactory,
+			forceUpdateTrigger:  sw.forceUpdateTrigger,
+			watchConfigurators:  sw.watchConfigurators,
+			debounceConfig:      sw.debounceConfig,
+		})
+		sw.workers[workerIdx].Start(sw.ctx)
 	}
 	sw.workers[workerIdx].HandleEvent(e)
 }
@@ -602,4 +609,59 @@ func fnv32(s string) uint32 {
 		h ^= uint32(c)
 	}
 	return h
+}
+
+type debouncer struct {
+	disabled             bool
+	delay                time.Duration
+	maxDelay             time.Duration
+	debounceDuration     time.Duration
+	debounceTriggerCount int
+	currentCount         int
+	overflowCount        int
+	lastWatchTime        time.Time
+}
+
+func newDebouncer(debounce *bootstrap.WatchingDebounce) *debouncer {
+	if debounce == nil {
+		return &debouncer{
+			disabled: true,
+		}
+	}
+	return &debouncer{
+		delay:                time.Duration(debounce.Delay),
+		maxDelay:             time.Duration(debounce.MaxDelay),
+		debounceDuration:     time.Duration(debounce.DebounceDuration),
+		debounceTriggerCount: debounce.TriggerCount,
+	}
+}
+
+func (d *debouncer) updateLast() {
+	d.lastWatchTime = time.Now()
+}
+
+func (d *debouncer) debounce() {
+	if d.disabled {
+		return
+	}
+	if time.Since(d.lastWatchTime) < d.debounceDuration {
+		d.currentCount++
+		if d.currentCount > d.debounceTriggerCount {
+			d.overflowCount++
+			d.currentCount = d.debounceTriggerCount
+		}
+	} else {
+		if d.currentCount > 0 {
+			d.currentCount--
+		}
+		d.overflowCount = 0
+	}
+	if d.currentCount >= d.debounceTriggerCount {
+		factor := 1.0 + float64(d.overflowCount)/float64(d.debounceTriggerCount)
+		usingDelay := d.delay * time.Duration(factor)
+		if usingDelay > d.maxDelay {
+			usingDelay = d.maxDelay
+		}
+		time.Sleep(usingDelay)
+	}
 }

@@ -246,9 +246,10 @@ type ZookeeperSourceArgs struct {
 	RegistryRootNode            string `json:"RegistryRootNode,omitempty"`
 	ApplicationRegisterRootNode string `json:"ApplicationRegisterRootNode,omitempty"`
 	// zk mode for get zk info
-	Mode                string `json:"Mode,omitempty"`
-	WatchingWorkerCount int    `json:"WatchingWorkerCount,omitempty"`
-	WatchingResyncCron         string `json:"WatchingResyncCron,omitempty"`
+	Mode                string            `json:"Mode,omitempty"`
+	WatchingWorkerCount int               `json:"WatchingWorkerCount,omitempty"`
+	WatchingResyncCron  string            `json:"WatchingResyncCron,omitempty"`
+	WatchingDebounce    *WatchingDebounce `json:"WatchingDebounce,omitempty"`
 
 	// dubbo configs
 	// configurator configs
@@ -264,6 +265,13 @@ type ZookeeperSourceArgs struct {
 	SelfConsume bool `json:"SelfConsume,omitempty"`
 
 	// mcp configs
+}
+
+type WatchingDebounce struct {
+	TriggerCount     int           `json:"TriggerCount,omitempty"`
+	DebounceDuration util.Duration `json:"DebounceDuration,omitempty"`
+	Delay            util.Duration `json:"Delay,omitempty"`
+	MaxDelay         util.Duration `json:"MaxDelay,omitempty"`
 }
 
 func (zkArgs *ZookeeperSourceArgs) Validate() error {
