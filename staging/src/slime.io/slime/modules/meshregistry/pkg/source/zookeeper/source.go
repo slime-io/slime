@@ -759,8 +759,10 @@ func generateInstanceFilter(
 }
 
 func (s *Source) forceUpdate() {
+	s.mut.Lock()
 	forceUpdateTrigger := s.forceUpdateTrigger.Load().(chan struct{})
 	s.forceUpdateTrigger.Store(make(chan struct{}))
+	s.mut.Unlock()
 	close(forceUpdateTrigger)
 }
 

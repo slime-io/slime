@@ -13,6 +13,7 @@ import (
 	"github.com/go-zookeeper/zk"
 	"github.com/jpillora/backoff"
 	cmap "github.com/orcaman/concurrent-map"
+	"github.com/robfig/cron/v3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/pkg/env"
 )
@@ -70,10 +71,34 @@ func (s *Source) Watching() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
 	go func() {
 		<-s.stop
 		cancel()
 	}()
+
+	go func() {
+		if s.args.WatchingResyncCron == "" {
+			return
+		}
+		log.Infof("watching add rewatch cron job with specs: %q", s.args.WatchingResyncCron)
+		c := cron.New(
+			cron.WithParser(cron.NewParser(cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor)),
+			cron.WithLogger(cron.VerbosePrintfLogger(log)),
+		)
+		for _, spec := range strings.Split(s.args.WatchingResyncCron, ",") {
+			if spec = strings.TrimSpace(spec); spec != "" {
+				_, err := c.AddFunc(spec, func() { s.forceUpdate() })
+				if err != nil {
+					log.Errorf("watching add rewatch cron job failed, err: %v", err)
+				}
+			}
+		}
+		c.Start() // asynchronized run cron job
+		<-ctx.Done()
+		c.Stop()
+	}()
+
 	sw.Start(ctx)
 	s.markServiceEntryInitDone()
 }

@@ -248,6 +248,7 @@ type ZookeeperSourceArgs struct {
 	// zk mode for get zk info
 	Mode                string `json:"Mode,omitempty"`
 	WatchingWorkerCount int    `json:"WatchingWorkerCount,omitempty"`
+	WatchingResyncCron         string `json:"WatchingResyncCron,omitempty"`
 
 	// dubbo configs
 	// configurator configs
