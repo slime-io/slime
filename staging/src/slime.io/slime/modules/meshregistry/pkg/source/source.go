@@ -1,11 +1,12 @@
 package source
 
 import (
+	"strings"
+	"time"
+
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/features"
-	"strings"
-	"time"
 
 	resource2 "istio.io/istio-mcp/pkg/config/schema/resource"
 	"istio.io/libistio/pkg/config/resource"

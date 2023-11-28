@@ -38,6 +38,7 @@ import (
 	slimebootstrap "slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
 	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
@@ -267,6 +268,7 @@ func (p *Processing) Start() (err error) {
 	p.httpServer.ListenerRegistry(mcpController, startWG, p.startXdsOverMcp)
 
 	go func() {
+		monitoring.RecordEnabledSource(len(csrc))
 		for _, src := range csrc {
 			src.Start()
 		}
@@ -333,12 +335,14 @@ func (p *Processing) getDeployKubeClient() (k kube.Interfaces, err error) {
 }
 
 func (p *Processing) createFileKubeSource(schemas collection.Schemas, filePath string, watchFiles bool) (
-	src event.Source, err error) {
+	src event.Source, err error,
+) {
 	return fsNew(filePath, schemas, watchFiles)
 }
 
 func (p *Processing) createKubeSource(schemas collection.Schemas) (
-	src event.Source, err error) {
+	src event.Source, err error,
+) {
 	o := apiserver.Options{
 		Client:            p.k,
 		WatchedNamespaces: p.regArgs.K8SSource.WatchedNamespaces,

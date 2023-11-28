@@ -25,6 +25,7 @@ import (
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 )
 
@@ -316,6 +317,7 @@ func (c *McpController) push() {
 	log.Infof("new push for version: %s", version)
 	c.mcpServer.NotifyPush(req)
 	c.lastPushVer = version
+	monitoring.RecordMcpPush()
 }
 
 func (c *McpController) start(ctx context.Context) {

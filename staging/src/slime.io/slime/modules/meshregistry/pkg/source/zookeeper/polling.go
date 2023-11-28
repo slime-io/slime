@@ -3,10 +3,11 @@ package zookeeper
 import (
 	"time"
 
-	"github.com/go-zookeeper/zk"
 	cmap "github.com/orcaman/concurrent-map"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
+
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
 func (s *Source) Polling() {
@@ -28,9 +29,12 @@ func (s *Source) Polling() {
 }
 
 func (s *Source) refresh() {
-	log.Infof("zk refresh start : %d", time.Now().UnixNano())
-	children, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode)
+	t0 := time.Now()
+	log.Infof("zk refresh start : %d", t0.UnixNano())
+	children, err := s.Con.Children(s.args.RegistryRootNode)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
+		monitoring.RecordPolling(SourceName, t0, time.Now(), false)
 		log.Errorf("zk path %s get child error: %s", s.args.RegistryRootNode, err.Error())
 		return
 	}
@@ -38,12 +42,15 @@ func (s *Source) refresh() {
 		s.iface(child)
 	}
 	s.handleNodeDelete(children)
-	log.Infof("zk refresh finish : %d", time.Now().UnixNano())
+	t1 := time.Now()
+	log.Infof("zk refresh finish : %d", t1.UnixNano())
+	monitoring.RecordPolling(SourceName, t0, t1, true)
 	s.markServiceEntryInitDone()
 }
 
 func (s *Source) iface(service string) {
-	providers, _, err := s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ProviderNode)
+	providers, err := s.Con.Children(s.args.RegistryRootNode + "/" + service + "/" + ProviderNode)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
 		log.Errorf("zk %s get provider error: %s", service, err.Error())
 		return
@@ -53,7 +60,8 @@ func (s *Source) iface(service string) {
 	if s.args.GatewayModel {
 		consumers = make([]string, 0)
 	} else {
-		consumers, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
+		consumers, err = s.Con.Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
+		monitoring.RecordSourceClientRequest(SourceName, err == nil)
 		if err != nil {
 			log.Debugf("zk %s get consumer error: %s", service, err.Error())
 		}
@@ -61,7 +69,7 @@ func (s *Source) iface(service string) {
 
 	var configurators []string
 	if s.args.EnableConfiguratorMeta {
-		configurators, _, err = s.Con.Load().(*zk.Conn).Children(s.args.RegistryRootNode + "/" + service + "/" + ConfiguratorNode)
+		configurators, err = s.Con.Children(s.args.RegistryRootNode + "/" + service + "/" + ConfiguratorNode)
 		if err != nil {
 			log.Debugf("zk %s get configurator error: %s", service, err.Error())
 		}
@@ -103,8 +111,8 @@ func (s *Source) handleNodeDelete(childrens []string) {
 					seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
 					seValueCopy.ServiceEntry = &seCopy
 					ses.Set(k, &seValueCopy)
-
-					if event, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil); err == nil {
+					event, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
+					if err == nil {
 						log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 						for _, h := range s.handlers {
 							h.Handle(event)
@@ -112,6 +120,7 @@ func (s *Source) handleNodeDelete(childrens []string) {
 					} else {
 						log.Errorf("delete(update) svc %s failed, case: %v", k, err.Error())
 					}
+					monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
 				}
 			}
 		}

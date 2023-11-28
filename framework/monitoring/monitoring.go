@@ -2,14 +2,18 @@ package monitoring
 
 import (
 	"fmt"
+
 	"istio.io/pkg/monitoring"
 )
 
-var (
-	SubModulesCount = monitoring.NewGauge(
-		"framework_submodules_count",
-		"total number of submodules",
-	)
+const (
+	UnitSeconds      = "s"
+	UnitMilliseconds = "ms"
+)
+
+var SubModulesCount = monitoring.NewGauge(
+	"framework_submodules_count",
+	"total number of submodules",
 )
 
 func init() {
@@ -30,10 +34,20 @@ func NewSum(module string, name string, help string, options ...monitoring.Optio
 	return sum
 }
 
+func NewDistribution(module string, name string, help string, bounds []float64, options ...monitoring.Options) monitoring.Metric {
+	histogram := monitoring.NewDistribution(fmt.Sprintf("%s_%s", module, name), help, bounds, options...)
+	monitoring.MustRegister(histogram)
+	return histogram
+}
+
 func MustCreateLabel(key string) monitoring.Label {
 	return monitoring.MustCreateLabel(key)
 }
 
-func WithLabels(resourceName monitoring.Label) monitoring.Options {
-	return monitoring.WithLabels(resourceName)
+func WithLabels(resourceName ...monitoring.Label) monitoring.Options {
+	return monitoring.WithLabels(resourceName...)
+}
+
+func WithUnit(unit string) monitoring.Options {
+	return monitoring.WithUnit(monitoring.Unit(unit))
 }

@@ -18,6 +18,7 @@ import (
 	"istio.io/pkg/env"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
 var forceUpdateJitterDuration = env.RegisterDurationVar(
@@ -42,11 +43,13 @@ func (s *Source) ServiceNodeDelete(path string) {
 		if ses, ok := seMap.(cmap.ConcurrentMap); ok {
 			for serviceKey, value := range ses.Items() {
 				if se, ok := value.(*ServiceEntryWithMeta); ok {
-					if event, err := buildServiceEntryEvent(event.Deleted, se.ServiceEntry, se.Meta, nil); err == nil {
+					event, err := buildServiceEntryEvent(event.Deleted, se.ServiceEntry, se.Meta, nil)
+					if err == nil {
 						for _, h := range s.handlers {
 							h.Handle(event)
 						}
 					}
+					monitoring.RecordServiceEntryDeletion(SourceName, true, err == nil)
 					ses.Remove(serviceKey)
 				}
 			}
@@ -125,7 +128,7 @@ type ServiceEvent struct {
 }
 
 type EndpointWatcherOpts struct {
-	conn                *atomic.Value
+	conn                *zkConn
 	endpointUpdateFunc  func(providers, consumers, configurators []string, serverPath string)
 	serviceDeleteFunc   func(path string)
 	gatewayMode         bool
@@ -157,7 +160,7 @@ func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointW
 }
 
 type EndpointWatcher struct {
-	conn *atomic.Value
+	conn *zkConn
 
 	// /{root:dubbo}/{service:<service-name>}
 	// - /{root:dubbo}/{service:<service-name>}/providers/dubbo://ip:port/{provider_service}}?xxx
@@ -221,7 +224,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		// When registering a watch for the first time, no matter whether it is successful or not,
 		// we will return the result to the upper layer, so that the upper layer can execute possible
 		// callbacks after determining that the first watch has completed.
-		paths, _, eventCh, err := ew.conn.Load().(*zk.Conn).ChildrenW(path)
+		paths, eventCh, err := ew.conn.ChildrenW(path)
 		if err != nil {
 			log.Debugf("endpointWatcher %q watch %q failed: %v", ew.servicePath, path, err)
 			if !first {
@@ -441,7 +444,7 @@ var dubboExcludeServicePath = []string{
 type ServiceWatcher struct {
 	ctx context.Context
 
-	conn               *atomic.Value
+	conn               *zkConn
 	rootPath           string
 	endpointUpdateFunc func([]string, []string, []string, string)
 	serviceDeleteFunc  func(string)
@@ -474,7 +477,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 			default:
 			}
 
-			paths, _, e, err := sw.conn.Load().(*zk.Conn).ChildrenW(sw.rootPath)
+			paths, e, err := sw.conn.ChildrenW(sw.rootPath)
 			if err != nil {
 				if errors.Is(err, zk.ErrNoNode) && firstLoop {
 					// mark ready

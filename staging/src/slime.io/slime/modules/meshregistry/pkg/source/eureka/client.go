@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
 type application struct {
@@ -127,6 +128,7 @@ func (c *client) Applications() ([]*application, error) {
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.client.Do(req)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
 		return nil, err
 	}
