@@ -26,6 +26,7 @@ import (
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
@@ -47,6 +48,30 @@ const (
 
 	defaultServiceFilter = ""
 )
+
+type zkConn struct {
+	conn atomic.Value // store *zk.Conn
+}
+
+func (z *zkConn) Store(conn *zk.Conn) {
+	z.conn.Store(conn)
+}
+
+func (z *zkConn) Load() interface{} {
+	return z.conn.Load()
+}
+
+func (z *zkConn) Children(path string) ([]string, error) {
+	children, _, err := z.conn.Load().(*zk.Conn).Children(path)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
+	return children, err
+}
+
+func (z *zkConn) ChildrenW(path string) ([]string, <-chan zk.Event, error) {
+	children, _, c, err := z.conn.Load().(*zk.Conn).ChildrenW(path)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
+	return children, c, err
+}
 
 type Source struct {
 	args *bootstrap.ZookeeperSourceArgs
@@ -76,7 +101,7 @@ type Source struct {
 	refreshSidecarMockServiceEntryNotifyCh chan struct{}
 	stop                                   chan struct{}
 
-	Con               *atomic.Value // store *zk.Conn
+	Con               *zkConn
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 
 	// instanceFilter fitler which instance of a service should be include
@@ -141,7 +166,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
 
-		Con:                &atomic.Value{},
+		Con:                &zkConn{},
 		seMergePortMocker:  svcMocker,
 		forceUpdateTrigger: &atomic.Value{},
 	}
@@ -358,8 +383,10 @@ func (s *Source) isPollingMode() bool {
 
 func (s *Source) Start() {
 	if s.initedCallback != nil {
+		t0 := time.Now()
 		go func() {
 			s.initWg.Wait()
+			monitoring.RecordReady(SourceName, t0, time.Now())
 			s.initedCallback(SourceName)
 		}()
 	}
@@ -652,23 +679,27 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 
 		if value, exist := interfaceSeCache.Get(serviceKey); !exist {
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+			ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel)
+			if err == nil {
 				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
 			}
+			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else if existSeWithMeta, ok := value.(*ServiceEntryWithMeta); ok {
 			if existSeWithMeta.Equals(*newSeWithMeta) {
 				continue
 			}
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			if ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel); err == nil {
+			ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel)
+			if err == nil {
 				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
 			}
+			monitoring.RecordServiceEntryUpdate(SourceName, err == nil)
 		}
 	}
 
@@ -707,14 +738,15 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 		seCache.Set(serviceKey, &seValueCopy)
 
 		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
-		if err != nil {
+		if err == nil {
+			log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
+			for _, h := range s.handlers {
+				h.Handle(ev)
+			}
+		} else {
 			log.Errorf("delete svc failed, case: %v", err.Error())
-			continue
 		}
-		log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
-		for _, h := range s.handlers {
-			h.Handle(ev)
-		}
+		monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
 	}
 
 	for _, key := range deleteKey {

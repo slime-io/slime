@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
 const defaultNacosTokenTTL = 5
@@ -73,7 +74,8 @@ type clients []*client
 func NewClients(
 	servers []bootstrap.NacosServer,
 	metaKeyNamespace, metaKeyGroup string,
-	headers map[string]string) Client {
+	headers map[string]string,
+) Client {
 	clis := make(clients, 0, len(servers))
 	for _, server := range servers {
 		clis = append(clis, newClient(server, metaKeyNamespace, metaKeyGroup, headers))
@@ -127,7 +129,8 @@ type client struct {
 func newClient(
 	server bootstrap.NacosServer,
 	metaKeyNamespace, metaKeyGroup string,
-	headers map[string]string) *client {
+	headers map[string]string,
+) *client {
 	c := &client{
 		client:             http.Client{Timeout: 30 * time.Second},
 		headers:            headers,
@@ -218,6 +221,7 @@ func (c *client) doCall(url string, method string, header map[string]string, bod
 		req.Header.Set(k, v)
 	}
 	resp, err := c.client.Do(req)
+	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +378,6 @@ func (c *client) listNamespaces() ([]*nacosNamespace, error) {
 		return nil, err
 	}
 	return nr.Data, nil
-
 }
 
 func (c *client) namespacedGroupedInstances(namespaceId, groupName string) (map[string][]*instance, error) {
@@ -459,7 +462,7 @@ func (c *client) login() {
 		needResetTTL = true
 		return
 	}
-	var result = struct {
+	result := struct {
 		AccessToken *string `json:"accessToken,omitempty"`
 		TokenTTL    *int64  `json:"tokenTtl,omitempty"`
 	}{}

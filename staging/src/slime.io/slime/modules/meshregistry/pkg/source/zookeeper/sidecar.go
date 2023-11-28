@@ -14,6 +14,7 @@ import (
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
 
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 )
 
@@ -183,9 +184,11 @@ func (s *Source) refreshSidecar(init bool) {
 		prev, ok := prevSidecarCache[fn]
 		if !ok {
 			events = append(events, buildSidecarEvent(event.Added, cur.Sidecar, cur.Meta))
+			monitoring.RecordSidecarCreation(SourceName)
 			added++
 		} else if !prev.Equals(cur) {
 			events = append(events, buildSidecarEvent(event.Updated, cur.Sidecar, cur.Meta))
+			monitoring.RecordSidecarUpdate(SourceName)
 			updated++
 		}
 	}
@@ -194,6 +197,7 @@ func (s *Source) refreshSidecar(init bool) {
 		for fn, prev := range prevSidecarCache {
 			if _, ok := sidecarMap[fn]; !ok {
 				events = append(events, buildSidecarEvent(event.Deleted, prev.Sidecar, prev.Meta))
+				monitoring.RecordSidecarDeletion(SourceName)
 				deleted++
 			}
 		}
@@ -392,7 +396,6 @@ func convertDubboCallModel(se *networking.ServiceEntry, inboundEndpoints []*netw
 
 			m[interfaceName] = struct{}{}
 		}
-
 	}
 
 	return dubboModels

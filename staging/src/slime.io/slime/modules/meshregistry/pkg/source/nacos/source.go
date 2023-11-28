@@ -20,6 +20,7 @@ import (
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
@@ -180,7 +181,8 @@ func generateInstanceFilter(
 	svcSel map[string][]*bootstrap.EndpointSelector,
 	epSel []*bootstrap.EndpointSelector,
 	emptySelectorsReturn bool,
-	alwaysUseSourceScopedEpSelectors bool) func(*instance) bool {
+	alwaysUseSourceScopedEpSelectors bool,
+) func(*instance) bool {
 	cfgs := make(map[string]source.HookConfig, len(svcSel))
 	for svc, selectors := range svcSel {
 		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
@@ -347,8 +349,10 @@ func (s *Source) Dispatch(handler event.Handler) {
 
 func (s *Source) Start() {
 	if s.initedCallback != nil {
+		t0 := time.Now()
 		go func() {
 			s.initWg.Wait()
+			monitoring.RecordReady(SourceName, t0, time.Now())
 			s.initedCallback(SourceName)
 		}()
 	}
@@ -387,8 +391,7 @@ func printEps(eps []*networking.WorkloadEntry) string {
 	return strings.Join(ips, ",")
 }
 
-func reGroupInstances(rl *bootstrap.InstanceMetaRelabel,
-	c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
+func reGroupInstances(rl *bootstrap.InstanceMetaRelabel, c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
 	if rl == nil && c == nil {
 		return nil
 	}

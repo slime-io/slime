@@ -13,6 +13,7 @@ import (
 	"k8s.io/kube-openapi/pkg/common"
 
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
+	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/util/cache"
 )
 
@@ -48,6 +49,7 @@ func (hs *HttpServer) start() {
 	}
 
 	go func() {
+		t0 := time.Now()
 		for {
 			if len(hs.unreadySources()) == 0 {
 				break
@@ -60,6 +62,9 @@ func (hs *HttpServer) start() {
 		hs.lock.Lock()
 		hs.sourceReady = true
 		hs.lock.Unlock()
+		// Since the polling check method is used, the time statistics of source ready are not accurate enough,
+		// which is only for reference, but marking source ready is part of meshregistry ready
+		monitoring.RecordReady("sources", t0, time.Now())
 
 		if cb := hs.sourceReadyCallback; cb != nil {
 			cb(hs.mcpController, hs.startWG)
