@@ -14,6 +14,7 @@ import (
 	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
+	"strings"
 )
 
 // LimiterSpec info come from config and SmartLimiterSpec
@@ -112,21 +113,22 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 						if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err != nil {
 							log.Errorf("calculate quota %s err, %+v", des.Action.Quota, err.Error())
 						} else {
-							// log.Infof("after calculate, the quota %s is %d",des.Action.Quota,rateLimitValue)
-							sd := &microservicev1alpha2.SmartLimitDescriptor{
-								Action: &microservicev1alpha2.SmartLimitDescriptor_Action{
-									Quota:        fmt.Sprintf("%d", rateLimitValue),
-									FillInterval: des.Action.FillInterval,
-									Strategy:     des.Action.Strategy,
-								},
-								Match:  des.Match,
-								Target: des.Target,
+							ips := exactIPs(des)
+							if ips == nil {
+								sd := warpDescriptors(des, rateLimitValue)
+								validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
+							} else {
+								for _, ip := range ips {
+									sd := warpDescriptors(des, rateLimitValue)
+									for i := range sd.Match {
+										if sd.Match[i].MatchSource == microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
+											sd.Match[i].ExactMatch = ip
+											break
+										}
+									}
+									validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
+								}
 							}
-							headers := generateHeadersToAdd(des)
-							if len(headers) > 0 {
-								sd.Action.HeadersToAdd = headers
-							}
-							validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
 						}
 					}
 				}
@@ -151,6 +153,33 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		}
 	}
 	return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
+}
+
+func warpDescriptors(descriptor *microservicev1alpha2.SmartLimitDescriptor, rateLimitValue int) *microservicev1alpha2.SmartLimitDescriptor {
+	des := descriptor.DeepCopy()
+	sd := &microservicev1alpha2.SmartLimitDescriptor{
+		Action: &microservicev1alpha2.SmartLimitDescriptor_Action{
+			Quota:        fmt.Sprintf("%d", rateLimitValue),
+			FillInterval: des.Action.FillInterval,
+			Strategy:     des.Action.Strategy,
+		},
+		Match:  des.Match,
+		Target: des.Target,
+	}
+	headers := generateHeadersToAdd(des)
+	if len(headers) > 0 {
+		sd.Action.HeadersToAdd = headers
+	}
+	return sd
+}
+
+func exactIPs(des *microservicev1alpha2.SmartLimitDescriptor) []string {
+	for _, m := range des.Match {
+		if m.MatchSource == microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
+			return strings.Split(m.ExactMatch, ",")
+		}
+	}
+	return nil
 }
 
 func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networking.EnvoyFilter {
