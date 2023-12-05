@@ -211,69 +211,93 @@ func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *netw
 	}
 }
 
+type zkLogger struct {
+	conn func() string
+}
+
+func (l zkLogger) Printf(format string, args ...interface{}) {
+	log.WithField("lib", "go-zk").WithField("conn", l.conn()).Infof(format, args...)
+}
+
 func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	if s.watchingRoot {
 		return // ??
 	}
+
+	// TODO: use the zk.Conn.hostProvider.Len() replace the len(s.args.Address)?
+	connectTimeout := time.Duration(len(s.args.Address)+1) * time.Second
 
 	var curConn *zk.Conn
 	if v := s.Con.Load(); v != nil {
 		curConn = v.(*zk.Conn)
 	}
 	if curConn != nil {
+		if curConn.State() == zk.StateHasSession {
+			log.Infof("the state of zk conn %p is ok with sessionID: %d", curConn, curConn.SessionID())
+			return
+		}
 		curConn.Close()
+		log.Infof("close connection for zk conn %p", curConn)
 	}
 
 	for {
 		var con *zk.Conn
 		var err error
 		var once sync.Once
+		logCon := func() string { return fmt.Sprintf("%p", con) }
 		con, _, err = zk.Connect(s.args.Address, time.Duration(s.args.ConnectionTimeout),
+			zk.WithLogger(zkLogger{conn: logCon}),
 			zk.WithNoRetryHosts(), // https://github.com/slime-io/go-zk/pull/1
 			zk.WithEventCallback(func(ev zk.Event) {
 				if ev.Type != zk.EventDisconnected {
 					return
 				}
 
-				// use the reconnection mechanism of the current client first
-				time.Sleep(time.Duration(len(s.args.Address)+1) * time.Second)
-				switch con.State() {
-				case zk.StateConnected, zk.StateHasSession:
-					return
-				default:
-					// ensure that each zk connection triggers only one reconnect
-					once.Do(func() {
-						select {
-						case reconCh <- struct{}{}:
-						default:
-						}
-					})
-				}
+				// wait for zk reconnected by self or create a new connection asynchronizely
+				go func() {
+					// use the reconnection mechanism of the current client first
+					time.Sleep(connectTimeout)
+					switch con.State() {
+					case zk.StateHasSession:
+						log.Infof("zk conn %s reconnect by self with sessionID: %d", logCon(), con.SessionID())
+					default:
+						// ensure that each zk connection triggers only one reconnect
+						once.Do(func() {
+							select {
+							case reconCh <- struct{}{}:
+							default:
+							}
+							log.Warnf("zk conn %s disconnected, already notify slime to reconnect", logCon())
+						})
+					}
+				}()
 			}))
 		if err != nil {
-			log.Infof("re connect zk error %v", err)
+			log.Infof("connect zk error %v", err)
 			time.Sleep(time.Second)
 		} else {
 			// TODO: this should be done in go-zk
 			connected := false
+			timeout := time.After(connectTimeout)
+		check:
 			for {
 				time.Sleep(1500 * time.Millisecond) // Wait for connecting. When go-zk connects to zk, the timeout is one second.
 				connState := con.State()
-				if connState == zk.StateConnected || connState == zk.StateHasSession {
+				if connState == zk.StateHasSession {
 					connected = true
 					break
 				}
-				if connState != zk.StateConnecting {
-					// connect failed
-					log.Debugf("wait for connected failed with current state: %s", connState)
-					con.Close()
-					break
+				select {
+				case <-timeout:
+					log.Infof("zk conn %s connect timeout", logCon())
+					break check
+				default:
 				}
 			}
 			if connected {
 				// replace the connection
 				s.Con.Store(con)
-				log.Infof("reconnect to zk successfully")
+				log.Infof("zk conn %s connect to zk successfully with sessionID: %d", logCon(), con.SessionID())
 				break
 			}
 		}
