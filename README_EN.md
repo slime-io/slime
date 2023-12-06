@@ -13,29 +13,28 @@
 
  [![Go Report Card](https://goreportcard.com/badge/github.com/slime-io/slime)](https://goreportcard.com/report/github.com/slime-io/slime) [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://github.com/slime-io/slime/blob/master/LICENSE) ![GitHub release (latest by date)](https://img.shields.io/github/v/release/slime-io/slime?color=green)
 
-Slime is an intelligent ServiceMesh manager based on istio. Through slime, we can define dynamic service management strategies, so as to achieve the purpose of automatically and conveniently using istio/envoy high-level functions.
-
+Slime is an intelligent ServiceMesh manager based on Istio that allows you to define dynamic service management strategies. It helps automate and simplify the use of Istio/Envoy high-level functions.
 
 ## Why Slime
 
-As a new generation of microservice architecture, Service mesh realizes the decoupling of business logic and microservice governance logic, and reduces the development and operation and maintenance costs of microservices. However, in the process of helping business teams to use Service mesh and implement it in production, we found that there are still many problems with the existing Service mesh.
+Slime optimizes ServiceMesh in the following aspects:
 
-- Some functions are missing or the threshold for use is too high, resulting in unsuccessful business access.
-- many stability risks in large-scale business cluster scenarios.
-- Difficulties in management and operation and maintenance of the service mesh by administrators: the service mesh base framework needs to be modified to solve the problem. This will change the original logic of the base framework, which cannot be merged into the community version and creates a lot of difficulties for developers to maintain the service mesh in the long term.
+- Enhanced functionality: Slime addresses the issue of missing functionality and high usage threshold in ServiceMesh, ensuring successful access to required features.
+- Stability in large-scale scenarios: Slime focuses on mitigating stability risks in large-scale business cluster scenarios, ensuring smooth operation in such environments.
+- Simplified management and operation: Slime streamlines the management and operation of ServiceMesh for administrators. It solves the problem of modifying the service mesh base framework, which avoids altering the original logic and provides easier long-term maintenance for developers.
 
-For this reason, we have developed a number of Service mesh peripheral modules to solve these problems and ensure that the enterprise business running on top of the Service mesh can run smoothly, and designed extension mechanisms do not need to invade the native code of the framework. In order to give back to the community, we systematically compiled core modules to solve common problems and open source them, which led to the Slime project.
+In order to optimize ServiceMesh, we have developed various peripheral modules that address these issues and ensure smooth operation of enterprise businesses built on top of ServiceMesh. These modules are designed with extension mechanisms that do not require modifying the underlying framework's native code. As a way to contribute to the community, we have systematically compiled core modules that solve common problems and open-sourced them, resulting in the Slime project.
 
-The project is based on the k8s-operator implementation, **which seamlessly interfaces with Istio without any customization**.
+The Slime project is built on the k8s-operator implementation, providing seamless integration with Istio without any customization.
 
-Slime core capabilities include intelligent traffic management, intelligent operation and maintenance management, intelligent extension management.
+The core capabilities of Slime include intelligent traffic management, intelligent operation and maintenance management, and intelligent plugin management.
 
-- **Intelligent Traffic Management**: Upgrades Service mesh traffic governance capabilities through feature content in business traffic to provide more granular and timely governance capabilities for business --
-  - [Adaptive Rate Limiting](./staging/src/slime.io/slime/modules/limiter): realizes local rate limiting, and at the same time can automatically adjust the rate limiting policy in conjunction with monitoring information, filling the shortcomings of the traditional service mesh flow limiting function
+- **Intelligent Traffic Management**: To enhance the traffic governance capabilities of ServiceMesh, we can upgrade the system to analyze the distinctive content of business traffic. This upgrade will provide more refined and timely governance functions for businesses
+  - [Adaptive Rate Limiting](./staging/src/slime.io/slime/modules/limiter): realizes local rate limiting, and at the same time can automatically adjust the rate limiting policy in conjunction with monitoring information, filling the shortcomings of the traditional ServiceMesh rate limiting function
   - Intelligent degradation
   - Traffic mark
 
-- **Intelligent O&M Management**: Combining the components and business features under the Service mesh architecture to provide more accurate and visualized O&M capabilities and performance stability enhancement --
+- **Intelligent O&M Management**: Combining the components and business features under the ServiceMesh architecture to provide more accurate and visualized O&M capabilities and performance stability enhancement
   - [configure lazy loading](./staging/src/slime.io/slime/modules/lazyload): no need to configure SidecarScope, automatically load configuration and service discovery information on demand, solving the problem of full volume push. The source of the service call relationship supports Prometheus or Accesslog
   - [mesh(service) repository](./staging/src/slime.io/slime/modules/meshregistry): helps istio to quickly integrate various service registries
   - File distribution management (filemanager, to be provided later)
@@ -55,7 +54,7 @@ The Slime architecture is mainly divided into three parts:
 2. slime-modules，core processes of Slime, watch Slime CRD and convert to Istio CRD, and process other built-in logic.
 3. slime-framework, as a base, provide generic base capabilities for modules.
 
-![slime架构图](media/slime-arch-v2.png)
+![slime架构图](media/slime-arch-v3.png)
 
 Slime supports aggregated packaging, allowing any module to be aggregated into a single image. So Slime can be deployed as a single deployment, avoiding too many components.
 

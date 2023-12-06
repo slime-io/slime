@@ -3,6 +3,7 @@
   - [背景](#背景)
   - [思路](#思路)
   - [架构](#架构)
+  - [特性](#特性)
   - [安装和使用](#安装和使用)
   - [更多信息](#更多信息)
 
@@ -57,7 +58,7 @@
 
 整个模块由 `lazyload controller` 和 `global-sidecar` 两部分组成。`lazyload controller` 无需注入 sidecar ，global-sidecar 则需要注入。
 
-<img src="./media/lazyload-architecture-20211222_zh.png" style="zoom:80%;" />
+<img src="./media/lazyload-architecture-2023-12-06.png" style="zoom:80%;" />
 
 
 
@@ -70,6 +71,9 @@
 
 
 
+## 特性
+
+refer: [lazyload_feature](../../../../../../doc/zh/feature-introduce/lazyload/TODO.md)
 
 
 ## 安装和使用
