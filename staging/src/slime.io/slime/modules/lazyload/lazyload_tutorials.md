@@ -30,56 +30,38 @@
 
 ## Architecture
 
-![](./media/lazyload-architecture-20211222.png)
+![](./media/lazyload-architecture-2023-12-06.png)
 
 * The green arrows are the internal logic of lazyload controller, and the orange arrows are the internal logic of global-sidecar. 
 
 Instruction：
 
-1. Deploy the Lazyload module, and Istiod will inject the standard sidecar (envoy) for the global-sidecar application
+Deploy the Lazyload module, and Istiod will inject the standard sidecar (envoy) for the global-sidecar application
 
-2. Enable lazyload for Service A
 
-   2.1 Create ServiceFence A
+1. Service A sends first request to Service B. sidecar A does not has information about Service B, then request is sent to global-sidecar.
 
-   2.2 Create Sidecar(Istio CRD) A, and initialize accrording to the static config of ServiceFence.spec
+2. Global-sidecar operations
 
-   2.3 ApiServer senses sidecar A creation
+   2.1 Inbound traffic is intercepted, and in accesslog mode, sidecar generates an accesslog containing the service invocation relationship
 
-3. Istiod gets the content of Sidecar A
+   2.2 The global-sidecar application converts the access target to Service B based on the request header and other information
 
-4. Istiod pushed new configuration to sidecar of Service A
+   2.3 Outbound traffic interception, where sidecar has all the service configuration information, finds the Service B target information and sends the request
 
-5. Service A sends first request to Service B. sidecar A does not has information about Service B, then request is sent to global-sidecar.
+3. Request sends to Service B
 
-6. Global-sidecar operations
+4. Global-sidecar reports relationships through access log or prometheus metric
 
-   6.1 Inbound traffic is intercepted, and in accesslog mode, sidecar generates an accesslog containing the service invocation relationship
+5. Lazyload controller gets the relationships，update ServiceFenceA and add ServiceB information
 
-   6.2 The global-sidecar application converts the access target to Service B based on the request header and other information
+6. Update Sidecar A，adding egress.hosts of Service B
 
-   6.3 Outbound traffic interception, where sidecar has all the service configuration information, finds the Service B target information and sends the request
+7.  Istiod gets the content of Sidecar A
 
-7. Request sends to Service B
+8.  Istiod pushed new configuration to sidecar of Service A
 
-8. Global-sidecar reports relationships through access log or prometheus metric
-
-9. Lazyload controller gets the relationships
-
-10. lazyload controller updates lazyload configuration
-
-    10.1 Update ServiceFence A adding infomation about Service B
-
-    10.2 Update Sidecar A，adding egress.hosts of Service B
-
-    10.3 ApiServer senses Sidecar A update
-
-11. Istiod gets the content of Sidecar A
-
-12. Istiod pushed new configuration to sidecar of Service A
-
-13. Service A sends request to Service B directly
-
+9.  Service A sends request to Service B directly
 
 
 ## Installation and Usage

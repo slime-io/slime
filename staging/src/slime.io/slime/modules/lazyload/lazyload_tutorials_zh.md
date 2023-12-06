@@ -39,60 +39,37 @@
 
 
 
-![](./media/lazyload-architecture-20211222_zh.png)
+![](./media/lazyload-architecture-2023-12-06.png)
 
 注：绿色箭头为lazyload controller内部逻辑，黄色箭头为global-sidecar内部逻辑。
 
-过程说明：
+首次访问过程说明：
 
-1. 部署Lazyload模块，自动创建global-sidecar应用，Istiod会为global-sidecar应用添加标准sidecar（envoy）
+ 前提：部署Lazyload模块，自动创建global-sidecar应用，Istiod会为global-sidecar应用添加标准sidecar（envoy），lazyload自动为服务开启懒加载。
 
-2. 为服务A启用懒加载
+1. Service A发起访问Service B，由于Service A没有Service B的配置信息，请求发到global-sidecar的sidecar
 
-   2.1 创建ServiceFence A
+2. global-sidecar处理
 
-   2.2 创建Sidecar（Istio CRD）A，根据静态配置（ServiceFence.spec）初始化
+   2.1 入流量拦截，如果是accesslog模式，sidecar会生成包含服务调用关系的accesslog
 
-   2.3 ApiServer感知到Sidecar A创建
+   2.2 global-sidecar应用根据请求头等信息，转换访问目标为Service B
 
-3. Istiod从ApiServer获取Sidecar A的内容
+   2.3 出流量拦截，sidecar拥有所有服务配置信息，找到Service B目标信息，发出请求
 
-4. Istiod下发Sidecar A限定范围内的配置给Service A的sidecar
+3. 请求正确到达Service B
 
-5. Service A发起访问Service B，由于Service A没有Service B的配置信息，请求发到global-sidecar的sidecar
+4. global-sidecar通过accesslog方式上报调用关系Service A->Service B，如果是prometheus模式，则由应用方的sidecar生成、上报metric
 
-6. global-sidecar处理
+5. lazyload controller获取到调用关系,更新ServiceFence A，添加关于B的metric
 
-   6.1 入流量拦截，如果是accesslog模式，sidecar会生成包含服务调用关系的accesslog
+6. 更新Sidecar A，egress.hosts添加B信息
 
-   6.2 global-sidecar应用根据请求头等信息，转换访问目标为Service B
+7. Istiod从ApiServer获取Sidecar A新内容
 
-   6.3 出流量拦截，sidecar拥有所有服务配置信息，找到Service B目标信息，发出请求
+8. Istiod下发Sidecar A限定范围内的配置给Service A的sidecar，新增了B的xDS内容
 
-7. 请求正确到达Service B
-
-8. global-sidecar通过accesslog方式上报调用关系Service A->Service B，如果是prometheus模式，则由应用方的sidecar生成、上报metric
-
-9. lazyload controller获取到调用关系
-
-10. lazyload更新懒加载配置
-
-    10.1 更新ServiceFence A，添加关于B的metric
-
-    10.2 更新Sidecar A，egress.hosts添加B信息
-
-    10.3 ApiServer 感知到Sidecar A更新
-
-11. Istiod从ApiServer获取Sidecar A新内容
-
-12. Istiod下发Sidecar A限定范围内的配置给Service A的sidecar，新增了B的xDS内容
-
-13. 后续调用，Service A直接访问Service B成功
-
-
-
-
-
+9. 后续调用，Service A直接访问Service B成功
 
 
 ## 安装和使用

@@ -1,9 +1,10 @@
 - [Lazyload Overview](#lazyload-overview)
+  - [NOTE: en document is out of date](#note-en-document-is-out-of-date)
   - [Features](#features)
   - [Backgroud](#backgroud)
   - [Thinking](#thinking)
   - [Architecture](#architecture)
-  - [Install & Use](#install--use)
+  - [Install \& Use](#install--use)
   - [Introduction of features](#introduction-of-features)
   - [Example](#example)
   - [E2E Test Introduction](#e2e-test-introduction)
@@ -50,7 +51,7 @@ Finally, the control logic is included in the lazyload controller component. It 
 
 The module consists of a Lazyload controller, which does not need to inject a sidecar, and a global-sidecar, which does.
 
-<img src="./media/lazyload-architecture-20211222.png" style="zoom:80%;" />
+<img src="./media/lazyload-architecture-2023-12-06.png" style="zoom:80%;" />
 
 
 
