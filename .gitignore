@@ -74,6 +74,7 @@ tags
 ### VisualStudioCode ###
 .vscode/*
 .history
+*.code-workspace
 ### idea ###
 .idea/*
 staging/src/slime.io/slime/modules/*/.idea/*
