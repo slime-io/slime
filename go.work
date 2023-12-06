@@ -1,0 +1,18 @@
+go 1.19
+
+use (
+	./framework
+	./modules/example
+	./staging/src/slime.io/slime/modules/bundle-all
+	./staging/src/slime.io/slime/modules/bundle-hango
+	./staging/src/slime.io/slime/modules/lazyload
+	./staging/src/slime.io/slime/modules/limiter
+	./staging/src/slime.io/slime/modules/meshregistry
+	./staging/src/slime.io/slime/modules/plugin
+)
+
+replace istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
+
+replace istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
+
+replace github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
