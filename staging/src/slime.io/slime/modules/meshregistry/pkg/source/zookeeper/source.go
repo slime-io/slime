@@ -760,6 +760,7 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 		seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
 		seValueCopy.ServiceEntry = &seCopy
 		seCache.Set(serviceKey, &seValueCopy)
+		seValue = &seValueCopy
 
 		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
 		if err == nil {

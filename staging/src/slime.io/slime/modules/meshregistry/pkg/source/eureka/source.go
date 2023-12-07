@@ -167,15 +167,16 @@ func (s *Source) updateServiceInfo() error {
 
 	cache := s.cacheShallowCopy()
 
-	for service, oldEntry := range cache {
+	for service, se := range cache {
 		if _, ok := newServiceEntryMap[service]; !ok {
 			// DELETE ==> set ep size to zero
-			oldEntryCopy := *oldEntry
-			oldEntryCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
-			newServiceEntryMap[service] = &oldEntryCopy
-			event, err := buildEvent(event.Updated, &oldEntryCopy, service, s.args.ResourceNs)
+			seCopy := *se
+			seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+			newServiceEntryMap[service] = &seCopy
+			se = &seCopy
+			event, err := buildEvent(event.Updated, se, service, s.args.ResourceNs)
 			if err == nil {
-				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
+				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}

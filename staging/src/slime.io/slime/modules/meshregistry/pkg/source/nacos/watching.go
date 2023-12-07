@@ -172,18 +172,19 @@ func (s *Source) updateNacosService() {
 
 func (s *Source) deleteService(serviceName string) {
 	s.mut.Lock()
-	oldEntry := s.cache[serviceName]
-	if oldEntry != nil {
+	se := s.cache[serviceName]
+	if se != nil {
 		// DELETE ==> set ep size to zero
-		oldEntryCopy := *oldEntry
-		oldEntryCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
-		s.cache[serviceName] = &oldEntryCopy
+		seCopy := *se
+		seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+		s.cache[serviceName] = &seCopy
+		se = &seCopy
 	}
 	s.mut.Unlock()
 
-	if oldEntry != nil {
-		if event, err := buildEvent(event.Updated, oldEntry, serviceName, s.args.ResourceNs, nil); err == nil {
-			log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", oldEntry.Hosts[0], printEps(oldEntry.Endpoints), len(oldEntry.Endpoints))
+	if se != nil {
+		if event, err := buildEvent(event.Updated, se, serviceName, s.args.ResourceNs, nil); err == nil {
+			log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
 			for _, h := range s.handlers {
 				h.Handle(event)
 			}
