@@ -2,11 +2,12 @@ package util
 
 import (
 	"fmt"
-	networking "istio.io/api/networking/v1alpha3"
-	"istio.io/libistio/pkg/config/resource"
 	"os"
 	"regexp"
 	"strings"
+
+	networking "istio.io/api/networking/v1alpha3"
+	"istio.io/libistio/pkg/config/resource"
 
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/util/cache"
@@ -236,7 +237,7 @@ func CopySe(item *networking.ServiceEntry) *networking.ServiceEntry {
 	copy(newHosts, item.Hosts)
 	newAddress := make([]string, len(item.Addresses))
 	copy(newAddress, item.Addresses)
-	newPorts := make([]*networking.Port, len(item.Ports))
+	newPorts := make([]*networking.ServicePort, len(item.Ports))
 	copy(newPorts, item.Ports)
 	eps := make([]*networking.WorkloadEntry, len(item.Endpoints))
 	copy(eps, item.Endpoints) // XXX deep copy?

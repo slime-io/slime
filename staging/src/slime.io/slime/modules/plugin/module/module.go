@@ -2,11 +2,12 @@ package module
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/proto"
+
+	"google.golang.org/protobuf/proto"
+	istionetworkingapi "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/modules/plugin/api/config"
 	pluginapiv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"

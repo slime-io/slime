@@ -105,8 +105,8 @@ spec:
                                 invert_match:
                                   description: If specified, the match result will
                                     be inverted before checking. Defaults to false.
-                                    * The regex ``\d{3}`` does not match the value
-                                    *1234*, so it will match when inverted.
+                                    * The regex “\d{3}“ does not match the value *1234*,
+                                    so it will match when inverted.
                                   type: boolean
                                 is_exact_match_empty:
                                   description: if specified, the exact match the value
@@ -264,8 +264,8 @@ spec:
                                 invert_match:
                                   description: If specified, the match result will
                                     be inverted before checking. Defaults to false.
-                                    * The regex ``\d{3}`` does not match the value
-                                    *1234*, so it will match when inverted.
+                                    * The regex “\d{3}“ does not match the value *1234*,
+                                    so it will match when inverted.
                                   type: boolean
                                 is_exact_match_empty:
                                   description: if specified, the exact match the value

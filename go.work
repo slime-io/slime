@@ -11,8 +11,12 @@ use (
 	./staging/src/slime.io/slime/modules/plugin
 )
 
-replace istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
-
-replace istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
-
-replace github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
+replace (
+	istio.io/api => istio.io/api v1.19.1
+	istio.io/client-go => istio.io/client-go v1.19.1
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
+	k8s.io/api => k8s.io/api v0.25.2
+	k8s.io/apimachinery => k8s.io/apimachinery v0.25.2
+	k8s.io/client-go => k8s.io/client-go v0.25.2
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
+)

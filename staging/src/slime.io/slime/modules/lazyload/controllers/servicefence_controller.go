@@ -19,30 +19,30 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/informers"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/golang/protobuf/proto"
 	istio "istio.io/api/networking/v1alpha3"
+	"istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
-	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	modmodel "slime.io/slime/modules/lazyload/model"
@@ -243,7 +243,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 		log.Infof("existed sidecar %v istioRev %s but our rev %s, skip update ...",
 			nsName, foundRev, r.env.IstioRev())
 	} else {
-		if !reflect.DeepEqual(found.Spec, sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
+		if !proto.Equal(&found.Spec, &sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
 			log.Infof("Update a Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
 			sidecar.ResourceVersion = found.ResourceVersion
 			err = r.Client.Update(context.TODO(), sidecar)
@@ -577,16 +577,12 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = sf.Name
 	}
 
-	spec, err := util.ProtoToMap(sidecar)
-	if err != nil {
-		return nil, err
-	}
 	ret := &v1alpha3.Sidecar{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sf.Name,
 			Namespace: sf.Namespace,
 		},
-		Spec: spec,
+		Spec: *sidecar,
 	}
 	return ret, nil
 }

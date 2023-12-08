@@ -11,8 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/copystructure"
+	"google.golang.org/protobuf/proto"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,14 +24,13 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"slime.io/slime/framework/apis/config/v1alpha1"
-	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
-	"slime.io/slime/framework/util"
 	meshregv1alpha1 "slime.io/slime/modules/meshregistry/api/v1alpha1"
 	"slime.io/slime/modules/meshregistry/model"
 	meshregbootstrap "slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/server"
+	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
 const (
@@ -39,9 +39,7 @@ const (
 
 var log = model.ModuleLog
 
-var (
-	PodNamespace = os.Getenv(EnvPodNamespace) // TODO passed by framework
-)
+var PodNamespace = os.Getenv(EnvPodNamespace) // TODO passed by framework
 
 type Module struct {
 	config                  util.AnyMessage
@@ -61,7 +59,7 @@ func (m *Module) Config() proto.Message {
 func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
-		istionetworkingapi.AddToScheme,
+		networkingv1alpha3.AddToScheme,
 	} {
 		if err := f(scheme); err != nil {
 			return err

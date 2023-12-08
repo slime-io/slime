@@ -34,15 +34,15 @@ spec:
           metadata:
             type: object
           spec:
-            description: 'Spec Example   spec:    enable: true    host:      reviews.default.svc.cluster.local:
-              # static dependency of reviews.default service        stable:      test/*:
-              {} # static dependency of all services in namespace ''test''    namespaceSelector:
-              # Match namespace names, multiple namespaces are ''or'' relations, static
-              dependency      - foo      - bar    labelSelector: # Match service label,
-              multiple selectors are ''or'' relationship, static dependency      -
-              selector:          project: back      - selector: # labels in same selector
-              are ''and'' relationship          project: front          group: web    workloadSelector:      labels:        group:
-              foo        zone: hz      fromService: false'
+            description: "Spec Example \n \tspec: \t enable: true \t host: \t   reviews.default.svc.cluster.local:
+              # static dependency of reviews.default service \t     stable: \t   test/*:
+              {} # static dependency of all services in namespace 'test' \t namespaceSelector:
+              # Match namespace names, multiple namespaces are 'or' relations, static
+              dependency \t   - foo \t   - bar \t labelSelector: # Match service label,
+              multiple selectors are 'or' relationship, static dependency \t   - selector:
+              \t       project: back \t   - selector: # labels in same selector are
+              'and' relationship \t       project: front \t       group: web \t workloadSelector:
+              \t   labels: \t     group: foo \t     zone: hz \t   fromService: false"
             properties:
               enable:
                 description: Switch to render servicefence as sidecar

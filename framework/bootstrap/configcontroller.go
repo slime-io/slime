@@ -2,6 +2,11 @@ package bootstrap
 
 import (
 	"fmt"
+	"net/url"
+	"strconv"
+	"strings"
+	"time"
+
 	discovery "github.com/envoyproxy/go-control-plane/envoy/service/discovery/v3"
 	log "github.com/sirupsen/logrus"
 	meshconfig "istio.io/api/mesh/v1alpha1"
@@ -9,9 +14,9 @@ import (
 	mcpc "istio.io/istio-mcp/pkg/mcp/client"
 	xdsc "istio.io/istio-mcp/pkg/mcp/xds/client"
 	mcpmodel "istio.io/istio-mcp/pkg/model"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
-	"net/url"
+
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap/adsc"
 	"slime.io/slime/framework/bootstrap/collections"
@@ -20,9 +25,6 @@ import (
 	"slime.io/slime/framework/bootstrap/serviceregistry/model"
 	"slime.io/slime/framework/bootstrap/serviceregistry/serviceentry"
 	"slime.io/slime/framework/bootstrap/viewstore"
-	"strconv"
-	"strings"
-	"time"
 )
 
 const (
@@ -85,7 +87,6 @@ func NewConfigController(configSources []*bootconfig.ConfigSource, stop <-chan s
 			} else {
 				mcs = append(mcs, mc)
 			}
-
 		} else if strings.HasPrefix(configSource.Address, KubernetesConfigSourcePrefix) {
 			if mc, err := initK8sMonitorController(configSource); err != nil {
 				return nil, err
@@ -115,7 +116,6 @@ func NewConfigController(configSources []*bootconfig.ConfigSource, stop <-chan s
 }
 
 func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Config) (ConfigController, error) {
-
 	cc, ok := c.(*configController)
 	if !ok {
 		return c, fmt.Errorf("convert to *configController error")
@@ -282,7 +282,7 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 		}
 
 		epsToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
-			ep := cfg.Spec.(*v1.Endpoints)
+			ep := cfg.Spec.(*corev1.Endpoints)
 			hostname := kube.ServiceHostname(cfg.Name, cfg.Namespace, model.DefaultTrustDomain)
 
 			switch e {
@@ -295,7 +295,7 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 				}
 				is := isCfg.Spec.(*model.Service)
 
-				oldEp := old.Spec.(*v1.Endpoints)
+				oldEp := old.Spec.(*corev1.Endpoints)
 				oldIeps, err := kube.ConvertIstioEndpoints(oldEp, hostname, old.Name, old.Namespace, vs)
 				if err != nil {
 					log.Errorf("[epsToIstioResHandler] [EventUpdate] ConvertIstioEndpoints error: %+v", err)
@@ -398,7 +398,6 @@ func (c *configController) RegisterEventHandler(kind resource.GroupVersionKind, 
 }
 
 func (c *configController) Run(stop <-chan struct{}) {
-
 	for i := range c.monitorControllers {
 		go c.monitorControllers[i].Run(stop)
 	}
@@ -424,7 +423,6 @@ func initXdsMonitorController(configSource *bootconfig.ConfigSource) (*monitorCo
 }
 
 func startXdsMonitorController(mc *monitorController, configRevision string, xdsSourceEnableIncPush bool, stop <-chan struct{}) error {
-
 	srcAddress, err := url.Parse(mc.configSource.Address)
 	if err != nil {
 		return fmt.Errorf("invalid xds config source %s: %v", mc.configSource.Address, err)
@@ -561,7 +559,6 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 	})
 
 	go func() {
-
 		log.Infof("MCP: connect xds source and wait sync in background")
 		err := xdsMCP.Run()
 		if err != nil {

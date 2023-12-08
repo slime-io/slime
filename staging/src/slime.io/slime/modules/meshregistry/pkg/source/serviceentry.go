@@ -15,9 +15,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-var (
-	ProtocolHTTP = "HTTP"
-)
+var ProtocolHTTP = "HTTP"
 
 type ServiceEntryMergePortMocker struct {
 	mergeSvcPorts, mergeInstPorts bool
@@ -28,13 +26,14 @@ type ServiceEntryMergePortMocker struct {
 	dispatcher func(meta resource.Metadata, item *networking.ServiceEntry)
 
 	notifyCh   chan struct{}
-	portsCache map[uint32]*networking.Port
+	portsCache map[uint32]*networking.ServicePort
 	mut        sync.RWMutex
 }
 
 func NewServiceEntryMergePortMocker(
 	resourceName, resourceNs, serviceHost string, mergeInstPorts, mergeSvcPorts bool,
-	resourceLabels map[string]string) *ServiceEntryMergePortMocker {
+	resourceLabels map[string]string,
+) *ServiceEntryMergePortMocker {
 	return &ServiceEntryMergePortMocker{
 		resourceName:   resourceName,
 		resourceNs:     resourceNs,
@@ -44,7 +43,7 @@ func NewServiceEntryMergePortMocker(
 		resourceLabels: resourceLabels,
 
 		notifyCh:   make(chan struct{}, 1),
-		portsCache: map[uint32]*networking.Port{},
+		portsCache: map[uint32]*networking.ServicePort{},
 	}
 }
 
@@ -56,7 +55,7 @@ func (m *ServiceEntryMergePortMocker) SetDispatcher(dispatcher func(meta resourc
 func (m *ServiceEntryMergePortMocker) Refresh() {
 	se := &networking.ServiceEntry{
 		Hosts:      []string{m.host},
-		Ports:      make([]*networking.Port, 0),
+		Ports:      make([]*networking.ServicePort, 0),
 		Resolution: networking.ServiceEntry_STATIC,
 	}
 
@@ -124,7 +123,7 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 
 				for _, svcPort := range se.Ports {
 					if svcPort.Name == portName {
-						port := &networking.Port{
+						port := &networking.ServicePort{
 							Number:   portNum,
 							Protocol: svcPort.Protocol,
 							Name:     fmt.Sprintf("%s-%d", portName, portNum),

@@ -123,7 +123,7 @@ func NewKubeResourceLock(config *rest.Config, namespace, name string) (resourcel
 	workload, _ := os.Hostname()
 	id := workload + "_" + uuid.New().String()
 	lock, err := resourcelock.New(
-		resourcelock.ConfigMapsLeasesResourceLock,
+		resourcelock.LeasesResourceLock,
 		namespace,
 		name,
 		client.CoreV1(),

@@ -1,7 +1,7 @@
 package apis
 
 import (
-	"slime.io/slime/framework/apis/networking/v1alpha3"
+	"istio.io/client-go/pkg/apis/networking/v1alpha3"
 )
 
 func init() {

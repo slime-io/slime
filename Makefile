@@ -22,15 +22,12 @@ $(MODULES_API_PROTOS):
 	@echo "generate module proto api from $@"
 	@protoc -I=$(input_dir) \
 		-I=$(shell go env GOPATH)/src \
-		--gogo_out=$(input_dir) \
-		--gogo_opt=paths=source_relative \
-		--gogo_opt=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types \
-		--gogo_opt=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types \
-		--gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
-		--deepcopy_out=$(input_dir) \
-		--deepcopy_opt=paths=source_relative \
-		--jsonshim_out=$(input_dir) \
-		--jsonshim_opt=paths=source_relative \
+		--go_out=$(input_dir) \
+		--go_opt=paths=source_relative \
+		--golang-deepcopy_out=$(input_dir) \
+		--golang-deepcopy_opt=paths=source_relative \
+		--golang-jsonshim_out=$(input_dir) \
+		--golang-jsonshim_opt=paths=source_relative \
 		$@
 modules-api-gen: $(MODULES_API_PROTOS)
 else
@@ -64,11 +61,8 @@ $(FRAMEWORK_API_PROTOS):
 	@echo "generate framework proto api from $@"
 	@protoc -I=$(input_dir) \
 		-I=$(shell go env GOPATH)/src \
-		--gogo_out=$(input_dir) \
-		--gogo_opt=paths=source_relative \
-		--gogo_opt=Mgoogle/protobuf/duration.proto=github.com/gogo/protobuf/types \
-		--gogo_opt=Mgoogle/protobuf/timestamp.proto=github.com/gogo/protobuf/types \
-		--gogo_opt=Mgoogle/protobuf/struct.proto=github.com/gogo/protobuf/types \
+		--go_out=$(input_dir) \
+		--go_opt=paths=source_relative \
 		$@
 framework-api-gen: $(FRAMEWORK_API_PROTOS)
 
