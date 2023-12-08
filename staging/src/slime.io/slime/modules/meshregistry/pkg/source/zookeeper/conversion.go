@@ -131,15 +131,27 @@ func trimSameDubboMethodsLabel(se *networking.ServiceEntry) bool {
 	return !diff
 }
 
+func getEndpointsLabel(endpoints []*networking.WorkloadEntry, key string, skipEmpty bool) string {
+	for _, ep := range endpoints {
+		if v, ok := ep.GetLabels()[key]; ok {
+			if skipEmpty && v == "" {
+				continue
+			}
+			return v
+		}
+	}
+	return ""
+}
+
 type convertedServiceEntry struct {
 	se               *networking.ServiceEntry
-	methodsEqual     bool
 	methodsLabel     string
+	labels           map[string]string
 	InboundEndPoints []*networking.WorkloadEntry
 }
 
-func convertServiceEntry(
-	providers, consumers, configurators []string, service string, s *Source,
+func (s *Source) convertServiceEntry(
+	providers, consumers, configurators []string, service string,
 ) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
 	var (
 		svcPort               = s.args.SvcPort
@@ -156,8 +168,23 @@ func convertServiceEntry(
 
 	defer func() {
 		for k, cse := range serviceEntryByServiceKey {
-			cse.methodsEqual = trimSameDubboMethodsLabel(cse.se)
+			cse.labels = map[string]string{}
+			if s.args.SingleAppService {
+				cse.labels[DubboSvcAppLabel] = getEndpointsLabel(cse.se.Endpoints, DubboSvcAppLabel, false)
+			}
 
+			var enableMethodLB bool
+			s.mut.RLock()
+			methodLBChecker := s.methodLBChecker
+			s.mut.RUnlock()
+			if methodLBChecker != nil {
+				enableMethodLB = methodLBChecker(cse)
+			}
+
+			if !trimSameDubboMethodsLabel(cse.se) && enableMethodLB {
+				// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
+				cse.labels[DubboSvcMethodEqLabel] = strconv.FormatBool(false)
+			}
 			if v := methodsByServiceKey[k]; len(v) > 0 {
 				methods := make([]string, 0, len(v))
 				for method := range v {

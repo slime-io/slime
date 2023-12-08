@@ -158,6 +158,12 @@ type EndpointSelector struct {
 	ExcludeIPRanges *IPRanges `json:"ExcludeIPRanges,omitempty"`
 }
 
+type ServiceSelector struct {
+	*metav1.LabelSelector
+	// Invert the match result. Turns the selector into a blacklist.
+	Invert bool `json:"Invert,omitempty"`
+}
+
 type MetadataWrapper struct {
 	Annotations map[string]string `json:"Annotations,omitempty"`
 	Labels      map[string]string `json:"Labels,omitempty"`
@@ -263,6 +269,17 @@ type ZookeeperSourceArgs struct {
 	DubboWorkloadAppLabel string `json:"DubboWorkloadAppLabel,omitempty"`
 	// if true, will consider self-provided services as consumed services and add them to `Sidecar`
 	SelfConsume bool `json:"SelfConsume,omitempty"`
+
+	// if true, will consider a svc(IGV) will only be provided by one app. Thus, we can derive the `service-app`
+	// from endpoints meta and set it to svc's label.
+	SingleAppService bool `json:"SingleAppService,omitempty"`
+
+	// specify which services will enable feature method-lb. supports dynamic config reload.
+	// NOTICE:
+	//   null or empty slice means "an empty whitelist list" and thus ALL-DISABLED;
+	//   whitelist(selector with invert value false) has higher priority than blacklist, if there're any whitelists
+	// all blacklists will be ignored.
+	MethodLBServiceSelectors []*ServiceSelector `json:"MethodLBServiceSelectors,omitempty"`
 
 	// mcp configs
 }

@@ -16,12 +16,15 @@ import (
 	"time"
 
 	"github.com/go-zookeeper/zk"
+	"github.com/hashicorp/go-multierror"
 	cmap "github.com/orcaman/concurrent-map"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/collections"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	k8slabels "k8s.io/apimachinery/pkg/labels"
 
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
@@ -108,6 +111,10 @@ type Source struct {
 	// Updates are only allowed when the configuration is loaded or reloaded.
 	instanceFilter func(*dubboInstance) bool
 
+	// methodLBChecker check whether the method-lb feature is enabled for the service
+	// NOTICE: support dynamic config and thus should be accessed with lock.
+	methodLBChecker func(*convertedServiceEntry) bool
+
 	forceUpdateTrigger *atomic.Value // store chan struct{}
 }
 
@@ -188,6 +195,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 	}
 
 	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	ret.methodLBChecker = generateMethodLBChecker(args.MethodLBServiceSelectors)
 
 	for _, op := range options {
 		if err := op(ret); err != nil {
@@ -591,19 +599,73 @@ func (s *Source) markServiceEntryInitDone() {
 
 func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 	var prevArgs *bootstrap.ZookeeperSourceArgs
-	prevArgs, s.args = s.args, args
-	updated := false
+	prevArgs, s.args = s.args, args // XXX should be atomic
 
+	var (
+		updateDetails     error
+		shouldForceUpdate bool
+	)
 	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
-		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
-		s.instanceFilter = newInstSel
-		updated = true
+		s.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+		updateDetails = multierror.Append(updateDetails, fmt.Errorf("instance filter updated, prev %+v, cur %+v", prevArgs.EndpointSelectors, args.EndpointSelectors))
+		shouldForceUpdate = true
+	}
+
+	if selectors := args.MethodLBServiceSelectors; !reflect.DeepEqual(prevArgs.MethodLBServiceSelectors, selectors) {
+		s.methodLBChecker = generateMethodLBChecker(selectors)
+		updateDetails = multierror.Append(updateDetails, fmt.Errorf("method lb checker updated, prev %+v, cur %+v", prevArgs.MethodLBServiceSelectors, selectors))
+		shouldForceUpdate = true
 	}
 	s.mut.Unlock()
-	if updated {
+
+	if updateDetails != nil {
+		log.Infof("zk source config change details: %s, shouldForceUpdate: %v", updateDetails.Error(), shouldForceUpdate)
+	}
+	if shouldForceUpdate {
 		s.forceUpdate()
+	}
+}
+
+func generateMethodLBChecker(selectors []*bootstrap.ServiceSelector) func(*convertedServiceEntry) bool {
+	var blackListCnt int
+	for _, v := range selectors {
+		if v.Invert {
+			blackListCnt++
+		}
+	}
+	if blackListCnt > 0 && blackListCnt != len(selectors) {
+		var whiteList []*bootstrap.ServiceSelector
+		for _, v := range selectors {
+			if !v.Invert {
+				whiteList = append(whiteList, v)
+			}
+		}
+		selectors = whiteList
+		blackListCnt = 0
+	}
+
+	return func(cse *convertedServiceEntry) bool {
+		if len(selectors) == 0 {
+			return false
+		}
+
+		for _, selector := range selectors {
+			if selector.LabelSelector != nil {
+				ls, err := metav1.LabelSelectorAsSelector(selector.LabelSelector)
+				if err != nil {
+					// ignore invalid LabelSelector
+					continue
+				}
+
+				if ls.Matches(k8slabels.Set(cse.labels)) {
+					return blackListCnt == 0 // match, return true for white list, false for black list
+				}
+			}
+		}
+
+		return blackListCnt > 0 // no match, return false for white list, true for black list
 	}
 }
 
@@ -616,7 +678,7 @@ func (s *Source) handleServiceData(
 		cacheInUse.Set(dubboInterface, cmap.New())
 	}
 
-	freshSvcMap, freshSeMap := convertServiceEntry(providers, consumers, configutators, dubboInterface, s)
+	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface)
 	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
 	s.updateSeCache(cacheInUse, freshSeMap, dubboInterface)
 }
@@ -680,10 +742,11 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 			},
 			Annotations: map[string]string{},
 		}
-		if !convertedSe.methodsEqual {
-			// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
-			meta.Labels[DubboSvcMethodEqLabel] = strconv.FormatBool(convertedSe.methodsEqual)
+
+		for k, v := range convertedSe.labels {
+			meta.Labels[k] = v
 		}
+
 		newSeWithMeta, _ := prepareServiceEntryWithMeta(se, meta)
 
 		s.mut.Lock()
