@@ -1,4 +1,4 @@
-FROM golang:1.17.13-bullseye
+FROM golang:1.20.0-bullseye
 
 WORKDIR /workspaces
 
@@ -22,11 +22,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean
 
 # version of toolchains
-ENV CONTROLLER_GEN_VERSION=v0.7.0
+ENV CONTROLLER_GEN_VERSION=v0.11.0
 ENV ISTIO_TOOLS_VERSION=1.12.0
 ENV GOGO_PROTOBUF_VERSION=1.3.2
 ENV PROTOC_VERSION=3.20.1
-ENV K8S_API_VERSION=0.22.2
+ENV K8S_API_VERSION=0.26.0
 
 # install controller-gen
 RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
