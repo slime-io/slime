@@ -1,6 +1,6 @@
 module slime.io/slime/modules/meshregistry
 
-go 1.17
+go 1.20
 
 require (
 	github.com/go-zookeeper/zk v1.0.3

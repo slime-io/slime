@@ -1,6 +1,6 @@
 module slime.io/slime/modules/limiter
 
-go 1.17
+go 1.20
 
 require (
 	github.com/envoyproxy/go-control-plane v0.11.0
@@ -15,7 +15,6 @@ require (
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v0.0.0-20210322145030-ec7ef4cd6eaf
-	istio.io/pkg v0.0.0-20200807181912-d97bc429be20
 	k8s.io/api v0.22.2
 	k8s.io/apimachinery v0.22.2
 	k8s.io/client-go v0.22.2
@@ -91,6 +90,7 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	istio.io/gogo-genproto v0.0.0-20190930162913-45029607206a // indirect
 	istio.io/istio-mcp v0.0.0 // indirect
+	istio.io/pkg v0.0.0-20200807181912-d97bc429be20 // indirect
 	k8s.io/apiextensions-apiserver v0.22.2 // indirect
 	k8s.io/component-base v0.22.2 // indirect
 	k8s.io/klog v1.0.0 // indirect

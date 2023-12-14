@@ -1,6 +1,6 @@
 module slime.io/slime/modules/bundle-all
 
-go 1.17
+go 1.20
 
 require (
 	slime.io/slime/framework v0.0.0
