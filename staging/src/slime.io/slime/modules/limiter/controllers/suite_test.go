@@ -26,7 +26,6 @@ import (
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/envtest/printer"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	// +kubebuilder:scaffold:imports
 )
@@ -45,7 +44,7 @@ func TestAPIs(t *testing.T) {
 
 	RunSpecsWithDefaultAndCustomReporters(t,
 		"Controller Suite",
-		[]Reporter{printer.NewlineReporter{}})
+		[]Reporter{})
 }
 
 var _ = BeforeSuite(func(done Done) {
