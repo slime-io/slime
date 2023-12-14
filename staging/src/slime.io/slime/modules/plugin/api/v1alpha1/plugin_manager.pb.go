@@ -157,6 +157,7 @@ type Plugin struct {
 	ListenerType Plugin_ListenerType `protobuf:"varint,4,opt,name=listenerType,proto3,enum=slime.microservice.plugin.v1alpha1.Plugin_ListenerType" json:"listenerType,omitempty"`
 	TypeUrl      string              `protobuf:"bytes,5,opt,name=type_url,json=typeUrl,proto3" json:"type_url,omitempty"`
 	// Types that are valid to be assigned to PluginSettings:
+	//
 	//	*Plugin_Wasm
 	//	*Plugin_Inline
 	//	*Plugin_Rider
@@ -327,6 +328,7 @@ type Wasm struct {
 	Url        string        `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	Sha256     string        `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"`
 	// Types that are valid to be assigned to ImagePullSecret:
+	//
 	//	*Wasm_ImagePullSecretName
 	//	*Wasm_ImagePullSecretContent
 	ImagePullSecret      isWasm_ImagePullSecret `protobuf_oneof:"image_pull_secret"`
@@ -436,6 +438,7 @@ type Rider struct {
 	Url        string        `protobuf:"bytes,3,opt,name=url,proto3" json:"url,omitempty"`
 	Sha256     string        `protobuf:"bytes,4,opt,name=sha256,proto3" json:"sha256,omitempty"`
 	// Types that are valid to be assigned to ImagePullSecret:
+	//
 	//	*Rider_ImagePullSecretName
 	//	*Rider_ImagePullSecretContent
 	ImagePullSecret      isRider_ImagePullSecret `protobuf_oneof:"image_pull_secret"`

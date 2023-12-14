@@ -112,26 +112,27 @@ func (m *Timestamp) GetNanos() int32 {
 }
 
 // Spec Example
-//   spec:
-//    enable: true
-//    host:
-//      reviews.default.svc.cluster.local: # static dependency of reviews.default service
-//        stable:
-//      test/*: {} # static dependency of all services in namespace 'test'
-//    namespaceSelector: # Match namespace names, multiple namespaces are 'or' relations, static dependency
-//      - foo
-//      - bar
-//    labelSelector: # Match service label, multiple selectors are 'or' relationship, static dependency
-//      - selector:
-//          project: back
-//      - selector: # labels in same selector are 'and' relationship
-//          project: front
-//          group: web
-//    workloadSelector:
-//      labels:
-//        group: foo
-//        zone: hz
-//      fromService: false
+//
+//	spec:
+//	 enable: true
+//	 host:
+//	   reviews.default.svc.cluster.local: # static dependency of reviews.default service
+//	     stable:
+//	   test/*: {} # static dependency of all services in namespace 'test'
+//	 namespaceSelector: # Match namespace names, multiple namespaces are 'or' relations, static dependency
+//	   - foo
+//	   - bar
+//	 labelSelector: # Match service label, multiple selectors are 'or' relationship, static dependency
+//	   - selector:
+//	       project: back
+//	   - selector: # labels in same selector are 'and' relationship
+//	       project: front
+//	       group: web
+//	 workloadSelector:
+//	   labels:
+//	     group: foo
+//	     zone: hz
+//	   fromService: false
 type ServiceFenceSpec struct {
 	Host map[string]*RecyclingStrategy `protobuf:"bytes,1,rep,name=host,proto3" json:"host,omitempty" protobuf_key:"bytes,1,opt,name=key,proto3" protobuf_val:"bytes,2,opt,name=value,proto3"`
 	// Switch to render servicefence as sidecar
