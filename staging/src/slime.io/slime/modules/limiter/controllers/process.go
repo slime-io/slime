@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"google.golang.org/protobuf/proto"
 	networkingapi "istio.io/api/networking/v1alpha3"
 	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -271,17 +272,9 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
 			loc, foundRev, r.env.IstioRev())
 	} else {
-		foundSpec, err := json.Marshal(found.Spec)
-		if err != nil {
-			log.Errorf("marshal found.spec err: %+v", err)
-		}
-		objSpec, err := json.Marshal(ef)
-		if err != nil {
-			log.Errorf("marshal obj.spec err: %+v", err)
-		}
-		// spec is not nil , update
 		if ef != nil {
-			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) || !reflect.DeepEqual(found.Labels, obj.Labels) {
+			if !proto.Equal(&found.Spec, ef) || !reflect.DeepEqual(found.Labels, obj.Labels) {
+				obj.Spec = *ef
 				obj.ResourceVersion = found.ResourceVersion
 				err := r.Client.Update(context.TODO(), obj)
 				if err != nil {
