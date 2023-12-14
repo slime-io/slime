@@ -77,23 +77,26 @@ type Fence struct {
 	// ```yaml
 	// managementSelectors:
 	//   - matchLabels:
-	//       env: prod
-	//       region: us-east1
+	//     env: prod
+	//     region: us-east1
 	//   - matchExpressions:
-	//     - key: app
-	//       operator: In
-	//       values:
-	//         - cassandra
-	//         - spark
+	//   - key: app
+	//     operator: In
+	//     values:
+	//   - cassandra
+	//   - spark
+	//
 	// ```
 	// Refer to the [kubernetes selector docs](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)
 	// for additional detail on selector semantics.
 	// when autoFence is true, managementSelectors will take effect
 	ManagementSelectors []*v1.LabelSelector `protobuf:"bytes,19,rep,name=managementSelectors,proto3" json:"managementSelectors,omitempty"`
 	// A list of namespaces that should be excluded or include
-	//  when autoFence is true, namespaceList will take effect
+	//
+	//	when autoFence is true, namespaceList will take effect
 	//
 	// Types that are valid to be assigned to NamespaceList:
+	//
 	//	*Fence_BlackNamespaceList
 	//	*Fence_WhiteNamespaceList
 	NamespaceList isFence_NamespaceList `protobuf_oneof:"namespaceList"`
@@ -387,7 +390,7 @@ func (m *Dispatch) GetDomainRegex() string {
 // domainAliases:
 //   - pattern: (?P<service>[^\.]+)\.(?P<namespace>[^\.]+)\.svc\.cluster\.local$
 //     template:
-//       - $namespace.$service.service.mailsaas
+//   - $namespace.$service.service.mailsaas
 type DomainAlias struct {
 	Pattern              string   `protobuf:"bytes,1,opt,name=pattern,proto3" json:"pattern,omitempty"`
 	Templates            []string `protobuf:"bytes,2,rep,name=templates,proto3" json:"templates,omitempty"`

@@ -1,10 +1,9 @@
-
 ---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.7.0
+    controller-gen.kubebuilder.io/version: v0.11.0
   creationTimestamp: null
   name: pluginmanagers.microservice.slime.io
 spec:
@@ -45,6 +44,8 @@ spec:
               plugin:
                 items:
                   properties:
+                    disable_on_filter_level:
+                      type: boolean
                     enable:
                       type: boolean
                     generic_app_protocol:
@@ -113,9 +114,3 @@ spec:
         type: object
     served: true
     storage: true
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []
