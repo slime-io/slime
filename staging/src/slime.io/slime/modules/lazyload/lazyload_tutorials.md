@@ -43,12 +43,13 @@ Deploy the Lazyload module, and Istiod will inject the standard sidecar (envoy) 
 
 2. Global-sidecar operations
 
+```
    2.1 Inbound traffic is intercepted, and in accesslog mode, sidecar generates an accesslog containing the service invocation relationship
 
    2.2 The global-sidecar application converts the access target to Service B based on the request header and other information
 
    2.3 Outbound traffic interception, where sidecar has all the service configuration information, finds the Service B target information and sends the request
-
+```
 3. Request sends to Service B
 
 4. Global-sidecar reports relationships through access log or prometheus metric
@@ -123,7 +124,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.8.2
+    tag: v0.9.0
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -166,7 +167,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.8.2
+        tag: v0.9.0
       probePort: 20000
 ' > /tmp/lazyload-slimeboot.yaml
 

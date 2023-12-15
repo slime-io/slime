@@ -180,7 +180,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.8.2
+    tag: v0.9.0
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -258,7 +258,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-limiter
-    tag: v0.8.2
+    tag: v0.9.0
   module:
     - name: limiter
       kind: limiter
@@ -291,7 +291,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-plugin
-    tag: v0.8.2
+    tag: v0.9.0
   module:
     - name: plugin
       kind: plugin
@@ -313,7 +313,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-bundle-all
-    tag: v0.8.2
+    tag: v0.9.0
   module:
     - name: bundle
       enable: true
@@ -377,7 +377,7 @@ spec:
           memory: 1024Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.8.2
+        tag: v0.9.0
       probePort: 20000 # health probe port
       port: 80 # global-sidecar default svc port
       legacyFilterName: true

@@ -1,13 +1,23 @@
 - [ROADMAP](#roadmap)
   - [Slime v0.4.0 (Released)](#slime-v040-released)
-  - [Slime v0.5.0 (Release in progress)](#slime-v050-release-in-progress)
-  - [Slime v0.6.0 (In Planning)](#slime-v060-in-planning)
-  - [Slime v0.7.0 (In Planning)](#slime-v070-in-planning)
+  - [Slime v0.5.0 (Released)](#slime-v050-released)
+  - [Slime v0.6.0 (Released)](#slime-v060-released)
+  - [Slime v0.7.0(Released)](#slime-v070released)
+  - [Slime v0.8.0 (Released)](#slime-v080-released)
+  - [Slime v0.8.1(Released)](#slime-v081released)
+  - [Slime v0.8.2(Released)](#slime-v082released)
+  - [Slime v0.9.0(Released)](#slime-v090released)
 - [路线图](#路线图)
   - [Slime v0.4.0 （已发布）](#slime-v040-已发布)
-  - [Slime v0.5.0（发布中）](#slime-v050发布中)
-  - [Slime v0.6.0（规划中）](#slime-v060规划中)
-  - [Slime v0.7.0（规划中）](#slime-v070规划中)
+  - [Slime v0.5.0（已发布）](#slime-v050已发布)
+  - [Slime v0.6.0（已发布）](#slime-v060已发布)
+  - [Slime v0.7.0（已发布）](#slime-v070已发布)
+  - [Slime v0.7.1（已发布）](#slime-v071已发布)
+  - [Slime v0.7.2（已发布）](#slime-v072已发布)
+- [Slime v0.8.0（已发布）](#slime-v080已发布)
+- [Slime v0.8.1（已发布）](#slime-v081已发布)
+- [Slime v0.8.2（已发布）](#slime-v082已发布)
+  - [Slime v0.9.0（发布中）](#slime-v090发布中)
 
 
 
@@ -93,9 +103,16 @@
 - Optimized many of the problems encountered in practice
 
 
-## Slime v0.8.2(Processing)
+## Slime v0.8.2(Released)
 
 - Optimized many of the problems encountered in practice
+
+
+## Slime v0.9.0(Released)
+- upgrade go version to 1.20
+- upgrade k8s version to 1.26.0
+- support metrics for slime
+
 
 
 # 路线图
@@ -200,14 +217,13 @@
 - 优化处理了很多实践过程中遇到的问题
   详见RELEASE NOTE [V0.8.1](https://github.com/slime-io/slime/releases/tag/v0.8.1)
 
-# Slime v0.8.2（发布中）
+# Slime v0.8.2（已发布）
 - 优化处理了很多实践过程中遇到的问题
   详见RELEASE NOTE [V0.8.2](https://github.com/slime-io/slime/releases/tag/v0.8.2)
 
-## Slime v0.9.0（规划中）
+## Slime v0.9.0（发布中）
+- 升级go版本到1.20
+- 升级k8s版本到1.26.0
+- slime支持metrics
 
-**扩展管理**
-- 支持服务级别插件下发
-
-**运维管理**
-- 前端控制台
+详见RELEASE NOTE [V0.9.0](https://github.com/slime-io/slime/releases/tag/v0.9.0)
