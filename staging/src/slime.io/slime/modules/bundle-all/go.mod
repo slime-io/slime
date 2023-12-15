@@ -99,7 +99,6 @@ require (
 	google.golang.org/genproto v0.0.0-20221118155620-16455021b5e6 // indirect
 	google.golang.org/grpc v1.52.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
-	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/ini.v1 v1.66.2 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
@@ -131,7 +130,8 @@ require (
 replace (
 	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
 	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20231205121800-d3e53bc03897
-	github.com/prometheus/common => github.com/prometheus/common v0.26.0
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/common => github.com/prometheus/common v0.44.0
 
 	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
