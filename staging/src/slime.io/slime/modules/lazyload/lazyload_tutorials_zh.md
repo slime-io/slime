@@ -41,8 +41,6 @@
 
 ![](./media/lazyload-architecture-2023-12-06.png)
 
-注：绿色箭头为lazyload controller内部逻辑，黄色箭头为global-sidecar内部逻辑。
-
 首次访问过程说明：
 
  前提：部署Lazyload模块，自动创建global-sidecar应用，Istiod会为global-sidecar应用添加标准sidecar（envoy），lazyload自动为服务开启懒加载。
@@ -51,11 +49,13 @@
 
 2. global-sidecar处理
 
+```
    2.1 入流量拦截，如果是accesslog模式，sidecar会生成包含服务调用关系的accesslog
 
    2.2 global-sidecar应用根据请求头等信息，转换访问目标为Service B
 
    2.3 出流量拦截，sidecar拥有所有服务配置信息，找到Service B目标信息，发出请求
+```
 
 3. 请求正确到达Service B
 
@@ -126,7 +126,7 @@ spec:
   image:
     pullPolicy: Always
     repository: docker.io/slimeio/slime-lazyload
-    tag: v0.8.2
+    tag: v0.9.0
   namespace: mesh-operator
   istioNamespace: istio-system
   module:
@@ -169,7 +169,7 @@ spec:
           memory: 400Mi
       image:
         repository: docker.io/slimeio/slime-global-sidecar
-        tag: v0.8.2
+        tag: v0.9.0
       probePort: 20000
 ' > /tmp/lazyload-slimeboot.yaml
 
