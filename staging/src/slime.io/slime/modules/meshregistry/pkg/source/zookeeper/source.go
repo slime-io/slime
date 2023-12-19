@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/hashicorp/go-multierror"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -83,10 +83,11 @@ type Source struct {
 	ignoreLabelsMap   map[string]string
 	watchingRoot      bool // TODO useless?
 
-	serviceMethods       map[string]string
-	registryServiceCache cmap.ConcurrentMap // string-interface: cmap(string-host: []dubboInstance)
-	cache                cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
-	pollingCache         cmap.ConcurrentMap // string-interface: cmap(string-host: *ServiceEntryWithMeta)
+	serviceMethods map[string]string
+
+	registryServiceCache cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, []dubboInstance]]
+	cache                cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, *ServiceEntryWithMeta]]
+
 	sidecarCache         map[resource.FullName]SidecarWithMeta
 	dubboCallModels      map[string]DubboCallModel // can only be replaced rather than being modified
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
@@ -161,9 +162,8 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 		initedCallback: readyCallback,
 
 		serviceMethods:       map[string]string{},
-		registryServiceCache: cmap.New(),
-		cache:                cmap.New(),
-		pollingCache:         cmap.New(),
+		registryServiceCache: cmap.New[cmap.ConcurrentMap[string, []dubboInstance]](),
+		cache:                cmap.New[cmap.ConcurrentMap[string, *ServiceEntryWithMeta]](),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
 		appSidecarUpdateTime: map[string]time.Time{},
 		dubboPortsCache:      map[uint32]*networking.Port{},
@@ -334,36 +334,28 @@ func (s *Source) simpleCacheJson(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func (s *Source) internalCacheJson(w http.ResponseWriter, req *http.Request, cache cmap.ConcurrentMap) {
+func internalCacheJson[V any](s *Source, w http.ResponseWriter, req *http.Request, cache cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, V]]) {
 	temp := cache
 	cacheData := map[string]map[string]interface{}{}
 	var result interface{}
 
 	interfaceName := req.URL.Query().Get("interfaceName")
 	if interfaceName != "" {
-		newTemp := cmap.New()
+		newTemp := cmap.New[cmap.ConcurrentMap[string, V]]()
 		if value, exist := temp.Get(interfaceName); exist {
 			newTemp.Set(interfaceName, value)
 		}
 		temp = newTemp
 	}
-	temp.IterCb(func(dubboInterface string, v interface{}) {
-		if v == nil {
-			return
-		}
 
-		inner := v.(cmap.ConcurrentMap)
-		if inner == nil {
-			return
-		}
-
+	temp.IterCb(func(dubboInterface string, inner cmap.ConcurrentMap[string, V]) {
 		interfaceCacheData := cacheData[dubboInterface]
 		if interfaceCacheData == nil {
 			interfaceCacheData = map[string]interface{}{}
 			cacheData[dubboInterface] = interfaceCacheData
 		}
-		inner.IterCb(func(host string, v interface{}) {
-			switch val := v.(type) {
+		inner.IterCb(func(host string, v V) {
+			switch val := any(v).(type) {
 			case *ServiceEntryWithMeta:
 				sem := val
 				s.mut.RLock()
@@ -401,12 +393,12 @@ func (s *Source) internalCacheJson(w http.ResponseWriter, req *http.Request, cac
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
-	temp := s.cacheInUse()
 	registrySvc := req.URL.Query().Get("registry_services")
 	if ok, _ := strconv.ParseBool(registrySvc); ok {
-		temp = s.registryServiceCache
+		internalCacheJson(s, w, req, s.registryServiceCache)
+	} else {
+		internalCacheJson(s, w, req, s.cache)
 	}
-	s.internalCacheJson(w, req, temp)
 }
 
 func (s *Source) isPollingMode() bool {
@@ -480,21 +472,19 @@ func (s *Source) Start() {
 func (s *Source) cacheInfo(iface string) interface{} {
 	info := make(map[string]interface{}, 0)
 	if iface == "" {
-		return s.cacheInUse()
+		return s.cache
 	}
 
-	cacheMap := s.cacheInUse().Items()
+	cacheMap := s.cache.Items()
 	for service, seCache := range cacheMap {
 		if service == iface {
 			info[service] = seCache
 			break
 		} else {
-			if ses, castok := seCache.(cmap.ConcurrentMap); castok {
-				for serviceKey, value := range ses.Items() {
-					if serviceKey == iface {
-						info[serviceKey] = value
-						break
-					}
+			for serviceKey, value := range seCache.Items() {
+				if serviceKey == iface {
+					info[serviceKey] = value
+					break
 				}
 			}
 		}
@@ -502,26 +492,14 @@ func (s *Source) cacheInfo(iface string) interface{} {
 	return info
 }
 
-func (s *Source) cacheInUse() cmap.ConcurrentMap {
-	if s.args.Mode == Polling {
-		return s.pollingCache
-	} else {
-		return s.cache
-	}
-}
-
 func (s *Source) cacheSummary() map[string]interface{} {
 	info := make(map[string]interface{}, 0)
 	count := 0
-	cacheMap := s.cacheInUse().Items()
-	for _, seCache := range cacheMap {
-		if ses, castok := seCache.(cmap.ConcurrentMap); castok {
-			for serviceKey, value := range ses.Items() {
-				if v, ok := value.(*ServiceEntryWithMeta); ok {
-					info[serviceKey] = len(v.ServiceEntry.Endpoints)
-					count = count + 1
-				}
-			}
+	cacheMap := s.cache.Items()
+	for _, ses := range cacheMap {
+		for serviceKey, sem := range ses.Items() {
+			info[serviceKey] = len(sem.ServiceEntry.Endpoints)
+			count = count + 1
 		}
 	}
 
@@ -534,18 +512,12 @@ func (s *Source) Stop() {
 }
 
 func (s *Source) ServiceEntries() []*networking.ServiceEntry {
-	cacheItems := s.cacheInUse().Items()
+	cacheItems := s.cache.Items()
 	ret := make([]*networking.ServiceEntry, 0, len(cacheItems))
 
-	for _, seCache := range cacheItems {
-		ses, castOk := seCache.(cmap.ConcurrentMap)
-		if !castOk {
-			continue
-		}
-		for _, value := range ses.Items() {
-			if sem, ok := value.(*ServiceEntryWithMeta); ok {
-				ret = append(ret, sem.ServiceEntry)
-			}
+	for _, ses := range cacheItems {
+		for _, sem := range ses.Items() {
+			ret = append(ret, sem.ServiceEntry)
 		}
 	}
 
@@ -557,25 +529,16 @@ func (s *Source) ServiceEntry(fullName resource.FullName) *networking.ServiceEnt
 	serviceKey := string(fullName.Name)
 	service := parseServiceFromKey(serviceKey)
 
-	v, ok := s.cacheInUse().Get(service)
+	ses, ok := s.cache.Get(service)
 	if !ok {
 		return nil
 	}
 
-	ses, castOk := v.(cmap.ConcurrentMap)
-	if !castOk {
-		return nil
-	}
-
-	v, ok = ses.Get(serviceKey)
+	sem, ok := ses.Get(serviceKey)
 	if !ok {
 		return nil
 	}
 
-	sem, ok := v.(*ServiceEntryWithMeta)
-	if !ok {
-		return nil
-	}
 	return sem.ServiceEntry
 }
 
@@ -669,30 +632,22 @@ func generateMethodLBChecker(selectors []*bootstrap.ServiceSelector) func(*conve
 	}
 }
 
-func (s *Source) handleServiceData(
-	cacheInUse cmap.ConcurrentMap,
-	providers, consumers, configutators []string,
-	dubboInterface string,
-) {
-	if _, ok := cacheInUse.Get(dubboInterface); !ok {
-		cacheInUse.Set(dubboInterface, cmap.New())
+func (s *Source) handleServiceData(providers, consumers, configutators []string, dubboInterface string) {
+	if _, ok := s.cache.Get(dubboInterface); !ok {
+		s.cache.Set(dubboInterface, cmap.New[*ServiceEntryWithMeta]())
 	}
 
 	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface)
 	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
-	s.updateSeCache(cacheInUse, freshSeMap, dubboInterface)
+	s.updateSeCache(freshSeMap, dubboInterface)
 }
 
 func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap map[string][]dubboInstance) {
 	if _, ok := s.registryServiceCache.Get(dubboInterface); !ok {
-		s.registryServiceCache.Set(dubboInterface, cmap.New())
+		s.registryServiceCache.Set(dubboInterface, cmap.New[[]dubboInstance]())
 	}
 	for serviceKey, instances := range freshSvcMap {
-		v, ok := s.registryServiceCache.Get(dubboInterface)
-		if !ok {
-			continue
-		}
-		svcCache, ok := v.(cmap.ConcurrentMap)
+		svcCache, ok := s.registryServiceCache.Get(dubboInterface)
 		if !ok {
 			continue
 		}
@@ -701,11 +656,7 @@ func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap m
 
 	// check if svc deleted
 	deleteKey := make([]string, 0)
-	v, ok := s.registryServiceCache.Get(dubboInterface)
-	if !ok {
-		return
-	}
-	svcCache, ok := v.(cmap.ConcurrentMap)
+	svcCache, ok := s.registryServiceCache.Get(dubboInterface)
 	if !ok {
 		return
 	}
@@ -723,9 +674,9 @@ func (s *Source) updateRegistryServiceCache(dubboInterface string, freshSvcMap m
 	}
 }
 
-func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[string]*convertedServiceEntry, dubboInterface string) {
-	if _, ok := cacheInUse.Get(dubboInterface); !ok {
-		cacheInUse.Set(dubboInterface, cmap.New())
+func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dubboInterface string) {
+	if _, ok := s.cache.Get(dubboInterface); !ok {
+		s.cache.Set(dubboInterface, cmap.New[*ServiceEntryWithMeta]())
 	}
 
 	for serviceKey, convertedSe := range freshSeMap {
@@ -753,18 +704,14 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 		s.serviceMethods[serviceKey] = convertedSe.methodsLabel
 		s.mut.Unlock()
 
-		v, ok := cacheInUse.Get(dubboInterface)
-		if !ok {
-			continue
-		}
-		interfaceSeCache, ok := v.(cmap.ConcurrentMap)
+		interfaceSeCache, ok := s.cache.Get(dubboInterface)
 		if !ok {
 			continue
 		}
 
 		callModel := convertDubboCallModel(se, convertedSe.InboundEndPoints)
 
-		if value, exist := interfaceSeCache.Get(serviceKey); !exist {
+		if oldSem, exist := interfaceSeCache.Get(serviceKey); !exist {
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
 			ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel)
 			if err == nil {
@@ -774,8 +721,8 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 				}
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
-		} else if existSeWithMeta, ok := value.(*ServiceEntryWithMeta); ok {
-			if existSeWithMeta.Equals(*newSeWithMeta) {
+		} else {
+			if oldSem.Equals(*newSeWithMeta) {
 				continue
 			}
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
@@ -792,25 +739,16 @@ func (s *Source) updateSeCache(cacheInUse cmap.ConcurrentMap, freshSeMap map[str
 
 	// check if svc deleted
 	deleteKey := make([]string, 0)
-	v, ok := cacheInUse.Get(dubboInterface)
+	seCache, ok := s.cache.Get(dubboInterface)
 	if !ok {
 		return
 	}
-	seCache, ok := v.(cmap.ConcurrentMap)
-	if !ok {
-		return
-	}
-	for serviceKey, v := range seCache.Items() {
+	for serviceKey, seValue := range seCache.Items() {
 		_, exist := freshSeMap[serviceKey]
 		if exist {
 			continue
 		}
 		deleteKey = append(deleteKey, serviceKey)
-		seValue, ok := v.(*ServiceEntryWithMeta)
-		if !ok {
-			log.Errorf("cast se failed, key: %s", serviceKey)
-			continue
-		}
 
 		// del event -> empty-ep update event
 

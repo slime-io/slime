@@ -3,7 +3,7 @@ package cache
 import (
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/resource"
 	v1 "k8s.io/api/core/v1"
@@ -17,7 +17,7 @@ var K8sNodeCaches = &nodeCacheHandler{}
 
 func newNodeCache() *nodeCache {
 	nc := &nodeCache{
-		cache: cmap.New(),
+		cache: cmap.New[*metav1.ObjectMeta](),
 	}
 	nc.Handler = cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -34,21 +34,18 @@ func newNodeCache() *nodeCache {
 }
 
 type nodeCache struct {
-	cache   cmap.ConcurrentMap
+	cache   cmap.ConcurrentMap[string, *metav1.ObjectMeta]
 	Handler cache.ResourceEventHandlerFuncs
 }
 
-func (nc *nodeCache) GetAll() cmap.ConcurrentMap {
+func (nc *nodeCache) GetAll() cmap.ConcurrentMap[string, *metav1.ObjectMeta] {
 	return nc.cache
 }
 
 func (nc *nodeCache) Get(ip string) (meta *metav1.ObjectMeta, exist bool) {
 	value, exist := nc.cache.Get(ip)
 	if exist {
-		v, castok := value.(*metav1.ObjectMeta)
-		if castok {
-			return v, exist
-		}
+		return value, exist
 	}
 	return nil, false
 }
@@ -81,13 +78,13 @@ func (nc *nodeCache) delete(obj interface{}) {
 
 type nodeCacheHandler struct {
 	sync.Mutex
-	caches map[string]objectCache
+	caches caches[*metav1.ObjectMeta]
 }
 
-func (nch *nodeCacheHandler) GetAll() map[string]interface{} {
+func (nch *nodeCacheHandler) GetAll() map[string]cmap.ConcurrentMap[string, *metav1.ObjectMeta] {
 	nch.Lock()
 	defer nch.Unlock()
-	return (caches)(nch.caches).Get()
+	return nch.caches.Get()
 }
 
 // Note: Use IP as cache key in single cluster, this interface does not work in multi-cluster multi-network environments
@@ -134,7 +131,7 @@ func (nch *nodeCacheHandler) ClusterAdded(cluster *multicluster.Cluster, stopCh 
 	nch.Lock()
 	defer nch.Unlock()
 	if nch.caches == nil {
-		nch.caches = make(map[string]objectCache)
+		nch.caches = make(map[string]objectCache[*metav1.ObjectMeta])
 	}
 	nodeCache := newNodeCache()
 	nch.caches[cluster.ID] = nodeCache

@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	prometheus_client "github.com/prometheus/client_golang/api"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	log "github.com/sirupsen/logrus"
@@ -17,6 +17,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	watchtools "k8s.io/client-go/tools/watch"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
@@ -31,7 +32,7 @@ type Source struct {
 	//
 	items            map[string]*v1alpha1.Prometheus_Source_Handler
 	Watcher          watch.Interface
-	Interest         cmap.ConcurrentMap
+	Interest         cmap.ConcurrentMap[string, bool]
 	UpdateChan       chan types.NamespacedName
 	multiClusterLock sync.RWMutex
 	getHandler       func(*Source, types.NamespacedName) map[string]string
@@ -45,7 +46,8 @@ func (m *Source) SetHandler(
 	getHandler func(*Source, types.NamespacedName) map[string]string,
 	watchHandler func(*Source, watch.Event),
 	timerHandler func(*Source),
-	updateHandler func(*Source, types.NamespacedName)) {
+	updateHandler func(*Source, types.NamespacedName),
+) {
 	m.getHandler = getHandler
 	m.watchHandler = watchHandler
 	m.timerHandler = timerHandler
@@ -128,7 +130,7 @@ func NewMetricSource(eventChan chan source.Event, env *bootstrap.Environment) (*
 		Watcher:    watcher,
 		K8sClient:  []*kubernetes.Clientset{k8sClient},
 		UpdateChan: make(chan types.NamespacedName),
-		Interest:   cmap.New(),
+		Interest:   cmap.New[bool](),
 	}
 	if m := env.Config.Metric.Prometheus; m != nil {
 		promClient, err := prometheus_client.NewClient(prometheus_client.Config{

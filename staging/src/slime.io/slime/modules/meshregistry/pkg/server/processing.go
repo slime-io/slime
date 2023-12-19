@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"google.golang.org/grpc"
 	"istio.io/libistio/galley/pkg/config/processor/transforms"
 	"istio.io/libistio/galley/pkg/config/source/kube"
@@ -76,7 +76,7 @@ func NewProcessing(args *Args) *Processing {
 		addr:            args.RegistryArgs.HTTPServerAddr,
 		mux:             http.NewServeMux(),
 		sourceReady:     true,
-		sources:         cmap.New(),
+		sources:         cmap.New[bool](),
 		httpPathHandler: args.SlimeEnv.HttpPathHandler,
 	}
 
