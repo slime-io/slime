@@ -36,6 +36,8 @@ message Limiter {
   // A regular expression in golang regex format (RE2) that can be used to select proxies using a specific version of istio proxy to apply the ratelimit envoyfilter.
   // refer to https://istio.io/latest/docs/reference/config/networking/envoy-filter/#EnvoyFilter-ProxyMatch
   string proxyVersion = 13;
+  // enable ratelimit placeholder in route to optimize performance
+  bool enableRatelimitPlaceholderInRoute = 14;
 }
 
 // configmap will mount to RateLimitService '/data/ratelimit/config'
