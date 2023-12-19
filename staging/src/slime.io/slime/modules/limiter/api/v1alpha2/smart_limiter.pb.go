@@ -279,7 +279,7 @@ type SmartLimitDescriptor_Matcher struct {
 	// request. If specified as false, header match will be performed based on whether the header is absent.
 	PresentMatch bool `protobuf:"varint,6,opt,name=present_match,json=presentMatch,proto3" json:"present_match,omitempty"`
 	// If specified, the match result will be inverted before checking. Defaults to false.
-	// * The regex “\d{3}“ does not match the value *1234*, so it will match when inverted.
+	// * The regex ``\d{3}`` does not match the value *1234*, so it will match when inverted.
 	InvertMatch bool `protobuf:"varint,7,opt,name=invert_match,json=invertMatch,proto3" json:"invert_match,omitempty"`
 	// if specified, the exact match the value ""
 	IsExactMatchEmpty bool `protobuf:"varint,8,opt,name=is_exact_match_empty,json=isExactMatchEmpty,proto3" json:"is_exact_match_empty,omitempty"`

@@ -83,6 +83,8 @@ const (
 	TypeURLUDPATypedStruct         = "type.googleapis.com/udpa.type.v1.TypedStruct"
 	TypeURLEnvoyLocalRateLimit     = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
 	TypeURLGenericProxyRouteAction = "type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction"
+	TypeURLFiterConfig             = "type.googleapis.com/envoy.config.route.v3.FilterConfig"
+	TypeURLConfigEmpty             = "type.googleapis.com/google.protobuf.Empty"
 
 	EnvoyFilterGlobalSidecar = "to_global_sidecar"
 

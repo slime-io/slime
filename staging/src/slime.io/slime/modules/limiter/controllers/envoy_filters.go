@@ -3,6 +3,8 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	networking "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -14,20 +16,21 @@ import (
 	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
-	"strings"
 )
 
 // LimiterSpec info come from config and SmartLimiterSpec
 type LimiterSpec struct {
-	rls                          *config.RateLimitService
-	gw                           bool
-	labels                       map[string]string
-	loc                          types.NamespacedName
-	disableGlobalRateLimit       bool
-	disableInsertLocalRateLimit  bool
-	disableInsertGlobalRateLimit bool
-	context                      string
-	rlsNs                        string
+	rls                               *config.RateLimitService
+	gw                                bool
+	labels                            map[string]string
+	loc                               types.NamespacedName
+	disableGlobalRateLimit            bool
+	disableInsertLocalRateLimit       bool
+	disableInsertGlobalRateLimit      bool
+	enableRatelimitPlaceholderInRoute bool
+
+	context string
+	rlsNs   string
 	// svc hostname
 	host   string
 	target *microservicev1alpha2.Target
@@ -47,18 +50,19 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha2.SmartLimitDescriptors)
 	globalDescriptors := make([]*model.Descriptor, 0)
 	params := &LimiterSpec{
-		rls:                          r.cfg.GetRls(),
-		gw:                           spec.Gateway,
-		labels:                       spec.WorkloadSelector,
-		loc:                          loc,
-		disableGlobalRateLimit:       r.cfg.GetDisableGlobalRateLimit(),
-		disableInsertLocalRateLimit:  r.cfg.GetDisableInsertLocalRateLimit(),
-		disableInsertGlobalRateLimit: r.cfg.GetDisableInsertGlobalRateLimit(),
-		host:                         spec.Host,
-		target:                       spec.Target,
-		domain:                       r.cfg.GetDomain(),
-		rlsConfigmap:                 r.cfg.GetRlsConfigMap(),
-		proxyVersion:                 r.cfg.GetProxyVersion(),
+		rls:                               r.cfg.GetRls(),
+		gw:                                spec.Gateway,
+		labels:                            spec.WorkloadSelector,
+		loc:                               loc,
+		disableGlobalRateLimit:            r.cfg.GetDisableGlobalRateLimit(),
+		disableInsertLocalRateLimit:       r.cfg.GetDisableInsertLocalRateLimit(),
+		disableInsertGlobalRateLimit:      r.cfg.GetDisableInsertGlobalRateLimit(),
+		enableRatelimitPlaceholderInRoute: r.cfg.GetEnableRatelimitPlaceholderInRoute(),
+		host:                              spec.Host,
+		target:                            spec.Target,
+		domain:                            r.cfg.GetDomain(),
+		rlsConfigmap:                      r.cfg.GetRlsConfigMap(),
+		proxyVersion:                      r.cfg.GetProxyVersion(),
 	}
 
 	var sets []*networking.Subset
@@ -212,9 +216,10 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 		ef.ConfigPatches = append(ef.ConfigPatches, httpRouterPatches...)
 	}
 
-	// config plugin envoy.filters.http.ratelimit
-	if len(globalDescriptors) > 0 {
-		// disable insert envoy.filters.http.ratelimit before route
+	// if global ratelimit is not disabled, config plugin envoy.filters.http.ratelimit
+	if !params.disableGlobalRateLimit && len(globalDescriptors) > 0 {
+
+		// disable insert envoy.filters.http.ratelimit before router
 		if !params.disableInsertGlobalRateLimit {
 			server, err := getRateLimiterService(params.rls)
 			if err != nil {
@@ -226,7 +231,13 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 				ef.ConfigPatches = append(ef.ConfigPatches, httpFilterEnvoyRateLimitPatch)
 			}
 		} else {
-			log.Debugf("disableGlobalRateLimit set true, skip")
+			log.Debugf("disableInsertGlobalRateLimit set true, skip insert envoy.filters.http.ratelimit before router automatically")
+		}
+
+		// optimize: only load plugins in routers with ratelimit
+		if params.enableRatelimitPlaceholderInRoute {
+			httpFilterRateLimitPatch := generateRateLimitPerFilterPatch(globalDescriptors, params)
+			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterRateLimitPatch...)
 		}
 	}
 

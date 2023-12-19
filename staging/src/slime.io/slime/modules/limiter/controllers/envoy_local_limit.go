@@ -342,6 +342,60 @@ func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networ
 	return patch
 }
 
+func generateRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networking.EnvoyFilter_EnvoyConfigObjectPatch {
+	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
+	route2RouteConfig := make(map[string][]*routeConfig)
+	routeNameList := make([]string, 0)
+
+	for _, descriptor := range descriptors {
+		rcs := generateRouteConfigs(descriptor.Target, params.target, params.gw)
+		for _, rc := range rcs {
+			vHostRouteName := genVhostRouteName(rc)
+
+			if _, ok := route2Descriptors[vHostRouteName]; !ok {
+				route2Descriptors[vHostRouteName] = []*microservicev1alpha2.SmartLimitDescriptor{descriptor}
+				routeNameList = append(routeNameList, vHostRouteName)
+			} else {
+				route2Descriptors[vHostRouteName] = append(route2Descriptors[vHostRouteName], descriptor)
+			}
+
+			if _, ok := route2RouteConfig[vHostRouteName]; !ok {
+				route2RouteConfig[vHostRouteName] = []*routeConfig{rc}
+			} else {
+				route2RouteConfig[vHostRouteName] = append(route2RouteConfig[vHostRouteName], rc)
+			}
+		}
+	}
+
+	for _, vr := range routeNameList {
+		_, ok := route2Descriptors[vr]
+		if !ok {
+			continue
+		}
+		rcs, ok := route2RouteConfig[vr]
+		if !ok {
+			continue
+		}
+
+		patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
+			Match: generateEnvoyVhostMatch(rcs[0], params.proxyVersion),
+			Patch: generateRatelimitPerFilterPatch(),
+		}
+
+		if rcs[0].routeName == "" {
+			// route name not specified, patch to vhost, skip
+			return patches
+		} else {
+			patch.ApplyTo = networking.EnvoyFilter_HTTP_ROUTE
+		}
+
+		patches = append(patches, patch)
+	}
+
+	return patches
+}
+
 func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networking.EnvoyFilter_EnvoyConfigObjectPatch {
 	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
@@ -804,6 +858,51 @@ func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networking.E
 	config.RouteConfiguration.Vhost.Name = rc.vhostName
 
 	return match
+}
+
+func generateRatelimitPerFilterPatch() *networking.EnvoyFilter_Patch {
+	return &networking.EnvoyFilter_Patch{
+		Operation: networking.EnvoyFilter_Patch_MERGE,
+		Value: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				model.TypePerFilterConfig: {
+					Kind: &structpb.Value_StructValue{
+						StructValue: &structpb.Struct{
+							Fields: map[string]*structpb.Value{
+								util.EnvoyLocalRateLimit: {
+									Kind: &structpb.Value_StructValue{
+										StructValue: &structpb.Struct{
+											Fields: map[string]*structpb.Value{
+												util.StructAnyAtType: {
+													Kind: &structpb.Value_StringValue{StringValue: util.TypeURLFiterConfig},
+												},
+												"config": {
+													Kind: &structpb.Value_StructValue{
+														StructValue: &structpb.Struct{
+															Fields: map[string]*structpb.Value{
+																util.StructAnyAtType: {
+																	Kind: &structpb.Value_StringValue{StringValue: util.TypeURLConfigEmpty},
+																},
+															},
+														},
+													},
+												},
+												"is_optional": {
+													Kind: &structpb.Value_BoolValue{
+														BoolValue: true,
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func generatePerFilterPatch(local *structpb.Struct) *networking.EnvoyFilter_Patch {
