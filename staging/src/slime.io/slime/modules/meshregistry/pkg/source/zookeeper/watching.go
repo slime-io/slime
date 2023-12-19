@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-zookeeper/zk"
 	"github.com/jpillora/backoff"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/robfig/cron/v3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/pkg/env"
@@ -39,27 +39,23 @@ func jitter(period time.Duration) time.Duration {
 func (s *Source) ServiceNodeDelete(path string) {
 	ss := strings.Split(path, "/")
 	service := ss[len(ss)-2]
-	if seMap, ok := s.cache.Get(service); ok {
-		if ses, ok := seMap.(cmap.ConcurrentMap); ok {
-			for serviceKey, value := range ses.Items() {
-				if se, ok := value.(*ServiceEntryWithMeta); ok {
-					event, err := buildServiceEntryEvent(event.Deleted, se.ServiceEntry, se.Meta, nil)
-					if err == nil {
-						for _, h := range s.handlers {
-							h.Handle(event)
-						}
-					}
-					monitoring.RecordServiceEntryDeletion(SourceName, true, err == nil)
-					ses.Remove(serviceKey)
+	if ses, ok := s.cache.Get(service); ok {
+		for serviceKey, sem := range ses.Items() {
+			event, err := buildServiceEntryEvent(event.Deleted, sem.ServiceEntry, sem.Meta, nil)
+			if err == nil {
+				for _, h := range s.handlers {
+					h.Handle(event)
 				}
 			}
+			monitoring.RecordServiceEntryDeletion(SourceName, true, err == nil)
+			ses.Remove(serviceKey)
 		}
 		s.cache.Remove(service)
 	}
 }
 
 func (s *Source) EndpointUpdate(providers, consumers, configurators []string, path string) {
-	s.handleServiceData(s.cache, providers, consumers, configurators, strings.Split(path, "/")[2])
+	s.handleServiceData(providers, consumers, configurators, strings.Split(path, "/")[2])
 }
 
 func (s *Source) Watching() {
@@ -385,14 +381,14 @@ func (q *eventQueue) Pop() (item ServiceEvent) {
 func NewServiceWorker(opts EndpointWatcherOpts) *worker {
 	return &worker{
 		q:             NewQueue(),
-		cache:         cmap.New(),
+		cache:         cmap.New[*EndpointWatcher](),
 		epWatcherOpts: opts,
 	}
 }
 
 type worker struct {
 	q     ServiceEventQueue
-	cache cmap.ConcurrentMap
+	cache cmap.ConcurrentMap[string, *EndpointWatcher]
 
 	epWatcherOpts EndpointWatcherOpts
 }
@@ -418,9 +414,8 @@ func (w *worker) processItem(ctx context.Context) bool {
 	default:
 	}
 	e := w.q.Pop()
-	watcher, ok := w.cache.Get(e.path)
+	ew, ok := w.cache.Get(e.path)
 	if e.etype == EventTypeDelete && ok {
-		ew := watcher.(*EndpointWatcher)
 		ew.Exit() // may block other service events from being processed？
 		log.Infof("endpoint watcher %q exited", ew.servicePath)
 		w.cache.Remove(e.path)

@@ -9,6 +9,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+
 	"slime.io/slime/framework/bootstrap/resource"
 	slime_serviceregistry "slime.io/slime/framework/bootstrap/serviceregistry/model"
 	"slime.io/slime/framework/controllers"
@@ -67,14 +68,8 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 
 	var sets []*networking.Subset
 
-	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
+	meta, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 	if !ok {
-		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
-	}
-
-	meta, ok := v.(SmartLimiterMeta)
-	if !ok {
-		log.Error("covert meta to SmartLimiterMeta err")
 		return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
 	}
 
@@ -84,8 +79,8 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		if meta.seHost != "" {
 			host = meta.seHost
 		}
-		if controllers.HostSubsetMapping.Get(host) != nil {
-			sets = controllers.HostSubsetMapping.Get(host).([]*networking.Subset)
+		if got := controllers.HostSubsetMapping.Get(host); len(got) != 0 {
+			sets = got
 		}
 	}
 

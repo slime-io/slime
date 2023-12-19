@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"k8s.io/kube-openapi/pkg/common"
 
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
@@ -24,7 +24,7 @@ type HttpServer struct {
 	sourceReady         bool
 	sourceReadyMsg      string
 	httpPathHandler     common.PathHandler
-	sources             cmap.ConcurrentMap
+	sources             cmap.ConcurrentMap[string, bool]
 	lock                sync.Mutex
 	mcpController       *mcpoverxds.McpController
 	startWG             *sync.WaitGroup
@@ -81,7 +81,7 @@ func (hs *HttpServer) Ready() bool {
 func (hs *HttpServer) unreadySources() []string {
 	var ret []string
 	for k, v := range hs.sources.Items() {
-		if boolValue, ok := v.(bool); ok && !boolValue {
+		if !v {
 			ret = append(ret, k)
 		}
 	}

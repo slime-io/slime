@@ -8,12 +8,12 @@ import (
 
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/source"
@@ -89,15 +89,13 @@ func metricGetHandler(m *Source, meta types.NamespacedName) map[string]string {
 		for _, pod := range pods {
 			if util.IsContain(pod.Labels, service.Spec.Selector) && pod.DeletionTimestamp == nil {
 				host := util.UnityHost(meta.Name, meta.Namespace)
-				if controllers.HostSubsetMapping.Get(host) != nil {
-					if sbs, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
-						for _, sb := range sbs {
-							if util.IsContain(pod.Labels, sb.Labels) {
-								if subsetsPods[sb.Name] != nil {
-									subsetsPods[sb.Name] = append(subsetsPods[sb.Name], pod.Name)
-								} else {
-									subsetsPods[sb.Name] = []string{pod.Name}
-								}
+				if sbs := controllers.HostSubsetMapping.Get(host); len(sbs) != 0 {
+					for _, sb := range sbs {
+						if util.IsContain(pod.Labels, sb.Labels) {
+							if subsetsPods[sb.Name] != nil {
+								subsetsPods[sb.Name] = append(subsetsPods[sb.Name], pod.Name)
+							} else {
+								subsetsPods[sb.Name] = []string{pod.Name}
 							}
 						}
 					}

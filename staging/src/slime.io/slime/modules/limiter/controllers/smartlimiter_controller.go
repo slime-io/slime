@@ -19,13 +19,14 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/types"
 	"sync"
 	"time"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	"slime.io/slime/framework/util"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -33,6 +34,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/bootstrap"
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
@@ -53,11 +55,11 @@ type SmartLimiterReconciler struct {
 	// key is limiter's namespace and name
 	// value is the SmartLimiterMeta
 	// subsequent code can get this information directly rather than through clientSet
-	interest cmap.ConcurrentMap
+	interest cmap.ConcurrentMap[string, SmartLimiterMeta]
 	// reuse, or use another filed to store interested nn
 	// key is the interested namespace/name
 	// value is the metricInfo
-	metricInfo cmap.ConcurrentMap
+	metricInfo cmap.ConcurrentMap[string, *slime_model.Endpoints]
 
 	watcherMetricChan <-chan metric.Metric
 	tickerMetricChan  <-chan metric.Metric
@@ -68,7 +70,6 @@ type SmartLimiterReconciler struct {
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters/status,verbs=get;update;patch
 
 func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	log.Infof("begin reconcile, get smartlimiter %+v", req)
 	ReconcilesTotal.Increment()
 
@@ -120,8 +121,8 @@ func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // NewReconciler returns a new reconcile.Reconciler
 func NewReconciler(opts ...ReconcilerOpts) *SmartLimiterReconciler {
 	r := &SmartLimiterReconciler{
-		metricInfo: cmap.New(),
-		interest:   cmap.New(),
+		metricInfo: cmap.New[*slime_model.Endpoints](),
+		interest:   cmap.New[SmartLimiterMeta](),
 	}
 	for _, opt := range opts {
 		opt(r)
@@ -227,7 +228,6 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 }
 
 func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, bool, error) {
-
 	gateway := instance.Spec.Gateway
 	sidecarOutbound := false
 

@@ -4,15 +4,16 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"strings"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
-	"istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
@@ -71,26 +72,18 @@ func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) me
 
 func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.QueryMap {
 	queryMap := make(map[string][]metric.Handler, 0)
-	v, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
+	meta, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 	if !ok {
 		log.Warnf("%s not in interest map", loc)
-		return queryMap
-	}
-
-	meta, ok := v.(SmartLimiterMeta)
-	if !ok {
-		log.Error("covert to SmartLimiterMeta err")
 		return queryMap
 	}
 
 	// handle loc which is in interest map in inbound scenario
 	if !r.cfg.GetDisableAdaptive() {
 		return r.handlePrometheusEvent(meta, loc)
-	} else {
-		// unify mesh and gateway in local event
-		return r.handleLocalEvent(meta, loc)
 	}
-	return nil
+	// unify mesh and gateway in local event
+	return r.handleLocalEvent(meta, loc)
 }
 
 func (r *SmartLimiterReconciler) handleLocalEvent(meta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
@@ -164,7 +157,6 @@ func queryServicePods(c client.Client, loc types.NamespacedName) ([]v1.Pod, erro
 }
 
 func queryPodsWithWorkloadSelector(c client.Client, workloadSelector map[string]string, ns string) ([]v1.Pod, error) {
-
 	pods := make([]v1.Pod, 0)
 
 	podLists := &v1.PodList{}
@@ -197,14 +189,11 @@ func querySubsetPods(pods []v1.Pod, loc types.NamespacedName) (map[string][]stri
 	host := util.UnityHost(loc.Name, loc.Namespace)
 
 	// if subset is existed, assign pods to subset
-	if controllers.HostSubsetMapping.Get(host) != nil {
-		subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset)
-		if ok {
-			for _, pod := range pods {
-				for _, sb := range subsets {
-					if util.IsContain(pod.Labels, sb.Labels) {
-						append2Subsets(sb.GetName(), subsetsPods, pod)
-					}
+	if subsets := controllers.HostSubsetMapping.Get(host); len(subsets) > 0 {
+		for _, pod := range pods {
+			for _, sb := range subsets {
+				if util.IsContain(pod.Labels, sb.Labels) {
+					append2Subsets(sb.GetName(), subsetsPods, pod)
 				}
 			}
 		}
@@ -368,7 +357,6 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta Sma
 }
 
 func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(host string, loc types.NamespacedName) map[string][]metric.Handler {
-
 	queryMap := make(map[string][]metric.Handler, 0)
 
 	svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
@@ -380,13 +368,11 @@ func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(host string, loc ty
 	subsetInfo := make(map[string]int)
 	subsetInfo[util.WellknownBaseSet] = len(svc.Endpoints)
 
-	if controllers.HostSubsetMapping.Get(host) != nil {
-		if subsets, ok := controllers.HostSubsetMapping.Get(host).([]*v1alpha3.Subset); ok {
-			for _, ep := range svc.Endpoints {
-				for _, sb := range subsets {
-					if util.IsContain(ep.Labels, serviceLabels) {
-						subsetInfo[sb.GetName()] = subsetInfo[sb.GetName()] + 1
-					}
+	if subsets := controllers.HostSubsetMapping.Get(host); len(subsets) > 0 {
+		for _, ep := range svc.Endpoints {
+			for _, sb := range subsets {
+				if util.IsContain(ep.Labels, serviceLabels) {
+					subsetInfo[sb.GetName()] = subsetInfo[sb.GetName()] + 1
 				}
 			}
 		}

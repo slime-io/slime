@@ -9,8 +9,9 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"strconv"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	networking "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -20,6 +21,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	"slime.io/slime/framework/apis/networking/v1alpha3"
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
@@ -112,14 +114,13 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 			Info:     args,
 		})
 	} else {
-		if i, ok := r.metricInfo.Get(request.Namespace + "/" + request.Name); ok {
-			if ep, ok := i.(*slime_model.Endpoints); ok {
-				ep.Lock.Lock()
-				for key, value := range args {
-					ep.Info[key] = value
-				}
-				ep.Lock.Unlock()
+		if ep, ok := r.metricInfo.Get(request.Namespace + "/" + request.Name); ok {
+			ep.Lock.Lock()
+			for key, value := range args {
+				ep.Info[key] = value
 			}
+			ep.Lock.Unlock()
+
 		}
 	}
 
@@ -235,10 +236,8 @@ func (r *SmartLimiterReconciler) subscribe(host string, subset interface{}) {
 }
 
 func (r *SmartLimiterReconciler) getMaterial(loc types.NamespacedName) map[string]string {
-	if i, ok := r.metricInfo.Get(loc.Namespace + "/" + loc.Name); ok {
-		if ep, ok := i.(*slime_model.Endpoints); ok {
-			return util.CopyMap(ep.Info)
-		}
+	if ep, ok := r.metricInfo.Get(loc.Namespace + "/" + loc.Name); ok {
+		return util.CopyMap(ep.Info)
 	}
 	return nil
 }
