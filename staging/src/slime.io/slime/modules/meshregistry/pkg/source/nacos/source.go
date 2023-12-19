@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -40,7 +40,7 @@ type Source struct {
 
 	// source cache
 	cache             map[string]*networking.ServiceEntry
-	namingServiceList cmap.ConcurrentMap
+	namingServiceList cmap.ConcurrentMap[string, bool]
 	handlers          []event.Handler
 
 	mut sync.RWMutex
@@ -106,7 +106,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		started:           false,
 		initedCallback:    readyCallback,
 		cache:             make(map[string]*networking.ServiceEntry),
-		namingServiceList: cmap.New(),
+		namingServiceList: cmap.New[bool](),
 		stop:              make(chan struct{}),
 		seInitCh:          make(chan struct{}),
 		seMergePortMocker: svcMocker,

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 )
 
 // Map operation
@@ -62,7 +62,7 @@ func findSubNode(ks []string, root map[string]interface{}) (map[string]interface
 		return root, ks, nil
 	} else {
 		if m, ok := root[ks[0]].(map[string]interface{}); !ok {
-			return nil, ks, fmt.Errorf("Leaf node reached,%v", ks)
+			return nil, ks, fmt.Errorf("leaf node reached,%v", ks)
 		} else {
 			return findSubNode(ks[1:], m)
 		}
@@ -70,30 +70,30 @@ func findSubNode(ks []string, root map[string]interface{}) (map[string]interface
 }
 
 // Subscribeable map
-type SubcribeableMap struct {
-	data           cmap.ConcurrentMap
+type SubcribeableMap[V any] struct {
+	data           cmap.ConcurrentMap[string, V]
 	subscriber     []func(key string, value interface{})
 	subscriberLock sync.RWMutex
 }
 
-func NewSubcribeableMap() *SubcribeableMap {
-	return &SubcribeableMap{
-		data:           cmap.New(),
+func NewSubcribeableMap[V any]() *SubcribeableMap[V] {
+	return &SubcribeableMap[V]{
+		data:           cmap.New[V](),
 		subscriber:     make([]func(key string, value interface{}), 0),
 		subscriberLock: sync.RWMutex{},
 	}
 }
 
-func (s *SubcribeableMap) Set(key string, value interface{}) {
-	s.data.Set(key, value)
+func (s *SubcribeableMap[V]) Set(key string, v V) {
+	s.data.Set(key, v)
 	s.subscriberLock.RLock()
 	for _, f := range s.subscriber {
-		f(key, value)
+		f(key, v)
 	}
 	s.subscriberLock.RUnlock()
 }
 
-func (s *SubcribeableMap) Pop(key string) {
+func (s *SubcribeableMap[V]) Pop(key string) {
 	s.data.Pop(key)
 	s.subscriberLock.RLock()
 	for _, f := range s.subscriber {
@@ -102,14 +102,14 @@ func (s *SubcribeableMap) Pop(key string) {
 	s.subscriberLock.RUnlock()
 }
 
-func (s *SubcribeableMap) Get(host string) interface{} {
+func (s *SubcribeableMap[V]) Get(host string) V {
 	if i, ok := s.data.Get(host); ok {
 		return i
 	}
-	return nil
+	return *new(V)
 }
 
-func (s *SubcribeableMap) Subscribe(subscribe func(key string, value interface{})) {
+func (s *SubcribeableMap[V]) Subscribe(subscribe func(key string, value interface{})) {
 	s.subscriberLock.Lock()
 	s.subscriber = append(s.subscriber, subscribe)
 	s.subscriberLock.Unlock()

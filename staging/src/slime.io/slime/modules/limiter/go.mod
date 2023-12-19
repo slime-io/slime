@@ -9,7 +9,7 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/onsi/ginkgo v1.16.4
 	github.com/onsi/gomega v1.24.1
-	github.com/orcaman/concurrent-map v0.0.0-20210106121528-16402b402231
+	github.com/orcaman/concurrent-map/v2 v2.0.1
 	github.com/prometheus/client_golang v1.16.0
 	github.com/sirupsen/logrus v1.8.1
 	google.golang.org/protobuf v1.30.0

@@ -19,12 +19,13 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/client-go/informers"
 	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+
+	"k8s.io/client-go/informers"
 
 	istio "istio.io/api/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
@@ -592,12 +593,7 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 }
 
 func getDestination(k string) []string {
-	if i := controllers.HostDestinationMapping.Get(k); i != nil {
-		if hs, ok := i.([]string); ok {
-			return hs
-		}
-	}
-	return nil
+	return controllers.HostDestinationMapping.Get(k)
 }
 
 // TODO: More rigorous verification

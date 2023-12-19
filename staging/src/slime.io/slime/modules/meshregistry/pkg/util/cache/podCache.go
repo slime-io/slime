@@ -3,7 +3,7 @@ package cache
 import (
 	"sync"
 
-	cmap "github.com/orcaman/concurrent-map"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/resource"
 	v1 "k8s.io/api/core/v1"
@@ -17,7 +17,7 @@ var K8sPodCaches = &podCacheHandler{}
 
 func newPodCache() *podCache {
 	pc := &podCache{
-		cache: cmap.New(),
+		cache: cmap.New[*podWrapper](),
 	}
 	pc.Handler = cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -39,21 +39,18 @@ type podWrapper struct {
 }
 
 type podCache struct {
-	cache   cmap.ConcurrentMap
+	cache   cmap.ConcurrentMap[string, *podWrapper]
 	Handler cache.ResourceEventHandlerFuncs
 }
 
-func (pc *podCache) GetAll() cmap.ConcurrentMap {
+func (pc *podCache) GetAll() cmap.ConcurrentMap[string, *podWrapper] {
 	return pc.cache
 }
 
 func (pc *podCache) Get(ip string) (meta *metav1.ObjectMeta, exist bool) {
 	value, exist := pc.cache.Get(ip)
 	if exist {
-		v, castok := value.(*podWrapper)
-		if castok {
-			return v.Meta, exist
-		}
+		return value.Meta, exist
 	}
 	return nil, false
 }
@@ -61,10 +58,7 @@ func (pc *podCache) Get(ip string) (meta *metav1.ObjectMeta, exist bool) {
 func (pc *podCache) GetHostKey(ip string) (string, bool) {
 	value, exist := pc.cache.Get(ip)
 	if exist {
-		v, castok := value.(*podWrapper)
-		if castok {
-			return v.NodeName, true
-		}
+		return value.NodeName, true
 	}
 	return "", false
 }
@@ -115,13 +109,13 @@ func (pc *podCache) delete(obj interface{}) {
 
 type podCacheHandler struct {
 	sync.Mutex
-	caches map[string]objectCache
+	caches caches[*podWrapper]
 }
 
-func (pch *podCacheHandler) GetAll() map[string]interface{} {
+func (pch *podCacheHandler) GetAll() map[string]cmap.ConcurrentMap[string, *podWrapper] {
 	pch.Lock()
 	defer pch.Unlock()
-	return (caches)(pch.caches).Get()
+	return pch.caches.Get()
 }
 
 // Note: Use IP as cache key in flat networks, this interface does not work in multi-cluster multi-network environments
@@ -169,7 +163,7 @@ func (pch *podCacheHandler) ClusterAdded(cluster *multicluster.Cluster, stopCh <
 	pch.Lock()
 	defer pch.Unlock()
 	if pch.caches == nil {
-		pch.caches = make(map[string]objectCache)
+		pch.caches = make(map[string]objectCache[*podWrapper])
 	}
 	podCache := newPodCache()
 	pch.caches[cluster.ID] = podCache
