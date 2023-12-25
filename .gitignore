@@ -73,6 +73,7 @@ Session.vim
 tags
 ### VisualStudioCode ###
 .vscode/*
+*.code-workspace
 .history
 *.code-workspace
 ### idea ###
@@ -84,6 +85,9 @@ staging/src/slime.io/slime/modules/*/.idea/*
 .kube/*
 /build
 .qz/*
+
+### project ###
+/efficiency.json
 
 ### module helm chats ###
 boot/helm-charts/slimeboot/templates/modules/*
