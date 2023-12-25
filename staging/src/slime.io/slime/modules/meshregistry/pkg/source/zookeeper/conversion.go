@@ -270,7 +270,7 @@ func (s *Source) convertServiceEntry(
 		cse := serviceEntryByServiceKey[serviceKey]
 		if cse == nil {
 			se := &networking.ServiceEntry{
-				Ports: make([]*networking.Port, 0),
+				Ports: make([]*networking.ServicePort, 0),
 			}
 			cse = &convertedServiceEntry{se: se}
 			serviceEntryByServiceKey[serviceKey] = cse
@@ -290,7 +290,7 @@ func (s *Source) convertServiceEntry(
 
 				var (
 					cAddr = consumerParts[2]
-					cPort *networking.Port
+					cPort *networking.ServicePort
 				)
 
 				if idx := strings.Index(cAddr, ":"); idx >= 0 { // consumer url generally does not have port
@@ -499,15 +499,15 @@ func parseDubboTag(str string, meta map[string]string) {
 	}
 }
 
-func convertPort(svcPort, port uint32) *networking.Port {
-	return &networking.Port{
+func convertPort(svcPort, port uint32) *networking.ServicePort {
+	return &networking.ServicePort{
 		Protocol: NetworkProtocolDubbo,
 		Number:   port,
 		Name:     source.PortName(NetworkProtocolDubbo, svcPort),
 	}
 }
 
-func convertEndpoint(ip string, meta map[string]string, port *networking.Port) *networking.WorkloadEntry {
+func convertEndpoint(ip string, meta map[string]string, port *networking.ServicePort) *networking.WorkloadEntry {
 	ret := &networking.WorkloadEntry{
 		Address: ip,
 		Ports: map[string]uint32{
@@ -527,7 +527,7 @@ type InboundEndPoint struct {
 	Ports   map[string]uint32
 }
 
-func convertInboundEndpoint(ip string, meta map[string]string, port *networking.Port) *networking.WorkloadEntry {
+func convertInboundEndpoint(ip string, meta map[string]string, port *networking.ServicePort) *networking.WorkloadEntry {
 	inboundEndpoint := &networking.WorkloadEntry{
 		Address: ip,
 		Labels:  meta,

@@ -9,9 +9,8 @@ import (
 	"errors"
 	"time"
 
-	"istio.io/libistio/galley/pkg/config/util/kuberesource"
-	"istio.io/libistio/pkg/config/schema/snapshots"
-	"istio.io/pkg/env"
+	"istio.io/libistio/pkg/config/schema/collections"
+	"istio.io/libistio/pkg/env"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 
@@ -30,18 +29,23 @@ type Args struct {
 	// Path to the mesh config file
 	MeshConfigFile string `json:"MeshConfigFile,omitempty"`
 
-	EnableGRPCTracing bool   `json:"EnableGRPCTracing,omitempty"`
+	EnableGRPCTracing bool `json:"EnableGRPCTracing,omitempty"`
+	// DEPRECATED, use K8SSource instead
 	WatchedNamespaces string `json:"WatchedNamespaces,omitempty"`
 	// Resync period for rescanning Kubernetes resources
 	ResyncPeriod util.Duration `json:"ResyncPeriod,omitempty"`
 
 	// Enable service discovery / endpoint processing.
+	// Uselss for now, will be removed in the future.
 	EnableServiceDiscovery bool `json:"EnableServiceDiscovery,omitempty"`
 
 	// ExcludedResourceKinds is a list of resource kinds for which no source events will be triggered.
-	// DEPRECATED
+	// DEPRECATED, moved to K8SSource
 	ExcludedResourceKinds []string `json:"ExcludedResourceKinds,omitempty"`
 
+	// Snapshot is the name of the preset resource set, available values are `default` and `localAnalysis`,
+	// default is `default`, which includes all pilot resources and k8s namesapce and service.
+	// DEPRECATED, replaced by K8SSource.Collections
 	Snapshots []string `json:"Snapshots,omitempty"`
 }
 
@@ -50,8 +54,8 @@ func DefaultArgs() *Args {
 	return &Args{
 		ResyncPeriod:          0,
 		MeshConfigFile:        defaultMeshConfigFile,
-		ExcludedResourceKinds: kuberesource.DefaultExcludedResourceKinds(),
-		Snapshots:             []string{snapshots.Default},
+		ExcludedResourceKinds: collections.LegacyDefaultExcludeKubeResourceKinds(),
+		Snapshots:             []string{CollectionsLegacyDefault},
 	}
 }
 
@@ -227,6 +231,13 @@ type InstanceMetaRelabelItem struct {
 	ValuesMapping map[string]string `json:"ValuesMapping,omitempty"`
 }
 
+const (
+	CollectionsAll           = "all"
+	CollectionsIstio         = "istio"
+	CollectionsLegacyDefault = "default"
+	CollectionsLegacyLocal   = "localAnalysis"
+)
+
 type K8SSourceArgs struct {
 	SourceArgs
 
@@ -239,6 +250,15 @@ type K8SSourceArgs struct {
 	// WatchConfigFiles if set to true, enables Fsnotify watcher for watching and signaling config file changes.
 	// Default is false
 	WatchConfigFiles bool `json:"WatchConfigFiles,omitempty"`
+
+	// Collections is the name of the preset resource set, available values are:
+	//   - all: all resources used by istio
+	//   - istio: all pilot and k8s gateway resources
+	//   - default: all legacy `default` snapshot resources
+	//   - localAnalysis: all legacy `localAnalysis` snapshot resources
+	Collections []string `json:"Collections,omitempty"`
+	// ExcludedResourceKinds is a list of resource kinds for which no source events will be triggered.
+	ExcludedResourceKinds []string `json:"ExcludedResourceKinds,omitempty"`
 }
 
 type ZookeeperSourceArgs struct {

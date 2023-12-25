@@ -128,7 +128,7 @@ func WithDynamicConfigOption(addCb func(func(*bootstrap.ZookeeperSourceArgs))) O
 	}
 }
 
-func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Schema, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
+func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	// XXX refactor to config
 	if zkSrc := args; zkSrc != nil && zkSrc.GatewayModel {
 		zkSrc.SvcPort = 80
@@ -155,9 +155,8 @@ func New(args *bootstrap.ZookeeperSourceArgs, exceptedResources []collection.Sch
 	}
 
 	ret := &Source{
-		args:              args,
-		exceptedResources: exceptedResources,
-		ignoreLabelsMap:   ignoreLabels,
+		args:            args,
+		ignoreLabelsMap: ignoreLabels,
 
 		initedCallback: readyCallback,
 
@@ -850,7 +849,7 @@ func prepareServiceEntryWithMeta(se *networking.ServiceEntry, meta resource.Meta
 func buildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
 	return event.Event{
 		Kind:   kind,
-		Source: collections.K8SNetworkingIstioIoV1Alpha3Serviceentries,
+		Source: collections.ServiceEntry,
 		Resource: &resource.Instance{
 			Metadata:    meta,
 			Message:     se,
@@ -865,7 +864,7 @@ func buildSidecarEvent(kind event.Kind, item *networking.Sidecar, meta resource.
 	source.FillRevision(meta)
 	return event.Event{
 		Kind:   kind,
-		Source: collections.K8SNetworkingIstioIoV1Alpha3Sidecars,
+		Source: collections.Sidecar,
 		Resource: &resource.Instance{
 			Metadata: meta,
 			Message:  item,

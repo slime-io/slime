@@ -31,7 +31,7 @@ func ConvertServiceEntryMap(
 	for _, ins := range instances {
 		if gatewayModel {
 			if nsfNacos {
-				//支持租户隔离
+				// 支持租户隔离
 				for _, projectCode := range getProjectCode(ins) {
 					seMap[ins.Dom+"-"+projectCode] = convertServiceEntryWithProjectCode(ins, nsHost, patchLabel, filter, hostAliases, projectCode)
 				}
@@ -82,10 +82,10 @@ func convertServiceEntryWithProjectCode(instanceResp *instanceResp, nsHost bool,
 	return ret
 }
 
-func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool, projectCode string) ([]*networking.WorkloadEntry, []*networking.Port, []string, bool) {
+func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool, projectCode string) ([]*networking.WorkloadEntry, []*networking.ServicePort, []string, bool) {
 	var (
 		endpoints      = make([]*networking.WorkloadEntry, 0)
-		ports          = make([]*networking.Port, 0)
+		ports          = make([]*networking.ServicePort, 0)
 		address        = make([]string, 0)
 		hasNonIPEpAddr bool
 	)
@@ -93,7 +93,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, filter func(*insta
 		return instances[i].InstanceId < instances[j].InstanceId
 	})
 
-	port := &networking.Port{
+	port := &networking.ServicePort{
 		Protocol: "HTTP",
 		Number:   80,
 		Name:     "http",
@@ -163,7 +163,7 @@ func convertServiceEntryWithNs(
 	if svcPort != 0 && instancePortAsSvcPort { // add extra svc port
 		for _, svcPorts := range nsSvcPorts {
 			if _, ok := svcPorts[svcPort]; !ok {
-				svcPorts[svcPort] = &networking.Port{
+				svcPorts[svcPort] = &networking.ServicePort{
 					Number:   svcPort,
 					Protocol: source.ProtocolHTTP,
 					Name:     source.PortName(source.ProtocolHTTP, svcPort),
@@ -197,7 +197,7 @@ func convertServiceEntryWithNs(
 		}
 
 		portMap := nsSvcPorts[ns]
-		ports := make([]*networking.Port, 0, len(portMap))
+		ports := make([]*networking.ServicePort, 0, len(portMap))
 		for _, p := range portMap {
 			ports = append(ports, p)
 		}
@@ -218,9 +218,9 @@ func convertServiceEntryWithNs(
 func convertEndpointsWithNs(
 	instances []*instance, defaultNs string, svcPort uint32, nsHost, instancePortAsSvcPort, patchLabel bool,
 	filter func(*instance) bool,
-) (map[string][]*networking.WorkloadEntry, map[string]map[uint32]*networking.Port, map[string]bool) {
+) (map[string][]*networking.WorkloadEntry, map[string]map[uint32]*networking.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
-	portsMap := make(map[string]map[uint32]*networking.Port, 0)
+	portsMap := make(map[string]map[uint32]*networking.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
@@ -273,7 +273,7 @@ func convertEndpointsWithNs(
 		var svcPortName string
 		ports, exist := portsMap[ns]
 		if !exist {
-			ports = map[uint32]*networking.Port{}
+			ports = map[uint32]*networking.ServicePort{}
 			portsMap[ns] = ports
 		}
 
@@ -283,7 +283,7 @@ func convertEndpointsWithNs(
 		}
 		if v, ok := ports[svcPortInUse]; !ok {
 			svcPortName = source.PortName(source.ProtocolHTTP, svcPortInUse)
-			ports[svcPortInUse] = &networking.Port{
+			ports[svcPortInUse] = &networking.ServicePort{
 				Protocol: source.ProtocolHTTP,
 				Number:   svcPortInUse,
 				Name:     svcPortName,

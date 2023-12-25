@@ -7,6 +7,7 @@ package server
 
 import (
 	"os"
+
 	slimebootstrap "slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 

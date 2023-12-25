@@ -15,7 +15,7 @@ import (
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/robfig/cron/v3"
 	"istio.io/libistio/pkg/config/event"
-	"istio.io/pkg/env"
+	"istio.io/libistio/pkg/env"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"

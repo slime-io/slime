@@ -76,7 +76,7 @@ func (m DubboCallModel) Consume(interfaceName string) bool {
 }
 
 func (s *Source) serviceEntryHandlerRefreshSidecar(e event.Event) {
-	if e.Source != collections.K8SNetworkingIstioIoV1Alpha3Serviceentries {
+	if !e.Source.Equal(collections.ServiceEntry) {
 		return
 	}
 

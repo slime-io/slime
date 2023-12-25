@@ -4,8 +4,6 @@ import (
 	"sync"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"istio.io/libistio/pkg/config/schema/collection"
-	"istio.io/libistio/pkg/config/schema/resource"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
@@ -113,21 +111,7 @@ func (nch *nodeCacheHandler) GetHostKey(ip string) (string, bool) {
 }
 
 func (nch *nodeCacheHandler) ClusterAdded(cluster *multicluster.Cluster, stopCh <-chan struct{}) error {
-	nodeKubeResource := collection.Builder{
-		Name: "k8s/core/v1/nodes",
-		Resource: resource.Builder{
-			Group:   "",
-			Version: "",
-			Plural:  "Nodes",
-			Kind:    "Node",
-		}.BuildNoValidate(),
-	}.MustBuild()
-	nodeInformer, err := cluster.Provider.GetAdapter(nodeKubeResource.Resource()).NewInformer()
-	if err != nil {
-		log.Errorf("cluster %s create k8s node informer error: %v", cluster.ID, err)
-		return err
-	}
-
+	nodeInformer := cluster.KubeInformer.Core().V1().Nodes().Informer()
 	nch.Lock()
 	defer nch.Unlock()
 	if nch.caches == nil {

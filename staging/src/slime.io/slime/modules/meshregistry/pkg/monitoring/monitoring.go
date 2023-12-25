@@ -28,7 +28,6 @@ var (
 		model.ModuleName,
 		"ready_time",
 		"Time spent on ready in seconds",
-		monitoring.WithLabels(souceLabel),
 	)
 
 	// mcpPushCount is the number of mcp push.

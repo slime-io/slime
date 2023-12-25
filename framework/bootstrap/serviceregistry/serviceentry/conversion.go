@@ -86,8 +86,9 @@ func convertIstioEndpoints(serviceEntry *networking.ServiceEntry, svcName, svcNa
 	return out
 }
 
-func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networking.Port,
-	endpoint *networking.WorkloadEntry, hosts []model.Name) *model.IstioEndpoint {
+func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networking.ServicePort,
+	endpoint *networking.WorkloadEntry, hosts []model.Name,
+) *model.IstioEndpoint {
 	var instancePort uint32
 	addr := endpoint.GetAddress()
 	if strings.HasPrefix(addr, model.UnixAddressPrefix) {
@@ -116,7 +117,7 @@ func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networking.
 	}
 }
 
-func convertPort(port *networking.Port) *model.Port {
+func convertPort(port *networking.ServicePort) *model.Port {
 	return &model.Port{
 		Name:     port.Name,
 		Port:     int(port.Number),

@@ -41,14 +41,14 @@ func convertServiceEntryForNacos(service string, instances []model.Instance, nsH
 	}
 }
 
-func convertEndpointsForNacos(service string, instances []model.Instance, patchLabel bool) ([]*networking.WorkloadEntry, []*networking.Port, []string) {
+func convertEndpointsForNacos(service string, instances []model.Instance, patchLabel bool) ([]*networking.WorkloadEntry, []*networking.ServicePort, []string) {
 	endpoints := make([]*networking.WorkloadEntry, 0)
-	ports := make([]*networking.Port, 0)
+	ports := make([]*networking.ServicePort, 0)
 	address := make([]string, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
 	})
-	port := &networking.Port{
+	port := &networking.ServicePort{
 		Protocol: "HTTP",
 		Number:   80,
 		Name:     "http",
@@ -87,7 +87,8 @@ func convertEndpointsForNacos(service string, instances []model.Instance, patchL
 
 // -------- for sidecar mode --------
 func convertServiceEntryWithNsForNacos(service string, instances []model.Instance, svcPort uint32, nsHost bool,
-	k8sDomainSuffix bool, svcNameWithNs bool, patchLabel bool) map[string]*networking.ServiceEntry {
+	k8sDomainSuffix bool, svcNameWithNs bool, patchLabel bool,
+) map[string]*networking.ServiceEntry {
 	endpointMap, portMap, useDNSMap := convertEndpointsWithNsForNacos(service, instances, svcPort, svcNameWithNs, patchLabel)
 	if len(endpointMap) > 0 {
 		ses := make(map[string]*networking.ServiceEntry, len(endpointMap))
@@ -123,9 +124,9 @@ func convertServiceEntryWithNsForNacos(service string, instances []model.Instanc
 	return nil
 }
 
-func convertEndpointsWithNsForNacos(service string, instances []model.Instance, svcPort uint32, svcNameWithNs bool, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.Port, map[string]bool) {
+func convertEndpointsWithNsForNacos(service string, instances []model.Instance, svcPort uint32, svcNameWithNs bool, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
-	portsMap := make(map[string][]*networking.Port, 0)
+	portsMap := make(map[string][]*networking.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
@@ -163,8 +164,8 @@ func convertEndpointsWithNsForNacos(service string, instances []model.Instance, 
 			if svcPort == 0 {
 				portNum = uint32(ins.Port)
 			}
-			ports = make([]*networking.Port, 0)
-			port := &networking.Port{
+			ports = make([]*networking.ServicePort, 0)
+			port := &networking.ServicePort{
 				Protocol: "HTTP",
 				Number:   portNum,
 				Name:     "http",
