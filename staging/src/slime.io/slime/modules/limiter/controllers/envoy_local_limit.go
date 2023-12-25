@@ -389,7 +389,6 @@ func generateRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLi
 		} else {
 			patch.ApplyTo = networking.EnvoyFilter_HTTP_ROUTE
 		}
-
 		patches = append(patches, patch)
 	}
 
@@ -869,7 +868,7 @@ func generateRatelimitPerFilterPatch() *networking.EnvoyFilter_Patch {
 					Kind: &structpb.Value_StructValue{
 						StructValue: &structpb.Struct{
 							Fields: map[string]*structpb.Value{
-								util.EnvoyLocalRateLimit: {
+								util.EnvoyRateLimit: {
 									Kind: &structpb.Value_StructValue{
 										StructValue: &structpb.Struct{
 											Fields: map[string]*structpb.Value{
@@ -882,6 +881,9 @@ func generateRatelimitPerFilterPatch() *networking.EnvoyFilter_Patch {
 															Fields: map[string]*structpb.Value{
 																util.StructAnyAtType: {
 																	Kind: &structpb.Value_StringValue{StringValue: util.TypeURLConfigEmpty},
+																},
+																util.StructAnyValue: {
+																	Kind: &structpb.Value_StructValue{},
 																},
 															},
 														},

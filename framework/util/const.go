@@ -52,6 +52,7 @@ const (
 	EnvoyFilterHTTPWasm = "envoy.filters.http.wasm"
 	EnvoyWasmV8         = "envoy.wasm.runtime.v8"
 	EnvoyLocalRateLimit = "envoy.filters.http.local_ratelimit"
+	EnvoyRateLimit      = "envoy.filters.http.ratelimit"
 
 	StructWasmConfig        = "config"
 	StructWasmName          = "name"
