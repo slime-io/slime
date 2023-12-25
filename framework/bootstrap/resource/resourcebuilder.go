@@ -3,7 +3,7 @@ package resource
 import (
 	"fmt"
 
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 )
 
 type ValidateFunc func(name, namespace string, config proto.Message) error

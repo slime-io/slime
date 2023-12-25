@@ -64,7 +64,7 @@ func ParseGroupVersionKind(s string) (GroupVersionKind, error) {
 
 type Config struct {
 	ConfigMeta
-	// Spec holds the configuration object as a gogo protobuf message
+	// Spec holds the configuration object as a protobuf message
 	Spec any
 }
 

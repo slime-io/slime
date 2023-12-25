@@ -4,7 +4,6 @@ go 1.20
 
 require (
 	github.com/envoyproxy/go-control-plane v0.11.2-0.20230725211550-11bfe846bcd4
-	github.com/gogo/protobuf v1.3.2
 	github.com/golang/glog v1.1.0
 	github.com/golang/protobuf v1.5.3
 	github.com/onsi/ginkgo v1.16.4
@@ -15,6 +14,7 @@ require (
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/yaml.v2 v2.4.0
 	istio.io/api v1.19.1
+	istio.io/client-go v1.19.1
 	k8s.io/api v0.28.4
 	k8s.io/apimachinery v0.28.4
 	k8s.io/client-go v0.28.4
@@ -42,6 +42,7 @@ require (
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
 	github.com/go-openapi/swag v0.22.3 // indirect
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-cmp v0.6.0 // indirect
@@ -111,7 +112,7 @@ require (
 
 replace (
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac
-	istio.io/libistio => github.com/believening/slime-libistio v0.0.0-20231225064106-f5308b7d8080
+	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc
 
 	slime.io/slime/framework => ../../../../../../framework
 )

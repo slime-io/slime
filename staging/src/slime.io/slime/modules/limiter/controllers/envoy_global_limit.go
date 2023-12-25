@@ -13,7 +13,7 @@ import (
 	envoy_config_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/config/ratelimit/v3"
 	"google.golang.org/protobuf/types/known/structpb"
 	"gopkg.in/yaml.v2"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,15 +25,15 @@ import (
 	"slime.io/slime/modules/limiter/model"
 )
 
-func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	rateLimitServiceConfig := generateRateLimitService(server)
 	rs, err := util.MessageToStruct(rateLimitServiceConfig)
 	if err != nil {
 		log.Errorf("MessageToStruct err: %+v", err.Error())
 		return nil
 	}
-	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
+	patch := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: networkingapi.EnvoyFilter_HTTP_FILTER,
 		Match:   generateEnvoyHttpFilterMatch(context, proxyVersion),
 		Patch:   generateEnvoyHttpFilterRateLimitServicePatch(rs, domain),
 	}
@@ -52,15 +52,15 @@ func generateRateLimitService(clusterName string) *envoy_config_ratelimit_v3.Rat
 	return rateLimitServiceConfig
 }
 
-func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
-	match := &networking.EnvoyFilter_EnvoyConfigObjectMatch{
-		Context: networking.EnvoyFilter_SIDECAR_INBOUND,
-		ObjectTypes: &networking.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
-			Listener: &networking.EnvoyFilter_ListenerMatch{
-				FilterChain: &networking.EnvoyFilter_ListenerMatch_FilterChainMatch{
-					Filter: &networking.EnvoyFilter_ListenerMatch_FilterMatch{
+func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectMatch {
+	match := &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
+		Context: networkingapi.EnvoyFilter_SIDECAR_INBOUND,
+		ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+			Listener: &networkingapi.EnvoyFilter_ListenerMatch{
+				FilterChain: &networkingapi.EnvoyFilter_ListenerMatch_FilterChainMatch{
+					Filter: &networkingapi.EnvoyFilter_ListenerMatch_FilterMatch{
 						Name: util.EnvoyHTTPConnectionManager,
-						SubFilter: &networking.EnvoyFilter_ListenerMatch_SubFilterMatch{
+						SubFilter: &networkingapi.EnvoyFilter_ListenerMatch_SubFilterMatch{
 							Name: util.EnvoyHTTPRouter,
 						},
 					},
@@ -70,22 +70,22 @@ func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networki
 	}
 
 	if proxyVersion != "" {
-		match.Proxy = &networking.EnvoyFilter_ProxyMatch{
+		match.Proxy = &networkingapi.EnvoyFilter_ProxyMatch{
 			ProxyVersion: proxyVersion,
 		}
 	}
 
 	if context == model.Gateway {
-		match.Context = networking.EnvoyFilter_GATEWAY
+		match.Context = networkingapi.EnvoyFilter_GATEWAY
 	} else if context == model.Outbound {
-		match.Context = networking.EnvoyFilter_SIDECAR_OUTBOUND
+		match.Context = networkingapi.EnvoyFilter_SIDECAR_OUTBOUND
 	}
 	return match
 }
 
-func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain string) *networking.EnvoyFilter_Patch {
-	return &networking.EnvoyFilter_Patch{
-		Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
+func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain string) *networkingapi.EnvoyFilter_Patch {
+	return &networkingapi.EnvoyFilter_Patch{
+		Operation: networkingapi.EnvoyFilter_Patch_INSERT_BEFORE,
 		Value: &structpb.Struct{
 			Fields: map[string]*structpb.Value{
 				util.StructHttpFilterName: {

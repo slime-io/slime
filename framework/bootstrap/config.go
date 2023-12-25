@@ -1,17 +1,17 @@
 package bootstrap
 
 import (
-	"bytes"
 	"encoding/json"
+	"os"
+	"strings"
+
 	ghYaml "github.com/ghodss/yaml"
-	"github.com/gogo/protobuf/jsonpb"
-	"io/ioutil"
+	"google.golang.org/protobuf/encoding/protojson"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/kube-openapi/pkg/common"
-	"os"
+
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
-	"strings"
 )
 
 const (
@@ -124,7 +124,7 @@ func GetModuleConfig(name string) (*ParsedModuleConfig, error) {
 		filePath += "_" + name
 	}
 
-	cfgData, err := ioutil.ReadFile(filePath)
+	cfgData, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			err = nil
@@ -176,8 +176,7 @@ func parseModuleConfig(data []byte) (*ParsedModuleConfig, error) {
 		}
 	}
 
-	um := jsonpb.Unmarshaler{AllowUnknownFields: true}
-	err = um.Unmarshal(bytes.NewBuffer(rawJson), c)
+	err = protojson.Unmarshal(rawJson, c)
 	if err != nil {
 		return nil, err
 	}
@@ -225,7 +224,6 @@ func (env *Environment) IstioRev() string {
 // when StrictRev is true, return true if revision in global.IstioRev
 // when StrictRev is false, return true if revision in global.IstioRev or revision is empty or global.IstioRev is empty
 func (env *Environment) RevInScope(rev string) bool {
-
 	// if IstioRev is "", strictRev is meaningless, we will manage all resource
 	if env == nil || env.Config == nil || env.Config.Global == nil || env.Config.Global.IstioRev == "" {
 		return true

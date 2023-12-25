@@ -3,7 +3,7 @@ package util
 import (
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 
 	"slime.io/slime/modules/meshregistry/pkg/features"
 )
@@ -187,7 +187,7 @@ func getLabelValue(labels map[string]string, labelsToTry ...string) string {
 	return ""
 }
 
-func FillWorkloadEntryLocality(we *networking.WorkloadEntry) {
+func FillWorkloadEntryLocality(we *networkingapi.WorkloadEntry) {
 	if we.Locality != "" {
 		return
 	}

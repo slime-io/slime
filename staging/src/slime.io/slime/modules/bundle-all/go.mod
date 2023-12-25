@@ -151,7 +151,7 @@ replace (
 	github.com/imdario/mergo => github.com/imdario/mergo v0.3.5
 
 	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac
-	istio.io/libistio => github.com/believening/slime-libistio v0.0.0-20231225064106-f5308b7d8080
+	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc
 	slime.io/pkg => github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7
 
 	slime.io/slime/framework => ./../../../../../../framework

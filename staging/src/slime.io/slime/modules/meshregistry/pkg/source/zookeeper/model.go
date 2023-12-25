@@ -1,8 +1,8 @@
 package zookeeper
 
 import (
-	"github.com/gogo/protobuf/proto"
-	networking "istio.io/api/networking/v1alpha3"
+	"google.golang.org/protobuf/proto"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/resource"
 )
 
@@ -11,12 +11,12 @@ const (
 )
 
 type ServiceEntryWithMeta struct {
-	ServiceEntry *networking.ServiceEntry
+	ServiceEntry *networkingapi.ServiceEntry
 	Meta         resource.Metadata
 }
 
 type SidecarWithMeta struct {
-	Sidecar *networking.Sidecar
+	Sidecar *networkingapi.Sidecar
 	Meta    resource.Metadata
 }
 

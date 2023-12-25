@@ -6,13 +6,13 @@ import (
 	"strings"
 
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-func ConvertServiceEntryMapForNacos(service string, instances []model.Instance, svcNameWithNs bool, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[string]*networking.ServiceEntry, error) {
-	seMap := make(map[string]*networking.ServiceEntry, 0)
+func ConvertServiceEntryMapForNacos(service string, instances []model.Instance, svcNameWithNs bool, gatewayModel bool, svcPort uint32, nsHost bool, k8sDomainSuffix bool, patchLabel bool) (map[string]*networkingapi.ServiceEntry, error) {
+	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
@@ -27,28 +27,28 @@ func ConvertServiceEntryMapForNacos(service string, instances []model.Instance, 
 }
 
 // -------- for gateway mode --------
-func convertServiceEntryForNacos(service string, instances []model.Instance, nsHost bool, patchLabel bool) *networking.ServiceEntry {
+func convertServiceEntryForNacos(service string, instances []model.Instance, nsHost bool, patchLabel bool) *networkingapi.ServiceEntry {
 	endpoints, ports, _ := convertEndpointsForNacos(service, instances, patchLabel)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".nacos"
 	}
-	return &networking.ServiceEntry{
+	return &networkingapi.ServiceEntry{
 		Hosts:      []string{strings.ReplaceAll(strings.ToLower(service), "_", "-") + nsSuffix},
-		Resolution: networking.ServiceEntry_DNS,
+		Resolution: networkingapi.ServiceEntry_DNS,
 		Endpoints:  endpoints,
 		Ports:      ports,
 	}
 }
 
-func convertEndpointsForNacos(service string, instances []model.Instance, patchLabel bool) ([]*networking.WorkloadEntry, []*networking.ServicePort, []string) {
-	endpoints := make([]*networking.WorkloadEntry, 0)
-	ports := make([]*networking.ServicePort, 0)
+func convertEndpointsForNacos(service string, instances []model.Instance, patchLabel bool) ([]*networkingapi.WorkloadEntry, []*networkingapi.ServicePort, []string) {
+	endpoints := make([]*networkingapi.WorkloadEntry, 0)
+	ports := make([]*networkingapi.ServicePort, 0)
 	address := make([]string, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
 	})
-	port := &networking.ServicePort{
+	port := &networkingapi.ServicePort{
 		Protocol: "HTTP",
 		Number:   80,
 		Name:     "http",
@@ -70,7 +70,7 @@ func convertEndpointsForNacos(service string, instances []model.Instance, patchL
 
 		util.FilterLabels(ins.Metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
-		ep := &networking.WorkloadEntry{
+		ep := &networkingapi.WorkloadEntry{
 			Address: ins.Ip,
 			Ports:   instancePorts,
 			Labels:  ins.Metadata,
@@ -88,10 +88,10 @@ func convertEndpointsForNacos(service string, instances []model.Instance, patchL
 // -------- for sidecar mode --------
 func convertServiceEntryWithNsForNacos(service string, instances []model.Instance, svcPort uint32, nsHost bool,
 	k8sDomainSuffix bool, svcNameWithNs bool, patchLabel bool,
-) map[string]*networking.ServiceEntry {
+) map[string]*networkingapi.ServiceEntry {
 	endpointMap, portMap, useDNSMap := convertEndpointsWithNsForNacos(service, instances, svcPort, svcNameWithNs, patchLabel)
 	if len(endpointMap) > 0 {
-		ses := make(map[string]*networking.ServiceEntry, len(endpointMap))
+		ses := make(map[string]*networkingapi.ServiceEntry, len(endpointMap))
 		for ns, endpoints := range endpointMap {
 			seName := service
 			nsSuffix := ""
@@ -105,14 +105,14 @@ func convertServiceEntryWithNsForNacos(service string, instances []model.Instanc
 			} else {
 				nsSuffix = ".svc.cluster.local"
 			}
-			resolution := networking.ServiceEntry_STATIC
+			resolution := networkingapi.ServiceEntry_STATIC
 			if useDNSMap[ns] {
-				resolution = networking.ServiceEntry_DNS
+				resolution = networkingapi.ServiceEntry_DNS
 			}
 			if !svcNameWithNs && ns != "" {
 				seName = seName + "." + ns
 			}
-			ses[seName] = &networking.ServiceEntry{
+			ses[seName] = &networkingapi.ServiceEntry{
 				Hosts:      []string{service + nsSuffix},
 				Resolution: resolution,
 				Endpoints:  endpoints,
@@ -124,9 +124,9 @@ func convertServiceEntryWithNsForNacos(service string, instances []model.Instanc
 	return nil
 }
 
-func convertEndpointsWithNsForNacos(service string, instances []model.Instance, svcPort uint32, svcNameWithNs bool, patchLabel bool) (map[string][]*networking.WorkloadEntry, map[string][]*networking.ServicePort, map[string]bool) {
-	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
-	portsMap := make(map[string][]*networking.ServicePort, 0)
+func convertEndpointsWithNsForNacos(service string, instances []model.Instance, svcPort uint32, svcNameWithNs bool, patchLabel bool) (map[string][]*networkingapi.WorkloadEntry, map[string][]*networkingapi.ServicePort, map[string]bool) {
+	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
+	portsMap := make(map[string][]*networkingapi.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
@@ -155,7 +155,7 @@ func convertEndpointsWithNsForNacos(service string, instances []model.Instance, 
 
 		endpoints, exist := endpointsMap[ns]
 		if !exist {
-			endpoints = make([]*networking.WorkloadEntry, 0)
+			endpoints = make([]*networkingapi.WorkloadEntry, 0)
 		}
 
 		ports, exist := portsMap[ns]
@@ -164,8 +164,8 @@ func convertEndpointsWithNsForNacos(service string, instances []model.Instance, 
 			if svcPort == 0 {
 				portNum = uint32(ins.Port)
 			}
-			ports = make([]*networking.ServicePort, 0)
-			port := &networking.ServicePort{
+			ports = make([]*networkingapi.ServicePort, 0)
+			port := &networkingapi.ServicePort{
 				Protocol: "HTTP",
 				Number:   portNum,
 				Name:     "http",
@@ -189,7 +189,7 @@ func convertEndpointsWithNsForNacos(service string, instances []model.Instance, 
 			}
 		}
 
-		ep := &networking.WorkloadEntry{
+		ep := &networkingapi.WorkloadEntry{
 			Address: ins.Ip,
 			Ports:   instancePorts,
 			Labels:  ins.Metadata,

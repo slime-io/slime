@@ -21,7 +21,7 @@ import (
 	"sync"
 
 	"google.golang.org/protobuf/types/known/structpb"
-	"istio.io/client-go/pkg/apis/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -122,7 +122,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	model.PatchObjectMeta(&ef.ObjectMeta, &instance.ObjectMeta)
 	model.PatchIstioRevLabel(&ef.Labels, istioRev)
 
-	found := &v1alpha3.EnvoyFilter{}
+	found := &networkingv1alpha3.EnvoyFilter{}
 	nsName := types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}
 	err = r.client.Get(ctx, nsName, found)
 	if err != nil {
@@ -157,7 +157,7 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	return ctrl.Result{}, nil
 }
 
-func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alpha1.PluginManager, pluginManager *v1alpha1.PluginManagerSpec) *v1alpha3.EnvoyFilter {
+func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alpha1.PluginManager, pluginManager *v1alpha1.PluginManagerSpec) *networkingv1alpha3.EnvoyFilter {
 	out := r.translatePluginManager(cr.ObjectMeta, pluginManager)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {

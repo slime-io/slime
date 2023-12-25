@@ -13,7 +13,7 @@ import (
 	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
 	"github.com/nacos-group/nacos-sdk-go/v2/model"
 	"github.com/nacos-group/nacos-sdk-go/v2/vo"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 )
 
@@ -176,7 +176,7 @@ func (s *Source) deleteService(serviceName string) {
 	if se != nil {
 		// DELETE ==> set ep size to zero
 		seCopy := *se
-		seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+		seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 		s.cache[serviceName] = &seCopy
 		se = &seCopy
 	}
@@ -194,10 +194,10 @@ func (s *Source) deleteService(serviceName string) {
 	}
 }
 
-func (s *Source) updateService(newServiceEntryMap map[string]*networking.ServiceEntry) {
+func (s *Source) updateService(newServiceEntryMap map[string]*networkingapi.ServiceEntry) {
 	type update struct {
 		service            string
-		oldEntry, newEntry *networking.ServiceEntry
+		oldEntry, newEntry *networkingapi.ServiceEntry
 	}
 
 	var updates []update

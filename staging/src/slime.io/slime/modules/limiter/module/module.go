@@ -4,16 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"slime.io/slime/framework/model/metric"
-
-	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	istioapi "slime.io/slime/framework/apis"
 	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/framework/model/pkg/leaderelection"
 	"slime.io/slime/modules/limiter/api/config"
@@ -54,8 +53,8 @@ func (m *Module) Clone() module.Module {
 	ret := *m
 	return &ret
 }
-func (m *Module) Setup(opts module.ModuleOptions) error {
 
+func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err := m.init(opts.Env); err != nil {
 		return err
 	}
@@ -71,7 +70,6 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 }
 
 func (m *Module) init(env bootstrap.Environment) error {
-
 	m.env = env
 	pc, err := controllers.NewProducerConfig(m.env, &m.config)
 	if err != nil {
