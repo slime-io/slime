@@ -3,14 +3,14 @@ package source
 import (
 	"testing"
 
-	"github.com/gogo/protobuf/proto"
-	networking "istio.io/api/networking/v1alpha3"
+	"google.golang.org/protobuf/proto"
+	networkingapi "istio.io/api/networking/v1alpha3"
 )
 
 func TestRectifyServiceEntry(t *testing.T) {
 	type args struct {
-		se          *networking.ServiceEntry
-		rectifiedSe *networking.ServiceEntry
+		se          *networkingapi.ServiceEntry
+		rectifiedSe *networkingapi.ServiceEntry
 	}
 	tests := []struct {
 		name string
@@ -19,11 +19,11 @@ func TestRectifyServiceEntry(t *testing.T) {
 		{
 			name: "string slice",
 			args: args{
-				se: &networking.ServiceEntry{
+				se: &networkingapi.ServiceEntry{
 					Hosts:    []string{"foo", "bar"},
 					ExportTo: []string{"ns2", "ns1"},
 				},
-				rectifiedSe: &networking.ServiceEntry{
+				rectifiedSe: &networkingapi.ServiceEntry{
 					Hosts:    []string{"bar", "foo"},
 					ExportTo: []string{"ns1", "ns2"},
 				},
@@ -32,14 +32,14 @@ func TestRectifyServiceEntry(t *testing.T) {
 		{
 			name: "ports",
 			args: args{
-				se: &networking.ServiceEntry{
-					Ports: []*networking.ServicePort{
+				se: &networkingapi.ServiceEntry{
+					Ports: []*networkingapi.ServicePort{
 						{Number: 81},
 						{Number: 80},
 					},
 				},
-				rectifiedSe: &networking.ServiceEntry{
-					Ports: []*networking.ServicePort{
+				rectifiedSe: &networkingapi.ServiceEntry{
+					Ports: []*networkingapi.ServicePort{
 						{Number: 80},
 						{Number: 81},
 					},
@@ -49,14 +49,14 @@ func TestRectifyServiceEntry(t *testing.T) {
 		{
 			name: "endpoints",
 			args: args{
-				se: &networking.ServiceEntry{
-					Endpoints: []*networking.WorkloadEntry{
+				se: &networkingapi.ServiceEntry{
+					Endpoints: []*networkingapi.WorkloadEntry{
 						{Address: "2.2.2.2"},
 						{Address: "1.1.1.1"},
 					},
 				},
-				rectifiedSe: &networking.ServiceEntry{
-					Endpoints: []*networking.WorkloadEntry{
+				rectifiedSe: &networkingapi.ServiceEntry{
+					Endpoints: []*networkingapi.WorkloadEntry{
 						{Address: "1.1.1.1"},
 						{Address: "2.2.2.2"},
 					},

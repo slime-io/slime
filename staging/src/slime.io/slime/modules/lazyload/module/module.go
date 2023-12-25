@@ -3,15 +3,18 @@ package module
 import (
 	"context"
 	"fmt"
-	"github.com/golang/protobuf/proto"
+	"os"
+	"time"
+
+	"google.golang.org/protobuf/proto"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"os"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
 	istioapi "slime.io/slime/framework/apis"
 	basecontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/metric"
@@ -21,7 +24,6 @@ import (
 	"slime.io/slime/modules/lazyload/controllers"
 	modmodel "slime.io/slime/modules/lazyload/model"
 	"slime.io/slime/modules/lazyload/pkg/server"
-	"time"
 )
 
 var log = modmodel.ModuleLog
@@ -57,7 +59,6 @@ func (m *Module) Clone() module.Module {
 }
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
-
 	log.Debugf("lazyload setup begin")
 
 	env, mgr, le := opts.Env, opts.Manager, opts.LeaderElectionCbs
@@ -253,7 +254,6 @@ func addPodLabel(ctx context.Context, client *kubernetes.Clientset, podNs, podNa
 }
 
 func deletePodLabel(ctx context.Context, client *kubernetes.Clientset, podNs, podName string) error {
-
 	po, err := getPod(ctx, client, podNs, podName)
 	if err != nil {
 		return err
@@ -273,7 +273,6 @@ func deletePodLabel(ctx context.Context, client *kubernetes.Clientset, podNs, po
 }
 
 func getPod(ctx context.Context, client *kubernetes.Clientset, podNs, podName string) (*corev1.Pod, error) {
-
 	pod, err := client.CoreV1().Pods(podNs).Get(ctx, podName, metav1.GetOptions{})
 	if err != nil {
 		if !errors.IsNotFound(err) {

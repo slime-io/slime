@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
@@ -64,7 +64,7 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-func getMetaServicePort(payload ServiceInstancePayload) *networking.Port {
+func getMetaServicePort(payload ServiceInstancePayload) *networkingapi.Port {
 	if payload.Metadata == nil || len(payload.Metadata) == 0 || payload.Metadata[metaDataServiceKey] == "" {
 		return nil
 	}
@@ -76,7 +76,7 @@ func getMetaServicePort(payload ServiceInstancePayload) *networking.Port {
 		if port, ok := metadataServiceParam["port"]; ok {
 			if portNum, err := strconv.Atoi(port); err == nil {
 				portName := metadataServicePortNamePrefix + port
-				metaServicePort := &networking.Port{
+				metaServicePort := &networkingapi.Port{
 					Number:   uint32(portNum),
 					Protocol: NetworkProtocolDubbo,
 					Name:     portName,
@@ -106,7 +106,7 @@ func verifyServiceInstance(si DubboServiceInstance) bool {
 // Also, not-send-ep-methods-to-envoy can greatly reduce the perf overhead in envoy side.
 // NOTE: if the same-dubbo-methods state keeps flipping, it will bring frequent full-pushes in istio side. But we do not
 // care about this rare case.
-func trimSameDubboMethodsLabel(se *networking.ServiceEntry) bool {
+func trimSameDubboMethodsLabel(se *networkingapi.ServiceEntry) bool {
 	var (
 		prev string
 		diff bool
@@ -131,7 +131,7 @@ func trimSameDubboMethodsLabel(se *networking.ServiceEntry) bool {
 	return !diff
 }
 
-func getEndpointsLabel(endpoints []*networking.WorkloadEntry, key string, skipEmpty bool) string {
+func getEndpointsLabel(endpoints []*networkingapi.WorkloadEntry, key string, skipEmpty bool) string {
 	for _, ep := range endpoints {
 		if v, ok := ep.GetLabels()[key]; ok {
 			if skipEmpty && v == "" {
@@ -144,10 +144,10 @@ func getEndpointsLabel(endpoints []*networking.WorkloadEntry, key string, skipEm
 }
 
 type convertedServiceEntry struct {
-	se               *networking.ServiceEntry
+	se               *networkingapi.ServiceEntry
 	methodsLabel     string
 	labels           map[string]string
-	InboundEndPoints []*networking.WorkloadEntry
+	InboundEndPoints []*networkingapi.WorkloadEntry
 }
 
 func (s *Source) convertServiceEntry(
@@ -269,8 +269,8 @@ func (s *Source) convertServiceEntry(
 
 		cse := serviceEntryByServiceKey[serviceKey]
 		if cse == nil {
-			se := &networking.ServiceEntry{
-				Ports: make([]*networking.ServicePort, 0),
+			se := &networkingapi.ServiceEntry{
+				Ports: make([]*networkingapi.ServicePort, 0),
 			}
 			cse = &convertedServiceEntry{se: se}
 			serviceEntryByServiceKey[serviceKey] = cse
@@ -280,7 +280,7 @@ func (s *Source) convertServiceEntry(
 			} else {
 				se.Hosts = []string{serviceKey}
 			}
-			se.Resolution = networking.ServiceEntry_STATIC
+			se.Resolution = networkingapi.ServiceEntry_STATIC
 
 			for _, consumer := range consumers {
 				consumerParts := splitUrl(consumer)
@@ -290,7 +290,7 @@ func (s *Source) convertServiceEntry(
 
 				var (
 					cAddr = consumerParts[2]
-					cPort *networking.ServicePort
+					cPort *networkingapi.ServicePort
 				)
 
 				if idx := strings.Index(cAddr, ":"); idx >= 0 { // consumer url generally does not have port
@@ -499,16 +499,16 @@ func parseDubboTag(str string, meta map[string]string) {
 	}
 }
 
-func convertPort(svcPort, port uint32) *networking.ServicePort {
-	return &networking.ServicePort{
+func convertPort(svcPort, port uint32) *networkingapi.ServicePort {
+	return &networkingapi.ServicePort{
 		Protocol: NetworkProtocolDubbo,
 		Number:   port,
 		Name:     source.PortName(NetworkProtocolDubbo, svcPort),
 	}
 }
 
-func convertEndpoint(ip string, meta map[string]string, port *networking.ServicePort) *networking.WorkloadEntry {
-	ret := &networking.WorkloadEntry{
+func convertEndpoint(ip string, meta map[string]string, port *networkingapi.ServicePort) *networkingapi.WorkloadEntry {
+	ret := &networkingapi.WorkloadEntry{
 		Address: ip,
 		Ports: map[string]uint32{
 			port.Name: port.Number,
@@ -527,8 +527,8 @@ type InboundEndPoint struct {
 	Ports   map[string]uint32
 }
 
-func convertInboundEndpoint(ip string, meta map[string]string, port *networking.ServicePort) *networking.WorkloadEntry {
-	inboundEndpoint := &networking.WorkloadEntry{
+func convertInboundEndpoint(ip string, meta map[string]string, port *networkingapi.ServicePort) *networkingapi.WorkloadEntry {
+	inboundEndpoint := &networkingapi.WorkloadEntry{
 		Address: ip,
 		Labels:  meta,
 	}

@@ -1,10 +1,11 @@
 package module
 
 import (
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
+
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/modules/example/api/config"
 	v1alpha1 "slime.io/slime/modules/example/api/v1alpha1"
@@ -45,7 +46,7 @@ func (mo *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
 		v1alpha1.AddToScheme,
-		istionetworkingapi.AddToScheme,
+		networkingv1alpha3.AddToScheme,
 	} {
 		if err := f(scheme); err != nil {
 			return err

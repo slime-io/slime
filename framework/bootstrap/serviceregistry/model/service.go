@@ -7,14 +7,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/hashicorp/go-multierror"
 	"github.com/mitchellh/copystructure"
+
 	"slime.io/slime/framework/bootstrap/resource"
 )
 
 type Service struct {
-
 	// Name of the istio service, e.g. "catalog.mystore.com"
 	Hostname Name `json:"hostname"`
 
@@ -54,8 +53,6 @@ func (s *Service) String() string {
 	return fmt.Sprintf("{s.Hostname: %s, s.Attributes: %+v, s.Ports: %+v, s.Addresses: %+v, s.Endpoints: %+v}",
 		s.Hostname, s.Attributes, s.Ports, s.Addresses, s.Endpoints)
 }
-
-func (s *Service) ProtoMessage() {}
 
 func (s *Service) ConvertConfig() resource.Config {
 	cfg := resource.Config{
@@ -98,10 +95,9 @@ func (s *ServiceAttributes) Reset() {
 }
 
 func (s *ServiceAttributes) String() string {
-	return proto.CompactTextString(s)
+	return fmt.Sprintf("{s.ServiceRegistry: %s, s.Name: %s, s.Namespace: %s, s.Labels: %+v, s.Annotations: %+v, s.LabelSelectors: %+v}",
+		s.ServiceRegistry, s.Name, s.Namespace, s.Labels, s.Annotations, s.LabelSelectors)
 }
-
-func (s *ServiceAttributes) ProtoMessage() {}
 
 type IstioEndpoint struct {
 	// Address is the address of the endpoint, using envoy proto.
@@ -135,8 +131,6 @@ func (ep *IstioEndpoint) String() string {
 	return fmt.Sprintf("{ep.Address: %s, ep.Labels: %+v, ep.Hostnames: %+v, ep.ServiceName: %s, ep.Namespace: %s, ep.ServicePortName: %s, ep.EndpointPort: %d}",
 		ep.Address, ep.Labels, ep.Hostnames, ep.ServiceName, ep.Namespace, ep.ServicePortName, ep.EndpointPort)
 }
-
-func (ep *IstioEndpoint) ProtoMessage() {}
 
 func (ep *IstioEndpoint) DeepCopy() *IstioEndpoint {
 	return copyInternal(ep).(*IstioEndpoint)
@@ -178,10 +172,8 @@ func (p *Port) Reset() {
 }
 
 func (p *Port) String() string {
-	return proto.CompactTextString(p)
+	return fmt.Sprintf("{p.Name: %s, p.Port: %d, p.Protocol: %s}", p.Name, p.Port, p.Protocol)
 }
-
-func (p *Port) ProtoMessage() {}
 
 // PortList is a set of ports
 type PortList []*Port
@@ -294,9 +286,7 @@ const (
 	dnsNamePrefixMaxLength = 253
 )
 
-var (
-	tagRegexp = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
-)
+var tagRegexp = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
 
 // LabelsInstance is a non empty map of arbitrary strings. Each version of a service can
 // be differentiated by a unique set of labels associated with the version. These

@@ -8,15 +8,14 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"slime.io/slime/framework/monitoring"
 	"strings"
 	"sync"
 	"unsafe"
 
 	"contrib.go.opencensus.io/exporter/prometheus"
-	"github.com/gogo/protobuf/jsonpb"
-	"github.com/golang/protobuf/proto"
 	log "github.com/sirupsen/logrus"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -31,6 +30,7 @@ import (
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/pkg/leaderelection"
+	"slime.io/slime/framework/monitoring"
 	"slime.io/slime/framework/util"
 )
 
@@ -189,8 +189,7 @@ func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(mo
 
 	// get mod.Config() value from config.general
 	if len(pmCfg.GeneralJson) > 0 {
-		u := jsonpb.Unmarshaler{AllowUnknownFields: true}
-		if err := u.Unmarshal(bytes.NewBuffer(pmCfg.GeneralJson), modSelfCfg); err != nil {
+		if err := protojson.Unmarshal(pmCfg.GeneralJson, modSelfCfg); err != nil {
 			log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
 			fatal()
 		}
@@ -204,7 +203,6 @@ func fatal() {
 }
 
 func Main(bundle string, modules []Module) {
-
 	// prepare module definition map
 	moduleDefinitions := make(map[string]Module)
 	for _, mod := range modules {

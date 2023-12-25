@@ -20,24 +20,15 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
-	"slime.io/slime/framework/bootstrap"
-	"slime.io/slime/framework/model"
-
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	networkingistioiov1alpha3 "slime.io/slime/framework/apis/networking/v1alpha3"
-)
-
-const (
-	vsHosts       = "hosts"
-	vsHost        = "host"
-	vsDestination = "destination"
-	vsHttp        = "http"
-	vsRoute       = "route"
+	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model"
 )
 
 // VirtualServiceReconciler reconciles a VirtualService object
@@ -53,7 +44,7 @@ type VirtualServiceReconciler struct {
 func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := log.WithField("virtualService", req.NamespacedName)
 	// Fetch the VirtualService instance
-	instance := &networkingistioiov1alpha3.VirtualService{}
+	instance := &networkingv1alpha3.VirtualService{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -83,33 +74,16 @@ func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
-func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[string][]string {
+func parseDestination(instance *networkingv1alpha3.VirtualService) map[string][]string {
 	ret := make(map[string][]string)
 
-	hosts := make([]string, 0)
-	i, ok := instance.Spec[vsHosts].([]interface{})
-	if !ok {
-		return nil
-	}
-	for _, iv := range i {
-		hosts = append(hosts, iv.(string))
-	}
+	hosts := make([]string, 0, len(instance.Spec.Hosts))
+	copy(hosts, instance.Spec.Hosts)
 
 	dhs := make(map[string]struct{}, 0)
-
-	if httpRoutes, ok := instance.Spec[vsHttp].([]interface{}); ok {
-		for _, httpRoute := range httpRoutes {
-			if hr, ok := httpRoute.(map[string]interface{}); ok {
-				if ds, ok := hr[vsRoute].([]interface{}); ok {
-					for _, d := range ds {
-						if route, ok := d.(map[string]interface{}); ok {
-							if destinationHost, ok := route[vsDestination].(map[string]interface{})[vsHost].(string); ok {
-								dhs[destinationHost] = struct{}{}
-							}
-						}
-					}
-				}
-			}
+	for _, httpRoute := range instance.Spec.Http {
+		for _, route := range httpRoute.Route {
+			dhs[route.Destination.Host] = struct{}{}
 		}
 	}
 
@@ -129,6 +103,6 @@ func parseDestination(instance *networkingistioiov1alpha3.VirtualService) map[st
 
 func (r *VirtualServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingistioiov1alpha3.VirtualService{}).
+		For(&networkingv1alpha3.VirtualService{}).
 		Complete(r)
 }

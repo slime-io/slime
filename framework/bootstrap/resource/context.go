@@ -1,10 +1,10 @@
 package resource
 
 import (
-	"bytes"
 	"encoding/json"
-	"github.com/golang/protobuf/jsonpb"
-	structpb "github.com/golang/protobuf/ptypes/struct"
+
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // NodeMetadata defines the metadata associated with a proxy
@@ -38,7 +38,7 @@ func (m NodeMetadata) ToStruct() *structpb.Struct {
 	}
 
 	pbs := &structpb.Struct{}
-	if err := jsonpb.Unmarshal(bytes.NewBuffer(j), pbs); err != nil {
+	if err := protojson.Unmarshal(j, pbs); err != nil {
 		return nil
 	}
 

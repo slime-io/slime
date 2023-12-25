@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
@@ -23,10 +23,10 @@ type ServiceEntryMergePortMocker struct {
 	resourceName, resourceNs, host string
 	resourceLabels                 map[string]string
 
-	dispatcher func(meta resource.Metadata, item *networking.ServiceEntry)
+	dispatcher func(meta resource.Metadata, item *networkingapi.ServiceEntry)
 
 	notifyCh   chan struct{}
-	portsCache map[uint32]*networking.ServicePort
+	portsCache map[uint32]*networkingapi.ServicePort
 	mut        sync.RWMutex
 }
 
@@ -43,20 +43,20 @@ func NewServiceEntryMergePortMocker(
 		resourceLabels: resourceLabels,
 
 		notifyCh:   make(chan struct{}, 1),
-		portsCache: map[uint32]*networking.ServicePort{},
+		portsCache: map[uint32]*networkingapi.ServicePort{},
 	}
 }
 
 // SetDispatcher should be called before `Run`
-func (m *ServiceEntryMergePortMocker) SetDispatcher(dispatcher func(meta resource.Metadata, item *networking.ServiceEntry)) {
+func (m *ServiceEntryMergePortMocker) SetDispatcher(dispatcher func(meta resource.Metadata, item *networkingapi.ServiceEntry)) {
 	m.dispatcher = dispatcher
 }
 
 func (m *ServiceEntryMergePortMocker) Refresh() {
-	se := &networking.ServiceEntry{
+	se := &networkingapi.ServiceEntry{
 		Hosts:      []string{m.host},
-		Ports:      make([]*networking.ServicePort, 0),
-		Resolution: networking.ServiceEntry_STATIC,
+		Ports:      make([]*networkingapi.ServicePort, 0),
+		Resolution: networkingapi.ServiceEntry_STATIC,
 	}
 
 	m.mut.RLock()
@@ -102,7 +102,7 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 		return
 	}
 
-	se := e.Resource.Message.(*networking.ServiceEntry)
+	se := e.Resource.Message.(*networkingapi.ServiceEntry)
 	var newPorts []uint32
 	m.mut.Lock()
 	if m.mergeSvcPorts {
@@ -124,7 +124,7 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 
 				for _, svcPort := range se.Ports {
 					if svcPort.Name == portName {
-						port := &networking.ServicePort{
+						port := &networkingapi.ServicePort{
 							Number:   portNum,
 							Protocol: svcPort.Protocol,
 							Name:     fmt.Sprintf("%s-%d", portName, portNum),
@@ -149,7 +149,7 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 	}
 }
 
-func BuildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata) event.Event {
+func BuildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata) event.Event {
 	FillRevision(meta)
 	util.FillSeLabels(se, meta)
 	return event.Event{
@@ -168,7 +168,7 @@ func BuildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta r
 // and http-8081: 8081, each instance has one of the corresponding ports.
 // After this function takes effect, we get: 1.1.1.1 http-8080: 8080 http-8081: 8080 and 2.2.2.2 http-8080: 8081
 // http-8081: 8081
-func ApplyServicePortToEndpoints(se *networking.ServiceEntry) {
+func ApplyServicePortToEndpoints(se *networkingapi.ServiceEntry) {
 	if len(se.Ports) == 0 || len(se.Endpoints) == 0 {
 		return
 	}
@@ -196,7 +196,7 @@ func PortName(protocol string, num uint32) string {
 	return fmt.Sprintf("%s-%d", strings.ToLower(protocol), num)
 }
 
-func RectifyServiceEntry(se *networking.ServiceEntry) {
+func RectifyServiceEntry(se *networkingapi.ServiceEntry) {
 	for _, strs := range [][]string{se.Addresses, se.ExportTo, se.Hosts, se.SubjectAltNames} {
 		sort.SliceStable(strs, func(i, j int) bool { return strs[i] < strs[j] })
 	}

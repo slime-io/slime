@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"gopkg.in/yaml.v2"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collections"
@@ -356,14 +356,14 @@ func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvid
 	return to
 }
 
-func convertDubboCallModel(se *networking.ServiceEntry, inboundEndpoints []*networking.WorkloadEntry) map[string]DubboCallModel {
+func convertDubboCallModel(se *networkingapi.ServiceEntry, inboundEndpoints []*networkingapi.WorkloadEntry) map[string]DubboCallModel {
 	dubboModels := make(map[string]DubboCallModel)
 
 	interfaceName := se.Hosts[0]
 	interfaceName = strings.TrimSuffix(interfaceName, DubboHostnameSuffix)
 
 	type item struct {
-		eps     []*networking.WorkloadEntry
+		eps     []*networkingapi.WorkloadEntry
 		inbound bool
 	}
 
@@ -442,15 +442,15 @@ func convertDubboCallModelConfigToSidecar(resourceNs string, callModel map[strin
 				},
 				Labels: map[string]string{},
 			},
-			Sidecar: &networking.Sidecar{
-				WorkloadSelector: &networking.WorkloadSelector{
+			Sidecar: &networkingapi.Sidecar{
+				WorkloadSelector: &networkingapi.WorkloadSelector{
 					Labels: map[string]string{dubboWorkloadAppLabel: m.Application},
 				},
 				Ingress: nil,
-				Egress: []*networking.IstioEgressListener{
+				Egress: []*networkingapi.IstioEgressListener{
 					{
 						Hosts: hosts,
-						Port: &networking.Port{
+						Port: &networkingapi.Port{
 							Protocol: NetworkProtocolDubbo,
 						},
 					},

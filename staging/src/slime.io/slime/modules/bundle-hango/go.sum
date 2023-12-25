@@ -45,8 +45,6 @@ github.com/aliyun/alibaba-cloud-sdk-go v1.61.1704/go.mod h1:RcDobYh8k5VP6TNybz9m
 github.com/antihax/optional v1.0.0/go.mod h1:uupD/76wgC+ih3iEmQUL+0Ugr19nfwCT1kdvxnR2qWY=
 github.com/antlr4-go/antlr/v4 v4.13.0 h1:lxCg3LAv+EUK6t1i0y1V6/SLeUi0eKEKdhQAlS8TVTI=
 github.com/antlr4-go/antlr/v4 v4.13.0/go.mod h1:pfChB/xh/Unjila75QW7+VU4TSnWnnk9UTnmpPaOR2g=
-github.com/believening/slime-libistio v0.0.0-20231225064106-f5308b7d8080 h1:JG++1+ya5RI0vvmQP3pscNpdEzlNfOTKN7/UfjkUrqg=
-github.com/believening/slime-libistio v0.0.0-20231225064106-f5308b7d8080/go.mod h1:Ql3C5aJvdK++PdrR0iW/sAC1vt0Z58ZMrsG0c2jSVOM=
 github.com/benbjohnson/clock v1.1.0/go.mod h1:J11/hYXuz8f4ySSvYwY0FKfm+ezbsZBKZxNJlLklBHA=
 github.com/beorn7/perks v0.0.0-20180321164747-3a771d992973/go.mod h1:Dwedo/Wpr24TaqPxmxbtue+5NUziq4I4S80YR8gNf3Q=
 github.com/beorn7/perks v1.0.0/go.mod h1:KWe93zE9D1o94FZ5RNwFwVgaQK1VOXiVxmqh+CedLV8=
@@ -345,6 +343,8 @@ github.com/sirupsen/logrus v1.9.0 h1:trlNQbNUG3OdDrDil03MCb1H2o9nJ1x4/5LYw7byDE0
 github.com/sirupsen/logrus v1.9.0/go.mod h1:naHLuLoDiP4jHNo9R0sCBMtWGeIprob74mVsIT4qYEQ=
 github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac h1:C51X04i/+5OfJg5rCY7JoF7QHGExVklkGGmZ/7uW9GA=
 github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac/go.mod h1:+YPccDrivpE07Sw4TrZSMtg3GYOGoRsjUTNBVhBOtdA=
+github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc h1:LNtU72/Afuny3/+mfRAT3f9Cc8dI2WgwPX7WL3jiCPc=
+github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc/go.mod h1:Ql3C5aJvdK++PdrR0iW/sAC1vt0Z58ZMrsG0c2jSVOM=
 github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7 h1:PY4OoFmailv6hnxFCmTNh7SmZLQD5ViiFoOcS8tQdSU=
 github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7/go.mod h1:3OcN6lWCMP6EclunnckgDHtCYgp4cioJjR75dkABG+c=
 github.com/spf13/cobra v1.7.0 h1:hyqWnYt1ZQShIddO5kBpj3vu05/++x6tJ6dg8EC572I=

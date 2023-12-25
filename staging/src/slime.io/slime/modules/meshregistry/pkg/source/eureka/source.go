@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-	networking "istio.io/api/networking/v1alpha3"
+	"google.golang.org/protobuf/proto"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 
@@ -37,7 +37,7 @@ type Source struct {
 	initWg   sync.WaitGroup
 	mut      sync.RWMutex
 
-	cache map[string]*networking.ServiceEntry
+	cache map[string]*networkingapi.ServiceEntry
 
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 	client            Client
@@ -84,7 +84,7 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 
 		initedCallback: readyCallback,
 
-		cache: make(map[string]*networking.ServiceEntry),
+		cache: make(map[string]*networkingapi.ServiceEntry),
 
 		stop:     make(chan struct{}),
 		seInitCh: make(chan struct{}),
@@ -97,7 +97,7 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 	if svcMocker != nil {
 		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
 
-		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
+		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
 			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
 			for _, h := range ret.handlers {
 				h.Handle(ev)
@@ -110,10 +110,10 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 	return ret, ret.cacheJson, nil
 }
 
-func (s *Source) cacheShallowCopy() map[string]*networking.ServiceEntry {
+func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	ret := make(map[string]*networking.ServiceEntry, len(s.cache))
+	ret := make(map[string]*networkingapi.ServiceEntry, len(s.cache))
 	for k, v := range s.cache {
 		ret[k] = v
 	}
@@ -170,7 +170,7 @@ func (s *Source) updateServiceInfo() error {
 		if _, ok := newServiceEntryMap[service]; !ok {
 			// DELETE ==> set ep size to zero
 			seCopy := *se
-			seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 			newServiceEntryMap[service] = &seCopy
 			se = &seCopy
 			event, err := buildEvent(event.Updated, se, service, s.args.ResourceNs)
@@ -223,7 +223,7 @@ func (s *Source) updateServiceInfo() error {
 	return nil
 }
 
-func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, resourceNs string) (event.Event, error) {
 	se := util.CopySe(item)
 	items := strings.Split(service, ".")
 	ns := resourceNs
@@ -310,7 +310,7 @@ func (s *Source) Stop() {
 	s.stop <- struct{}{}
 }
 
-func printEps(eps []*networking.WorkloadEntry) string {
+func printEps(eps []*networkingapi.WorkloadEntry) string {
 	ips := make([]string, 0)
 	for _, ep := range eps {
 		ips = append(ips, ep.Address)

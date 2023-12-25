@@ -3,7 +3,7 @@ package zookeeper
 import (
 	"testing"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/resource"
 )
 
@@ -17,7 +17,7 @@ func TestServiceEntryWithMeta_Equals(t *testing.T) {
 		{
 			name: "different meta version",
 			sem: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"foo"},
 				},
 				Meta: resource.Metadata{
@@ -26,7 +26,7 @@ func TestServiceEntryWithMeta_Equals(t *testing.T) {
 				},
 			},
 			o: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"foo"},
 				},
 				Meta: resource.Metadata{
@@ -39,7 +39,7 @@ func TestServiceEntryWithMeta_Equals(t *testing.T) {
 		{
 			name: "different map order",
 			sem: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"foo"},
 				},
 				Meta: resource.Metadata{
@@ -48,7 +48,7 @@ func TestServiceEntryWithMeta_Equals(t *testing.T) {
 				},
 			},
 			o: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"foo"},
 				},
 				Meta: resource.Metadata{
@@ -61,12 +61,12 @@ func TestServiceEntryWithMeta_Equals(t *testing.T) {
 		{
 			name: "different serviceEntry",
 			sem: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"foo"},
 				},
 			},
 			o: ServiceEntryWithMeta{
-				ServiceEntry: &networking.ServiceEntry{
+				ServiceEntry: &networkingapi.ServiceEntry{
 					Hosts: []string{"bar"},
 				},
 			},

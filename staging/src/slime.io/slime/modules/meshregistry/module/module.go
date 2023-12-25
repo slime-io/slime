@@ -11,8 +11,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/mitchellh/copystructure"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -23,10 +26,8 @@ import (
 	"k8s.io/client-go/tools/cache"
 
 	"slime.io/slime/framework/apis/config/v1alpha1"
-	istionetworkingapi "slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/module"
-	"slime.io/slime/framework/util"
 	meshregv1alpha1 "slime.io/slime/modules/meshregistry/api/v1alpha1"
 	"slime.io/slime/modules/meshregistry/model"
 	meshregbootstrap "slime.io/slime/modules/meshregistry/pkg/bootstrap"
@@ -39,12 +40,19 @@ const (
 
 var log = model.ModuleLog
 
-var (
-	PodNamespace = os.Getenv(EnvPodNamespace) // TODO passed by framework
-)
+var PodNamespace = os.Getenv(EnvPodNamespace) // TODO passed by framework
+
+type structWrapper struct {
+	*structpb.Struct
+}
+
+func (s *structWrapper) Value() []byte {
+	value, _ := protojson.Marshal(s)
+	return value
+}
 
 type Module struct {
-	config                  util.AnyMessage
+	config                  structWrapper
 	reloadDynamicConfigTask func(ctx context.Context)
 	dynConfigHandlers       []func(args *meshregbootstrap.RegistryArgs)
 	mut                     sync.RWMutex
@@ -61,7 +69,7 @@ func (m *Module) Config() proto.Message {
 func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
-		istionetworkingapi.AddToScheme,
+		networkingv1alpha3.AddToScheme,
 	} {
 		if err := f(scheme); err != nil {
 			return err
@@ -72,17 +80,22 @@ func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 
 func (m *Module) Clone() module.Module {
 	ret := Module{}
+	if m.config.Struct != nil {
+		ret.config.Struct = proto.Clone(m.config.Struct).(*structpb.Struct)
+	} else {
+		ret.config.Struct = &structpb.Struct{}
+	}
 	return &ret
 }
 
-func ParseArgsFromModuleConfig(config util.AnyMessage) (*meshregbootstrap.RegistryArgs, error) {
+func ParseArgsFromModuleConfig(config *structWrapper) (*meshregbootstrap.RegistryArgs, error) {
 	regArgs := meshregbootstrap.NewRegistryArgs()
 
 	type legacyWrapper struct {
 		Legacy json.RawMessage `json:"LEGACY"`
 	}
 
-	if rawJson := config.RawJson; rawJson != nil {
+	if rawJson := config.Value(); len(rawJson) > 0 {
 		var lw legacyWrapper
 		if err := json.Unmarshal(rawJson, &lw); err != nil {
 			log.Errorf("invalid raw json: %s", string(rawJson))
@@ -271,15 +284,15 @@ func (m *Module) prepareCmDynamicConfigController(
 			}
 		}
 
-		anyMsg, err := parseModuleConfig(cmValue)
+		cfgMsg, err := parseModuleConfig(cmValue)
 		if err != nil {
 			return nil, err
 		}
-		if anyMsg == nil {
+		if cfgMsg == nil {
 			return nil, nil
 		}
 
-		return ParseArgsFromModuleConfig(*anyMsg)
+		return ParseArgsFromModuleConfig(cfgMsg)
 	}
 
 	notify := func(obj, newObj interface{}) {
@@ -377,7 +390,7 @@ func patchRegistryArgs(src, patch *meshregbootstrap.RegistryArgs) (*meshregboots
 	return src, nil
 }
 
-func parseModuleConfig(data []byte) (*util.AnyMessage, error) {
+func parseModuleConfig(data []byte) (*structWrapper, error) {
 	pmCfg, err := bootstrap.LoadModuleConfigFromData(data, false)
 	if err != nil {
 		return nil, err
@@ -390,11 +403,11 @@ func parseModuleConfig(data []byte) (*util.AnyMessage, error) {
 		return nil, err
 	}
 
-	return mod.Config().(*util.AnyMessage), nil
+	return mod.Config().(*structWrapper), nil
 }
 
 func (m *Module) Setup(opts module.ModuleOptions) error {
-	regArgs, err := ParseArgsFromModuleConfig(m.config)
+	regArgs, err := ParseArgsFromModuleConfig(&m.config)
 	if err != nil {
 		return err
 	}

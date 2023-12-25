@@ -4,8 +4,6 @@ import (
 	"flag"
 	"os"
 	"strings"
-
-	"github.com/gogo/protobuf/jsonpb"
 )
 
 const (
@@ -39,27 +37,4 @@ func UnityHost(host string, namespace string) string {
 
 func Fatal() {
 	os.Exit(1)
-}
-
-type AnyMessage struct {
-	RawJson []byte
-}
-
-func (a *AnyMessage) Reset() {
-}
-
-func (a *AnyMessage) String() string {
-	return ""
-}
-
-func (a *AnyMessage) ProtoMessage() {
-}
-
-func (a *AnyMessage) UnmarshalJSONPB(_ *jsonpb.Unmarshaler, data []byte) error {
-	a.RawJson = append([]byte{}, data...)
-	return nil
-}
-
-func (a *AnyMessage) MarshalJSONPB(_ *jsonpb.Marshaler) ([]byte, error) {
-	return a.RawJson, nil
 }
