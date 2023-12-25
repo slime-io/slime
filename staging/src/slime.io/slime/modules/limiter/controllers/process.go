@@ -11,18 +11,16 @@ import (
 	"reflect"
 	"strconv"
 
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
-
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/util"
@@ -165,7 +163,7 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 	}
 	spec := instance.Spec
 
-	var efs map[string]*networking.EnvoyFilter
+	var efs map[string]*networkingapi.EnvoyFilter
 	var descriptor map[string]*microservicev1alpha2.SmartLimitDescriptors
 	var gdesc []*model.Descriptor
 
@@ -174,30 +172,23 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 		return reconcile.Result{}, err
 	}
 	for k, ef := range efs {
-		var efcr *v1alpha3.EnvoyFilter
+		var efcr *networkingv1alpha3.EnvoyFilter
 		if k == util.WellknownBaseSet {
-			efcr = &v1alpha3.EnvoyFilter{
+			efcr = &networkingv1alpha3.EnvoyFilter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s.%s.ratelimit", instance.Name, instance.Namespace),
 					Namespace: instance.Namespace,
 				},
 			}
 		} else {
-			efcr = &v1alpha3.EnvoyFilter{
+			efcr = &networkingv1alpha3.EnvoyFilter{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      fmt.Sprintf("%s.%s.%s.ratelimit", instance.Name, instance.Namespace, k),
 					Namespace: instance.Namespace,
 				},
 			}
 		}
-		if ef != nil {
-			if mi, err := util.ProtoToMap(ef); err == nil {
-				efcr.Spec = mi
-			} else {
-				log.Errorf("proto map err :%+v", err)
-			}
-		}
-		_, err = refreshEnvoyFilter(instance, r, efcr)
+		_, err = refreshEnvoyFilter(instance, r, efcr, ef)
 		if err != nil {
 			log.Errorf("generated/deleted EnvoyFilter %s failed:%+v", efcr.Name, err)
 		}
@@ -242,7 +233,7 @@ func (r *SmartLimiterReconciler) getMaterial(loc types.NamespacedName) map[strin
 	return nil
 }
 
-func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLimiterReconciler, obj *v1alpha3.EnvoyFilter) (reconcile.Result, error) {
+func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLimiterReconciler, obj *networkingv1alpha3.EnvoyFilter, ef *networkingapi.EnvoyFilter) (reconcile.Result, error) {
 	if err := controllerutil.SetControllerReference(instance, obj, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -251,7 +242,7 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 	slime_model.PatchIstioRevLabel(&obj.Labels, istioRev)
 	slime_model.PatchObjectMeta(&obj.ObjectMeta, &instance.ObjectMeta)
 
-	found := &v1alpha3.EnvoyFilter{}
+	found := &networkingv1alpha3.EnvoyFilter{}
 	if err := r.Client.Get(context.TODO(), loc, found); err != nil {
 		if errors.IsNotFound(err) {
 			found = nil
@@ -264,7 +255,8 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 	// envoyfilter is found or not
 	if found == nil {
 		// found is nil and obj's spec is not nil , create envoyFilter
-		if obj.Spec != nil {
+		if ef != nil {
+			obj.Spec = *ef
 			if err := r.Client.Create(context.TODO(), obj); err != nil {
 				EnvoyFilterCreationsFailed.Increment()
 				return reconcile.Result{}, fmt.Errorf("creating a new EnvoyFilter err, %+v", err.Error())
@@ -283,12 +275,12 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 		if err != nil {
 			log.Errorf("marshal found.spec err: %+v", err)
 		}
-		objSpec, err := json.Marshal(obj.Spec)
+		objSpec, err := json.Marshal(ef)
 		if err != nil {
 			log.Errorf("marshal obj.spec err: %+v", err)
 		}
 		// spec is not nil , update
-		if obj.Spec != nil {
+		if ef != nil {
 			if !reflect.DeepEqual(string(foundSpec), string(objSpec)) || !reflect.DeepEqual(found.Labels, obj.Labels) {
 				obj.ResourceVersion = found.ResourceVersion
 				err := r.Client.Update(context.TODO(), obj)

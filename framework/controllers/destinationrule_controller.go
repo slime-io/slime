@@ -20,14 +20,13 @@ import (
 	"context"
 
 	log "github.com/sirupsen/logrus"
-	istionetworking "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-	networkingistioiov1alpha3 "slime.io/slime/framework/apis/networking/v1alpha3"
+
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/util"
@@ -47,7 +46,7 @@ func (r *DestinationRuleReconciler) Reconcile(_ context.Context, req ctrl.Reques
 	log := log.WithField("destinationRule", req.NamespacedName)
 
 	// Fetch the DestinationRule instance
-	instance := &networkingistioiov1alpha3.DestinationRule{}
+	instance := &networkingv1alpha3.DestinationRule{}
 	err := r.Client.Get(context.TODO(), req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -69,34 +68,14 @@ func (r *DestinationRuleReconciler) Reconcile(_ context.Context, req ctrl.Reques
 	log.Infof("get destinationRule, %s", instance.Name)
 
 	// 资源更新
-	pb, err := util.FromJSONMap("istio.networking.v1alpha3.DestinationRule", instance.Spec)
-	if err != nil {
-		return reconcile.Result{}, nil
-	}
-	if dr, ok := pb.(*istionetworking.DestinationRule); ok {
-		drHost := util.UnityHost(dr.Host, instance.Namespace)
-		HostSubsetMapping.Set(drHost, dr.Subsets)
-	}
+	drHost := util.UnityHost(instance.Spec.Host, instance.Namespace)
+	HostSubsetMapping.Set(drHost, instance.Spec.Subsets)
 
 	return ctrl.Result{}, nil
 }
 
-func DoUpdate(i v1.Object, args ...interface{}) error {
-	if instance, ok := i.(*networkingistioiov1alpha3.DestinationRule); ok {
-		pb, err := util.FromJSONMap("istio.networking.v1alpha3.DestinationRule", instance.Spec)
-		if err != nil {
-			return err
-		}
-		if dr, ok := pb.(*istionetworking.DestinationRule); ok {
-			drHost := util.UnityHost(dr.Host, instance.Namespace)
-			HostSubsetMapping.Set(drHost, dr.Subsets)
-		}
-	}
-	return nil
-}
-
 func (r *DestinationRuleReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&networkingistioiov1alpha3.DestinationRule{}).
+		For(&networkingv1alpha3.DestinationRule{}).
 		Complete(r)
 }

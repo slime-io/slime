@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
-	networking "istio.io/api/networking/v1alpha3"
+	"google.golang.org/protobuf/proto"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
@@ -71,7 +71,7 @@ func (s *Source) updateServiceInfo() error {
 		if _, ok := newServiceEntryMap[service]; !ok {
 			// DELETE ==> set ep size to zero
 			seCopy := *se
-			seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 			newServiceEntryMap[service] = &seCopy
 			se = &seCopy
 			event, err := buildEvent(event.Updated, se, service, s.args.ResourceNs, seMetaModifierFactory(service))

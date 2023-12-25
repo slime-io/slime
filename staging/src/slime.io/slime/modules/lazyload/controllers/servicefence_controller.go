@@ -25,25 +25,23 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/client-go/informers"
-
-	istio "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/informers"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
-	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 	modmodel "slime.io/slime/modules/lazyload/model"
@@ -219,7 +217,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	model.PatchIstioRevLabel(&sidecar.Labels, sfRev)
 
 	// Check if this Pod already exists
-	found := &v1alpha3.Sidecar{}
+	found := &networkingv1alpha3.Sidecar{}
 	nsName := types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}
 	err = r.Client.Get(context.TODO(), nsName, found)
 
@@ -480,7 +478,7 @@ func addDomainsWithMetricStatus(domains map[string]*lazyloadv1alpha1.Destination
 	}
 }
 
-func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, env bootstrap.Environment) (*v1alpha3.Sidecar, error) {
+func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, env bootstrap.Environment) (*networkingv1alpha3.Sidecar, error) {
 	hosts := make([]string, 0)
 
 	if !sf.Spec.Enable {
@@ -534,11 +532,11 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	// sort hosts so that it follows the Equals semantics
 	sort.Strings(hosts)
 	log.Debugf("sort host is %+v in %s:%s", hosts, sf.Namespace, sf.Name)
-	sidecar := &istio.Sidecar{
-		WorkloadSelector: &istio.WorkloadSelector{
+	sidecar := &networkingapi.Sidecar{
+		WorkloadSelector: &networkingapi.WorkloadSelector{
 			Labels: map[string]string{},
 		},
-		Egress: []*istio.IstioEgressListener{
+		Egress: []*networkingapi.IstioEgressListener{
 			{
 				// Bind:  "0.0.0.0",
 				Hosts: hosts,
@@ -578,16 +576,12 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 		sidecar.WorkloadSelector.Labels[env.Config.Global.Service] = sf.Name
 	}
 
-	spec, err := util.ProtoToMap(sidecar)
-	if err != nil {
-		return nil, err
-	}
-	ret := &v1alpha3.Sidecar{
+	ret := &networkingv1alpha3.Sidecar{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      sf.Name,
 			Namespace: sf.Namespace,
 		},
-		Spec: spec,
+		Spec: *sidecar,
 	}
 	return ret, nil
 }

@@ -15,13 +15,13 @@ import (
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
 	envoyextensionswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/proto"
+	any "google.golang.org/protobuf/types/known/anypb"
+	duration "google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
-	istioapi "istio.io/api/networking/v1alpha3"
+	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -53,8 +53,8 @@ const (
 
 // genGatewayInlineCfps is a custom func to handle EnvoyPlugin gateway
 // default is nil, ignore gateway
-var genGatewayInlineCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx istioapi.EnvoyFilter_PatchContext,
-	p *v1alpha1.Plugin, m *v1alpha1.Inline) []*istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+var genGatewayInlineCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx networkingapi.EnvoyFilter_PatchContext,
+	p *v1alpha1.Plugin, m *v1alpha1.Inline) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 
 type target struct {
 	applyToVh   bool
@@ -77,11 +77,11 @@ func directPatching(name string) bool {
 }
 
 // translate EnvoyPlugin
-func translatePluginToPatch(name, typeURL string, setting *structpb.Struct) *istioapi.EnvoyFilter_Patch {
-	return &istioapi.EnvoyFilter_Patch{Value: translatePluginToPatchValue(name, typeURL, setting)}
+func translatePluginToPatch(name, typeURL string, setting *structpb.Struct) *networkingapi.EnvoyFilter_Patch {
+	return &networkingapi.EnvoyFilter_Patch{Value: translatePluginToPatchValue(name, typeURL, setting)}
 }
 
-func stringValueToStruct(strValue *wrapperspb.StringValue) *structpb.Struct {
+func stringValueToStruct(strValue *wrappers.StringValue) *structpb.Struct {
 	if strValue == nil {
 		return nil
 	}
@@ -131,7 +131,7 @@ func translatePluginToPatchValue(name, typeURL string, setting *structpb.Struct)
 	}
 }
 
-func translateRlsAndCorsToDirectPatch(settings *structpb.Struct, applyToHTTPRoute bool) *istioapi.EnvoyFilter_Patch {
+func translateRlsAndCorsToDirectPatch(settings *structpb.Struct, applyToHTTPRoute bool) *networkingapi.EnvoyFilter_Patch {
 	fieldPatchTo := ""
 	if applyToHTTPRoute {
 		fieldPatchTo = "route"
@@ -139,8 +139,8 @@ func translateRlsAndCorsToDirectPatch(settings *structpb.Struct, applyToHTTPRout
 	return translatePluginToDirectPatch(settings, fieldPatchTo)
 }
 
-func translatePluginToDirectPatch(settings *structpb.Struct, fieldPatchTo string) *istioapi.EnvoyFilter_Patch {
-	patch := &istioapi.EnvoyFilter_Patch{}
+func translatePluginToDirectPatch(settings *structpb.Struct, fieldPatchTo string) *networkingapi.EnvoyFilter_Patch {
+	patch := &networkingapi.EnvoyFilter_Patch{}
 
 	if fieldPatchTo == "ROOT" {
 		fieldPatchTo = ""
@@ -164,11 +164,11 @@ func translatePluginToDirectPatch(settings *structpb.Struct, fieldPatchTo string
 
 func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) translateOutput {
 	in := cr.Spec.DeepCopy()
-	envoyFilter := &istioapi.EnvoyFilter{}
+	envoyFilter := &networkingapi.EnvoyFilter{}
 	proxyVersion := r.Cfg.GetProxyVersion()
 
 	if in.WorkloadSelector != nil {
-		envoyFilter.WorkloadSelector = &istioapi.WorkloadSelector{
+		envoyFilter.WorkloadSelector = &networkingapi.WorkloadSelector{
 			Labels: in.WorkloadSelector.Labels,
 		}
 	}
@@ -212,15 +212,15 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				continue
 			}
 
-			patchCtx := istioapi.EnvoyFilter_ANY
+			patchCtx := networkingapi.EnvoyFilter_ANY
 			if !strings.HasPrefix(t.host, "inbound|") { // keep backward compatibility
 				switch p.ListenerType {
 				case v1alpha1.Plugin_Outbound:
-					patchCtx = istioapi.EnvoyFilter_SIDECAR_OUTBOUND
+					patchCtx = networkingapi.EnvoyFilter_SIDECAR_OUTBOUND
 				case v1alpha1.Plugin_Inbound:
-					patchCtx = istioapi.EnvoyFilter_SIDECAR_INBOUND
+					patchCtx = networkingapi.EnvoyFilter_SIDECAR_INBOUND
 				case v1alpha1.Plugin_Gateway:
-					patchCtx = istioapi.EnvoyFilter_GATEWAY
+					patchCtx = networkingapi.EnvoyFilter_GATEWAY
 				}
 			}
 
@@ -273,7 +273,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 					})
 				}
 			} else {
-				if patchCtx == istioapi.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == istioapi.EnvoyFilter_GATEWAY {
+				if patchCtx == networkingapi.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == networkingapi.EnvoyFilter_GATEWAY {
 					// ':*' is appended if port info is not specified in outbound and gateway
 					// it will match all port in same host after istio adapted
 					if len(t.host) > 0 && strings.Index(t.host, ":") == -1 {
@@ -294,12 +294,12 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 	}
 }
 
-func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
+func generateInlineCfp(t target, patchCtx networkingapi.EnvoyFilter_PatchContext,
 	p *v1alpha1.Plugin, inline *v1alpha1.Inline, proxyVersion string,
 ) translateOutputConfigPatch {
 	var (
 		extraPatch *structpb.Struct
-		cfp        = &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{}
+		cfp        = &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{}
 		applyTo    string
 		match      *structpb.Struct
 	)
@@ -312,28 +312,28 @@ func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
 
 	switch p.Protocol {
 	case v1alpha1.Plugin_HTTP:
-		vhMatch := &istioapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{Name: t.host}
+		vhMatch := &networkingapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{Name: t.host}
 		if !t.applyToVh {
-			vhMatch.Route = &istioapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
+			vhMatch.Route = &networkingapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
 		}
-		cfp.Match = &istioapi.EnvoyFilter_EnvoyConfigObjectMatch{
+		cfp.Match = &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
 			Context: patchCtx,
-			ObjectTypes: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-				RouteConfiguration: &istioapi.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch},
+			ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+				RouteConfiguration: &networkingapi.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch},
 			},
 		}
 
 		// only apply to protocol http
 		// dubbo or other support will be considered later
 		if proxyVersion != "" {
-			cfp.Match.Proxy = &istioapi.EnvoyFilter_ProxyMatch{
+			cfp.Match.Proxy = &networkingapi.EnvoyFilter_ProxyMatch{
 				ProxyVersion: proxyVersion,
 			}
 		}
 		if t.applyToVh {
-			cfp.ApplyTo = istioapi.EnvoyFilter_VIRTUAL_HOST
+			cfp.ApplyTo = networkingapi.EnvoyFilter_VIRTUAL_HOST
 		} else {
-			cfp.ApplyTo = istioapi.EnvoyFilter_HTTP_ROUTE
+			cfp.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 		}
 	case v1alpha1.Plugin_Dubbo:
 		// dubbo does not support vh-level filter config
@@ -405,7 +405,7 @@ func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
 		}
 	}
 
-	cfp.Patch.Operation = istioapi.EnvoyFilter_Patch_MERGE
+	cfp.Patch.Operation = networkingapi.EnvoyFilter_Patch_MERGE
 	return translateOutputConfigPatch{
 		envoyPatch: cfp,
 		extraPatch: extraPatch,
@@ -413,7 +413,7 @@ func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
 	}
 }
 
-func translateGenericPluginToPatch(name string, typeUrl string, settings *structpb.Struct) *istioapi.EnvoyFilter_Patch {
+func translateGenericPluginToPatch(name string, typeUrl string, settings *structpb.Struct) *networkingapi.EnvoyFilter_Patch {
 	// onMatch:
 	//  action:
 	//    typedConfig:
@@ -422,7 +422,7 @@ func translateGenericPluginToPatch(name string, typeUrl string, settings *struct
 	//        envoy.filters.http.lua:
 	//          inlineCode: |
 	//            function envoy_on_request(request_handle)
-	return &istioapi.EnvoyFilter_Patch{
+	return &networkingapi.EnvoyFilter_Patch{
 		Value: wrapStructToStruct(
 			"onMatch", wrapStructToStruct(
 				"action", wrapStructToStruct(
@@ -435,13 +435,13 @@ func translateGenericPluginToPatch(name string, typeUrl string, settings *struct
 }
 
 type translateOutputConfigPatch struct {
-	envoyPatch *istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+	envoyPatch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 	extraPatch *structpb.Struct
 	plugin     *v1alpha1.Plugin
 }
 
 type translateOutput struct {
-	envoyFilter   *istioapi.EnvoyFilter
+	envoyFilter   *networkingapi.EnvoyFilter
 	configPatches []translateOutputConfigPatch
 }
 
@@ -453,7 +453,7 @@ func translateOutputToEnvoyFilterWrapper(out translateOutput) (*networkingv1alph
 	envoyFilterWrapper.Spec = *out.envoyFilter
 
 	if len(out.configPatches) > 0 {
-		var appliedPatches []*istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+		var appliedPatches []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 		for _, configPatch := range out.configPatches {
 			v, err := applyRawPatch(configPatch)
 			if err != nil {
@@ -466,7 +466,7 @@ func translateOutputToEnvoyFilterWrapper(out translateOutput) (*networkingv1alph
 	return envoyFilterWrapper, nil
 }
 
-func applyRawPatch(outputPatch translateOutputConfigPatch) (*istioapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+func applyRawPatch(outputPatch translateOutputConfigPatch) (*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
 	envoyPatchBytes, err := protojson.Marshal(outputPatch.envoyPatch)
 	if err != nil {
 		return nil, err
@@ -493,7 +493,7 @@ func applyRawPatch(outputPatch translateOutputConfigPatch) (*istioapi.EnvoyFilte
 		envoyPatchBytes = bs
 	}
 
-	var ret istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+	var ret networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 	if err := protojson.Unmarshal(envoyPatchBytes, &ret); err != nil {
 		return nil, err
 	}
@@ -512,16 +512,16 @@ func (r *PluginManagerReconciler) isKnownProtocol(in *v1alpha1.Plugin) bool {
 // translate PluginManager
 func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec) translateOutput {
 	var (
-		envoyFilter   = &istioapi.EnvoyFilter{}
+		envoyFilter   = &networkingapi.EnvoyFilter{}
 		configPatches []translateOutputConfigPatch
 	)
-	envoyFilter.WorkloadSelector = &istioapi.WorkloadSelector{
+	envoyFilter.WorkloadSelector = &networkingapi.WorkloadSelector{
 		Labels: in.WorkloadLabels,
 	}
 
 	envoyFilter.Priority = in.Priority
 
-	envoyFilter.ConfigPatches = make([]*istioapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	envoyFilter.ConfigPatches = make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	for _, p := range in.Plugin {
 		if !p.Enable {
 			continue
@@ -589,11 +589,11 @@ func getConfigDiscoveryFilterFullName(ns, name string) string {
 }
 
 func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, in *v1alpha1.Plugin) ([]translateOutputConfigPatch, error) {
-	listener := &istioapi.EnvoyFilter_ListenerMatch{
-		FilterChain: &istioapi.EnvoyFilter_ListenerMatch_FilterChainMatch{
-			Filter: &istioapi.EnvoyFilter_ListenerMatch_FilterMatch{
+	listener := &networkingapi.EnvoyFilter_ListenerMatch{
+		FilterChain: &networkingapi.EnvoyFilter_ListenerMatch_FilterChainMatch{
+			Filter: &networkingapi.EnvoyFilter_ListenerMatch_FilterMatch{
 				Name: r.getListenerFilterName(in),
-				SubFilter: &istioapi.EnvoyFilter_ListenerMatch_SubFilterMatch{
+				SubFilter: &networkingapi.EnvoyFilter_ListenerMatch_SubFilterMatch{
 					Name: r.getSubFilterName(in),
 				},
 			},
@@ -604,16 +604,16 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		listener.PortNumber = in.Port
 	}
 
-	defaultApplyTo := istioapi.EnvoyFilter_HTTP_FILTER
-	out := &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{
+	defaultApplyTo := networkingapi.EnvoyFilter_HTTP_FILTER
+	out := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: defaultApplyTo,
-		Match: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch{
-			ObjectTypes: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+		Match: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
+			ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
 				Listener: listener,
 			},
 		},
-		Patch: &istioapi.EnvoyFilter_Patch{
-			Operation: istioapi.EnvoyFilter_Patch_INSERT_BEFORE,
+		Patch: &networkingapi.EnvoyFilter_Patch{
+			Operation: networkingapi.EnvoyFilter_Patch_INSERT_BEFORE,
 			Value: &structpb.Struct{
 				Fields: map[string]*structpb.Value{},
 			},
@@ -622,7 +622,7 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	// if proxyVersion is set, apply specified proxyVersion
 	if proxyVersion := r.cfg.GetProxyVersion(); proxyVersion != "" {
-		out.Match.Proxy = &istioapi.EnvoyFilter_ProxyMatch{
+		out.Match.Proxy = &networkingapi.EnvoyFilter_ProxyMatch{
 			ProxyVersion: proxyVersion,
 		}
 	}
@@ -651,11 +651,11 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	switch in.ListenerType {
 	case v1alpha1.Plugin_Outbound:
-		out.Match.Context = istioapi.EnvoyFilter_SIDECAR_OUTBOUND
+		out.Match.Context = networkingapi.EnvoyFilter_SIDECAR_OUTBOUND
 	case v1alpha1.Plugin_Inbound:
-		out.Match.Context = istioapi.EnvoyFilter_SIDECAR_INBOUND
+		out.Match.Context = networkingapi.EnvoyFilter_SIDECAR_INBOUND
 	case v1alpha1.Plugin_Gateway:
-		out.Match.Context = istioapi.EnvoyFilter_GATEWAY
+		out.Match.Context = networkingapi.EnvoyFilter_GATEWAY
 	}
 
 	if in.PluginSettings == nil {
@@ -772,10 +772,10 @@ func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL
 }
 
 func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, value *structpb.Struct, p *v1alpha1.Plugin, target *[]translateOutputConfigPatch) error {
-	out := &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: istioapi.EnvoyFilter_EXTENSION_CONFIG,
-		Patch: &istioapi.EnvoyFilter_Patch{
-			Operation: istioapi.EnvoyFilter_Patch_ADD,
+	out := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: networkingapi.EnvoyFilter_EXTENSION_CONFIG,
+		Patch: &networkingapi.EnvoyFilter_Patch{
+			Operation: networkingapi.EnvoyFilter_Patch_ADD,
 			Value: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
 					util.StructHttpFilterName:        {Kind: &structpb.Value_StringValue{StringValue: filterName}},
@@ -843,7 +843,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
 }
 
-func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wrapperspb.StringValue, error) {
+func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wrappers.StringValue, error) {
 	if pluginSettings == nil { // use empty struct json string as wasm does not allow nil `configuration`
 		pluginSettings = &structpb.Struct{
 			Fields: map[string]*structpb.Value{
@@ -860,7 +860,7 @@ func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wr
 	if strField := pluginSettings.Fields["_string"]; strField != nil && len(pluginSettings.Fields) == 1 {
 		if _, ok := strField.Kind.(*structpb.Value_StringValue); ok {
 			// != Value_StringValue
-			return &wrapperspb.StringValue{Value: strField.GetStringValue()}, nil
+			return &wrappers.StringValue{Value: strField.GetStringValue()}, nil
 		}
 	}
 
@@ -868,7 +868,7 @@ func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wr
 	if settingsBytes, err := protojson.Marshal(pluginSettings); err != nil {
 		return nil, err
 	} else {
-		return &wrapperspb.StringValue{Value: string(settingsBytes)}, nil
+		return &wrappers.StringValue{Value: string(settingsBytes)}, nil
 	}
 }
 
@@ -974,7 +974,7 @@ func convertDataSource(urlStr, sha256 string) (*envoyconfigcorev3.AsyncDataSourc
 				Remote: &envoyconfigcorev3.RemoteDataSource{
 					HttpUri: &envoyconfigcorev3.HttpUri{
 						Uri:     imageURL.String(),
-						Timeout: durationpb.New(30 * time.Second),
+						Timeout: duration.New(30 * time.Second),
 						HttpUpstreamType: &envoyconfigcorev3.HttpUri_Cluster{
 							// this will be fetched by the agent anyway, so no need for a cluster
 							Cluster: "_",

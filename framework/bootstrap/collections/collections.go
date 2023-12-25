@@ -1,7 +1,8 @@
 package collections
 
 import (
-	"github.com/gogo/protobuf/proto"
+	"google.golang.org/protobuf/proto"
+
 	"slime.io/slime/framework/bootstrap/resource"
 )
 

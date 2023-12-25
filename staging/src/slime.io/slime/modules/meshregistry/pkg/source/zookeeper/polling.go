@@ -3,7 +3,7 @@ package zookeeper
 import (
 	"time"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
@@ -98,7 +98,7 @@ func (s *Source) handleNodeDelete(childrens []string) {
 				// DELETE ==> empty endpoints
 				seValueCopy := *sem
 				seCopy := *sem.ServiceEntry
-				seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+				seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 				seValueCopy.ServiceEntry = &seCopy
 				ses.Set(k, &seValueCopy)
 				event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, nil)

@@ -18,10 +18,10 @@ import (
 	envoy_extensions_filters_http_local_ratelimit_v3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/local_ratelimit/v3"
 	envoy_match_v3 "github.com/envoyproxy/go-control-plane/envoy/type/matcher/v3"
 	envoy_type_v3 "github.com/envoyproxy/go-control-plane/envoy/type/v3"
-	"github.com/golang/protobuf/ptypes/duration"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	duration "google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/structpb"
-	networking "istio.io/api/networking/v1alpha3"
+	wrappers "google.golang.org/protobuf/types/known/wrapperspb"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
 
 	"slime.io/slime/framework/util"
@@ -125,8 +125,8 @@ func generateDefaultInboundRouteConfigs(target *microservicev1alpha2.Target) []*
 	return rcs
 }
 
-func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) ([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, error) {
-	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) ([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+	patches := make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	// route2RouteConfig store the vhostName/routeName => routeConfig
 	route2RouteConfig := make(map[string][]*routeConfig)
 	routeNameList := make([]string, 0)
@@ -181,16 +181,16 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 		}
 
 		match := generateEnvoyVhostMatch(rcs[0], params.proxyVersion)
-		if match.Context == networking.EnvoyFilter_GATEWAY {
+		if match.Context == networkingapi.EnvoyFilter_GATEWAY {
 			params.context = model.Gateway
-		} else if match.Context == networking.EnvoyFilter_SIDECAR_OUTBOUND {
+		} else if match.Context == networkingapi.EnvoyFilter_SIDECAR_OUTBOUND {
 			params.context = model.Outbound
 		}
 
-		patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
+		patch := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
 			Match: match,
-			Patch: &networking.EnvoyFilter_Patch{
-				Operation: networking.EnvoyFilter_Patch_MERGE,
+			Patch: &networkingapi.EnvoyFilter_Patch{
+				Operation: networkingapi.EnvoyFilter_Patch_MERGE,
 			},
 		}
 		patch2vhost := false
@@ -202,7 +202,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			if err != nil {
 				return nil, err
 			}
-			patch.ApplyTo = networking.EnvoyFilter_VIRTUAL_HOST
+			patch.ApplyTo = networkingapi.EnvoyFilter_VIRTUAL_HOST
 			patch.Patch.Value = vhStruct
 		} else {
 			route := &envoy_config_route_v3.Route{
@@ -216,7 +216,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			if err != nil {
 				return nil, err
 			}
-			patch.ApplyTo = networking.EnvoyFilter_HTTP_ROUTE
+			patch.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 			patch.Patch.Value = routeStruct
 		}
 
@@ -229,7 +229,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 	return patches, nil
 }
 
-func patchBodyActions(patch *networking.EnvoyFilter_EnvoyConfigObjectPatch, patch2vhost bool, record map[int]int, bodyactions []*rlBodyAction) error {
+func patchBodyActions(patch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, patch2vhost bool, record map[int]int, bodyactions []*rlBodyAction) error {
 	ppv := patch.Patch.Value
 	m, err := util.ProtoToMap(ppv)
 	if err != nil {
@@ -299,7 +299,7 @@ func deleteAtIndex(slice []*rlBodyAction, indices []int) []*rlBodyAction {
 }
 
 // only enable local rate limit
-func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
 		StatPrefix: util.StructEnvoyLocalRateLimitLimiter,
 	}
@@ -309,11 +309,11 @@ func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networ
 		return nil
 	}
 
-	patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: networking.EnvoyFilter_HTTP_FILTER,
+	patch := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: networkingapi.EnvoyFilter_HTTP_FILTER,
 		Match:   generateEnvoyHttpFilterMatch(context, proxyVersion),
-		Patch: &networking.EnvoyFilter_Patch{
-			Operation: networking.EnvoyFilter_Patch_INSERT_BEFORE,
+		Patch: &networkingapi.EnvoyFilter_Patch{
+			Operation: networkingapi.EnvoyFilter_Patch_INSERT_BEFORE,
 			Value: &structpb.Struct{
 				Fields: map[string]*structpb.Value{
 					util.StructHttpFilterName: {
@@ -343,8 +343,8 @@ func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networ
 	return patch
 }
 
-func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networking.EnvoyFilter_EnvoyConfigObjectPatch {
-	patches := make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
+	patches := make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
 	route2RouteConfig := make(map[string][]*routeConfig)
 	routeNameList := make([]string, 0)
@@ -406,14 +406,14 @@ func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.Sm
 			}
 		}
 
-		patch := &networking.EnvoyFilter_EnvoyConfigObjectPatch{
+		patch := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
 			Match: generateEnvoyVhostMatch(rcs[0], params.proxyVersion),
 			Patch: generatePerFilterPatch(local),
 		}
 		if rcs[0].routeName == "" {
-			patch.ApplyTo = networking.EnvoyFilter_VIRTUAL_HOST
+			patch.ApplyTo = networkingapi.EnvoyFilter_VIRTUAL_HOST
 		} else {
-			patch.ApplyTo = networking.EnvoyFilter_HTTP_ROUTE
+			patch.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 		}
 		patches = append(patches, patch)
 	}
@@ -763,14 +763,14 @@ func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescrip
 	return headers
 }
 
-func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networking.EnvoyFilter_EnvoyConfigObjectMatch {
+func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectMatch {
 	// default context is inbound
-	match := &networking.EnvoyFilter_EnvoyConfigObjectMatch{
-		Context: networking.EnvoyFilter_SIDECAR_INBOUND,
-		ObjectTypes: &networking.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-			RouteConfiguration: &networking.EnvoyFilter_RouteConfigurationMatch{
-				Vhost: &networking.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
-					Route: &networking.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
+	match := &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
+		Context: networkingapi.EnvoyFilter_SIDECAR_INBOUND,
+		ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+			RouteConfiguration: &networkingapi.EnvoyFilter_RouteConfigurationMatch{
+				Vhost: &networkingapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{
+					Route: &networkingapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{
 						Name: rc.routeName,
 					},
 				},
@@ -779,21 +779,21 @@ func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networking.E
 	}
 
 	if proxyVersion != "" {
-		match.Proxy = &networking.EnvoyFilter_ProxyMatch{
+		match.Proxy = &networkingapi.EnvoyFilter_ProxyMatch{
 			ProxyVersion: proxyVersion,
 		}
 	}
 
 	// if gateway is enabled, match context should be EnvoyFilter_GATEWAY
 	if rc.gw {
-		match.Context = networking.EnvoyFilter_GATEWAY
+		match.Context = networkingapi.EnvoyFilter_GATEWAY
 		log.Debugf("gw is true, set context to gateway")
 	} else if rc.direction == model.Outbound {
-		match.Context = networking.EnvoyFilter_SIDECAR_OUTBOUND
+		match.Context = networkingapi.EnvoyFilter_SIDECAR_OUTBOUND
 		log.Debugf("direction is outbound and gw is false, set context to outbound")
 	}
 	// if allow_any, config.RouteConfiguration.Vhost.Name is ""
-	config, ok := match.ObjectTypes.(*networking.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration)
+	config, ok := match.ObjectTypes.(*networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration)
 	if !ok {
 		log.Errorf("covert to EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration err, can not be here")
 		return match
@@ -807,9 +807,9 @@ func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networking.E
 	return match
 }
 
-func generatePerFilterPatch(local *structpb.Struct) *networking.EnvoyFilter_Patch {
-	return &networking.EnvoyFilter_Patch{
-		Operation: networking.EnvoyFilter_Patch_MERGE,
+func generatePerFilterPatch(local *structpb.Struct) *networkingapi.EnvoyFilter_Patch {
+	return &networkingapi.EnvoyFilter_Patch{
+		Operation: networkingapi.EnvoyFilter_Patch_MERGE,
 		Value: &structpb.Struct{
 			Fields: map[string]*structpb.Value{
 				model.TypePerFilterConfig: {

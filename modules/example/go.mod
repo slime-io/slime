@@ -3,7 +3,7 @@ module slime.io/slime/modules/example
 go 1.20
 
 require (
-	github.com/gogo/protobuf v1.3.2
+	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.3
 	github.com/sirupsen/logrus v1.9.0
 	k8s.io/apimachinery v0.28.4
@@ -11,7 +11,11 @@ require (
 	sigs.k8s.io/controller-runtime v0.14.0
 )
 
-require slime.io/slime/framework v0.0.0
+require (
+	google.golang.org/protobuf v1.31.0
+	istio.io/client-go v1.19.1
+	slime.io/slime/framework v0.0.0
+)
 
 require (
 	contrib.go.opencensus.io/exporter/prometheus v0.4.0 // indirect
@@ -83,7 +87,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20230920204549-e6e6cdab5c13 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231009173412-8bfb1ae86b6c // indirect
 	google.golang.org/grpc v1.58.3 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

@@ -3,7 +3,7 @@ package serviceentry
 import (
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 
 	"slime.io/slime/framework/bootstrap/resource"
 	"slime.io/slime/framework/bootstrap/serviceregistry/model"
@@ -11,7 +11,7 @@ import (
 
 // ConvertSvcsAndEps transforms a ServiceEntry config to a list of IstioService and IstioEndpoint.
 func ConvertSvcsAndEps(cfg resource.Config, seLabelSelectorKeys string) ([]*model.Service, []*model.IstioEndpoint) {
-	serviceEntry := cfg.Spec.(*networking.ServiceEntry)
+	serviceEntry := cfg.Spec.(*networkingapi.ServiceEntry)
 
 	outEps := convertIstioEndpoints(serviceEntry, cfg.Name, cfg.Namespace)
 	outSvcs := make([]*model.Service, 0)
@@ -63,7 +63,7 @@ func ConvertSvcsAndEps(cfg resource.Config, seLabelSelectorKeys string) ([]*mode
 }
 
 // convertIstioEndpoints transforms a ServiceEntry config to a list of IstioEndpoint.
-func convertIstioEndpoints(serviceEntry *networking.ServiceEntry, svcName, svcNamespace string) []*model.IstioEndpoint {
+func convertIstioEndpoints(serviceEntry *networkingapi.ServiceEntry, svcName, svcNamespace string) []*model.IstioEndpoint {
 	out := make([]*model.IstioEndpoint, 0)
 
 	var hosts []model.Name
@@ -86,8 +86,8 @@ func convertIstioEndpoints(serviceEntry *networking.ServiceEntry, svcName, svcNa
 	return out
 }
 
-func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networking.ServicePort,
-	endpoint *networking.WorkloadEntry, hosts []model.Name,
+func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networkingapi.ServicePort,
+	endpoint *networkingapi.WorkloadEntry, hosts []model.Name,
 ) *model.IstioEndpoint {
 	var instancePort uint32
 	addr := endpoint.GetAddress()
@@ -117,7 +117,7 @@ func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networking.
 	}
 }
 
-func convertPort(port *networking.ServicePort) *model.Port {
+func convertPort(port *networkingapi.ServicePort) *model.Port {
 	return &model.Port{
 		Name:     port.Name,
 		Port:     int(port.Number),

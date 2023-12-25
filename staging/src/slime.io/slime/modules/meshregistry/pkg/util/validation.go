@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/resource"
 
 	"slime.io/slime/modules/meshregistry/pkg/features"
@@ -59,7 +59,7 @@ type seLabelKeysHolder struct {
 	seMeta []*seLabelKeyItem
 }
 
-func (h *seLabelKeysHolder) selectLabelsInto(se *networking.ServiceEntry, labels map[string]string) {
+func (h *seLabelKeysHolder) selectLabelsInto(se *networkingapi.ServiceEntry, labels map[string]string) {
 	for _, item := range h.instanceLabels {
 		if _, ok := labels[item.mapKey]; ok {
 			continue
@@ -231,17 +231,16 @@ func getNodeLabelsByPod(podIP string) map[string]string {
 	return labels
 }
 
-// copy 防止同时读写导致的并发异常 https://github.com/gogo/protobuf/issues/668
-func CopySe(item *networking.ServiceEntry) *networking.ServiceEntry {
+func CopySe(item *networkingapi.ServiceEntry) *networkingapi.ServiceEntry {
 	newHosts := make([]string, len(item.Hosts))
 	copy(newHosts, item.Hosts)
 	newAddress := make([]string, len(item.Addresses))
 	copy(newAddress, item.Addresses)
-	newPorts := make([]*networking.ServicePort, len(item.Ports))
+	newPorts := make([]*networkingapi.ServicePort, len(item.Ports))
 	copy(newPorts, item.Ports)
-	eps := make([]*networking.WorkloadEntry, len(item.Endpoints))
+	eps := make([]*networkingapi.WorkloadEntry, len(item.Endpoints))
 	copy(eps, item.Endpoints) // XXX deep copy?
-	newSe := &networking.ServiceEntry{
+	newSe := &networkingapi.ServiceEntry{
 		Hosts:           newHosts,
 		Addresses:       newAddress,
 		Ports:           newPorts,
@@ -254,7 +253,7 @@ func CopySe(item *networking.ServiceEntry) *networking.ServiceEntry {
 	return newSe
 }
 
-func SelectLabels(item *networking.ServiceEntry) map[string]string {
+func SelectLabels(item *networkingapi.ServiceEntry) map[string]string {
 	labels := make(map[string]string, 0)
 
 	if seLabelKeys != nil {
@@ -263,7 +262,7 @@ func SelectLabels(item *networking.ServiceEntry) map[string]string {
 	return labels
 }
 
-func FillSeLabels(se *networking.ServiceEntry, meta resource.Metadata) bool {
+func FillSeLabels(se *networkingapi.ServiceEntry, meta resource.Metadata) bool {
 	var (
 		labels  = SelectLabels(se)
 		changed bool

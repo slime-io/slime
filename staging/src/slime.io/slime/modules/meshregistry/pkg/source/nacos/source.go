@@ -12,7 +12,7 @@ import (
 
 	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	cmap "github.com/orcaman/concurrent-map/v2"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 
@@ -38,7 +38,7 @@ type Source struct {
 	delay time.Duration
 
 	// source cache
-	cache             map[string]*networking.ServiceEntry
+	cache             map[string]*networkingapi.ServiceEntry
 	namingServiceList cmap.ConcurrentMap[string, bool]
 	handlers          []event.Handler
 
@@ -104,7 +104,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 		delay:             delay,
 		started:           false,
 		initedCallback:    readyCallback,
-		cache:             make(map[string]*networking.ServiceEntry),
+		cache:             make(map[string]*networkingapi.ServiceEntry),
 		namingServiceList: cmap.New[bool](),
 		stop:              make(chan struct{}),
 		seInitCh:          make(chan struct{}),
@@ -142,7 +142,7 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	if ret.seMergePortMocker != nil {
 		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
 
-		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networking.ServiceEntry) {
+		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
 			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
 			for _, h := range ret.handlers {
 				h.Handle(ev)
@@ -166,10 +166,10 @@ func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, del
 	return ret, ret.cacheJson, nil
 }
 
-func (s *Source) cacheShallowCopy() map[string]*networking.ServiceEntry {
+func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
 	s.mut.RLock()
 	defer s.mut.RUnlock()
-	ret := make(map[string]*networking.ServiceEntry, len(s.cache))
+	ret := make(map[string]*networkingapi.ServiceEntry, len(s.cache))
 	for k, v := range s.cache {
 		ret[k] = v
 	}
@@ -316,7 +316,7 @@ func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
 	se := util.CopySe(item)
 	items := strings.Split(service, ".")
 	ns := resourceNs
@@ -382,7 +382,7 @@ func (s *Source) Stop() {
 	s.stop <- struct{}{}
 }
 
-func printEps(eps []*networking.WorkloadEntry) string {
+func printEps(eps []*networkingapi.WorkloadEntry) string {
 	ips := make([]string, 0)
 	for _, ep := range eps {
 		ips = append(ips, ep.Address)

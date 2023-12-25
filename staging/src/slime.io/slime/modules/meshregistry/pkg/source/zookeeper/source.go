@@ -18,7 +18,7 @@ import (
 	"github.com/go-zookeeper/zk"
 	"github.com/hashicorp/go-multierror"
 	cmap "github.com/orcaman/concurrent-map/v2"
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
 	"istio.io/libistio/pkg/config/schema/collection"
@@ -93,7 +93,7 @@ type Source struct {
 	seDubboCallModels    map[resource.FullName]map[string]DubboCallModel
 	changedApps          map[string]struct{}
 	appSidecarUpdateTime map[string]time.Time
-	dubboPortsCache      map[uint32]*networking.Port
+	dubboPortsCache      map[uint32]*networkingapi.Port
 
 	handlers       []event.Handler
 	initedCallback func(string)
@@ -165,7 +165,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback
 		cache:                cmap.New[cmap.ConcurrentMap[string, *ServiceEntryWithMeta]](),
 		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
 		appSidecarUpdateTime: map[string]time.Time{},
-		dubboPortsCache:      map[uint32]*networking.Port{},
+		dubboPortsCache:      map[uint32]*networkingapi.Port{},
 
 		seInitCh:               make(chan struct{}),
 		stop:                   make(chan struct{}),
@@ -205,7 +205,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback
 	return ret, ret.cacheJson, ret.simpleCacheJson, nil
 }
 
-func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networking.ServiceEntry) {
+func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networkingapi.ServiceEntry) {
 	prepared, _ := prepareServiceEntryWithMeta(se, meta)
 	ev, err := buildServiceEntryEvent(event.Updated, prepared.ServiceEntry, prepared.Meta, nil)
 	if err != nil {
@@ -510,9 +510,9 @@ func (s *Source) Stop() {
 	s.stop <- struct{}{}
 }
 
-func (s *Source) ServiceEntries() []*networking.ServiceEntry {
+func (s *Source) ServiceEntries() []*networkingapi.ServiceEntry {
 	cacheItems := s.cache.Items()
-	ret := make([]*networking.ServiceEntry, 0, len(cacheItems))
+	ret := make([]*networkingapi.ServiceEntry, 0, len(cacheItems))
 
 	for _, ses := range cacheItems {
 		for _, sem := range ses.Items() {
@@ -523,7 +523,7 @@ func (s *Source) ServiceEntries() []*networking.ServiceEntry {
 	return ret
 }
 
-func (s *Source) ServiceEntry(fullName resource.FullName) *networking.ServiceEntry {
+func (s *Source) ServiceEntry(fullName resource.FullName) *networkingapi.ServiceEntry {
 	// here we do not use the ns according to the cache layout.
 	serviceKey := string(fullName.Name)
 	service := parseServiceFromKey(serviceKey)
@@ -757,7 +757,7 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 
 		seValueCopy := *seValue
 		seCopy := *seValue.ServiceEntry
-		seCopy.Endpoints = make([]*networking.WorkloadEntry, 0)
+		seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 		seValueCopy.ServiceEntry = &seCopy
 		seCache.Set(serviceKey, &seValueCopy)
 		seValue = &seValueCopy
@@ -827,7 +827,7 @@ func (s *Source) forceUpdate() {
 // data, and the event handlers can safely modify its contents.
 // In addition, certain metadata will also be populated.
 // Returns the prepared service entry with meta and whether the data has been changed.
-func prepareServiceEntryWithMeta(se *networking.ServiceEntry, meta resource.Metadata) (*ServiceEntryWithMeta, bool) {
+func prepareServiceEntryWithMeta(se *networkingapi.ServiceEntry, meta resource.Metadata) (*ServiceEntryWithMeta, bool) {
 	se = util.CopySe(se)
 	meta = meta.Clone()
 
@@ -846,7 +846,7 @@ func prepareServiceEntryWithMeta(se *networking.ServiceEntry, meta resource.Meta
 }
 
 // buildServiceEntryEvent assembled the incoming data into an event. Event handle should not modify the data.
-func buildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
+func buildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
 	return event.Event{
 		Kind:   kind,
 		Source: collections.ServiceEntry,
@@ -859,7 +859,7 @@ func buildServiceEntryEvent(kind event.Kind, se *networking.ServiceEntry, meta r
 }
 
 // buildSidecarEvent assembled the incoming data into an event. Event handle should not modify the data.
-func buildSidecarEvent(kind event.Kind, item *networking.Sidecar, meta resource.Metadata) event.Event {
+func buildSidecarEvent(kind event.Kind, item *networkingapi.Sidecar, meta resource.Metadata) event.Event {
 	meta = meta.Clone()
 	source.FillRevision(meta)
 	return event.Event{

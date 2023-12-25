@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
@@ -27,8 +27,8 @@ func (e Error) Error() string {
 func ConvertServiceEntryMap(
 	apps []*application, defaultSvcNs string, gatewayModel, patchLabel bool, svcPort uint32,
 	instancePortAsSvcPort, nsHost, k8sDomainSuffix, nsfEureka bool,
-) (map[string]*networking.ServiceEntry, error) {
-	seMap := make(map[string]*networking.ServiceEntry, 0)
+) (map[string]*networkingapi.ServiceEntry, error) {
+	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if apps == nil || len(apps) == 0 {
 		return seMap, nil
 	}
@@ -58,55 +58,55 @@ func ConvertServiceEntryMap(
 }
 
 // -------- for gateway mode --------
-func convertServiceEntry(app *application, nsHost bool, patchLabel bool) *networking.ServiceEntry {
+func convertServiceEntry(app *application, nsHost bool, patchLabel bool) *networkingapi.ServiceEntry {
 	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.Instances, patchLabel, "")
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".eureka"
 	}
 
-	ret := &networking.ServiceEntry{
+	ret := &networkingapi.ServiceEntry{
 		Hosts:      []string{strings.ReplaceAll(strings.ToLower(app.Name), "_", "-") + nsSuffix},
-		Resolution: networking.ServiceEntry_STATIC,
+		Resolution: networkingapi.ServiceEntry_STATIC,
 		Endpoints:  endpoints,
 		Ports:      ports,
 	}
 
 	if hasNonIPEpAddr {
 		// currently we do not consider the UDS case
-		ret.Resolution = networking.ServiceEntry_DNS
+		ret.Resolution = networkingapi.ServiceEntry_DNS
 	}
 
 	return ret
 }
 
 // 根据projectCode做eureka服务的项目隔离
-func convertServiceEntryWithProjectCode(app *application, nsHost bool, patchLabel bool, projectCode string) *networking.ServiceEntry {
+func convertServiceEntryWithProjectCode(app *application, nsHost bool, patchLabel bool, projectCode string) *networkingapi.ServiceEntry {
 	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.Instances, patchLabel, projectCode)
 	nsSuffix := ""
 	if nsHost {
 		nsSuffix = ".eureka"
 	}
 
-	ret := &networking.ServiceEntry{
+	ret := &networkingapi.ServiceEntry{
 		Hosts:      []string{strings.ToLower(strings.ReplaceAll(strings.ToLower(app.Name), "_", "-")+".nsf."+projectCode) + nsSuffix},
-		Resolution: networking.ServiceEntry_STATIC,
+		Resolution: networkingapi.ServiceEntry_STATIC,
 		Endpoints:  endpoints,
 		Ports:      ports,
 	}
 
 	if hasNonIPEpAddr {
 		// currently we do not consider the UDS case
-		ret.Resolution = networking.ServiceEntry_DNS
+		ret.Resolution = networkingapi.ServiceEntry_DNS
 	}
 
 	return ret
 }
 
-func convertEndpoints(instances []*instance, patchLabel bool, projectCode string) ([]*networking.WorkloadEntry, []*networking.ServicePort, []string, bool) {
+func convertEndpoints(instances []*instance, patchLabel bool, projectCode string) ([]*networkingapi.WorkloadEntry, []*networkingapi.ServicePort, []string, bool) {
 	var (
-		endpoints      = make([]*networking.WorkloadEntry, 0)
-		ports          = make([]*networking.ServicePort, 0)
+		endpoints      = make([]*networkingapi.WorkloadEntry, 0)
+		ports          = make([]*networkingapi.ServicePort, 0)
 		address        = make([]string, 0)
 		hasNonIPEpAddr bool
 	)
@@ -114,7 +114,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, projectCode string
 		return instances[i].InstanceID < instances[j].InstanceID
 	})
 
-	port := &networking.ServicePort{
+	port := &networkingapi.ServicePort{
 		Protocol: "HTTP",
 		Number:   80,
 		Name:     "http",
@@ -151,7 +151,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, projectCode string
 
 		util.FilterLabels(ins.Metadata, patchLabel, ipAddr, "eureka:"+ins.InstanceID)
 
-		ep := &networking.WorkloadEntry{
+		ep := &networkingapi.WorkloadEntry{
 			Address: ins.IPAddress,
 			Ports:   instancePorts,
 			Labels:  ins.Metadata,
@@ -171,7 +171,7 @@ func convertEndpoints(instances []*instance, patchLabel bool, projectCode string
 func convertServiceEntryWithNs(
 	app *application, defaultNs string, svcPort uint32,
 	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
-) map[string]*networking.ServiceEntry {
+) map[string]*networkingapi.ServiceEntry {
 	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(
 		app.Instances, defaultNs, svcPort, nsHost, instancePortAsSvcPort, patchLabel)
 	if len(nsEndpoints) == 0 {
@@ -181,7 +181,7 @@ func convertServiceEntryWithNs(
 	if svcPort != 0 && instancePortAsSvcPort { // add extra svc port
 		for _, svcPorts := range nsSvcPorts {
 			if _, ok := svcPorts[svcPort]; !ok {
-				svcPorts[svcPort] = &networking.ServicePort{
+				svcPorts[svcPort] = &networkingapi.ServicePort{
 					Number:   svcPort,
 					Protocol: source.ProtocolHTTP,
 					Name:     source.PortName(source.ProtocolHTTP, svcPort),
@@ -191,7 +191,7 @@ func convertServiceEntryWithNs(
 	}
 
 	var (
-		ses          = make(map[string]*networking.ServiceEntry, len(nsEndpoints))
+		ses          = make(map[string]*networkingapi.ServiceEntry, len(nsEndpoints))
 		svcShortName = strings.ToLower(app.Name)
 	)
 
@@ -208,9 +208,9 @@ func convertServiceEntryWithNs(
 			}
 		}
 
-		resolution := networking.ServiceEntry_STATIC
+		resolution := networkingapi.ServiceEntry_STATIC
 		if nsUseDnsMap[ns] {
-			resolution = networking.ServiceEntry_DNS
+			resolution = networkingapi.ServiceEntry_DNS
 		}
 
 		existSe := ses[seName]
@@ -219,7 +219,7 @@ func convertServiceEntryWithNs(
 			log.Errorf("eureka found dup se %s, prev %+v", seName, existSe)
 		} else {
 			portMap := nsSvcPorts[ns]
-			ports := make([]*networking.ServicePort, 0, len(portMap))
+			ports := make([]*networkingapi.ServicePort, 0, len(portMap))
 			for _, p := range portMap {
 				ports = append(ports, p)
 			}
@@ -227,7 +227,7 @@ func convertServiceEntryWithNs(
 				return ports[i].Number < ports[j].Number
 			})
 
-			ses[seName] = &networking.ServiceEntry{
+			ses[seName] = &networkingapi.ServiceEntry{
 				Hosts:      []string{host},
 				Resolution: resolution,
 				Endpoints:  endpoints,
@@ -242,9 +242,9 @@ func convertServiceEntryWithNs(
 func convertEndpointsWithNs(
 	instances []*instance, defaultNs string, svcPort uint32, nsHost, instancePortAsSvcPort,
 	patchLabel bool,
-) (map[string][]*networking.WorkloadEntry, map[string]map[uint32]*networking.ServicePort, map[string]bool) {
-	endpointsMap := make(map[string][]*networking.WorkloadEntry, 0)
-	portsMap := make(map[string]map[uint32]*networking.ServicePort, 0)
+) (map[string][]*networkingapi.WorkloadEntry, map[string]map[uint32]*networkingapi.ServicePort, map[string]bool) {
+	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
+	portsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 
 	sort.Slice(instances, func(i, j int) bool {
@@ -271,7 +271,7 @@ func convertEndpointsWithNs(
 		var svcPortName string
 		ports, exist := portsMap[ns]
 		if !exist {
-			ports = map[uint32]*networking.ServicePort{}
+			ports = map[uint32]*networkingapi.ServicePort{}
 			portsMap[ns] = ports
 		}
 
@@ -281,7 +281,7 @@ func convertEndpointsWithNs(
 		}
 		if v, ok := ports[svcPortInUse]; !ok {
 			svcPortName = source.PortName(source.ProtocolHTTP, svcPortInUse)
-			ports[svcPortInUse] = &networking.ServicePort{
+			ports[svcPortInUse] = &networkingapi.ServicePort{
 				Protocol: source.ProtocolHTTP,
 				Number:   svcPortInUse,
 				Name:     svcPortName,
@@ -297,7 +297,7 @@ func convertEndpointsWithNs(
 			}
 		}
 
-		ep := &networking.WorkloadEntry{
+		ep := &networkingapi.WorkloadEntry{
 			Address: ins.IPAddress,
 			Ports:   map[string]uint32{svcPortName: uint32(ins.Port.Port)},
 			Labels:  ins.Metadata,

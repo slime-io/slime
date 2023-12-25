@@ -19,7 +19,7 @@ package controllers
 import (
 	"context"
 
-	"istio.io/client-go/pkg/apis/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -82,7 +82,7 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	model.PatchObjectMeta(&ef.ObjectMeta, &instance.ObjectMeta)
 	model.PatchIstioRevLabel(&ef.Labels, istioRev)
 
-	found := &v1alpha3.EnvoyFilter{}
+	found := &networkingv1alpha3.EnvoyFilter{}
 	err = r.Client.Get(ctx, types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -119,7 +119,7 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin) *v1alpha3.EnvoyFilter {
+func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin) *networkingv1alpha3.EnvoyFilter {
 	out := r.translateEnvoyPlugin(cr)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {

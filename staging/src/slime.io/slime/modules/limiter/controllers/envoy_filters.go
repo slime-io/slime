@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	networking "istio.io/api/networking/v1alpha3"
+	networkingapi "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,10 +42,10 @@ type LimiterSpec struct {
 
 func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
 	material map[string]string, loc types.NamespacedName) (
-	map[string]*networking.EnvoyFilter, map[string]*microservicev1alpha2.SmartLimitDescriptors, []*model.Descriptor, error,
+	map[string]*networkingapi.EnvoyFilter, map[string]*microservicev1alpha2.SmartLimitDescriptors, []*model.Descriptor, error,
 ) {
 	materialInterface := util.MapToMapInterface(material)
-	setsEnvoyFilter := make(map[string]*networking.EnvoyFilter)
+	setsEnvoyFilter := make(map[string]*networkingapi.EnvoyFilter)
 	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha2.SmartLimitDescriptors)
 	globalDescriptors := make([]*model.Descriptor, 0)
 	params := &LimiterSpec{
@@ -63,7 +63,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		proxyVersion:                 r.cfg.GetProxyVersion(),
 	}
 
-	var sets []*networking.Subset
+	var sets []*networkingapi.Subset
 
 	meta, ok := r.interest.Get(FQN(loc.Namespace, loc.Name))
 	if !ok {
@@ -81,7 +81,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 		}
 	}
 
-	sets = append(sets, &networking.Subset{Name: util.WellknownBaseSet})
+	sets = append(sets, &networkingapi.Subset{Name: util.WellknownBaseSet})
 
 	svcSelector, err := generateServiceSelector(r, params)
 	if err != nil {
@@ -178,14 +178,14 @@ func exactIPs(des *microservicev1alpha2.SmartLimitDescriptor) []string {
 	return nil
 }
 
-func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networking.EnvoyFilter {
-	ef := &networking.EnvoyFilter{}
-	ef.ConfigPatches = make([]*networking.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networkingapi.EnvoyFilter {
+	ef := &networkingapi.EnvoyFilter{}
+	ef.ConfigPatches = make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	globalDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
 	localDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
 
 	if len(labels) > 0 {
-		ef.WorkloadSelector = &networking.WorkloadSelector{Labels: labels}
+		ef.WorkloadSelector = &networkingapi.WorkloadSelector{Labels: labels}
 	}
 
 	// split descriptors due to different envoy plugins

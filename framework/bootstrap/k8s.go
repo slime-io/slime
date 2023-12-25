@@ -2,9 +2,11 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
+
 	log "github.com/sirupsen/logrus"
-	networking "istio.io/api/networking/v1alpha3"
-	v1 "k8s.io/api/core/v1"
+	networkingapi "istio.io/api/networking/v1alpha3"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -14,10 +16,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap/collections"
 	"slime.io/slime/framework/bootstrap/resource"
-	"time"
 )
 
 // TODO support multi clusters, configSource takes no effect now
@@ -31,7 +33,6 @@ func initK8sMonitorController(configSource *bootconfig.ConfigSource) (*monitorCo
 }
 
 func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <-chan struct{}) error {
-
 	clientSet, err := kubernetes.NewForConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to init client for K8S config source: %+v", err)
@@ -43,7 +44,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 	podInformer := podInformerFactory.Core().V1().Pods().Informer()
 	podInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Pod)
+			re, ok := obj.(*corev1.Pod)
 			if !ok {
 				return
 			}
@@ -64,7 +65,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		UpdateFunc: func(_, new interface{}) {
-			re, ok := new.(*v1.Pod)
+			re, ok := new.(*corev1.Pod)
 			if !ok {
 				return
 			}
@@ -85,7 +86,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Pod)
+			re, ok := obj.(*corev1.Pod)
 			if !ok {
 				return
 			}
@@ -113,7 +114,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 	epInformer := epInformerFactory.Core().V1().Endpoints().Informer()
 	epInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Endpoints)
+			re, ok := obj.(*corev1.Endpoints)
 			if !ok {
 				return
 			}
@@ -134,7 +135,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		UpdateFunc: func(_, new interface{}) {
-			re, ok := new.(*v1.Endpoints)
+			re, ok := new.(*corev1.Endpoints)
 			if !ok {
 				return
 			}
@@ -155,7 +156,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Endpoints)
+			re, ok := obj.(*corev1.Endpoints)
 			if !ok {
 				return
 			}
@@ -183,7 +184,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 	svcInformer := svcInformerFactory.Core().V1().Services().Informer()
 	svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Service)
+			re, ok := obj.(*corev1.Service)
 			if !ok {
 				return
 			}
@@ -204,7 +205,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		UpdateFunc: func(_, new interface{}) {
-			re, ok := new.(*v1.Service)
+			re, ok := new.(*corev1.Service)
 			if !ok {
 				return
 			}
@@ -225,7 +226,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.Service)
+			re, ok := obj.(*corev1.Service)
 			if !ok {
 				return
 			}
@@ -253,7 +254,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 	cmInformer := cmInformerFactory.Core().V1().ConfigMaps().Informer()
 	cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.ConfigMap)
+			re, ok := obj.(*corev1.ConfigMap)
 			if !ok {
 				return
 			}
@@ -274,7 +275,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		UpdateFunc: func(_, new interface{}) {
-			re, ok := new.(*v1.ConfigMap)
+			re, ok := new.(*corev1.ConfigMap)
 			if !ok {
 				return
 			}
@@ -295,7 +296,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 			}
 		},
 		DeleteFunc: func(obj interface{}) {
-			re, ok := obj.(*v1.ConfigMap)
+			re, ok := obj.(*corev1.ConfigMap)
 			if !ok {
 				return
 			}
@@ -335,7 +336,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 				return
 			}
 			spec, _, _ := unstructured.NestedFieldCopy(re.Object, "spec")
-			var serviceEntry networking.ServiceEntry
+			var serviceEntry networkingapi.ServiceEntry
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(spec.(map[string]interface{}), &serviceEntry); err != nil {
 				log.Errorf("convert ServiceEntry %s/%s to structured error: %v", re.GetNamespace(), re.GetName(), err)
 				return
@@ -362,7 +363,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 				return
 			}
 			spec, _, _ := unstructured.NestedFieldCopy(re.Object, "spec")
-			var serviceEntry networking.ServiceEntry
+			var serviceEntry networkingapi.ServiceEntry
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(spec.(map[string]interface{}), &serviceEntry); err != nil {
 				log.Errorf("convert ServiceEntry %s/%s to structured error: %v", re.GetNamespace(), re.GetName(), err)
 				return
@@ -389,7 +390,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 				return
 			}
 			spec, _, _ := unstructured.NestedFieldCopy(re.Object, "spec")
-			var serviceEntry networking.ServiceEntry
+			var serviceEntry networkingapi.ServiceEntry
 			if err = runtime.DefaultUnstructuredConverter.FromUnstructured(spec.(map[string]interface{}), &serviceEntry); err != nil {
 				log.Errorf("convert ServiceEntry %s/%s to structured error: %v", re.GetNamespace(), re.GetName(), err)
 				return
