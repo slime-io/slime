@@ -731,6 +731,10 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 		},
 	}
 
+	if settings == nil && typeURL != "" {
+		settings = &v1alpha1.Plugin_Inline{Inline: &v1alpha1.Inline{}}
+	}
+
 	if settings != nil {
 		out.Fields[util.StructHttpFilterTypedConfig] = &types.Value{
 			Kind: &types.Value_StructValue{
