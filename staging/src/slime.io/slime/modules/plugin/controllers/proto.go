@@ -1,38 +1,41 @@
 package controllers
 
-import "github.com/gogo/protobuf/types"
+import (
+	gogotypes "github.com/gogo/protobuf/types"
+	"google.golang.org/protobuf/types/known/structpb"
+)
 
-func addStructField(s *types.Struct, k string, value *types.Value) *types.Struct {
+func addStructField(s *structpb.Struct, k string, value *structpb.Value) *structpb.Struct {
 	s.Fields[k] = value
 	return s
 }
 
-func structToValue(st *types.Struct) *types.Value {
-	return &types.Value{
-		Kind: &types.Value_StructValue{
+func structToValue(st *structpb.Struct) *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_StructValue{
 			StructValue: st,
 		},
 	}
 }
 
-func stringToValue(s string) *types.Value {
-	return &types.Value{
-		Kind: &types.Value_StringValue{
+func stringToValue(s string) *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_StringValue{
 			StringValue: s,
 		},
 	}
 }
 
 type structWrapper struct {
-	st *types.Struct
+	st *structpb.Struct
 }
 
-func (s *structWrapper) AddField(k string, value *types.Value) *structWrapper {
+func (s *structWrapper) AddField(k string, value *structpb.Value) *structWrapper {
 	s.st.Fields[k] = value
 	return s
 }
 
-func (s *structWrapper) AddStructField(k string, st *types.Struct) *structWrapper {
+func (s *structWrapper) AddStructField(k string, st *structpb.Struct) *structWrapper {
 	return s.AddField(k, structToValue(st))
 }
 
@@ -40,11 +43,11 @@ func (s *structWrapper) WrapToStruct(k string) *structWrapper {
 	return newStructWrapper(nil).AddStructField(k, s.st)
 }
 
-func (s *structWrapper) WrapToListValue() *types.Value {
-	return &types.Value{
-		Kind: &types.Value_ListValue{
-			ListValue: &types.ListValue{
-				Values: []*types.Value{
+func (s *structWrapper) WrapToListValue() *structpb.Value {
+	return &structpb.Value{
+		Kind: &structpb.Value_ListValue{
+			ListValue: &structpb.ListValue{
+				Values: []*structpb.Value{
 					structToValue(s.st),
 				},
 			},
@@ -56,29 +59,49 @@ func (s *structWrapper) AddStringField(k string, v string) *structWrapper {
 	return s.AddField(k, stringToValue(v))
 }
 
-func (s *structWrapper) Get() *types.Struct {
+func (s *structWrapper) Get() *structpb.Struct {
 	return s.st
 }
 
-func newStructWrapper(st *types.Struct) *structWrapper {
+func newStructWrapper(st *structpb.Struct) *structWrapper {
 	if st == nil {
-		st = &types.Struct{Fields: map[string]*types.Value{}}
+		st = &structpb.Struct{Fields: map[string]*structpb.Value{}}
 	}
 	return &structWrapper{st: st}
 }
 
-func fieldToStruct(k string, value *types.Value) *types.Struct {
-	return &types.Struct{
-		Fields: map[string]*types.Value{
+func fieldToStruct(k string, value *structpb.Value) *structpb.Struct {
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
 			k: value,
 		},
 	}
 }
 
-func wrapStructToStruct(k string, st *types.Struct) *types.Struct {
+func wrapStructToStruct(k string, st *structpb.Struct) *structpb.Struct {
 	return fieldToStruct(k, structToValue(st))
 }
 
-func wrapStructToStructWrapper(k string, st *types.Struct) *structWrapper {
+func wrapStructToStructWrapper(k string, st *structpb.Struct) *structWrapper {
 	return newStructWrapper(nil).AddStructField(k, st)
+}
+
+func gogoStructToStruct(gogo *gogotypes.Struct) *structpb.Struct {
+	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
+	return nil
+}
+
+func structToGogoStruct(st *structpb.Struct) *gogotypes.Struct {
+	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
+	return nil
+}
+
+func structValueToGogoStructValue(value *structpb.Value) *gogotypes.Value {
+	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
+	return nil
+}
+
+func gogoStructValueToStructValue(value *gogotypes.Value) *structpb.Value {
+	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
+	return nil
 }

@@ -24,24 +24,20 @@ import (
 
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"google.golang.org/grpc"
-	"istio.io/libistio/galley/pkg/config/processor/transforms"
-	"istio.io/libistio/galley/pkg/config/source/kube"
-	"istio.io/libistio/galley/pkg/config/source/kube/apiserver"
-	"istio.io/libistio/galley/pkg/config/util/kuberesource"
 	"istio.io/libistio/pkg/config/event"
-	"istio.io/libistio/pkg/config/schema"
 	"istio.io/libistio/pkg/config/schema/collection"
-	"istio.io/libistio/pkg/mcp/snapshot"
-	"k8s.io/client-go/tools/cache"
+	"istio.io/libistio/pkg/config/schema/collections"
+	"istio.io/libistio/pkg/config/schema/resource"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 
-	slimebootstrap "slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
-	"slime.io/slime/modules/meshregistry/pkg/source/k8s"
+	"slime.io/slime/modules/meshregistry/pkg/source/k8s/fs"
 	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
 	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
 	utilcache "slime.io/slime/modules/meshregistry/pkg/util/cache"
@@ -50,13 +46,9 @@ import (
 // Processing component is the main config processing component that will listen to a config source and publish
 // resources through an MCP server, or a dialout connection.
 type Processing struct {
-	env          slimebootstrap.Environment
 	regArgs      *bootstrap.RegistryArgs
 	addOnRegArgs func(onRegArgs func(args *bootstrap.RegistryArgs))
 
-	mcpCache *snapshot.Cache
-
-	k              kube.Interfaces
 	localCLusterID string
 
 	serveWG       sync.WaitGroup
@@ -65,9 +57,7 @@ type Processing struct {
 	stopCh        chan struct{}
 	httpServer    *HttpServer
 
-	dynConfigController cache.Controller
-
-	sources []event.Source
+	kubeSourceSchemas *collection.Schemas
 }
 
 // NewProcessing returns a new processing component.
@@ -104,48 +94,24 @@ func NewProcessing(args *Args) *Processing {
 func (p *Processing) Start() (err error) {
 	csrc := make([]event.Source, 0, 5)
 	var (
-		meshConfigFileSrc     event.Source
-		kubeSrc, extraKubeSrc event.Source
-		zookeeperSrc          event.Source
-		eurekaSrc             event.Source
-		nacosSrc              event.Source
+		kubeFsSrc    event.Source
+		zookeeperSrc event.Source
+		eurekaSrc    event.Source
+		nacosSrc     event.Source
 
 		httpHandle       func(http.ResponseWriter, *http.Request)
 		simpleHttpHandle func(http.ResponseWriter, *http.Request)
-
-		shouldInitKubeClient bool
 	)
 
-	if p.regArgs.MeshConfigFile != "" && p.regArgs.K8SSource.Enabled {
-		if meshConfigFileSrc, err = meshcfgNewFS(p.regArgs.MeshConfigFile); err != nil {
-			return
-		}
-	}
-
-	shouldInitKubeClient = shouldInitKubeClient || p.regArgs.K8SSource.Enabled
-
-	if shouldInitKubeClient {
-		if p.k, err = p.getResourceKubeInterfaces(); err != nil {
-			return
-		}
-	}
-
-	m := schema.MustGet()
-
-	transformProviders := transforms.Providers(m)
-
-	// Disable any unnecessary resources, including resources not in configured snapshots
-	var colsInSnapshots collection.Names
-	for _, c := range m.AllCollectionsInSnapshots(p.regArgs.Snapshots) {
-		colsInSnapshots = append(colsInSnapshots, collection.NewName(c))
-	}
-	kubeResources := kuberesource.DisableExcludedCollections(m.KubeCollections(), transformProviders,
-		colsInSnapshots, p.regArgs.ExcludedResourceKinds, p.regArgs.EnableServiceDiscovery)
-
-	if p.regArgs.K8SSource.EnableConfigFile && p.regArgs.K8SSource.ConfigPath != "" {
-		if extraKubeSrc, err = p.createFileKubeSource(kubeResources, p.regArgs.K8SSource.ConfigPath, p.regArgs.K8SSource.WatchConfigFiles); err != nil {
-			log.Errorf("create extra k8s file source met err %v", err)
-			return
+	if p.regArgs.K8SSource.Enabled {
+		if p.regArgs.K8SSource.EnableConfigFile && p.regArgs.K8SSource.ConfigPath != "" {
+			schemas := p.getKubeSourceSchemas()
+			log.Warnf("watching config files in %s", p.regArgs.K8SSource.ConfigPath)
+			log.Warnf("watching config schemas %v", schemas.Kinds())
+			kubeFsSrc, err = fs.New(p.regArgs.K8SSource.ConfigPath, schemas, p.regArgs.K8SSource.WatchConfigFiles)
+			if err != nil {
+				return
+			}
 		}
 	}
 
@@ -153,7 +119,7 @@ func (p *Processing) Start() (err error) {
 
 	if srcArgs := p.regArgs.ZookeeperSource.SourceArgs; srcArgs.Enabled {
 		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.New(
-			p.regArgs.ZookeeperSource, kubeResources.All(), time.Duration(p.regArgs.RegistryStartDelay),
+			p.regArgs.ZookeeperSource, time.Duration(p.regArgs.RegistryStartDelay),
 			p.httpServer.SourceReadyCallBack, zookeeper.WithDynamicConfigOption(func(onZookeeperArgs func(*bootstrap.ZookeeperSourceArgs)) {
 				if p.addOnRegArgs != nil {
 					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
@@ -208,16 +174,6 @@ func (p *Processing) Start() (err error) {
 		clusterCache = clusterCache || p.regArgs.EurekaSource.LabelPatch
 	}
 
-	if srcArgs := p.regArgs.K8SSource; srcArgs.Enabled {
-		if kubeSrc, err = p.createKubeSource(kubeResources); err != nil {
-			log.Errorf("create k8s source met err %v", err)
-			return
-		}
-
-		p.httpServer.SourceRegistry(k8s.K8S)
-		p.httpServer.SourceReadyLater(k8s.K8S, time.Duration(srcArgs.WaitTime)) // init-done-notify not impl. leave it to do.
-	}
-
 	if clusterCache {
 		p.initMulticluster()
 	}
@@ -229,14 +185,8 @@ func (p *Processing) Start() (err error) {
 		})
 	}
 
-	if meshConfigFileSrc != nil {
-		csrc = append(csrc, meshConfigFileSrc)
-	}
-	if kubeSrc != nil {
-		csrc = append(csrc, kubeSrc)
-	}
-	if extraKubeSrc != nil {
-		csrc = append(csrc, extraKubeSrc)
+	if kubeFsSrc != nil {
+		csrc = append(csrc, kubeFsSrc)
 	}
 	if zookeeperSrc != nil {
 		csrc = append(csrc, zookeeperSrc)
@@ -304,55 +254,65 @@ func CombineSources(c []event.Source) event.Source {
 	return o
 }
 
-func (p *Processing) getResourceKubeInterfaces() (k kube.Interfaces, err error) {
-	if p.regArgs.K8S.ApiServerUrl != "" {
-		config, err := clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrl, "")
+func (p *Processing) getDeployKubeClient() (k kubernetes.Interface, err error) {
+	return p.getKubeClient(p.regArgs.K8S.KubeRestConfig, p.regArgs.K8S.ApiServerUrlForDeploy, p.regArgs.K8S.KubeConfig)
+}
+
+func (p *Processing) getKubeClient(config *rest.Config, masterUrl, kubeconfigPath string) (k kubernetes.Interface, err error) {
+	if config == nil {
+		config, err = clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrl, p.regArgs.K8S.KubeConfig)
 		if err != nil {
 			return nil, err
 		}
-		k = kube.NewInterfaces(config)
-	} else if p.regArgs.K8S.KubeRestConfig != nil {
-		k = kube.NewInterfaces(p.regArgs.K8S.KubeRestConfig)
-	} else {
-		k, err = newInterfaces(p.regArgs.K8S.KubeConfig)
 	}
-	return
+	return kubernetes.NewForConfig(config)
 }
 
-func (p *Processing) getDeployKubeClient() (k kube.Interfaces, err error) {
-	if p.regArgs.K8S.ApiServerUrlForDeploy != "" {
-		config, err := clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrlForDeploy, "")
-		if err != nil {
-			return nil, err
+func (p *Processing) getKubeSourceSchemas() collection.Schemas {
+	if p.kubeSourceSchemas == nil {
+		builder := collection.NewSchemasBuilder()
+
+		colMap := make(map[string]struct{})
+		for _, col := range p.regArgs.K8SSource.Collections {
+			colMap[col] = struct{}{}
 		}
-		k = kube.NewInterfaces(config)
-	} else if p.regArgs.K8S.KubeRestConfig != nil {
-		k = kube.NewInterfaces(p.regArgs.K8S.KubeRestConfig)
-	} else {
-		k, err = newInterfaces(p.regArgs.K8S.KubeConfig)
+		for _, col := range p.regArgs.Snapshots {
+			colMap[col] = struct{}{}
+		}
+		excludeKindMap := make(map[string]struct{})
+		for _, k := range p.regArgs.K8SSource.ExcludedResourceKinds {
+			excludeKindMap[k] = struct{}{}
+		}
+		for _, col := range p.regArgs.ExcludedResourceKinds {
+			excludeKindMap[col] = struct{}{}
+		}
+		schemaMap := make(map[resource.Schema]struct{})
+		for col := range colMap {
+			var schemas collection.Schemas
+			switch col {
+			case bootstrap.CollectionsAll:
+				schemas = collections.All
+			case bootstrap.CollectionsIstio:
+				schemas = collections.PilotGatewayAPI()
+			case bootstrap.CollectionsLegacyDefault:
+				schemas = collections.LegacyDefault
+			case bootstrap.CollectionsLegacyLocal:
+				schemas = collections.LegacyLocalAnalysis
+			}
+			for _, s := range schemas.All() {
+				if _, ok := excludeKindMap[s.Kind()]; ok {
+					continue
+				}
+				schemaMap[s] = struct{}{}
+			}
+		}
+		for s := range schemaMap {
+			builder.MustAdd(s)
+		}
+		schemas := builder.Build()
+		p.kubeSourceSchemas = &schemas
 	}
-	return
-}
-
-func (p *Processing) createFileKubeSource(schemas collection.Schemas, filePath string, watchFiles bool) (
-	src event.Source, err error,
-) {
-	return fsNew(filePath, schemas, watchFiles)
-}
-
-func (p *Processing) createKubeSource(schemas collection.Schemas) (
-	src event.Source, err error,
-) {
-	o := apiserver.Options{
-		Client:            p.k,
-		WatchedNamespaces: p.regArgs.K8SSource.WatchedNamespaces,
-		ResyncPeriod:      time.Duration(p.regArgs.ResyncPeriod),
-		Schemas:           schemas,
-	}
-	s := apiserver.New(o)
-	src = s
-
-	return
+	return *p.kubeSourceSchemas
 }
 
 // Stop implements process.Component

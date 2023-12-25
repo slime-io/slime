@@ -45,7 +45,7 @@ func (s *McpConfigStore) Update(ns string, gvk resource.GroupVersionKind, name s
 	if config != nil {
 		if config.ResourceVersion == "" { // generate/update resource version for internal(self-gen) configs
 			config.ResourceVersion = tnow
-			config.UpdateAnnotationResourceVersion()
+			mcpmodel.UpdateAnnotationResourceVersion(config)
 		}
 
 		if config.ResourceVersion > s.gvkResourceVersions[gvk] { // should always be true

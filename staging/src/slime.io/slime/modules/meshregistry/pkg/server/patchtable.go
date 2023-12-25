@@ -14,17 +14,17 @@
 
 package server
 
-import (
-	"istio.io/libistio/galley/pkg/config/mesh"
-	"istio.io/libistio/galley/pkg/config/source/kube"
-	"istio.io/libistio/galley/pkg/config/source/kube/fs"
-	"istio.io/libistio/pkg/config/event"
-)
+// import (
+// 	"istio.io/libistio/galley/pkg/config/mesh"
+// 	"istio.io/libistio/galley/pkg/config/source/kube"
+// 	"istio.io/libistio/galley/pkg/config/source/kube/fs"
+// 	"istio.io/libistio/pkg/config/event"
+// )
 
 // The patch table for external dependencies for code in components.
 var (
-	newInterfaces = kube.NewInterfacesFromConfigFile
+// newInterfaces = kube.NewInterfacesFromConfigFile
 
-	meshcfgNewFS = func(path string) (event.Source, error) { return mesh.NewMeshConfigFS(path) }
-	fsNew        = fs.New
+// meshcfgNewFS = func(path string) (event.Source, error) { return mesh.NewMeshConfigFS(path) }
+// fsNew        = fs.New
 )

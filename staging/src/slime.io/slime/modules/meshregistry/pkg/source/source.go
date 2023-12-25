@@ -15,14 +15,21 @@ import (
 )
 
 var (
-	kindServiceEntry = collections.K8SNetworkingIstioIoV1Alpha3Serviceentries.Resource().Kind()
-	kindSidecar      = collections.K8SNetworkingIstioIoV1Alpha3Sidecars.Resource().Kind()
+	kindServiceEntry = collections.ServiceEntry.Kind()
+	kindSidecar      = collections.Sidecar.Kind()
 	IstioRevisionKey = "istio.io/rev"
 
 	log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "source")
+
+	ServiceEntry = collection.Builder{
+		Resource: collections.ServiceEntry,
+	}.MustBuild()
+	Sidecar = collection.Builder{
+		Resource: collections.Sidecar,
+	}.MustBuild()
 )
 
-func GenVersion(sch collection.Schema) resource.Version {
+func GenVersion() resource.Version {
 	return resource.Version(time.Now().String())
 }
 

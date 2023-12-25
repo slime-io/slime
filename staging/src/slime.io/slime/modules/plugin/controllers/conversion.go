@@ -6,27 +6,26 @@
 package controllers
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
-	jsonpatch "github.com/evanphx/json-patch/v5"
-	"slime.io/slime/framework/apis/networking/v1alpha3"
-
 	envoyconfigcorev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
 	envoyextensionswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/gogo/protobuf/types"
-	gogojsonpb "github.com/golang/protobuf/jsonpb"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
-	"github.com/golang/protobuf/ptypes/wrappers"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/types/known/durationpb"
-	istio "istio.io/api/networking/v1alpha3"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
+	istioapi "istio.io/api/networking/v1alpha3"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/plugin/api/v1alpha1"
 )
@@ -55,21 +54,19 @@ const (
 
 // genGatewayInlineCfps is a custom func to handle EnvoyPlugin gateway
 // default is nil, ignore gateway
-var genGatewayInlineCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx istio.EnvoyFilter_PatchContext,
-	p *v1alpha1.Plugin, m *v1alpha1.Inline) []*istio.EnvoyFilter_EnvoyConfigObjectPatch
+var genGatewayInlineCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx istioapi.EnvoyFilter_PatchContext,
+	p *v1alpha1.Plugin, m *v1alpha1.Inline) []*istioapi.EnvoyFilter_EnvoyConfigObjectPatch
 
 type target struct {
 	applyToVh   bool
 	host, route string
 }
 
-var (
-	directPatchingPlugins = []string{
-		util.EnvoyHTTPRateLimit,
-		util.EnvoyHTTPCors,
-		util.EnvoyRatelimitV1, // keep backward compatibility
-	}
-)
+var directPatchingPlugins = []string{
+	util.EnvoyHTTPRateLimit,
+	util.EnvoyHTTPCors,
+	util.EnvoyRatelimitV1, // keep backward compatibility
+}
 
 func directPatching(name string) bool {
 	for _, plugin := range directPatchingPlugins {
@@ -81,51 +78,51 @@ func directPatching(name string) bool {
 }
 
 // translate EnvoyPlugin
-func translatePluginToPatch(name, typeURL string, setting *types.Struct) *istio.EnvoyFilter_Patch {
-	return &istio.EnvoyFilter_Patch{Value: translatePluginToPatchValue(name, typeURL, setting)}
+func translatePluginToPatch(name, typeURL string, setting *structpb.Struct) *istioapi.EnvoyFilter_Patch {
+	return &istioapi.EnvoyFilter_Patch{Value: translatePluginToPatchValue(name, typeURL, setting)}
 }
 
-func stringValueToStruct(strValue *wrappers.StringValue) *types.Struct {
+func stringValueToStruct(strValue *wrapperspb.StringValue) *structpb.Struct {
 	if strValue == nil {
 		return nil
 	}
-	return &types.Struct{
-		Fields: map[string]*types.Value{
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
 			util.StructAnyAtType: {
-				Kind: &types.Value_StringValue{StringValue: util.TypeURLStringValue},
+				Kind: &structpb.Value_StringValue{StringValue: util.TypeURLStringValue},
 			},
 			util.StructAnyValue: {
-				Kind: &types.Value_StringValue{StringValue: strValue.Value},
+				Kind: &structpb.Value_StringValue{StringValue: strValue.Value},
 			},
 		},
 	}
 }
 
-func valueToTypedStructValue(typeURL string, setting *types.Struct) *types.Struct {
-	return &types.Struct{
-		Fields: map[string]*types.Value{
+func valueToTypedStructValue(typeURL string, setting *structpb.Struct) *structpb.Struct {
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
 			util.StructAnyValue: {
-				Kind: &types.Value_StructValue{StructValue: setting},
+				Kind: &structpb.Value_StructValue{StructValue: setting},
 			},
 			util.StructAnyTypeURL: {
-				Kind: &types.Value_StringValue{StringValue: typeURL},
+				Kind: &structpb.Value_StringValue{StringValue: typeURL},
 			},
 			util.StructAnyAtType: {
-				Kind: &types.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
+				Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 			},
 		},
 	}
 }
 
-func translatePluginToPatchValue(name, typeURL string, setting *types.Struct) *types.Struct {
-	return &types.Struct{
-		Fields: map[string]*types.Value{
+func translatePluginToPatchValue(name, typeURL string, setting *structpb.Struct) *structpb.Struct {
+	return &structpb.Struct{
+		Fields: map[string]*structpb.Value{
 			util.StructFilterTypedPerFilterConfig: {
-				Kind: &types.Value_StructValue{
-					StructValue: &types.Struct{
-						Fields: map[string]*types.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: &structpb.Struct{
+						Fields: map[string]*structpb.Value{
 							name: {
-								Kind: &types.Value_StructValue{StructValue: valueToTypedStructValue(typeURL, setting)},
+								Kind: &structpb.Value_StructValue{StructValue: valueToTypedStructValue(typeURL, setting)},
 							},
 						},
 					},
@@ -135,7 +132,7 @@ func translatePluginToPatchValue(name, typeURL string, setting *types.Struct) *t
 	}
 }
 
-func translateRlsAndCorsToDirectPatch(settings *types.Struct, applyToHTTPRoute bool) *istio.EnvoyFilter_Patch {
+func translateRlsAndCorsToDirectPatch(settings *structpb.Struct, applyToHTTPRoute bool) *istioapi.EnvoyFilter_Patch {
 	fieldPatchTo := ""
 	if applyToHTTPRoute {
 		fieldPatchTo = "route"
@@ -143,18 +140,18 @@ func translateRlsAndCorsToDirectPatch(settings *types.Struct, applyToHTTPRoute b
 	return translatePluginToDirectPatch(settings, fieldPatchTo)
 }
 
-func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *istio.EnvoyFilter_Patch {
-	patch := &istio.EnvoyFilter_Patch{}
+func translatePluginToDirectPatch(settings *structpb.Struct, fieldPatchTo string) *istioapi.EnvoyFilter_Patch {
+	patch := &istioapi.EnvoyFilter_Patch{}
 
 	if fieldPatchTo == "ROOT" {
 		fieldPatchTo = ""
 	}
 
 	if fieldPatchTo != "" {
-		patch.Value = &types.Struct{
-			Fields: map[string]*types.Value{
+		patch.Value = &structpb.Struct{
+			Fields: map[string]*structpb.Value{
 				fieldPatchTo: {
-					Kind: &types.Value_StructValue{
+					Kind: &structpb.Value_StructValue{
 						StructValue: settings,
 					},
 				},
@@ -168,11 +165,11 @@ func translatePluginToDirectPatch(settings *types.Struct, fieldPatchTo string) *
 
 func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) translateOutput {
 	in := cr.Spec.DeepCopy()
-	envoyFilter := &istio.EnvoyFilter{}
+	envoyFilter := &istioapi.EnvoyFilter{}
 	proxyVersion := r.Cfg.GetProxyVersion()
 
 	if in.WorkloadSelector != nil {
-		envoyFilter.WorkloadSelector = &istio.WorkloadSelector{
+		envoyFilter.WorkloadSelector = &istioapi.WorkloadSelector{
 			Labels: in.WorkloadSelector.Labels,
 		}
 	}
@@ -216,15 +213,15 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				continue
 			}
 
-			patchCtx := istio.EnvoyFilter_ANY
+			patchCtx := istioapi.EnvoyFilter_ANY
 			if !strings.HasPrefix(t.host, "inbound|") { // keep backward compatibility
 				switch p.ListenerType {
 				case v1alpha1.Plugin_Outbound:
-					patchCtx = istio.EnvoyFilter_SIDECAR_OUTBOUND
+					patchCtx = istioapi.EnvoyFilter_SIDECAR_OUTBOUND
 				case v1alpha1.Plugin_Inbound:
-					patchCtx = istio.EnvoyFilter_SIDECAR_INBOUND
+					patchCtx = istioapi.EnvoyFilter_SIDECAR_INBOUND
 				case v1alpha1.Plugin_Gateway:
-					patchCtx = istio.EnvoyFilter_GATEWAY
+					patchCtx = istioapi.EnvoyFilter_GATEWAY
 				}
 			}
 
@@ -234,7 +231,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 			)
 			switch pluginSettings := p.PluginSettings.(type) {
 			case *v1alpha1.Plugin_Wasm:
-				strValue, err := convertWasmConfigurationToStringValue(pluginSettings.Wasm.Settings)
+				strValue, err := convertWasmConfigurationToStringValue(gogoStructToStruct(pluginSettings.Wasm.Settings))
 				if err != nil {
 					log.Errorf("convert wasm configuration to string value failed, skip plugin build, plugin: %s", p.Name)
 					continue
@@ -245,7 +242,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				//   value: '{}'
 				// ```
 				inline = &v1alpha1.Inline{
-					Settings: wrapStructToStruct("configuration", stringValueToStruct(strValue)),
+					Settings: structToGogoStruct(wrapStructToStruct("configuration", stringValueToStruct(strValue))),
 				}
 				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, p.Name)
 			case *v1alpha1.Plugin_Rider:
@@ -255,10 +252,11 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				//   name: xx
 				// ```
 				inline = &v1alpha1.Inline{
-					Settings: fieldToStruct(
-						"plugins", wrapStructToStructWrapper(
-							"config", pluginSettings.Rider.Settings).AddStringField(
-							"name", p.Name).WrapToListValue()),
+					Settings: structToGogoStruct(
+						fieldToStruct("plugins", wrapStructToStructWrapper(
+							"config", gogoStructToStruct(pluginSettings.Rider.Settings)).AddStringField("name", p.Name).WrapToListValue(),
+						),
+					),
 				}
 				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, getFullRiderPluginName(p.Name))
 			case *v1alpha1.Plugin_Inline:
@@ -277,7 +275,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 					})
 				}
 			} else {
-				if patchCtx == istio.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == istio.EnvoyFilter_GATEWAY {
+				if patchCtx == istioapi.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == istioapi.EnvoyFilter_GATEWAY {
 					// ':*' is appended if port info is not specified in outbound and gateway
 					// it will match all port in same host after istio adapted
 					if len(t.host) > 0 && strings.Index(t.host, ":") == -1 {
@@ -298,44 +296,46 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 	}
 }
 
-func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
-	p *v1alpha1.Plugin, inline *v1alpha1.Inline, proxyVersion string) translateOutputConfigPatch {
+func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
+	p *v1alpha1.Plugin, inline *v1alpha1.Inline, proxyVersion string,
+) translateOutputConfigPatch {
 	var (
-		extraPatch *types.Struct
-		cfp        = &istio.EnvoyFilter_EnvoyConfigObjectPatch{}
+		extraPatch *structpb.Struct
+		cfp        = &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{}
 		applyTo    string
-		match      *types.Struct
+		match      *structpb.Struct
 	)
 
 	if p.Protocol != v1alpha1.Plugin_HTTP {
-		extraPatch = &types.Struct{
-			Fields: map[string]*types.Value{},
+		extraPatch = &structpb.Struct{
+			Fields: map[string]*structpb.Value{},
 		}
 	}
 
 	switch p.Protocol {
 	case v1alpha1.Plugin_HTTP:
-		vhMatch := &istio.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{Name: t.host}
+		vhMatch := &istioapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{Name: t.host}
 		if !t.applyToVh {
-			vhMatch.Route = &istio.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
+			vhMatch.Route = &istioapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
 		}
-		cfp.Match = &istio.EnvoyFilter_EnvoyConfigObjectMatch{
+		cfp.Match = &istioapi.EnvoyFilter_EnvoyConfigObjectMatch{
 			Context: patchCtx,
-			ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-				RouteConfiguration: &istio.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch}},
+			ObjectTypes: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
+				RouteConfiguration: &istioapi.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch},
+			},
 		}
 
 		// only apply to protocol http
 		// dubbo or other support will be considered later
 		if proxyVersion != "" {
-			cfp.Match.Proxy = &istio.EnvoyFilter_ProxyMatch{
+			cfp.Match.Proxy = &istioapi.EnvoyFilter_ProxyMatch{
 				ProxyVersion: proxyVersion,
 			}
 		}
 		if t.applyToVh {
-			cfp.ApplyTo = istio.EnvoyFilter_VIRTUAL_HOST
+			cfp.ApplyTo = istioapi.EnvoyFilter_VIRTUAL_HOST
 		} else {
-			cfp.ApplyTo = istio.EnvoyFilter_HTTP_ROUTE
+			cfp.ApplyTo = istioapi.EnvoyFilter_HTTP_ROUTE
 		}
 	case v1alpha1.Plugin_Dubbo:
 		// dubbo does not support vh-level filter config
@@ -344,7 +344,7 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 		} else {
 			applyTo = applyToDubboRoute
 		}
-		vhMatch := &types.Struct{Fields: map[string]*types.Value{}}
+		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
 		// ```yaml
 		// dubboRouteConfiguration:
 		//   routeConfig:
@@ -356,8 +356,8 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 			addStructField(vhMatch, "name", stringToValue(t.host))
 		}
 		if !t.applyToVh && t.route != "" {
-			addStructField(vhMatch, "route", &types.Value{
-				Kind: &types.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
+			addStructField(vhMatch, "route", &structpb.Value{
+				Kind: &structpb.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
 			})
 		}
 		match = wrapStructToStruct("dubboRouteConfiguration",
@@ -368,7 +368,7 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 		} else {
 			applyTo = appToGenericRoute
 		}
-		vhMatch := &types.Struct{Fields: map[string]*types.Value{}}
+		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
 		// ```yaml
 		// genericProxyRouteConfiguration:
 		//   vhost:
@@ -379,8 +379,8 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 			addStructField(vhMatch, "name", stringToValue(t.host))
 		}
 		if !t.applyToVh && t.route != "" {
-			addStructField(vhMatch, "route", &types.Value{
-				Kind: &types.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
+			addStructField(vhMatch, "route", &structpb.Value{
+				Kind: &structpb.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
 			})
 		}
 		match = wrapStructToStruct("genericProxyRouteConfiguration",
@@ -388,26 +388,26 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 	}
 
 	if p.Protocol != v1alpha1.Plugin_HTTP {
-		extraPatch.Fields["applyTo"] = &types.Value{Kind: &types.Value_StringValue{StringValue: applyTo}}
-		extraPatch.Fields["match"] = &types.Value{Kind: &types.Value_StructValue{StructValue: match}}
+		extraPatch.Fields["applyTo"] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: applyTo}}
+		extraPatch.Fields["match"] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: match}}
 	}
 
 	if directPatching(p.Name) {
-		cfp.Patch = translateRlsAndCorsToDirectPatch(inline.Settings, !t.applyToVh)
+		cfp.Patch = translateRlsAndCorsToDirectPatch(gogoStructToStruct(inline.Settings), !t.applyToVh)
 	} else if inline.DirectPatch {
-		cfp.Patch = translatePluginToDirectPatch(inline.Settings, inline.FieldPatchTo)
+		cfp.Patch = translatePluginToDirectPatch(gogoStructToStruct(inline.Settings), inline.FieldPatchTo)
 	} else {
 		switch p.Protocol {
 		case v1alpha1.Plugin_Generic:
-			cfp.Patch = translateGenericPluginToPatch(p.Name, p.TypeUrl, inline.Settings)
+			cfp.Patch = translateGenericPluginToPatch(p.Name, p.TypeUrl, gogoStructToStruct(inline.Settings))
 		case v1alpha1.Plugin_Dubbo:
 			fallthrough // same with http
 		case v1alpha1.Plugin_HTTP:
-			cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, inline.Settings)
+			cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, gogoStructToStruct(inline.Settings))
 		}
 	}
 
-	cfp.Patch.Operation = istio.EnvoyFilter_Patch_MERGE
+	cfp.Patch.Operation = istioapi.EnvoyFilter_Patch_MERGE
 	return translateOutputConfigPatch{
 		envoyPatch: cfp,
 		extraPatch: extraPatch,
@@ -415,7 +415,7 @@ func generateInlineCfp(t target, patchCtx istio.EnvoyFilter_PatchContext,
 	}
 }
 
-func translateGenericPluginToPatch(name string, typeUrl string, settings *types.Struct) *istio.EnvoyFilter_Patch {
+func translateGenericPluginToPatch(name string, typeUrl string, settings *structpb.Struct) *istioapi.EnvoyFilter_Patch {
 	// onMatch:
 	//  action:
 	//    typedConfig:
@@ -424,7 +424,7 @@ func translateGenericPluginToPatch(name string, typeUrl string, settings *types.
 	//        envoy.filters.http.lua:
 	//          inlineCode: |
 	//            function envoy_on_request(request_handle)
-	return &istio.EnvoyFilter_Patch{
+	return &istioapi.EnvoyFilter_Patch{
 		Value: wrapStructToStruct(
 			"onMatch", wrapStructToStruct(
 				"action", wrapStructToStruct(
@@ -437,29 +437,25 @@ func translateGenericPluginToPatch(name string, typeUrl string, settings *types.
 }
 
 type translateOutputConfigPatch struct {
-	envoyPatch *istio.EnvoyFilter_EnvoyConfigObjectPatch
-	extraPatch *types.Struct
+	envoyPatch *istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+	extraPatch *structpb.Struct
 	plugin     *v1alpha1.Plugin
 }
 
 type translateOutput struct {
-	envoyFilter   *istio.EnvoyFilter
+	envoyFilter   *istioapi.EnvoyFilter
 	configPatches []translateOutputConfigPatch
 }
 
-func translateOutputToEnvoyFilterWrapper(out translateOutput) (*v1alpha3.EnvoyFilter, error) {
+func translateOutputToEnvoyFilterWrapper(out translateOutput) (*networkingv1alpha3.EnvoyFilter, error) {
 	if out.envoyFilter == nil {
 		return nil, nil
 	}
-	envoyFilterWrapper := &v1alpha3.EnvoyFilter{}
-
-	m, err := util.ProtoToMap(out.envoyFilter)
-	if err != nil {
-		return nil, err
-	}
+	envoyFilterWrapper := &networkingv1alpha3.EnvoyFilter{}
+	envoyFilterWrapper.Spec = *out.envoyFilter
 
 	if len(out.configPatches) > 0 {
-		var appliedPatches []interface{}
+		var appliedPatches []*istioapi.EnvoyFilter_EnvoyConfigObjectPatch
 		for _, configPatch := range out.configPatches {
 			v, err := applyRawPatch(configPatch)
 			if err != nil {
@@ -467,48 +463,43 @@ func translateOutputToEnvoyFilterWrapper(out translateOutput) (*v1alpha3.EnvoyFi
 			}
 			appliedPatches = append(appliedPatches, v)
 		}
-
-		m["configPatches"] = appliedPatches
+		envoyFilterWrapper.Spec.ConfigPatches = appliedPatches
 	}
-
-	envoyFilterWrapper.Spec = m
 	return envoyFilterWrapper, nil
 }
 
-func applyRawPatch(outputPatch translateOutputConfigPatch) (interface{}, error) {
-	m := &gogojsonpb.Marshaler{}
-	var buf bytes.Buffer
-	if err := m.Marshal(&buf, outputPatch.envoyPatch); err != nil {
+func applyRawPatch(outputPatch translateOutputConfigPatch) (*istioapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+	envoyPatchBytes, err := protojson.Marshal(outputPatch.envoyPatch)
+	if err != nil {
 		return nil, err
 	}
-	envoyPatchBytes := buf.Bytes()
 
-	var rawPatches []*types.Struct
+	var rawPatches []*structpb.Struct
 	if outputPatch.extraPatch != nil {
 		rawPatches = append(rawPatches, outputPatch.extraPatch)
 	}
 	if rawPatch := outputPatch.plugin.GetRawPatch(); rawPatch != nil {
-		rawPatches = append(rawPatches, rawPatch)
+		rawPatches = append(rawPatches, gogoStructToStruct(rawPatch))
 	}
 
 	for _, rawPatch := range rawPatches {
-		var rawPatchBuf bytes.Buffer
-		if err := m.Marshal(&rawPatchBuf, rawPatch); err != nil {
+		rawPatchBytes, err := protojson.Marshal(rawPatch)
+		if err != nil {
 			return nil, err
 		}
 
-		bs, err := jsonpatch.MergePatch(envoyPatchBytes, rawPatchBuf.Bytes())
+		bs, err := jsonpatch.MergePatch(envoyPatchBytes, rawPatchBytes)
 		if err != nil {
 			return nil, nil
 		}
 		envoyPatchBytes = bs
 	}
 
-	var ret interface{}
-	if err := json.Unmarshal(envoyPatchBytes, &ret); err != nil {
+	var ret istioapi.EnvoyFilter_EnvoyConfigObjectPatch
+	if err := protojson.Unmarshal(envoyPatchBytes, &ret); err != nil {
 		return nil, err
 	}
-	return ret, nil
+	return &ret, nil
 }
 
 func (r *PluginManagerReconciler) isKnownProtocol(in *v1alpha1.Plugin) bool {
@@ -523,16 +514,16 @@ func (r *PluginManagerReconciler) isKnownProtocol(in *v1alpha1.Plugin) bool {
 // translate PluginManager
 func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec) translateOutput {
 	var (
-		envoyFilter   = &istio.EnvoyFilter{}
+		envoyFilter   = &istioapi.EnvoyFilter{}
 		configPatches []translateOutputConfigPatch
 	)
-	envoyFilter.WorkloadSelector = &istio.WorkloadSelector{
+	envoyFilter.WorkloadSelector = &istioapi.WorkloadSelector{
 		Labels: in.WorkloadLabels,
 	}
 
 	envoyFilter.Priority = in.Priority
 
-	envoyFilter.ConfigPatches = make([]*istio.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	envoyFilter.ConfigPatches = make([]*istioapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	for _, p := range in.Plugin {
 		if !p.Enable {
 			continue
@@ -600,11 +591,11 @@ func getConfigDiscoveryFilterFullName(ns, name string) string {
 }
 
 func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, in *v1alpha1.Plugin) ([]translateOutputConfigPatch, error) {
-	listener := &istio.EnvoyFilter_ListenerMatch{
-		FilterChain: &istio.EnvoyFilter_ListenerMatch_FilterChainMatch{
-			Filter: &istio.EnvoyFilter_ListenerMatch_FilterMatch{
+	listener := &istioapi.EnvoyFilter_ListenerMatch{
+		FilterChain: &istioapi.EnvoyFilter_ListenerMatch_FilterChainMatch{
+			Filter: &istioapi.EnvoyFilter_ListenerMatch_FilterMatch{
 				Name: r.getListenerFilterName(in),
-				SubFilter: &istio.EnvoyFilter_ListenerMatch_SubFilterMatch{
+				SubFilter: &istioapi.EnvoyFilter_ListenerMatch_SubFilterMatch{
 					Name: r.getSubFilterName(in),
 				},
 			},
@@ -615,44 +606,44 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		listener.PortNumber = in.Port
 	}
 
-	defaultApplyTo := istio.EnvoyFilter_HTTP_FILTER
-	out := &istio.EnvoyFilter_EnvoyConfigObjectPatch{
+	defaultApplyTo := istioapi.EnvoyFilter_HTTP_FILTER
+	out := &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: defaultApplyTo,
-		Match: &istio.EnvoyFilter_EnvoyConfigObjectMatch{
-			ObjectTypes: &istio.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
+		Match: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch{
+			ObjectTypes: &istioapi.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
 				Listener: listener,
 			},
 		},
-		Patch: &istio.EnvoyFilter_Patch{
-			Operation: istio.EnvoyFilter_Patch_INSERT_BEFORE,
-			Value: &types.Struct{
-				Fields: map[string]*types.Value{},
+		Patch: &istioapi.EnvoyFilter_Patch{
+			Operation: istioapi.EnvoyFilter_Patch_INSERT_BEFORE,
+			Value: &structpb.Struct{
+				Fields: map[string]*structpb.Value{},
 			},
 		},
 	}
 
 	// if proxyVersion is set, apply specified proxyVersion
 	if proxyVersion := r.cfg.GetProxyVersion(); proxyVersion != "" {
-		out.Match.Proxy = &istio.EnvoyFilter_ProxyMatch{
+		out.Match.Proxy = &istioapi.EnvoyFilter_ProxyMatch{
 			ProxyVersion: proxyVersion,
 		}
 	}
 
 	if in.DisableOnFilterLevel {
-		out.Patch.Value.Fields[util.StructFilterDisabled] = &types.Value{
-			Kind: &types.Value_BoolValue{BoolValue: true},
+		out.Patch.Value.Fields[util.StructFilterDisabled] = &structpb.Value{
+			Kind: &structpb.Value_BoolValue{BoolValue: true},
 		}
 	}
 
-	var extraPatch *types.Struct
+	var extraPatch *structpb.Struct
 	if applyTo := r.getApplyTo(in); applyTo != defaultApplyTo.String() {
 		if extraPatch == nil {
-			extraPatch = &types.Struct{
-				Fields: map[string]*types.Value{},
+			extraPatch = &structpb.Struct{
+				Fields: map[string]*structpb.Value{},
 			}
 		}
-		extraPatch.Fields["applyTo"] = &types.Value{
-			Kind: &types.Value_StringValue{
+		extraPatch.Fields["applyTo"] = &structpb.Value{
+			Kind: &structpb.Value_StringValue{
 				StringValue: applyTo,
 			},
 		}
@@ -662,11 +653,11 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	switch in.ListenerType {
 	case v1alpha1.Plugin_Outbound:
-		out.Match.Context = istio.EnvoyFilter_SIDECAR_OUTBOUND
+		out.Match.Context = istioapi.EnvoyFilter_SIDECAR_OUTBOUND
 	case v1alpha1.Plugin_Inbound:
-		out.Match.Context = istio.EnvoyFilter_SIDECAR_INBOUND
+		out.Match.Context = istioapi.EnvoyFilter_SIDECAR_INBOUND
 	case v1alpha1.Plugin_Gateway:
-		out.Match.Context = istio.EnvoyFilter_GATEWAY
+		out.Match.Context = istioapi.EnvoyFilter_GATEWAY
 	}
 
 	if in.PluginSettings == nil {
@@ -678,7 +669,8 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	applyConfigDiscoveryPlugin := func(
 		resourceName, pluginTypeURL string,
-		converter func(name string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error)) error {
+		converter func(name string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error),
+	) error {
 		fullResourceName := getConfigDiscoveryFilterFullName(meta.Namespace, resourceName)
 		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, r.getConfigDiscoveryDefaultConfig(pluginTypeURL), out.Patch.Value); err != nil {
 			return err
@@ -694,12 +686,12 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error) {
+		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error) {
 			wasmFilterConfig, err := r.convertWasmFilterConfig(resourceName, meta, in)
 			if err != nil {
 				return nil, err
 			}
-			return util.MessageToGogoStruct(wasmFilterConfig)
+			return util.MessageToStruct(wasmFilterConfig)
 		}); err != nil {
 			return nil, err
 		}
@@ -716,34 +708,34 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 	return ret, nil
 }
 
-func toTypedConfig(atType, typeURL string, value *types.Struct) *types.Struct {
+func toTypedConfig(atType, typeURL string, value *structpb.Struct) *structpb.Struct {
 	if typeURL != "" {
 		return util.ToTypedStruct(typeURL, value)
 	}
-	value.Fields[util.StructAnyAtType] = &types.Value{Kind: &types.Value_StringValue{StringValue: atType}}
+	value.Fields[util.StructAnyAtType] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: atType}}
 	return value
 }
 
-func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settings *v1alpha1.Plugin_Inline, out *types.Struct) error {
-	out.Fields[util.StructHttpFilterName] = &types.Value{
-		Kind: &types.Value_StringValue{
+func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settings *v1alpha1.Plugin_Inline, out *structpb.Struct) error {
+	out.Fields[util.StructHttpFilterName] = &structpb.Value{
+		Kind: &structpb.Value_StringValue{
 			StringValue: name,
 		},
 	}
 
 	if settings != nil {
-		out.Fields[util.StructHttpFilterTypedConfig] = &types.Value{
-			Kind: &types.Value_StructValue{
-				StructValue: &types.Struct{
-					Fields: map[string]*types.Value{
+		out.Fields[util.StructHttpFilterTypedConfig] = &structpb.Value{
+			Kind: &structpb.Value_StructValue{
+				StructValue: &structpb.Struct{
+					Fields: map[string]*structpb.Value{
 						util.StructAnyTypeURL: {
-							Kind: &types.Value_StringValue{StringValue: typeURL},
+							Kind: &structpb.Value_StringValue{StringValue: typeURL},
 						},
 						util.StructAnyAtType: {
-							Kind: &types.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
+							Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 						},
 						util.StructAnyValue: {
-							Kind: &types.Value_StructValue{StructValue: settings.Inline.Settings},
+							Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(settings.Inline.Settings)},
 						},
 					},
 				},
@@ -754,42 +746,42 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 	return nil
 }
 
-func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, defaultConfig *types.Struct, out *types.Struct) error {
-	out.Fields[util.StructHttpFilterName] = &types.Value{
-		Kind: &types.Value_StringValue{
+func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, defaultConfig *structpb.Struct, out *structpb.Struct) error {
+	out.Fields[util.StructHttpFilterName] = &structpb.Value{
+		Kind: &structpb.Value_StringValue{
 			StringValue: filterName,
 		},
 	}
 
-	configDiscoveryFields := map[string]*types.Value{
-		util.StructHttpFilterConfigSource: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{
-			util.StructHttpFilterAds: {Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: map[string]*types.Value{}}}},
+	configDiscoveryFields := map[string]*structpb.Value{
+		util.StructHttpFilterConfigSource: {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{
+			util.StructHttpFilterAds: {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{}}}},
 		}}}},
-		util.StructHttpFilterTypeURLs: {Kind: &types.Value_ListValue{ListValue: &types.ListValue{Values: []*types.Value{
-			{Kind: &types.Value_StringValue{StringValue: typeURL}},
+		util.StructHttpFilterTypeURLs: {Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{Values: []*structpb.Value{
+			{Kind: &structpb.Value_StringValue{StringValue: typeURL}},
 		}}}},
 	}
 	if defaultConfig != nil {
-		configDiscoveryFields[util.StructHttpFilterDefaultConfig] = &types.Value{
-			Kind: &types.Value_StructValue{StructValue: defaultConfig},
+		configDiscoveryFields[util.StructHttpFilterDefaultConfig] = &structpb.Value{
+			Kind: &structpb.Value_StructValue{StructValue: defaultConfig},
 		}
 	}
-	out.Fields[util.StructHttpFilterConfigDiscovery] = &types.Value{
-		Kind: &types.Value_StructValue{StructValue: &types.Struct{Fields: configDiscoveryFields}},
+	out.Fields[util.StructHttpFilterConfigDiscovery] = &structpb.Value{
+		Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: configDiscoveryFields}},
 	}
 
 	return nil
 }
 
-func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, value *types.Struct, p *v1alpha1.Plugin, target *[]translateOutputConfigPatch) error {
-	out := &istio.EnvoyFilter_EnvoyConfigObjectPatch{
-		ApplyTo: istio.EnvoyFilter_EXTENSION_CONFIG,
-		Patch: &istio.EnvoyFilter_Patch{
-			Operation: istio.EnvoyFilter_Patch_ADD,
-			Value: &types.Struct{
-				Fields: map[string]*types.Value{
-					util.StructHttpFilterName:        {Kind: &types.Value_StringValue{StringValue: filterName}},
-					util.StructHttpFilterTypedConfig: {Kind: &types.Value_StructValue{StructValue: value}},
+func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, value *structpb.Struct, p *v1alpha1.Plugin, target *[]translateOutputConfigPatch) error {
+	out := &istioapi.EnvoyFilter_EnvoyConfigObjectPatch{
+		ApplyTo: istioapi.EnvoyFilter_EXTENSION_CONFIG,
+		Patch: &istioapi.EnvoyFilter_Patch{
+			Operation: istioapi.EnvoyFilter_Patch_ADD,
+			Value: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					util.StructHttpFilterName:        {Kind: &structpb.Value_StringValue{StringValue: filterName}},
+					util.StructHttpFilterTypedConfig: {Kind: &structpb.Value_StructValue{StructValue: value}},
 				},
 			},
 		},
@@ -836,7 +828,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 		},
 	}
 
-	wasmConfigStrValue, err := convertWasmConfigurationToStringValue(pluginWasm.Wasm.Settings)
+	wasmConfigStrValue, err := convertWasmConfigurationToStringValue(gogoStructToStruct(pluginWasm.Wasm.Settings))
 	if err != nil {
 		return nil, err
 	}
@@ -853,12 +845,12 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 	return &envoyextensionsfilterswasmv3.Wasm{Config: pluginConfig}, nil
 }
 
-func convertWasmConfigurationToStringValue(pluginSettings *types.Struct) (*wrappers.StringValue, error) {
+func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wrapperspb.StringValue, error) {
 	if pluginSettings == nil { // use empty struct json string as wasm does not allow nil `configuration`
-		pluginSettings = &types.Struct{
-			Fields: map[string]*types.Value{
+		pluginSettings = &structpb.Struct{
+			Fields: map[string]*structpb.Value{
 				"_string": {
-					Kind: &types.Value_StringValue{
+					Kind: &structpb.Value_StringValue{
 						StringValue: "{}",
 					},
 				},
@@ -868,21 +860,21 @@ func convertWasmConfigurationToStringValue(pluginSettings *types.Struct) (*wrapp
 
 	// string类型的配置解析为 google.protobuf.StringValue
 	if strField := pluginSettings.Fields["_string"]; strField != nil && len(pluginSettings.Fields) == 1 {
-		if _, ok := strField.Kind.(*types.Value_StringValue); ok {
+		if _, ok := strField.Kind.(*structpb.Value_StringValue); ok {
 			// != Value_StringValue
-			return &wrappers.StringValue{Value: strField.GetStringValue()}, nil
+			return &wrapperspb.StringValue{Value: strField.GetStringValue()}, nil
 		}
 	}
 
 	// to json string to align with istio behaviour
-	if s, err := (&gogojsonpb.Marshaler{OrigName: true}).MarshalToString(pluginSettings); err != nil {
+	if settingsBytes, err := protojson.Marshal(pluginSettings); err != nil {
 		return nil, err
 	} else {
-		return &wrappers.StringValue{Value: s}, nil
+		return &wrapperspb.StringValue{Value: string(settingsBytes)}, nil
 	}
 }
 
-func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*types.Struct, error) {
+func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error) {
 	var (
 		pluginRider            = in.PluginSettings.(*v1alpha1.Plugin_Rider)
 		imagePullSecretContent string
@@ -902,48 +894,48 @@ func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, 
 		}
 	}
 
-	datasourceStruct, err := util.MessageToGogoStruct(datasource)
+	datasourceStruct, err := util.MessageToStruct(datasource)
 	if err != nil {
 		return nil, err
 	}
 
-	riderPluginConfig := &types.Struct{Fields: map[string]*types.Value{
-		"name": {Kind: &types.Value_StringValue{StringValue: pluginRider.Rider.PluginName}},
-		"vm_config": {Kind: &types.Value_StructValue{StructValue: &types.Struct{
-			Fields: map[string]*types.Value{
-				"package_path": {Kind: &types.Value_StringValue{StringValue: riderPackagePath}},
+	riderPluginConfig := &structpb.Struct{Fields: map[string]*structpb.Value{
+		"name": {Kind: &structpb.Value_StringValue{StringValue: pluginRider.Rider.PluginName}},
+		"vm_config": {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{
+			Fields: map[string]*structpb.Value{
+				"package_path": {Kind: &structpb.Value_StringValue{StringValue: riderPackagePath}},
 			},
 		}}},
-		"code": {Kind: &types.Value_StructValue{StructValue: datasourceStruct}},
+		"code": {Kind: &structpb.Value_StructValue{StructValue: datasourceStruct}},
 	}}
-	riderFilterConfig := &types.Struct{
-		Fields: map[string]*types.Value{
-			"plugin": {Kind: &types.Value_StructValue{StructValue: riderPluginConfig}},
+	riderFilterConfig := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			"plugin": {Kind: &structpb.Value_StructValue{StructValue: riderPluginConfig}},
 		},
 	}
 
 	config := pluginRider.Rider.Settings
-	ensureEnv := func() *types.Struct {
+	ensureEnv := func() *structpb.Struct {
 		if config.GetFields() == nil {
-			config = &types.Struct{Fields: map[string]*types.Value{}}
+			config = structToGogoStruct(&structpb.Struct{Fields: map[string]*structpb.Value{}})
 		}
 
 		envSt := config.Fields[RiderEnvKey].GetStructValue()
 		if envSt == nil {
-			envSt = &types.Struct{Fields: map[string]*types.Value{}}
-			config.Fields[RiderEnvKey] = &types.Value{Kind: &types.Value_StructValue{StructValue: envSt}}
+			envSt = structToGogoStruct(&structpb.Struct{Fields: map[string]*structpb.Value{}})
+			config.Fields[RiderEnvKey] = structValueToGogoStructValue(&structpb.Value{Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(envSt)}})
 		}
 		if envSt.Fields == nil {
-			envSt.Fields = map[string]*types.Value{}
+			envSt.Fields = make(map[string]*types.Value)
 		}
-		return envSt
+		return gogoStructToStruct(envSt)
 	}
 	if imagePullSecretContent != "" {
-		ensureEnv().Fields[WasmSecretEnv] = &types.Value{Kind: &types.Value_StringValue{StringValue: imagePullSecretContent}}
+		ensureEnv().Fields[WasmSecretEnv] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: imagePullSecretContent}}
 	}
 
 	if config != nil {
-		riderPluginConfig.Fields["config"] = &types.Value{Kind: &types.Value_StructValue{StructValue: config}}
+		riderPluginConfig.Fields["config"] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(config)}}
 	}
 
 	return riderFilterConfig, nil

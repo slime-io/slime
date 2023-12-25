@@ -12,11 +12,17 @@ use (
 )
 
 replace (
-	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.0
-	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/common => github.com/prometheus/common v0.44.0
-	istio.io/api => istio.io/api v0.0.0-20211206163441-1a632586cbd4
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20230425025011-b36fb1902b29
+	// slime lib
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac
+	istio.io/libistio => github.com/believening/slime-libistio v0.0.0-20231225064106-f5308b7d8080
+	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20231205121800-d3e53bc03897
+	slime.io/pkg => github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7
+
+	// istio and envoy lib
+	istio.io/api => istio.io/api v1.19.1
+	istio.io/client-go => istio.io/client-go v1.19.1
+	golang.org/x/exp => golang.org/x/exp v0.0.0-20230713183714-613f0c0eb8a1 // adapted from istio.io/istio 1.19.1
+	github.com/envoyproxy/go-control-plane => github.com/envoyproxy/go-control-plane v0.11.2-0.20230725211550-11bfe846bcd4
 
 	// k8s lib
 	k8s.io/api => k8s.io/api v0.26.0
@@ -28,4 +34,7 @@ replace (
 	k8s.io/kubectl => k8s.io/kubectl v0.26.0
 	sigs.k8s.io/controller-runtime => sigs.k8s.io/controller-runtime v0.14.0
 
+	// monitoring lib
+	github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.16.0
+	github.com/prometheus/common => github.com/prometheus/common v0.44.0
 )

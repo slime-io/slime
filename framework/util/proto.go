@@ -5,33 +5,32 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"reflect"
+
 	"github.com/ghodss/yaml"
 	gogojsonpb "github.com/gogo/protobuf/jsonpb"
 	gogoproto "github.com/gogo/protobuf/proto"
 	gogotypes "github.com/gogo/protobuf/types"
 	"github.com/golang/protobuf/jsonpb"
 	"github.com/hashicorp/go-multierror"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/structpb"
 	yaml2 "gopkg.in/yaml.v2"
-	"io"
-	"reflect"
 )
 
-// MessageToStruct
-// Deprecated
-// WARN:
-// the callers which use this func to convert envoy api to gogo struct should mirgate to MessageToGogoStruct and do test
-func MessageToStruct(msg gogoproto.Message) (*gogotypes.Struct, error) {
+// MessageToStruct converts golang proto msg to struct
+func MessageToStruct(msg proto.Message) (*structpb.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
 	}
-
-	buf := &bytes.Buffer{}
-	if err := (&gogojsonpb.Marshaler{OrigName: true}).Marshal(buf, msg); err != nil {
+	bs, err := protojson.Marshal(msg)
+	if err != nil {
 		return nil, err
 	}
-
-	pbs := &gogotypes.Struct{}
-	if err := gogojsonpb.Unmarshal(buf, pbs); err != nil {
+	pbs := &structpb.Struct{}
+	if err := protojson.Unmarshal(bs, pbs); err != nil {
 		return nil, err
 	}
 	return pbs, nil
@@ -143,10 +142,10 @@ func StructToMessage(pbst *gogotypes.Struct, out gogoproto.Message) error {
 	return gogojsonpb.Unmarshal(buf, out)
 }
 
-func ToTypedStruct(typeURL string, value *gogotypes.Struct) *gogotypes.Struct {
-	return &gogotypes.Struct{Fields: map[string]*gogotypes.Value{
-		StructAnyAtType:  {Kind: &gogotypes.Value_StringValue{StringValue: TypeURLUDPATypedStruct}},
-		StructAnyTypeURL: {Kind: &gogotypes.Value_StringValue{StringValue: typeURL}},
-		StructAnyValue:   {Kind: &gogotypes.Value_StructValue{StructValue: value}},
+func ToTypedStruct(typeURL string, value *structpb.Struct) *structpb.Struct {
+	return &structpb.Struct{Fields: map[string]*structpb.Value{
+		StructAnyAtType:  {Kind: &structpb.Value_StringValue{StringValue: TypeURLUDPATypedStruct}},
+		StructAnyTypeURL: {Kind: &structpb.Value_StringValue{StringValue: typeURL}},
+		StructAnyValue:   {Kind: &structpb.Value_StructValue{StructValue: value}},
 	}}
 }

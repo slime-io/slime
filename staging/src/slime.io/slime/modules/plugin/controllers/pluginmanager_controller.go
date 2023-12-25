@@ -18,10 +18,10 @@ package controllers
 
 import (
 	"context"
-	structpb "github.com/gogo/protobuf/types"
-	"slime.io/slime/modules/plugin/api/config"
 	"sync"
 
+	"google.golang.org/protobuf/types/known/structpb"
+	"istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -31,10 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"slime.io/slime/framework/apis/networking/v1alpha3"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/framework/util"
+	"slime.io/slime/modules/plugin/api/config"
 	"slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
@@ -276,7 +276,7 @@ func (r *PluginManagerReconciler) OnStartLeading(ctx context.Context) {
 
 func (r *PluginManagerReconciler) getConfigDiscoveryDefaultConfig(url string) *structpb.Struct {
 	defaultConfig := r.cfg.ConfigDiscoveryDefaultConfig[url]
-	return defaultConfig
+	return gogoStructToStruct(defaultConfig)
 }
 
 func getPluginManagerWatchSecrets(ns string, in *v1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {
