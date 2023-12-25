@@ -6,7 +6,6 @@
 syntax = "proto3";
 package slime.microservice.limiter.config;
 
-import "github.com/gogo/protobuf/gogoproto/gogo.proto";
 import "google/protobuf/duration.proto";
 
 option go_package = "slime.io/slime/modules/limiter/api/config";
@@ -17,7 +16,7 @@ message Limiter {
     envoyLocalRateLimit = 1;
   }
   RateLimitBackend backend = 3;
-  google.protobuf.Duration refresh = 4 [(gogoproto.stdduration) = true];
+  google.protobuf.Duration refresh = 4;
   // it will disable GlobalRateLimit
   bool disableGlobalRateLimit = 5;
   // it will disable use promql

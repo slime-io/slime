@@ -15,7 +15,6 @@ import (
 	envoyextensionsfilterswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/wasm/v3"
 	envoyextensionswasmv3 "github.com/envoyproxy/go-control-plane/envoy/extensions/wasm/v3"
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	"github.com/gogo/protobuf/types"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -231,7 +230,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 			)
 			switch pluginSettings := p.PluginSettings.(type) {
 			case *v1alpha1.Plugin_Wasm:
-				strValue, err := convertWasmConfigurationToStringValue(gogoStructToStruct(pluginSettings.Wasm.Settings))
+				strValue, err := convertWasmConfigurationToStringValue(pluginSettings.Wasm.Settings)
 				if err != nil {
 					log.Errorf("convert wasm configuration to string value failed, skip plugin build, plugin: %s", p.Name)
 					continue
@@ -242,7 +241,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				//   value: '{}'
 				// ```
 				inline = &v1alpha1.Inline{
-					Settings: structToGogoStruct(wrapStructToStruct("configuration", stringValueToStruct(strValue))),
+					Settings: wrapStructToStruct("configuration", stringValueToStruct(strValue)),
 				}
 				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, p.Name)
 			case *v1alpha1.Plugin_Rider:
@@ -252,10 +251,9 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				//   name: xx
 				// ```
 				inline = &v1alpha1.Inline{
-					Settings: structToGogoStruct(
-						fieldToStruct("plugins", wrapStructToStructWrapper(
-							"config", gogoStructToStruct(pluginSettings.Rider.Settings)).AddStringField("name", p.Name).WrapToListValue(),
-						),
+					Settings: fieldToStruct("plugins",
+						wrapStructToStructWrapper("config", pluginSettings.Rider.Settings).
+							AddStringField("name", p.Name).WrapToListValue(),
 					),
 				}
 				pluginInUse.Name = getConfigDiscoveryFilterFullName(cr.Namespace, getFullRiderPluginName(p.Name))
@@ -393,17 +391,17 @@ func generateInlineCfp(t target, patchCtx istioapi.EnvoyFilter_PatchContext,
 	}
 
 	if directPatching(p.Name) {
-		cfp.Patch = translateRlsAndCorsToDirectPatch(gogoStructToStruct(inline.Settings), !t.applyToVh)
+		cfp.Patch = translateRlsAndCorsToDirectPatch(inline.Settings, !t.applyToVh)
 	} else if inline.DirectPatch {
-		cfp.Patch = translatePluginToDirectPatch(gogoStructToStruct(inline.Settings), inline.FieldPatchTo)
+		cfp.Patch = translatePluginToDirectPatch(inline.Settings, inline.FieldPatchTo)
 	} else {
 		switch p.Protocol {
 		case v1alpha1.Plugin_Generic:
-			cfp.Patch = translateGenericPluginToPatch(p.Name, p.TypeUrl, gogoStructToStruct(inline.Settings))
+			cfp.Patch = translateGenericPluginToPatch(p.Name, p.TypeUrl, inline.Settings)
 		case v1alpha1.Plugin_Dubbo:
 			fallthrough // same with http
 		case v1alpha1.Plugin_HTTP:
-			cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, gogoStructToStruct(inline.Settings))
+			cfp.Patch = translatePluginToPatch(p.Name, p.TypeUrl, inline.Settings)
 		}
 	}
 
@@ -479,7 +477,7 @@ func applyRawPatch(outputPatch translateOutputConfigPatch) (*istioapi.EnvoyFilte
 		rawPatches = append(rawPatches, outputPatch.extraPatch)
 	}
 	if rawPatch := outputPatch.plugin.GetRawPatch(); rawPatch != nil {
-		rawPatches = append(rawPatches, gogoStructToStruct(rawPatch))
+		rawPatches = append(rawPatches, rawPatch)
 	}
 
 	for _, rawPatch := range rawPatches {
@@ -735,7 +733,7 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 							Kind: &structpb.Value_StringValue{StringValue: util.TypeURLUDPATypedStruct},
 						},
 						util.StructAnyValue: {
-							Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(settings.Inline.Settings)},
+							Kind: &structpb.Value_StructValue{StructValue: settings.Inline.Settings},
 						},
 					},
 				},
@@ -828,7 +826,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 		},
 	}
 
-	wasmConfigStrValue, err := convertWasmConfigurationToStringValue(gogoStructToStruct(pluginWasm.Wasm.Settings))
+	wasmConfigStrValue, err := convertWasmConfigurationToStringValue(pluginWasm.Wasm.Settings)
 	if err != nil {
 		return nil, err
 	}
@@ -917,25 +915,25 @@ func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, 
 	config := pluginRider.Rider.Settings
 	ensureEnv := func() *structpb.Struct {
 		if config.GetFields() == nil {
-			config = structToGogoStruct(&structpb.Struct{Fields: map[string]*structpb.Value{}})
+			config = &structpb.Struct{Fields: map[string]*structpb.Value{}}
 		}
 
 		envSt := config.Fields[RiderEnvKey].GetStructValue()
 		if envSt == nil {
-			envSt = structToGogoStruct(&structpb.Struct{Fields: map[string]*structpb.Value{}})
-			config.Fields[RiderEnvKey] = structValueToGogoStructValue(&structpb.Value{Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(envSt)}})
+			envSt = &structpb.Struct{Fields: map[string]*structpb.Value{}}
+			config.Fields[RiderEnvKey] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: envSt}}
 		}
 		if envSt.Fields == nil {
-			envSt.Fields = make(map[string]*types.Value)
+			envSt.Fields = map[string]*structpb.Value{}
 		}
-		return gogoStructToStruct(envSt)
+		return envSt
 	}
 	if imagePullSecretContent != "" {
 		ensureEnv().Fields[WasmSecretEnv] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: imagePullSecretContent}}
 	}
 
 	if config != nil {
-		riderPluginConfig.Fields["config"] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: gogoStructToStruct(config)}}
+		riderPluginConfig.Fields["config"] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: config}}
 	}
 
 	return riderFilterConfig, nil
