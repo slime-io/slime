@@ -276,7 +276,7 @@ func (r *PluginManagerReconciler) OnStartLeading(ctx context.Context) {
 
 func (r *PluginManagerReconciler) getConfigDiscoveryDefaultConfig(url string) *structpb.Struct {
 	defaultConfig := r.cfg.ConfigDiscoveryDefaultConfig[url]
-	return gogoStructToStruct(defaultConfig)
+	return defaultConfig
 }
 
 func getPluginManagerWatchSecrets(ns string, in *v1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {

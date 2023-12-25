@@ -2,11 +2,12 @@ FROM golang:1.20.0-bullseye
 
 WORKDIR /workspaces
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    lsb-release \
-    software-properties-common \
-    jq \
-    unzip && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        lsb-release \
+        software-properties-common \
+        jq \
+        unzip && \
     apt-get clean
 
 # install docker
@@ -23,25 +24,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # version of toolchains
 ENV CONTROLLER_GEN_VERSION=v0.11.0
-ENV ISTIO_TOOLS_VERSION=1.12.0
-ENV GOGO_PROTOBUF_VERSION=1.3.2
+ENV ISTIO_TOOLS_VERSION=1.19.1
+ENV GOLANG_PROTOBUF_VERSION=v1.31.0
 ENV PROTOC_VERSION=3.20.1
 ENV K8S_API_VERSION=0.26.0
 
-# install controller-gen
-RUN go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION}
-
-# install istio code-generator
-RUN go install istio.io/tools/cmd/protoc-gen-jsonshim@${ISTIO_TOOLS_VERSION} && \
-    go install istio.io/tools/cmd/protoc-gen-deepcopy@${ISTIO_TOOLS_VERSION}
-
-# install gogo protobuf
-RUN go install github.com/gogo/protobuf/protoc-gen-gogo@v${GOGO_PROTOBUF_VERSION} && \
-    curl -LO https://github.com/gogo/protobuf/archive/refs/tags/v${GOGO_PROTOBUF_VERSION}.zip && \
-    mkdir -p ${GOPATH}/src/github.com/gogo && \
-    unzip v${GOGO_PROTOBUF_VERSION}.zip -d ${GOPATH}/src/github.com/gogo && \
-    mv ${GOPATH}/src/github.com/gogo/protobuf-${GOGO_PROTOBUF_VERSION} ${GOPATH}/src/github.com/gogo/protobuf && \
-    rm v${GOGO_PROTOBUF_VERSION}.zip
+RUN \
+    # install controller-gen
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_GEN_VERSION} && \
+    # install golang protobuf
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' google.golang.org/protobuf/cmd/protoc-gen-go@${GOLANG_PROTOBUF_VERSION} && \
+    # install istio code-generator
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-jsonshim@${ISTIO_TOOLS_VERSION} && \
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-deepcopy@${ISTIO_TOOLS_VERSION}
 
 # install k8s api protobuf
 RUN mkdir -p ${GOPATH}/src/k8s.io && \
@@ -53,7 +48,6 @@ RUN mkdir -p ${GOPATH}/src/k8s.io && \
     unzip v${K8S_API_VERSION}.zip -d ${GOPATH}/src/k8s.io && \
     mv ${GOPATH}/src/k8s.io/apimachinery-${K8S_API_VERSION} ${GOPATH}/src/k8s.io/apimachinery && \
     rm v${K8S_API_VERSION}.zip
-
 
 # install protocol compiler
 RUN export PB_REL="https://github.com/protocolbuffers/protobuf/releases"; \

@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	gogotypes "github.com/gogo/protobuf/types"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -84,24 +83,4 @@ func wrapStructToStruct(k string, st *structpb.Struct) *structpb.Struct {
 
 func wrapStructToStructWrapper(k string, st *structpb.Struct) *structWrapper {
 	return newStructWrapper(nil).AddStructField(k, st)
-}
-
-func gogoStructToStruct(gogo *gogotypes.Struct) *structpb.Struct {
-	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
-	return nil
-}
-
-func structToGogoStruct(st *structpb.Struct) *gogotypes.Struct {
-	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
-	return nil
-}
-
-func structValueToGogoStructValue(value *structpb.Value) *gogotypes.Value {
-	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
-	return nil
-}
-
-func gogoStructValueToStructValue(value *gogotypes.Value) *structpb.Value {
-	// transition function, no need to implement, after the api is migrated to google proto, it is no longer needed
-	return nil
 }
