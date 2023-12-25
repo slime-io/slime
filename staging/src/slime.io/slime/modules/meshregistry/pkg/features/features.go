@@ -1,8 +1,9 @@
 package features
 
 import (
-	"istio.io/pkg/env"
 	"strings"
+
+	"istio.io/libistio/pkg/env"
 )
 
 var (
@@ -29,9 +30,7 @@ var (
 		"defines the cluster that this mesh-registry instance is belongs to").Get()
 )
 
-var (
-	EndpointRelabelItems = map[string]string{}
-)
+var EndpointRelabelItems = map[string]string{}
 
 func init() {
 	if endpointRelabelItems != "" {

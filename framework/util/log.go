@@ -14,7 +14,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
-	ilog "istio.io/pkg/log"
+	ilog "istio.io/libistio/pkg/log"
 	"k8s.io/klog"
 )
 
@@ -34,7 +34,7 @@ func InitLog(logConfig *bootconfig.Log) error {
 	scopes := make(map[string]string)
 	if logConfig.IlogLevel != "" {
 		parts := strings.Split(logConfig.IlogLevel, ",")
-		for i, _ := range parts {
+		for i := range parts {
 			items := strings.Split(parts[i], ":")
 			if len(items) != 2 {
 				continue
@@ -117,12 +117,11 @@ func GetKlogLevel() string {
 }
 
 func SetiLog(settings map[string]string) {
-
 	if len(settings) == 0 {
 		return
 	}
 
-	var stringToLevel = map[string]ilog.Level{
+	stringToLevel := map[string]ilog.Level{
 		"debug": ilog.DebugLevel,
 		"info":  ilog.InfoLevel,
 		"warn":  ilog.WarnLevel,

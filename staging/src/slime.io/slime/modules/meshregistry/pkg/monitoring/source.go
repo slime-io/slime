@@ -26,7 +26,6 @@ var (
 		"polling_time",
 		"Time spent on polling in seconds",
 		[]float64{.5, 1, 3, 5, 8, 10, 20, 30, 60, 90, 120},
-		monitoring.WithLabels(souceLabel, statusLabel),
 		monitoring.WithUnit(monitoring.UnitSeconds),
 	)
 	// pollingsCount is the number of pollings by source.
@@ -34,7 +33,6 @@ var (
 		model.ModuleName,
 		"pollings_count",
 		"Number of pollings by source.",
-		monitoring.WithLabels(souceLabel, statusLabel),
 	)
 
 	// serviceEntryTotal is the number of service entries in the mesh registry by source.
@@ -42,14 +40,12 @@ var (
 		model.ModuleName,
 		"service_entry_total",
 		"Number of service entries in the mesh registry by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 	// serviceEntryCreation is the number of service entries created by source.
 	serviceEntryCreation = monitoring.NewSum(
 		model.ModuleName,
 		"service_entry_creation",
 		"Number of service entries created by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 	// serviceEntryDeletion is the number of service entries deleted by source.
 	serviceEntryDeletion = monitoring.NewSum(
@@ -57,14 +53,12 @@ var (
 		"service_entry_deletion",
 		"Number of service entries deleted by source,"+
 			" or the endpoints of service entry are cleared.",
-		monitoring.WithLabels(souceLabel),
 	)
 	// serviceEntryUpdate is the number of service entries updated by source.
 	serviceEntryUpdate = monitoring.NewSum(
 		model.ModuleName,
 		"service_entry_update",
 		"Number of service entries updated by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 
 	// sidecarTotal is the number of sidecars in the mesh registry by source.
@@ -72,7 +66,6 @@ var (
 		model.ModuleName,
 		"sidecar_total",
 		"Number of sidecars in the mesh registry by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 
 	// sidecarCreation is the number of sidecars created by source.
@@ -80,21 +73,18 @@ var (
 		model.ModuleName,
 		"sidecar_creation",
 		"Number of sidecars created by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 	// sidecarDeletion is the number of sidecars deleted by source.
 	sidecarDeletion = monitoring.NewSum(
 		model.ModuleName,
 		"sidecar_deletion",
 		"Number of sidecars deleted by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 	// sidecarUpdate is the number of sidecars updated by source.
 	sidecarUpdate = monitoring.NewSum(
 		model.ModuleName,
 		"sidecar_update",
 		"Number of sidecars updated by source.",
-		monitoring.WithLabels(souceLabel),
 	)
 
 	// sourceEventTypeLabel is the label for the type of the source event.
@@ -104,7 +94,6 @@ var (
 		model.ModuleName,
 		"source_event_count",
 		"config event count by source, with event type and config type, and status.",
-		monitoring.WithLabels(souceLabel, configTypeLabel, sourceEventTypeLabel, statusLabel),
 	)
 
 	// sourceClientRequestCount is the number of client requests by source, with status.
@@ -112,7 +101,6 @@ var (
 		model.ModuleName,
 		"source_client_request_count",
 		"client request count by source, with status.",
-		monitoring.WithLabels(souceLabel, statusLabel),
 	)
 )
 

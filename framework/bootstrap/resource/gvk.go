@@ -4,8 +4,6 @@ import (
 	"errors"
 	"strings"
 	"time"
-
-	"github.com/gogo/protobuf/proto"
 )
 
 var (
@@ -67,7 +65,7 @@ func ParseGroupVersionKind(s string) (GroupVersionKind, error) {
 type Config struct {
 	ConfigMeta
 	// Spec holds the configuration object as a gogo protobuf message
-	Spec proto.Message
+	Spec any
 }
 
 // ConfigMeta is metadata attached to each configuration unit.

@@ -11,14 +11,14 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"istio.io/libistio/galley/pkg/config/source/kube"
-	"istio.io/libistio/galley/pkg/config/source/kube/rt"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/apimachinery/pkg/watch"
+	"k8s.io/client-go/informers"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
@@ -43,7 +43,7 @@ type ClusterHandler interface {
 // Controller is the controller implementation for Secret resources
 type Controller struct {
 	localClusterID     string
-	localClusterClient kube.Interfaces
+	localClusterClient kubernetes.Interface
 	queue              workqueue.RateLimitingInterface
 	informer           cache.SharedIndexInformer
 	cs                 *ClusterStore
@@ -54,20 +54,15 @@ type Controller struct {
 }
 
 // NewController returns a new secret controller
-func NewController(k kube.Interfaces, namespace string, resyncPeriod time.Duration, localClusterID string) *Controller {
-	client, err := k.KubeClient()
-	if err != nil {
-		log.Warnf("failed to get kube client: %v", err)
-		return nil
-	}
+func NewController(kubeClient kubernetes.Interface, namespace string, resyncPeriod time.Duration, localClusterID string) *Controller {
 	lw := &cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 			opts.LabelSelector = multiClusterSecretLabel + "=true"
-			return client.CoreV1().Secrets(namespace).List(context.TODO(), opts)
+			return kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
 		},
 		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 			opts.LabelSelector = multiClusterSecretLabel + "=true"
-			return client.CoreV1().Secrets(namespace).Watch(context.TODO(), opts)
+			return kubeClient.CoreV1().Secrets(namespace).Watch(context.TODO(), opts)
 		},
 	}
 	informer := cache.NewSharedIndexInformer(lw, &corev1.Secret{}, resyncPeriod,
@@ -77,7 +72,7 @@ func NewController(k kube.Interfaces, namespace string, resyncPeriod time.Durati
 	controller := &Controller{
 		resyncPeriod:       resyncPeriod,
 		localClusterID:     localClusterID,
-		localClusterClient: k,
+		localClusterClient: kubeClient,
 		cs:                 newClustersStore(),
 		informer:           informer,
 		queue:              queue,
@@ -122,7 +117,11 @@ func (c *Controller) AddHandler(h ClusterHandler) {
 
 // Run starts the controller until it receives a message over stopCh
 func (c *Controller) Run(stopCh <-chan struct{}) error {
-	localCluster := &Cluster{Provider: rt.NewProvider(c.localClusterClient, metav1.NamespaceAll, c.resyncPeriod), ID: c.localClusterID}
+	localCluster := &Cluster{
+		ID:           c.localClusterID,
+		KubeClient:   c.localClusterClient,
+		KubeInformer: informers.NewSharedInformerFactory(c.localClusterClient, c.resyncPeriod),
+	}
 	if err := c.handleAdd(localCluster, stopCh); err != nil {
 		return fmt.Errorf("failed initializing local cluster %s: %v", c.localClusterID, err)
 	}
@@ -274,8 +273,8 @@ func (c *Controller) deleteSecret(secretKey string) {
 	delete(c.cs.remoteClusters, secretKey)
 }
 
-// BuildClientsFromConfig creates kube.Interfaces from the provided kubeconfig. This is overridden for testing only
-var BuildClientsFromConfig = func(kubeConfig []byte) (kube.Interfaces, error) {
+// BuildClientsFromConfig creates kubernetes.Interface from the provided kubeconfig.
+func BuildClientsFromConfig(kubeConfig []byte) (kubernetes.Interface, error) {
 	if len(kubeConfig) == 0 {
 		return nil, errors.New("kubeconfig is empty")
 	}
@@ -294,7 +293,7 @@ var BuildClientsFromConfig = func(kubeConfig []byte) (kube.Interfaces, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get rest config from kubeconfig: %v", err)
 	}
-	return kube.NewInterfaces(restConfig), nil
+	return kubernetes.NewForConfig(restConfig)
 }
 
 func (c *Controller) createRemoteCluster(kubeConfig []byte, ID string) (*Cluster, error) {
@@ -302,10 +301,11 @@ func (c *Controller) createRemoteCluster(kubeConfig []byte, ID string) (*Cluster
 	if err != nil {
 		return nil, err
 	}
-	provider := rt.NewProvider(clients, metav1.NamespaceAll, c.resyncPeriod)
+	informers := informers.NewSharedInformerFactory(clients, c.resyncPeriod)
 	return &Cluster{
 		ID:            ID,
-		Provider:      provider,
+		KubeClient:    clients,
+		KubeInformer:  informers,
 		stop:          make(chan struct{}),
 		kubeConfigSha: sha256.Sum256(kubeConfig),
 	}, nil
@@ -353,8 +353,10 @@ func (c *Controller) handleDelete(key string) error {
 
 // Cluster defines cluster struct
 type Cluster struct {
-	ID       string
-	Provider *rt.Provider
+	ID string
+
+	KubeClient   kubernetes.Interface
+	KubeInformer informers.SharedInformerFactory
 
 	kubeConfigSha [sha256.Size]byte
 	stop          chan struct{}

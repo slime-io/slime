@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gogo/protobuf/proto"
 	"istio.io/istio-mcp/pkg/config/schema/resource"
 	mcp "istio.io/istio-mcp/pkg/mcp"
 	mcpsvr "istio.io/istio-mcp/pkg/mcp/server"
@@ -35,7 +34,6 @@ type McpController struct {
 	ctx                context.Context
 	cancel             func()
 	mut                sync.Mutex
-	verMut             sync.Mutex
 	stop, notifyPushCh chan struct{}
 
 	mcpArgs *bootstrap.McpArgs
@@ -73,7 +71,7 @@ func NewController(args *bootstrap.RegistryArgs) (*McpController, error) {
 	})
 
 	if err != nil {
-		return nil, errors.New(fmt.Sprint("new xds server with url %s met err %v", args.Mcp.ServerUrl, err))
+		return nil, fmt.Errorf("new xds server with url %s met err %v", args.Mcp.ServerUrl, err)
 	} else {
 		impl.mcpServer = svr
 	}
@@ -176,12 +174,12 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 	converter := func(config mcpmodel.Config) interface{} {
 		type k8sResource struct {
 			metav1.TypeMeta `json:",inline"`
-			Metadata        mcpmodel.ConfigMeta `json:"metadata"`
-			Spec            proto.Message       `json:"spec"`
+			Metadata        mcpmodel.Meta `json:"metadata"`
+			Spec            any           `json:"spec"`
 		}
 
 		if k8sRsc {
-			meta := config.ConfigMeta
+			meta := config.Meta
 			gvk := meta.GroupVersionKind
 			meta.GroupVersionKind = resource.GroupVersionKind{}
 			if anno := meta.Annotations; anno != nil {
@@ -380,12 +378,12 @@ func (c *McpController) start(ctx context.Context) {
 }
 
 func (c *McpController) convert(e event.Event) (*mcpmodel.Config, string, string, error) {
-	if e.Resource == nil || e.Source == nil || e.Source.Resource() == nil {
+	if e.Resource == nil || e.Source == nil {
 		return nil, "", "", fmt.Errorf("ev resource or source or source.resource nil")
 	}
 
 	var (
-		gvk = resource.TypeUrlToGvk(e.Source.Resource().GroupVersionKind().String())
+		gvk = resource.TypeUrlToGvk(e.Source.GroupVersionKind().String())
 		ver resource2.Version
 	)
 	if !source.IsInternalResource(gvk) {
@@ -396,7 +394,7 @@ func (c *McpController) convert(e event.Event) (*mcpmodel.Config, string, string
 		ver = resource2.Version(fmt.Sprintf("%032d", k8sVer))
 	}
 
-	meta := mcpmodel.ConfigMeta{
+	meta := mcpmodel.Meta{
 		GroupVersionKind:  gvk,
 		CreationTimestamp: e.Resource.Metadata.CreateTime,
 		Labels:            e.Resource.Metadata.Labels,
@@ -407,12 +405,12 @@ func (c *McpController) convert(e event.Event) (*mcpmodel.Config, string, string
 	}
 
 	conf := &mcpmodel.Config{
-		ConfigMeta: meta,
-		Spec:       e.Resource.Message,
+		Meta: meta,
+		Spec: e.Resource.Message,
 	}
 
 	if c.mcpArgs.EnableAnnoResVer && meta.ResourceVersion != "" {
-		conf.UpdateAnnotationResourceVersion()
+		mcpmodel.UpdateAnnotationResourceVersion(conf)
 	}
 
 	return conf, meta.Namespace, meta.Name, nil
@@ -427,7 +425,7 @@ func (c *McpController) NotifyPush() bool {
 	return false
 }
 
-func (c *McpController) RecordConfigRevChange(gvk resource.GroupVersionKind, nn resource.NamespacedName) {
+func (c *McpController) RecordConfigRevChange(gvk resource.GroupVersionKind, nn mcpmodel.NamespacedName) {
 	c.mut.Lock()
 	defer c.mut.Unlock()
 
@@ -470,7 +468,7 @@ func (h *XdsEventHandler) Handle(e event.Event) {
 	}
 
 	if revChanged {
-		h.c.RecordConfigRevChange(config.GroupVersionKind, resource.NamespacedName{
+		h.c.RecordConfigRevChange(config.GroupVersionKind, mcpmodel.NamespacedName{
 			Name:      name,
 			Namespace: ns,
 		})

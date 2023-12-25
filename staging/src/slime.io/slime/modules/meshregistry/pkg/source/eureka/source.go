@@ -12,7 +12,6 @@ import (
 	networking "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
-	"istio.io/libistio/pkg/config/schema/collections"
 
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
@@ -237,7 +236,7 @@ func buildEvent(kind event.Kind, item *networking.ServiceEntry, service, resourc
 		Labels: map[string]string{
 			"registry": SourceName,
 		},
-		Version:     source.GenVersion(collections.K8SNetworkingIstioIoV1Alpha3Serviceentries),
+		Version:     source.GenVersion(),
 		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}

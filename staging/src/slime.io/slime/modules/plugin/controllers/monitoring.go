@@ -36,20 +36,17 @@ var (
 		model.ModuleName,
 		"envoyfilter_creations",
 		"total number of envoyfilter creations",
-		monitoring.WithLabels(resourceName),
 	)
 
 	EnvoyfilterCreationsFailed = monitoring.NewSum(
 		model.ModuleName,
 		"envoyfilter_creations_failed",
 		"total number of envoyfilter creations failed",
-		monitoring.WithLabels(resourceName),
 	)
 
 	EnvoyfilterRefreshes = monitoring.NewSum(
 		model.ModuleName,
 		"envoyfilter_refreshes",
 		"total number of envoyfilter refreshes",
-		monitoring.WithLabels(resourceName),
 	)
 )

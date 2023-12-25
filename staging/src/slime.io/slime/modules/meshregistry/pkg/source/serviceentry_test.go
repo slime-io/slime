@@ -33,13 +33,13 @@ func TestRectifyServiceEntry(t *testing.T) {
 			name: "ports",
 			args: args{
 				se: &networking.ServiceEntry{
-					Ports: []*networking.Port{
+					Ports: []*networking.ServicePort{
 						{Number: 81},
 						{Number: 80},
 					},
 				},
 				rectifiedSe: &networking.ServiceEntry{
-					Ports: []*networking.Port{
+					Ports: []*networking.ServicePort{
 						{Number: 80},
 						{Number: 81},
 					},
