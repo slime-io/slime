@@ -55,10 +55,9 @@ var defaultModuleConfig = &bootconfig.Config{
 func patchModuleConfig(config, patch *bootconfig.Config) {
 	if config.Global == nil {
 		config.Global = patch.Global
-	} else {
-		patchGlobal(config.Global, patch.Global)
+		return
 	}
-	return
+	patchGlobal(config.Global, patch.Global)
 }
 
 func patchGlobal(global, patch *bootconfig.Global) {
@@ -176,7 +175,7 @@ func parseModuleConfig(data []byte) (*ParsedModuleConfig, error) {
 		}
 	}
 
-	err = protojson.Unmarshal(rawJson, c)
+	err = protojson.UnmarshalOptions{DiscardUnknown: true}.Unmarshal(rawJson, c)
 	if err != nil {
 		return nil, err
 	}

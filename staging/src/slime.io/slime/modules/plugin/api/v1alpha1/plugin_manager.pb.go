@@ -204,6 +204,7 @@ func (x *PluginManagerSpec) GetPriority() int32 {
 	return 0
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type Plugin struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -382,6 +383,7 @@ func (*Plugin_Inline) isPlugin_PluginSettings() {}
 
 func (*Plugin_Rider) isPlugin_PluginSettings() {}
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type Wasm struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -495,6 +497,7 @@ func (*Wasm_ImagePullSecretName) isWasm_ImagePullSecret() {}
 
 func (*Wasm_ImagePullSecretContent) isWasm_ImagePullSecret() {}
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type Rider struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

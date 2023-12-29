@@ -67,6 +67,7 @@ message PluginManagerSpec {
     int32 priority = 4;
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 message Plugin {
     bool enable = 1;
     string name = 2;
@@ -79,6 +80,7 @@ message Plugin {
     }
     ListenerType listenerType = 4;
     string type_url = 5;
+ 
     oneof plugin_settings {
         Wasm wasm = 6;
         // plugin compiled inside envoy
@@ -98,22 +100,26 @@ message Plugin {
     bool disable_on_filter_level = 13;
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 message Wasm {
     google.protobuf.Struct settings = 1;
     string plugin_name = 2;
     string url = 3;
     string sha256 = 4;
+
     oneof image_pull_secret {
         string image_pull_secret_name = 5;
         string image_pull_secret_content = 6;
     }
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 message Rider {
     google.protobuf.Struct settings = 1;
     string plugin_name = 2;
     string url = 3;
     string sha256 = 4;
+
     oneof image_pull_secret {
         string image_pull_secret_name = 5;
         string image_pull_secret_content = 6;

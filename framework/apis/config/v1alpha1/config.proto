@@ -79,6 +79,7 @@ message Metric{
   K8S_Source k8s = 2;
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 message General {// general module
 }
 
@@ -91,7 +92,6 @@ message Bundle {
   }
   repeated Item modules = 1;
 }
-
 
 message Config {
 
