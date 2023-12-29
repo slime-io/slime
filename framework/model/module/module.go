@@ -187,9 +187,10 @@ func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(mo
 		return mod, nil
 	}
 
+	unmarshaler := protojson.UnmarshalOptions{DiscardUnknown: true}
 	// get mod.Config() value from config.general
 	if len(pmCfg.GeneralJson) > 0 {
-		if err := protojson.Unmarshal(pmCfg.GeneralJson, modSelfCfg); err != nil {
+		if err := unmarshaler.Unmarshal(pmCfg.GeneralJson, modSelfCfg); err != nil {
 			log.Errorf("unmarshal for mod %s modGeneralJson (%v) met err %v", modCfg.Name, pmCfg.GeneralJson, err)
 			fatal()
 		}

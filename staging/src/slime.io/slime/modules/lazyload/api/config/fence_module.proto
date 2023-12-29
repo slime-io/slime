@@ -11,6 +11,7 @@ package slime.microservice.lazyload.config;
 
 option go_package = "slime.io/slime/modules/lazyload/api/config";
 
+// +kubebuilder:pruning:PreserveUnknownFields
 message Fence {
   // service ports enable lazyload
   repeated string wormholePort = 1;

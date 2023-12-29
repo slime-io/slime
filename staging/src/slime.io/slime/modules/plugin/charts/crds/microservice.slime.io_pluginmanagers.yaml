@@ -95,6 +95,7 @@ spec:
                     type_url:
                       type: string
                   type: object
+                  x-kubernetes-preserve-unknown-fields: true
                 type: array
               priority:
                 description: priority defines the order in which patch sets are applied

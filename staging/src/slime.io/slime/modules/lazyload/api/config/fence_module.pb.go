@@ -25,6 +25,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type Fence struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

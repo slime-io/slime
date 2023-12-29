@@ -46,7 +46,7 @@ $(MODULE_ROOTS):
 	@echo "generate k8s object for module $(notdir $@)"
 	@pushd $@ 1>/dev/null 2>&1; \
 	controller-gen object:headerFile="$(GO_HEADER_FILE)" paths="./api/..."; \
-	controller-gen crd paths="./api/..." output:crd:dir="./charts/crds" 1>/dev/null 2>&1; \
+	controller-gen crd:ignoreUnexportedFields=true paths="./api/..." output:crd:dir="./charts/crds" 1>/dev/null 2>&1; \
 	popd 1>/dev/null 2>&1
 modules-k8s-gen: $(MODULE_ROOTS)
 else
@@ -63,14 +63,22 @@ $(FRAMEWORK_API_PROTOS):
 		-I=$(shell go env GOPATH)/src \
 		--go_out=$(input_dir) \
 		--go_opt=paths=source_relative \
+		--golang-jsonshim_out=$(input_dir) \
+		--golang-jsonshim_opt=paths=source_relative \
 		$@
 framework-api-gen: $(FRAMEWORK_API_PROTOS)
+gen-slimeboot-crd:
+	@echo "generate slime-boot crd"
+	@pushd ./framework 1>/dev/null 2>&1; \
+	controller-gen crd:ignoreUnexportedFields=true paths="./apis/config/..." output:crd:dir="./charts/crds" 1>/dev/null 2>&1; \
+	popd 1>/dev/null 2>&1
+
 
 # Generate code
 .PHONY: generate-module generate-framework
 ifeq ($(IN_CONTAINER),1)
 generate-module: modules-api-gen modules-k8s-gen
-generate-framework: framework-api-gen
+generate-framework: framework-api-gen gen-slimeboot-crd
 generate-all: generate-module generate-framework
 else
 generate-module:
