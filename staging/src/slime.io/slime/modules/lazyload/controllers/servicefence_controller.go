@@ -491,7 +491,11 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 	}
 
 	for _, host := range r.cfg.StableHost {
-		hosts = append(hosts, host)
+		if strings.HasSuffix(host, "/*") {
+			hosts = append(hosts, host)
+		} else {
+			hosts = append(hosts, "*/"+host)
+		}
 	}
 
 	for k, v := range sf.Status.Domains {
