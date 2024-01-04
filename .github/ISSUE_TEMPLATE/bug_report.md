@@ -3,7 +3,8 @@ name: 问题报告
 about: 向slime开发者报告任何存在的问题
 title: 问题报告
 labels: bug
-assignees: MouceL
+assignees: believening
+
 ---
 
 **问题描述**
@@ -17,4 +18,3 @@ assignees: MouceL
 - [ ] 安装Boot
 
 **重现问题的步骤**
-

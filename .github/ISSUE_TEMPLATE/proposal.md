@@ -2,8 +2,9 @@
 name: 用户提案
 about: 用户的提案
 title: ''
-labels: 'proposal'
+labels: proposal
 assignees: MouceL
+
 ---
 
 **影响的子模块(在下面列表中打'X')**
