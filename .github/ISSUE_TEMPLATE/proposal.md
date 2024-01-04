@@ -3,7 +3,7 @@ name: 用户提案
 about: 用户的提案
 title: ''
 labels: proposal
-assignees: MouceL
+assignees: believening
 
 ---
 
