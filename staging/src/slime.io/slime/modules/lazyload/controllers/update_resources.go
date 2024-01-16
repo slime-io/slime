@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+
 	config "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/modules/lazyload/charts"
@@ -252,24 +253,6 @@ func patchSlimeboot(spec, wp []byte, specRaw, pos string) ([]byte, error) {
 	return spec, nil
 }
 
-func removeGsResource(m map[string]interface{}) (map[string]interface{}, error) {
-	re := make(map[string]interface{})
-	boot, err := json.Marshal(m)
-	if err != nil {
-		return re, err
-	}
-	boot, err = jsonparser.Set(boot, []byte(`{}`), "spec", "component", "globalSidecar", "resources")
-	if err != nil {
-		return re, fmt.Errorf("set resources to emtpy error %s", err.Error())
-	}
-
-	err = json.Unmarshal(boot, &re)
-	if err != nil {
-		return re, fmt.Errorf("unmarshal str to map[string]interface{} err %s", err.Error())
-	}
-	return re, nil
-}
-
 func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error) {
 	slimeBootNs := os.Getenv("WATCH_NAMESPACE")
 	deployName := strings.Split(os.Getenv("POD_NAME"), "-")[0]
@@ -283,14 +266,8 @@ func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error)
 			return "", nil, fmt.Errorf("try to get slimeboot in namespace %s failed", slimeBootNs)
 		}
 	}
-
-	// slimeboot references fields from k8s, which uses gogoprotobuf.
-	res, err := removeGsResource(utd.UnstructuredContent())
-	if err != nil {
-		return "", nil, fmt.Errorf("remove gs resource limit error: %v", err)
-	}
-
 	// Unstructured -> SlimeBoot
+	res := utd.UnstructuredContent()
 	var slimeBoot config.SlimeBoot
 	if err = runtime.DefaultUnstructuredConverter.FromUnstructured(res, &slimeBoot); err != nil {
 		return "", nil, fmt.Errorf("convert slimeboot %s/%s to structured error: %v", slimeBootNs, utd.GetName(), err)
@@ -342,19 +319,6 @@ func getSlimebootByLabelSelector(slimeBootNs, deployName string, env *bootstrap.
 	}
 	// By convention only one slimeboot will be matched to
 	return &utdList.Items[0], nil
-}
-
-func object2Values(obj interface{}) (map[string]interface{}, error) {
-	data, err := json.Marshal(obj)
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]interface{})
-	err = json.Unmarshal(data, &m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
 }
 
 func generateNewReources(chrt *chart.Chart, values map[string]interface{}) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
