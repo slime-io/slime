@@ -1008,6 +1008,8 @@ github.com/ruudk/golang-pdf417 v0.0.0-20181029194003-1af4ab5afa58/go.mod h1:6lfF
 github.com/ruudk/golang-pdf417 v0.0.0-20201230142125-a7e3863a1245/go.mod h1:pQAZKsJ8yyVxGRWYNEm9oFB8ieLgKFnamEyDmSA0BRk=
 github.com/slime-io/go-zk v0.0.0-20231205121800-d3e53bc03897 h1:Mb/hedX3IXmVkYMIQaEYptLg17BDGuu3Pzv/XpLaNYo=
 github.com/slime-io/go-zk v0.0.0-20231205121800-d3e53bc03897/go.mod h1:nOB03cncLtlp4t+UAkGSV+9beXP/akpekBwL+UX1Qcw=
+github.com/slime-io/istio-mcp v0.0.0-20240116022210-c7970f94037d h1:al8pdejJwH6v6S1hSyh2dmw6QYVHW0DdCvfRdGTCbZ0=
+github.com/slime-io/istio-mcp v0.0.0-20240116022210-c7970f94037d/go.mod h1:KW93PUpbn8uNrNKpzm1TeskbbdG8c/CtEgX5RVTgMRo=
 github.com/soheilhy/cmux v0.1.5/go.mod h1:T7TcVDs9LWfQgPlPsdngu6I6QIoyIFZDDC6sNE1GqG0=
 github.com/spf13/afero v1.3.3/go.mod h1:5KUK8ByomD5Ti5Artl0RtHeI5pTF7MIDuXL3yY520V4=
 github.com/spf13/afero v1.6.0/go.mod h1:Ai8FlHk4v/PARR026UzYexafAt9roJ7LcLMAmO6Z93I=
