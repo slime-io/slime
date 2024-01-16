@@ -107,7 +107,7 @@ require (
 )
 
 replace (
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20231219061554-c440780b8aac
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20240116022210-c7970f94037d
 	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc
 
 	// slime.io/slime/framework => ../../../../../../framework   // need uncomment
