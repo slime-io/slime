@@ -94,6 +94,17 @@ func (this *Service) UnmarshalJSON(b []byte) error {
 	return SlimeBootUnmarshaler.Unmarshal(bytes.NewReader(b), this)
 }
 
+// MarshalJSON is a custom marshaler for ResourceRequirements
+func (this *ResourceRequirements) MarshalJSON() ([]byte, error) {
+	str, err := SlimeBootMarshaler.MarshalToString(this)
+	return []byte(str), err
+}
+
+// UnmarshalJSON is a custom unmarshaler for ResourceRequirements
+func (this *ResourceRequirements) UnmarshalJSON(b []byte) error {
+	return SlimeBootUnmarshaler.Unmarshal(bytes.NewReader(b), this)
+}
+
 var (
 	SlimeBootMarshaler   = &jsonpb.Marshaler{}
 	SlimeBootUnmarshaler = &jsonpb.Unmarshaler{AllowUnknownFields: true}
