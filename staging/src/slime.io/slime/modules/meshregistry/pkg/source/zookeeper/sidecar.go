@@ -23,9 +23,9 @@ const (
 )
 
 type DubboCallModel struct {
-	Application     string              // dubbo service a
-	ProvideServices map[string]struct{} // a provides services
-	ConsumeServices map[string]struct{} // services dependent on a
+	Application     string              // dubbo service app
+	ProvideServices map[string]struct{} // services that app provides
+	ConsumeServices map[string]struct{} // services that app depends on
 }
 
 // Equals does not distinguish between nil and empty (map)
@@ -80,24 +80,12 @@ func (s *Source) serviceEntryHandlerRefreshSidecar(e event.Event) {
 		return
 	}
 
-	var preCallModel, callModel map[string]DubboCallModel
+	var refreshCallModel bool
 	if att := e.Resource.Attachments[AttachmentDubboCallModel]; att != nil {
-		callModel = att.(map[string]DubboCallModel)
+		refreshCallModel = att.(bool)
 	}
-	s.mut.Lock()
-	preCallModel, s.seDubboCallModels[e.Resource.Metadata.FullName] = s.seDubboCallModels[e.Resource.Metadata.FullName], callModel
-	changedApps := calcChangedApps(preCallModel, callModel)
-	if len(changedApps) > 0 {
-		if s.changedApps == nil {
-			s.changedApps = map[string]struct{}{}
-		}
-		for _, app := range changedApps {
-			s.changedApps[app] = struct{}{}
-		}
-	}
-	s.mut.Unlock()
 
-	if len(changedApps) > 0 {
+	if refreshCallModel {
 		select {
 		case s.refreshSidecarNotifyCh <- struct{}{}:
 		default:

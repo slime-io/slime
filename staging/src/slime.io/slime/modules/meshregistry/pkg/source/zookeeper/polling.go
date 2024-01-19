@@ -101,7 +101,7 @@ func (s *Source) handleNodeDelete(childrens []string) {
 				seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 				seValueCopy.ServiceEntry = &seCopy
 				ses.Set(k, &seValueCopy)
-				event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, nil)
+				event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
 				if err == nil {
 					log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
 					for _, h := range s.handlers {

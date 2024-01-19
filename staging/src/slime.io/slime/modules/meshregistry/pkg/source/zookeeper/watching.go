@@ -41,7 +41,7 @@ func (s *Source) ServiceNodeDelete(path string) {
 	service := ss[len(ss)-2]
 	if ses, ok := s.cache.Get(service); ok {
 		for serviceKey, sem := range ses.Items() {
-			event, err := buildServiceEntryEvent(event.Deleted, sem.ServiceEntry, sem.Meta, nil)
+			event, err := buildServiceEntryEvent(event.Deleted, sem.ServiceEntry, sem.Meta, false)
 			if err == nil {
 				for _, h := range s.handlers {
 					h.Handle(event)
