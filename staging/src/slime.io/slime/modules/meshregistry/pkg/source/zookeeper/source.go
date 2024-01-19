@@ -207,7 +207,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback
 
 func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networkingapi.ServiceEntry) {
 	prepared, _ := prepareServiceEntryWithMeta(se, meta)
-	ev, err := buildServiceEntryEvent(event.Updated, prepared.ServiceEntry, prepared.Meta, nil)
+	ev, err := buildServiceEntryEvent(event.Updated, prepared.ServiceEntry, prepared.Meta, false)
 	if err != nil {
 		log.Errorf("buildSeEvent met err %v", err)
 		return
@@ -708,11 +708,25 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 			continue
 		}
 
+		var preCallModel map[string]DubboCallModel
 		callModel := convertDubboCallModel(se, convertedSe.InboundEndPoints)
+		s.mut.Lock()
+		preCallModel, s.seDubboCallModels[meta.FullName] = s.seDubboCallModels[meta.FullName], callModel
+		changedApps := calcChangedApps(preCallModel, callModel)
+		attachCallModel := len(changedApps) > 0
+		if attachCallModel {
+			if s.changedApps == nil {
+				s.changedApps = map[string]struct{}{}
+			}
+			for _, app := range changedApps {
+				s.changedApps[app] = struct{}{}
+			}
+		}
+		s.mut.Unlock()
 
 		if oldSem, exist := interfaceSeCache.Get(serviceKey); !exist {
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel)
+			ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, attachCallModel)
 			if err == nil {
 				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
@@ -721,11 +735,11 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else {
-			if oldSem.Equals(*newSeWithMeta) {
+			if oldSem.Equals(*newSeWithMeta) && !attachCallModel {
 				continue
 			}
 			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, callModel)
+			ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, attachCallModel)
 			if err == nil {
 				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
@@ -762,7 +776,7 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 		seCache.Set(serviceKey, &seValueCopy)
 		seValue = &seValueCopy
 
-		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, nil)
+		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, false)
 		if err == nil {
 			log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
 			for _, h := range s.handlers {
@@ -846,14 +860,14 @@ func prepareServiceEntryWithMeta(se *networkingapi.ServiceEntry, meta resource.M
 }
 
 // buildServiceEntryEvent assembled the incoming data into an event. Event handle should not modify the data.
-func buildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata, callModel map[string]DubboCallModel) (event.Event, error) {
+func buildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata, attachCallModel bool) (event.Event, error) {
 	return event.Event{
 		Kind:   kind,
 		Source: collections.ServiceEntry,
 		Resource: &resource.Instance{
 			Metadata:    meta,
 			Message:     se,
-			Attachments: map[string]interface{}{AttachmentDubboCallModel: callModel},
+			Attachments: map[string]interface{}{AttachmentDubboCallModel: attachCallModel},
 		},
 	}, nil
 }
