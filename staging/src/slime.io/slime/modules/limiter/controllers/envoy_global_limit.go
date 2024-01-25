@@ -15,8 +15,6 @@ import (
 	"gopkg.in/yaml.v2"
 	networkingapi "istio.io/api/networking/v1alpha3"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"slime.io/slime/framework/util"
@@ -300,13 +298,8 @@ func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, servi
 	found := &v1.ConfigMap{}
 	err = r.Client.Get(context.TODO(), loc, found)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Errorf("configmap %s:%s is not found", loc.Namespace, loc.Name)
-			return
-		} else {
-			log.Errorf("get configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
-			return
-		}
+		log.Errorf("get configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
+		return
 	}
 
 	config, ok := found.Data[model.ConfigMapConfig]
@@ -331,11 +324,11 @@ func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, servi
 		return newCm[i].Value < newCm[j].Value
 	})
 
-	configmap := constructConfigMap(newCm, loc, getDomain(r.cfg.GetDomain()))
-	if !reflect.DeepEqual(found.Data["config.yaml"], configmap.Data["config.yaml"]) {
+	newCfg := constructNewConfig(newCm, getDomain(r.cfg.GetDomain()))
+	if !reflect.DeepEqual(found.Data[model.ConfigMapConfig], newCfg) {
 		log.Infof("update rate-limit-config %s:%s", loc.Namespace, loc.Name)
-		configmap.ResourceVersion = found.ResourceVersion
-		err = r.Client.Update(context.TODO(), configmap)
+		found.Data[model.ConfigMapConfig] = newCfg
+		err = r.Client.Update(context.TODO(), found)
 		if err != nil {
 			log.Infof("update configmap %s:%s err: %+v", loc.Namespace, loc.Name, err.Error())
 			return
@@ -343,23 +336,14 @@ func refreshConfigMap(desc []*model.Descriptor, r *SmartLimiterReconciler, servi
 	}
 }
 
-func constructConfigMap(desc []*model.Descriptor, loc types.NamespacedName, domain string) *v1.ConfigMap {
+func constructNewConfig(desc []*model.Descriptor, domain string) string {
 	rateLimitConfig := &model.RateLimitConfig{
 		Domain:      domain,
 		Descriptors: desc,
 	}
 
 	b, _ := yaml.Marshal(rateLimitConfig)
-	configmap := &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      loc.Name,
-			Namespace: loc.Namespace,
-		},
-		Data: map[string]string{
-			model.ConfigMapConfig: string(b),
-		},
-	}
-	return configmap
+	return string(b)
 }
 
 func generateDescriptorKey(item *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) string {
