@@ -93,6 +93,9 @@ message Fence {
   // A regular expression in golang regex format (RE2) that can be used to select proxies using a specific version of istio proxy to apply the to_global_sidecar envoyfilter.
   // refer to https://istio.io/latest/docs/reference/config/networking/envoy-filter/#EnvoyFilter-ProxyMatch
   string proxyVersion = 22;
+
+	// A stable host list that be default added to all servicefences hosts
+  repeated string StableHost = 23;
 }
 
 // The general idea is to assign different default traffic to different targets
