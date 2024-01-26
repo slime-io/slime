@@ -49,6 +49,25 @@ const (
 )
 
 func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+	var argsCopy *bootstrap.EurekaSourceArgs
+	if args.GatewayModel || args.NsfEureka {
+		cp := *args
+		argsCopy = &cp
+
+		if args.GatewayModel {
+			argsCopy.InstancePortAsSvcPort = false
+			argsCopy.K8sDomainSuffix = false
+		}
+		if args.NsfEureka {
+			argsCopy.EnableProjectCode = true
+			argsCopy.AppSuffix = ".nsf"
+		}
+	}
+
+	if argsCopy != nil {
+		args = argsCopy
+	}
+
 	serviers := args.Servers
 	if len(serviers) == 0 {
 		serviers = []bootstrap.EurekaServer{args.EurekaServer}
@@ -157,8 +176,8 @@ func (s *Source) updateServiceInfo() error {
 		return fmt.Errorf("get eureka app failed: %v", err)
 	}
 	newServiceEntryMap, err := ConvertServiceEntryMap(
-		apps, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.LabelPatch, s.args.SvcPort,
-		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.NsfEureka)
+		apps, s.args.DefaultServiceNs, s.args.AppSuffix, s.args.LabelPatch, s.args.SvcPort,
+		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.EnableProjectCode)
 	if err != nil {
 		log.Errorf("convert eureka servceentry map failed: " + err.Error())
 		return fmt.Errorf("convert eureka servceentry map failed: %v", err)
@@ -166,50 +185,50 @@ func (s *Source) updateServiceInfo() error {
 
 	cache := s.cacheShallowCopy()
 
-	for service, se := range cache {
-		if _, ok := newServiceEntryMap[service]; !ok {
+	for seFullName, se := range cache {
+		if _, ok := newServiceEntryMap[seFullName]; !ok {
 			// DELETE ==> set ep size to zero
 			seCopy := *se
 			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
-			newServiceEntryMap[service] = &seCopy
+			newServiceEntryMap[seFullName] = &seCopy
 			se = &seCopy
-			event, err := buildEvent(event.Updated, se, service, s.args.ResourceNs)
+			event, err := buildEvent(event.Updated, se, seFullName, s.args.ResourceNs)
 			if err == nil {
 				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			} else {
-				log.Errorf("build delete event for %s failed: %v", service, err)
+				log.Errorf("build delete event for %s failed: %v", seFullName, err)
 			}
 			monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
 		}
 	}
 
-	for service, newEntry := range newServiceEntryMap {
-		if oldEntry, ok := cache[service]; !ok {
+	for seFullName, newEntry := range newServiceEntryMap {
+		if oldEntry, ok := cache[seFullName]; !ok {
 			// ADD
-			event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs)
+			event, err := buildEvent(event.Added, newEntry, seFullName, s.args.ResourceNs)
 			if err == nil {
 				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			} else {
-				log.Errorf("build add event for %s failed: %v", service, err)
+				log.Errorf("build add event for %s failed: %v", seFullName, err)
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else {
 			if !proto.Equal(oldEntry, newEntry) {
 				// UPDATE
-				event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs)
+				event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs)
 				if err == nil {
 					log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}
 				} else {
-					log.Errorf("build update event for %s failed: %v", service, err)
+					log.Errorf("build update event for %s failed: %v", seFullName, err)
 				}
 				monitoring.RecordServiceEntryUpdate(SourceName, err == nil)
 			}
@@ -223,9 +242,9 @@ func (s *Source) updateServiceInfo() error {
 	return nil
 }
 
-func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, resourceNs string) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, seFullName, resourceNs string) (event.Event, error) {
 	se := util.CopySe(item)
-	items := strings.Split(service, ".")
+	items := strings.Split(seFullName, ".")
 	ns := resourceNs
 	if len(items) > 1 {
 		ns = items[1]
@@ -237,7 +256,7 @@ func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, reso
 			"registry": SourceName,
 		},
 		Version:     source.GenVersion(),
-		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
+		FullName:    resource.FullName{Name: resource.LocalName(seFullName), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}
 

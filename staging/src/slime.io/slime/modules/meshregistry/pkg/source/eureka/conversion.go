@@ -25,26 +25,37 @@ func (e Error) Error() string {
 }
 
 func ConvertServiceEntryMap(
-	apps []*application, defaultSvcNs string, gatewayModel, patchLabel bool, svcPort uint32,
-	instancePortAsSvcPort, nsHost, k8sDomainSuffix, nsfEureka bool,
+	apps []*application, defaultSvcNs, appSuffix string, patchLabel bool, svcPort uint32,
+	instancePortAsSvcPort, nsHost, k8sDomainSuffix, enableProjectCode bool,
 ) (map[string]*networkingapi.ServiceEntry, error) {
 	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if apps == nil || len(apps) == 0 {
 		return seMap, nil
 	}
 	for _, app := range apps {
-		if gatewayModel {
-			if nsfEureka {
-				// 基于projectCode支持eureka服务租户隔离
-				for _, projectCode := range getProjectCodeArr(app) {
-					seMap[app.Name+"-"+projectCode] = convertServiceEntryWithProjectCode(app, nsHost, patchLabel, projectCode)
-				}
-			} else {
-				seMap[app.Name] = convertServiceEntry(app, nsHost, patchLabel)
-			}
+		correctedAppName := strings.ReplaceAll(strings.ToLower(app.Name), "_", "-")
+		if appSuffix != "" {
+			correctedAppName = correctedAppName + "." + appSuffix
+		}
+
+		var projectCodes []string
+		if enableProjectCode {
+			projectCodes = getProjectCodeArr(app)
 		} else {
-			for k, v := range convertServiceEntryWithNs(
-				app, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel) {
+			projectCodes = append(projectCodes, "")
+		}
+
+		for _, projectCode := range projectCodes {
+			projectAppName := correctedAppName
+			if projectCode != "" {
+				projectAppName = projectAppName + "." + projectCode
+			}
+
+			projectApp := *app
+			projectApp.Name = projectAppName
+
+			for k, v := range convertServiceEntry(
+				&projectApp, defaultSvcNs, projectCode, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel) {
 				seMap[k] = v
 			}
 		}
@@ -57,123 +68,12 @@ func ConvertServiceEntryMap(
 	return seMap, nil
 }
 
-// -------- for gateway mode --------
-func convertServiceEntry(app *application, nsHost bool, patchLabel bool) *networkingapi.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.Instances, patchLabel, "")
-	nsSuffix := ""
-	if nsHost {
-		nsSuffix = ".eureka"
-	}
-
-	ret := &networkingapi.ServiceEntry{
-		Hosts:      []string{strings.ReplaceAll(strings.ToLower(app.Name), "_", "-") + nsSuffix},
-		Resolution: networkingapi.ServiceEntry_STATIC,
-		Endpoints:  endpoints,
-		Ports:      ports,
-	}
-
-	if hasNonIPEpAddr {
-		// currently we do not consider the UDS case
-		ret.Resolution = networkingapi.ServiceEntry_DNS
-	}
-
-	return ret
-}
-
-// 根据projectCode做eureka服务的项目隔离
-func convertServiceEntryWithProjectCode(app *application, nsHost bool, patchLabel bool, projectCode string) *networkingapi.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(app.Instances, patchLabel, projectCode)
-	nsSuffix := ""
-	if nsHost {
-		nsSuffix = ".eureka"
-	}
-
-	ret := &networkingapi.ServiceEntry{
-		Hosts:      []string{strings.ToLower(strings.ReplaceAll(strings.ToLower(app.Name), "_", "-")+".nsf."+projectCode) + nsSuffix},
-		Resolution: networkingapi.ServiceEntry_STATIC,
-		Endpoints:  endpoints,
-		Ports:      ports,
-	}
-
-	if hasNonIPEpAddr {
-		// currently we do not consider the UDS case
-		ret.Resolution = networkingapi.ServiceEntry_DNS
-	}
-
-	return ret
-}
-
-func convertEndpoints(instances []*instance, patchLabel bool, projectCode string) ([]*networkingapi.WorkloadEntry, []*networkingapi.ServicePort, []string, bool) {
-	var (
-		endpoints      = make([]*networkingapi.WorkloadEntry, 0)
-		ports          = make([]*networkingapi.ServicePort, 0)
-		address        = make([]string, 0)
-		hasNonIPEpAddr bool
-	)
-	sort.Slice(instances, func(i, j int) bool {
-		return instances[i].InstanceID < instances[j].InstanceID
-	})
-
-	port := &networkingapi.ServicePort{
-		Protocol: "HTTP",
-		Number:   80,
-		Name:     "http",
-	}
-	ports = append(ports, port)
-
-	for _, ins := range instances {
-		if !strings.EqualFold(ins.Status, "UP") {
-			continue
-		}
-		if ins.Port.Port > math.MaxUint16 {
-			log.Errorf("instance port illegal %v", ins)
-			continue
-		}
-		// 与要求projectCode不同的服务实例跳过，实现eureka服务实例项目隔离
-		if projectCode != "" && ins.Metadata[ProjectCode] != projectCode {
-			continue
-		}
-
-		instancePorts := make(map[string]uint32, 1)
-		for _, v := range ports {
-			instancePorts[v.Name] = uint32(ins.Port.Port)
-		}
-
-		var (
-			addr   = ins.IPAddress
-			ipAddr = addr
-		)
-		if net.ParseIP(addr) == nil {
-			ipAddr = ""
-			hasNonIPEpAddr = true
-		}
-		address = append(address, ins.IPAddress)
-
-		util.FilterLabels(ins.Metadata, patchLabel, ipAddr, "eureka:"+ins.InstanceID)
-
-		ep := &networkingapi.WorkloadEntry{
-			Address: ins.IPAddress,
-			Ports:   instancePorts,
-			Labels:  ins.Metadata,
-		}
-		util.FillWorkloadEntryLocality(ep)
-		endpoints = append(endpoints, ep)
-	}
-
-	sort.Slice(ports, func(i, j int) bool {
-		return ports[i].Number < ports[j].Number
-	})
-
-	return endpoints, ports, address, hasNonIPEpAddr
-}
-
-// -------- for sidecar mode --------
-func convertServiceEntryWithNs(
-	app *application, defaultNs string, svcPort uint32,
+func convertServiceEntry(
+	app *application, defaultNs, projectCode string, svcPort uint32,
 	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
 ) map[string]*networkingapi.ServiceEntry {
 	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(
-		app.Instances, defaultNs, svcPort, nsHost, instancePortAsSvcPort, patchLabel)
+		app.Instances, defaultNs, projectCode, svcPort, nsHost, instancePortAsSvcPort, patchLabel)
 	if len(nsEndpoints) == 0 {
 		return nil
 	}
@@ -192,7 +92,7 @@ func convertServiceEntryWithNs(
 
 	var (
 		ses          = make(map[string]*networkingapi.ServiceEntry, len(nsEndpoints))
-		svcShortName = strings.ToLower(app.Name)
+		svcShortName = app.Name
 	)
 
 	for ns, endpoints := range nsEndpoints {
@@ -240,11 +140,11 @@ func convertServiceEntryWithNs(
 }
 
 func convertEndpointsWithNs(
-	instances []*instance, defaultNs string, svcPort uint32, nsHost, instancePortAsSvcPort,
+	instances []*instance, defaultNs, projectCode string, svcPort uint32, withNs, instancePortAsSvcPort,
 	patchLabel bool,
 ) (map[string][]*networkingapi.WorkloadEntry, map[string]map[uint32]*networkingapi.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
-	portsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
+	svcPortsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 
 	sort.Slice(instances, func(i, j int) bool {
@@ -255,12 +155,20 @@ func convertEndpointsWithNs(
 		if !strings.EqualFold(ins.Status, "UP") {
 			continue
 		}
+		if ins.Port.Port > math.MaxUint16 {
+			log.Errorf("instance port illegal %v", ins)
+			continue
+		}
+		// 与要求projectCode不同的服务实例跳过，实现eureka服务实例项目隔离
+		if projectCode != "" && ins.Metadata[ProjectCode] != projectCode {
+			continue
+		}
 
 		metadata := ins.Metadata
 		util.FilterLabels(metadata, patchLabel, ins.IPAddress, "eureka:"+ins.InstanceID)
 
 		var ns string
-		if nsHost {
+		if withNs {
 			if v, ok := metadata["k8sNs"]; ok {
 				ns = v
 			} else {
@@ -269,10 +177,10 @@ func convertEndpointsWithNs(
 		}
 
 		var svcPortName string
-		ports, exist := portsMap[ns]
+		ports, exist := svcPortsMap[ns]
 		if !exist {
 			ports = map[uint32]*networkingapi.ServicePort{}
-			portsMap[ns] = ports
+			svcPortsMap[ns] = ports
 		}
 
 		svcPortInUse := svcPort
@@ -302,29 +210,28 @@ func convertEndpointsWithNs(
 			Ports:   map[string]uint32{svcPortName: uint32(ins.Port.Port)},
 			Labels:  ins.Metadata,
 		}
+
 		util.FillWorkloadEntryLocality(ep)
 
 		endpointsMap[ns] = append(endpointsMap[ns], ep)
 	}
 
-	return endpointsMap, portsMap, useDNSMap
+	return endpointsMap, svcPortsMap, useDNSMap
 }
 
 // 获取每一个应用的projectCode
 func getProjectCodeArr(app *application) []string {
-	projectCode := make([]string, 0)
-	projectCodeMap := make(map[string]string)
+	projectCodes := make([]string, 0)
+	projectCodeMap := make(map[string]struct{})
 	// 获取服务中所有实例的projectCode标签，并去重
 	for _, instance := range app.Instances {
-		for k, v := range instance.Metadata {
-			if k == ProjectCode {
-				projectCodeMap[v] = ""
+		if v, ok := instance.Metadata[ProjectCode]; ok {
+			if _, ok = projectCodeMap[v]; !ok {
+				projectCodes = append(projectCodes, v)
+				projectCodeMap[v] = struct{}{}
 			}
 		}
 	}
 
-	for k := range projectCodeMap {
-		projectCode = append(projectCode, k)
-	}
-	return projectCode
+	return projectCodes
 }
