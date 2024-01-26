@@ -65,11 +65,15 @@ func (s *Source) Watching() {
 		rootPath:           s.args.RegistryRootNode,
 		endpointUpdateFunc: s.EndpointUpdate,
 		serviceDeleteFunc:  s.ServiceNodeDelete,
-		gatewatModel:       s.args.GatewayModel,
+		consumerPath:       consumerPathSuffix,
+		providerPath:       providerPathSuffix,
 		watchConfigurators: s.args.EnableConfiguratorMeta,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
 		forceUpdateTrigger: s.forceUpdateTrigger,
 		debounceConfig:     s.args.WatchingDebounce,
+	}
+	if s.args.GatewayModel {
+		sw.consumerPath = "" // consumer data is not needed in gateway mode
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -124,21 +128,22 @@ type ServiceEvent struct {
 }
 
 type EndpointWatcherOpts struct {
-	conn                *zkConn
-	endpointUpdateFunc  func(providers, consumers, configurators []string, serverPath string)
-	serviceDeleteFunc   func(path string)
-	gatewayMode         bool
-	initCallbackFactory func() func()
-	forceUpdateTrigger  *atomic.Value
-	watchConfigurators  bool
-	debounceConfig      *bootstrap.WatchingDebounce
+	conn                       *zkConn
+	endpointUpdateFunc         func(providers, consumers, configurators []string, serverPath string)
+	serviceDeleteFunc          func(path string)
+	consumerPath, providerPath string
+	initCallbackFactory        func() func()
+	forceUpdateTrigger         *atomic.Value
+	watchConfigurators         bool
+	debounceConfig             *bootstrap.WatchingDebounce
 }
 
 func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointWatcher {
 	ew := &EndpointWatcher{
-		conn:        opts.conn,
-		servicePath: servicePath,
-		gatewayMode: opts.gatewayMode,
+		conn:         opts.conn,
+		servicePath:  servicePath,
+		consumerPath: opts.consumerPath,
+		providerPath: opts.providerPath,
 		handler: func(providers, consumers, configurators []string) {
 			opts.endpointUpdateFunc(providers, consumers, configurators, servicePath)
 		},
@@ -168,8 +173,8 @@ type EndpointWatcher struct {
 
 	serviceDeleteHandler func()
 
-	gatewayMode        bool
-	watchConfigurators bool
+	consumerPath, providerPath string
+	watchConfigurators         bool
 
 	signalExit, exit chan struct{}
 
@@ -183,9 +188,6 @@ type EndpointWatcher struct {
 func (ew *EndpointWatcher) Start(ctx context.Context) {
 	log.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
 	providerPath, consumerPath := providerPathSuffix, consumerPathSuffix
-	if ew.gatewayMode {
-		consumerPath = "" // gw does not need consumer data
-	}
 	go ew.watchService(ctx, providerPath, consumerPath)
 }
 
@@ -439,12 +441,12 @@ var dubboExcludeServicePath = []string{
 type ServiceWatcher struct {
 	ctx context.Context
 
-	conn               *zkConn
-	rootPath           string
-	endpointUpdateFunc func([]string, []string, []string, string)
-	serviceDeleteFunc  func(string)
-	gatewatModel       bool
-	watchConfigurators bool
+	conn                       *zkConn
+	rootPath                   string
+	endpointUpdateFunc         func([]string, []string, []string, string)
+	serviceDeleteFunc          func(string)
+	consumerPath, providerPath string
+	watchConfigurators         bool
 
 	svcs []string
 
@@ -549,7 +551,8 @@ func (sw *ServiceWatcher) dispatch(e ServiceEvent) {
 			conn:                sw.conn,
 			endpointUpdateFunc:  sw.endpointUpdateFunc,
 			serviceDeleteFunc:   sw.serviceDeleteFunc,
-			gatewayMode:         sw.gatewatModel,
+			consumerPath:        sw.consumerPath,
+			providerPath:        sw.providerPath,
 			initCallbackFactory: sw.initCallbackFactory,
 			forceUpdateTrigger:  sw.forceUpdateTrigger,
 			watchConfigurators:  sw.watchConfigurators,

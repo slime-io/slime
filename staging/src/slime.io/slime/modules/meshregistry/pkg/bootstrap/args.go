@@ -107,7 +107,10 @@ type SourceArgs struct {
 	WaitTime util.Duration `json:"WaitTime,omitempty"`
 	// Set refresh period. meaningful for sources which support and is in `polling` mode
 	RefreshPeriod util.Duration `json:"RefreshPeriod,omitempty"`
-	GatewayModel  bool          `json:"GatewayModel,omitempty"`
+	// Deprecated
+	// almost equals `InstancePortAsSvcPort = false and K8sDomainSuffix = false` and will override them if true
+	// NOTICE: does not support hot-reload
+	GatewayModel bool `json:"GatewayModel,omitempty"`
 	// patch instances label
 	LabelPatch bool `json:"LabelPatch,omitempty"`
 	// svc port for services, 0 will be ignored
@@ -324,12 +327,17 @@ func (zkArgs *ZookeeperSourceArgs) Validate() error {
 type EurekaSourceArgs struct {
 	SourceArgs
 	EurekaServer
-	// EurekaSource address belongs to nsf or not
+	// Deprecated
+	// almost equals `EnableProjectCode = true && AppSuffix = ".nsf"` and will override them if true
 	NsfEureka bool `json:"NsfEureka,omitempty"`
 	// need k8sDomainSuffix in Host
 	K8sDomainSuffix bool `json:"K8SDomainSuffix,omitempty"`
 	// need ns in Host
 	NsHost bool `json:"NsHost,omitempty"`
+	// if true, will split service to project-services by project code
+	EnableProjectCode bool `json:"EnableProjectCode,omitempty"`
+	// if not empty, will add this suffix to app name
+	AppSuffix string `json:"AppSuffix,omitempty"`
 
 	Servers []EurekaServer `json:"Servers,omitempty"`
 }
@@ -491,7 +499,7 @@ func NewRegistryArgs() *RegistryArgs {
 				SvcPort:               80,
 				InstancePortAsSvcPort: true,
 				// should set it to "xx" explicitly to get the same behaviour as before("foo.eureka")
-				DefaultServiceNs: "",
+				DefaultServiceNs: "eureka",
 				ResourceNs:       "eureka",
 			},
 			K8sDomainSuffix: true,
