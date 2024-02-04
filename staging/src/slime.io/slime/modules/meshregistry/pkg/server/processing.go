@@ -156,7 +156,7 @@ func (p *Processing) Start() (err error) {
 
 	if srcArgs := p.regArgs.NacosSource; srcArgs.Enabled {
 		if nacosSrc, httpHandle, err = nacos.New(
-			p.regArgs.NacosSource, srcArgs.NsHost, srcArgs.K8sDomainSuffix, time.Duration(p.regArgs.RegistryStartDelay),
+			p.regArgs.NacosSource, time.Duration(p.regArgs.RegistryStartDelay),
 			p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {
 				if p.addOnRegArgs != nil {
 					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {

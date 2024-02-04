@@ -85,7 +85,26 @@ func WithDynamicConfigOption(addCb func(func(*bootstrap.NacosSourceArgs))) Optio
 	}
 }
 
-func New(args *bootstrap.NacosSourceArgs, nsHost bool, k8sDomainSuffix bool, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
+	var argsCopy *bootstrap.NacosSourceArgs
+	if args.GatewayModel || args.NsfNacos {
+		cp := *args
+		argsCopy = &cp
+
+		if args.GatewayModel {
+			argsCopy.InstancePortAsSvcPort = false
+			argsCopy.K8sDomainSuffix = false
+		}
+		if args.NsfNacos {
+			argsCopy.EnableProjectCode = true
+			argsCopy.DomSuffix = ".nsf"
+		}
+	}
+
+	if argsCopy != nil {
+		args = argsCopy
+	}
+
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
@@ -316,9 +335,9 @@ func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
+func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, seFullName, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
 	se := util.CopySe(item)
-	items := strings.Split(service, ".")
+	items := strings.Split(seFullName, ".")
 	ns := resourceNs
 	if len(items) > 1 {
 		ns = items[1]
@@ -330,7 +349,7 @@ func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, service, reso
 			"registry": "nacos",
 		},
 		Version:     source.GenVersion(),
-		FullName:    resource.FullName{Name: resource.LocalName(service), Namespace: resource.Namespace(ns)},
+		FullName:    resource.FullName{Name: resource.LocalName(seFullName), Namespace: resource.Namespace(ns)},
 		Annotations: map[string]string{},
 	}
 	if metaModifier != nil {

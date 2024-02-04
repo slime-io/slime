@@ -59,58 +59,59 @@ func (s *Source) updateServiceInfo() error {
 	}
 
 	newServiceEntryMap, err := ConvertServiceEntryMap(
-		instances, s.args.DefaultServiceNs, s.args.GatewayModel, s.args.SvcPort, s.args.NsHost, s.args.K8sDomainSuffix,
-		s.args.InstancePortAsSvcPort, s.args.LabelPatch, s.args.NsfNacos, s.getInstanceFilters(), s.getServiceHostAlias())
+		instances, s.args.DefaultServiceNs, s.args.DomSuffix, s.args.SvcPort,
+		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.EnableProjectCode, s.args.LabelPatch,
+		s.getInstanceFilters(), s.getServiceHostAlias())
 	if err != nil {
 		return fmt.Errorf("convert nacos servceentry map failed: %v", err)
 	}
 
 	cache := s.cacheShallowCopy()
 	seMetaModifierFactory := s.getSeMetaModifierFactory()
-	for service, se := range cache {
-		if _, ok := newServiceEntryMap[service]; !ok {
+	for seFullName, se := range cache {
+		if _, ok := newServiceEntryMap[seFullName]; !ok {
 			// DELETE ==> set ep size to zero
 			seCopy := *se
 			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
-			newServiceEntryMap[service] = &seCopy
+			newServiceEntryMap[seFullName] = &seCopy
 			se = &seCopy
-			event, err := buildEvent(event.Updated, se, service, s.args.ResourceNs, seMetaModifierFactory(service))
+			event, err := buildEvent(event.Updated, se, seFullName, s.args.ResourceNs, seMetaModifierFactory(seFullName))
 			if err == nil {
 				log.Infof("delete(update) nacos se, hosts: %s ,ep: %s ,size : %d ", se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			} else {
-				log.Errorf("build delete event for %s failed: %v", service, err)
+				log.Errorf("build delete event for %s failed: %v", seFullName, err)
 			}
 			monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
 		}
 	}
 
-	for service, newEntry := range newServiceEntryMap {
-		if oldEntry, ok := cache[service]; !ok {
+	for seFullName, newEntry := range newServiceEntryMap {
+		if oldEntry, ok := cache[seFullName]; !ok {
 			// ADD
-			event, err := buildEvent(event.Added, newEntry, service, s.args.ResourceNs, seMetaModifierFactory(service))
+			event, err := buildEvent(event.Added, newEntry, seFullName, s.args.ResourceNs, seMetaModifierFactory(seFullName))
 			if err == nil {
 				log.Infof("add nacos se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
 			} else {
-				log.Errorf("build add event for %s failed: %v", service, err)
+				log.Errorf("build add event for %s failed: %v", seFullName, err)
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else {
 			if !proto.Equal(oldEntry, newEntry) {
 				// UPDATE
-				event, err := buildEvent(event.Updated, newEntry, service, s.args.ResourceNs, seMetaModifierFactory(service))
+				event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs, seMetaModifierFactory(seFullName))
 				if err == nil {
 					log.Infof("update nacos se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 					for _, h := range s.handlers {
 						h.Handle(event)
 					}
 				} else {
-					log.Errorf("build update event for %s failed: %v", service, err)
+					log.Errorf("build update event for %s failed: %v", seFullName, err)
 				}
 				monitoring.RecordServiceEntryUpdate(SourceName, err == nil)
 			}

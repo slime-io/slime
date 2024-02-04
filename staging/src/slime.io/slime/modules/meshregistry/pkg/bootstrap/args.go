@@ -372,7 +372,8 @@ func (eurekaArgs *EurekaSourceArgs) Validate() error {
 type NacosSourceArgs struct {
 	SourceArgs
 	NacosServer
-	// NacosSource address belongs to nsf or not
+	// Deprecated
+	// almost equals `EnableProjectCode = true && AppSuffix = ".nsf"` and will override them if true
 	NsfNacos bool `json:"NsfNacos,omitempty"`
 	// nacos mode for get nacos info
 	Mode string `json:"Mode,omitempty"`
@@ -383,9 +384,13 @@ type NacosSourceArgs struct {
 	// need ns in Host
 	NsHost bool `json:"NsHost,omitempty"`
 	// If set, namespace and group information will be injected into the ep's metadata using the set key.
-	MetaKeyGroup     string        `json:"MetaKeyGroup,omitempty"`
-	MetaKeyNamespace string        `json:"MetaKeyNamespace,omitempty"`
-	Servers          []NacosServer `json:"Servers,omitempty"`
+	MetaKeyGroup     string `json:"MetaKeyGroup,omitempty"`
+	MetaKeyNamespace string `json:"MetaKeyNamespace,omitempty"`
+	// if true, will split service to project-services by project code
+	EnableProjectCode bool `json:"EnableProjectCode,omitempty"`
+	// if not empty, will add this suffix to dom
+	DomSuffix string        `json:"DomSuffix,omitempty"`
+	Servers   []NacosServer `json:"Servers,omitempty"`
 }
 
 type NacosServer struct {
@@ -511,7 +516,7 @@ func NewRegistryArgs() *RegistryArgs {
 				LabelPatch:            true,
 				SvcPort:               80,
 				InstancePortAsSvcPort: true,
-				DefaultServiceNs:      "",
+				DefaultServiceNs:      "nacos",
 				ResourceNs:            "nacos",
 			},
 			Mode:            "watching",

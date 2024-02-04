@@ -1,7 +1,6 @@
 package nacos
 
 import (
-	"math"
 	"net"
 	"sort"
 	"strings"
@@ -20,28 +19,45 @@ func (e Error) Error() string {
 	return e.msg
 }
 
+const (
+	ProjectCode = "projectCode"
+)
+
 func ConvertServiceEntryMap(
-	instances []*instanceResp, defaultSvcNs string, gatewayModel bool, svcPort uint32, nsHost, k8sDomainSuffix,
-	instancePortAsSvcPort, patchLabel, nsfNacos bool, filter func(*instance) bool, hostAliases map[string][]string,
+	instances []*instanceResp, defaultSvcNs, domSuffix string, svcPort uint32,
+	instancePortAsSvcPort, nsHost, k8sDomainSuffix, enableProjectCode, patchLabel bool,
+	filter func(*instance) bool, hostAliases map[string][]string,
 ) (map[string]*networkingapi.ServiceEntry, error) {
 	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
-		if gatewayModel {
-			if nsfNacos {
-				// 支持租户隔离
-				for _, projectCode := range getProjectCode(ins) {
-					seMap[ins.Dom+"-"+projectCode] = convertServiceEntryWithProjectCode(ins, nsHost, patchLabel, filter, hostAliases, projectCode)
-				}
-			} else {
-				seMap[ins.Dom] = convertServiceEntryWithProjectCode(ins, nsHost, patchLabel, filter, hostAliases, "")
-			}
+		correctedDom := strings.ReplaceAll(strings.ToLower(ins.Dom), "_", "-")
+		if domSuffix != "" {
+			correctedDom = correctedDom + "." + domSuffix
+		}
+
+		var projectCodes []string
+		if enableProjectCode {
+			projectCodes = getProjectCodeArr(ins)
 		} else {
-			for k, v := range convertServiceEntryWithNs(
-				ins, defaultSvcNs, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel, filter,
-				hostAliases) {
+			projectCodes = append(projectCodes, "")
+		}
+
+		for _, projectCode := range projectCodes {
+			projectDom := correctedDom
+			if projectCode != "" {
+				projectDom = projectDom + "." + projectCode
+			}
+
+			projectIns := *ins
+			projectIns.Dom = projectDom
+
+			for k, v := range convertServiceEntry(
+				&projectIns, defaultSvcNs, projectCode, svcPort,
+				nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel,
+				filter, hostAliases) {
 				seMap[k] = v
 			}
 		}
@@ -54,109 +70,14 @@ func ConvertServiceEntryMap(
 	return seMap, nil
 }
 
-// -------- for gateway mode --------
-func convertServiceEntryWithProjectCode(instanceResp *instanceResp, nsHost bool, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string, projectCode string) *networkingapi.ServiceEntry {
-	endpoints, ports, _, hasNonIPEpAddr := convertEndpoints(instanceResp.Hosts, patchLabel, filter, projectCode)
-	nsSuffix := ""
-	if nsHost {
-		nsSuffix = ".nacos"
-	}
-	host := strings.ReplaceAll(instanceResp.Dom, "_", "-")
-	if projectCode != "" {
-		host += ".nsf." + projectCode
-	}
-	host = strings.ToLower(host) + nsSuffix
-	hosts := []string{host}
-	if hostAliases != nil {
-		hosts = append(hosts, hostAliases[host]...)
-	}
-	ret := &networkingapi.ServiceEntry{
-		Hosts:      hosts,
-		Resolution: networkingapi.ServiceEntry_STATIC,
-		Endpoints:  endpoints,
-		Ports:      ports,
-	}
-	if hasNonIPEpAddr {
-		ret.Resolution = networkingapi.ServiceEntry_DNS
-	}
-	return ret
-}
-
-func convertEndpoints(instances []*instance, patchLabel bool, filter func(*instance) bool, projectCode string) ([]*networkingapi.WorkloadEntry, []*networkingapi.ServicePort, []string, bool) {
-	var (
-		endpoints      = make([]*networkingapi.WorkloadEntry, 0)
-		ports          = make([]*networkingapi.ServicePort, 0)
-		address        = make([]string, 0)
-		hasNonIPEpAddr bool
-	)
-	sort.Slice(instances, func(i, j int) bool {
-		return instances[i].InstanceId < instances[j].InstanceId
-	})
-
-	port := &networkingapi.ServicePort{
-		Protocol: "HTTP",
-		Number:   80,
-		Name:     "http",
-	}
-	ports = append(ports, port)
-
-	for _, ins := range instances {
-		if filter != nil && !filter(ins) {
-			continue
-		}
-
-		if !ins.Healthy {
-			continue
-		}
-		if ins.Port > math.MaxUint16 {
-			log.Errorf("instance port illegal %v", ins)
-			continue
-		}
-
-		if projectCode != "" && projectCode != ins.Metadata["projectCode"] {
-			continue
-		}
-
-		instancePorts := make(map[string]uint32, 1)
-		for _, v := range ports {
-			instancePorts[v.Name] = uint32(ins.Port)
-		}
-
-		var (
-			addr   = ins.Ip
-			ipAddr = addr
-		)
-		if net.ParseIP(addr) == nil {
-			ipAddr = ""
-			hasNonIPEpAddr = true
-		}
-		address = append(address, addr)
-
-		convertInstanceId(ins.Metadata)
-
-		util.FilterLabels(ins.Metadata, patchLabel, ipAddr, "nacos :"+ins.InstanceId)
-
-		ep := &networkingapi.WorkloadEntry{
-			Address: addr,
-			Ports:   instancePorts,
-			Labels:  ins.Metadata,
-		}
-		util.FillWorkloadEntryLocality(ep)
-		endpoints = append(endpoints, ep)
-	}
-	sort.Slice(ports, func(i, j int) bool {
-		return ports[i].Number < ports[j].Number
-	})
-	return endpoints, ports, address, hasNonIPEpAddr
-}
-
-func convertServiceEntryWithNs(
-	instanceResp *instanceResp, defaultNs string, svcPort uint32, nsHost bool, k8sDomainSuffix bool,
-	instancePortAsSvcPort, patchLabel bool, filter func(*instance) bool, hostAliases map[string][]string,
+func convertServiceEntry(
+	instanceResp *instanceResp, defaultNs, projectCode string, svcPort uint32,
+	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
+	filter func(*instance) bool, hostAliases map[string][]string,
 ) map[string]*networkingapi.ServiceEntry {
-	endpointMap, nsSvcPorts, useDNSMap := convertEndpointsWithNs(
-		instanceResp.Hosts, defaultNs, svcPort, nsHost, instancePortAsSvcPort, patchLabel, filter)
-	if len(endpointMap) == 0 {
+	nsEndpoints, nsSvcPorts, useDNSMap := convertEndpointsWithNs(
+		instanceResp.Hosts, defaultNs, projectCode, svcPort, nsHost, instancePortAsSvcPort, patchLabel, filter)
+	if len(nsEndpoints) == 0 {
 		return nil
 	}
 
@@ -172,10 +93,12 @@ func convertServiceEntryWithNs(
 		}
 	}
 
-	// todo: why transform to lowercase?
-	svcShortName := strings.ToLower(instanceResp.Dom)
-	ses := make(map[string]*networkingapi.ServiceEntry, len(endpointMap))
-	for ns, endpoints := range endpointMap {
+	var (
+		ses          = make(map[string]*networkingapi.ServiceEntry, len(nsEndpoints))
+		svcShortName = instanceResp.Dom
+	)
+
+	for ns, endpoints := range nsEndpoints {
 		var (
 			host   = svcShortName
 			seName = svcShortName
@@ -187,40 +110,50 @@ func convertServiceEntryWithNs(
 				host += ".svc.cluster.local"
 			}
 		}
+
 		resolution := networkingapi.ServiceEntry_STATIC
 		if useDNSMap[ns] {
 			resolution = networkingapi.ServiceEntry_DNS
 		}
-		hosts := []string{host}
-		if hostAliases != nil {
-			hosts = append(hosts, hostAliases[host]...)
-		}
 
-		portMap := nsSvcPorts[ns]
-		ports := make([]*networkingapi.ServicePort, 0, len(portMap))
-		for _, p := range portMap {
-			ports = append(ports, p)
-		}
-		sort.Slice(ports, func(i, j int) bool {
-			return ports[i].Number < ports[j].Number
-		})
+		existSe := ses[seName]
+		if existSe != nil {
+			// should never happen considering that we've done merge-ns in convert-ep stage
+			log.Errorf("found dup se %s, prev %+v", seName, existSe)
+		} else {
+			hosts := []string{host}
+			if hostAliases != nil {
+				hosts = append(hosts, hostAliases[host]...)
+			}
 
-		ses[seName] = &networkingapi.ServiceEntry{
-			Hosts:      hosts,
-			Resolution: resolution,
-			Endpoints:  endpoints,
-			Ports:      ports,
+			portMap := nsSvcPorts[ns]
+			ports := make([]*networkingapi.ServicePort, 0, len(portMap))
+			for _, p := range portMap {
+				ports = append(ports, p)
+			}
+			sort.Slice(ports, func(i, j int) bool {
+				return ports[i].Number < ports[j].Number
+			})
+
+			ses[seName] = &networkingapi.ServiceEntry{
+				Hosts:      hosts,
+				Resolution: resolution,
+				Endpoints:  endpoints,
+				Ports:      ports,
+			}
 		}
 	}
+
 	return ses
 }
 
 func convertEndpointsWithNs(
-	instances []*instance, defaultNs string, svcPort uint32, nsHost, instancePortAsSvcPort, patchLabel bool,
+	instances []*instance, defaultNs, projectCode string, svcPort uint32,
+	nsHost, instancePortAsSvcPort, patchLabel bool,
 	filter func(*instance) bool,
 ) (map[string][]*networkingapi.WorkloadEntry, map[string]map[uint32]*networkingapi.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
-	portsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
+	svcPortsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
 	useDNSMap := make(map[string]bool, 0)
 	sort.Slice(instances, func(i, j int) bool {
 		return instances[i].InstanceId < instances[j].InstanceId
@@ -230,12 +163,17 @@ func convertEndpointsWithNs(
 		if filter != nil && !filter(ins) {
 			continue
 		}
-		if !ins.Healthy {
+		if !ins.Healthy { // nacos-spec
+			continue
+		}
+		// 与要求projectCode不同的服务实例跳过，实现服务实例项目隔离
+		if projectCode != "" && ins.Metadata[ProjectCode] != projectCode {
 			continue
 		}
 
 		metadata := ins.Metadata
-		convertInstanceId(metadata)
+		convertInstanceId(metadata) // nacos-spec
+		util.FilterLabels(metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
 		var ns string
 		if nsHost {
@@ -246,35 +184,11 @@ func convertEndpointsWithNs(
 			}
 		}
 
-		var (
-			addr   = ins.Ip
-			ipAddr = addr
-		)
-		useDns, e := useDNSMap[ns]
-		if !e {
-			useDns = false
-			useDNSMap[ns] = false
-		}
-		if net.ParseIP(addr) == nil {
-			ipAddr = ""
-			if !useDns {
-				useDns = true
-				useDNSMap[ns] = true
-			}
-		}
-
-		util.FilterLabels(metadata, patchLabel, ipAddr, "nacos :"+ins.InstanceId)
-
-		endpoints, exist := endpointsMap[ns]
-		if !exist {
-			endpoints = make([]*networkingapi.WorkloadEntry, 0)
-		}
-
 		var svcPortName string
-		ports, exist := portsMap[ns]
+		ports, exist := svcPortsMap[ns]
 		if !exist {
 			ports = map[uint32]*networkingapi.ServicePort{}
-			portsMap[ns] = ports
+			svcPortsMap[ns] = ports
 		}
 
 		svcPortInUse := svcPort
@@ -292,20 +206,32 @@ func convertEndpointsWithNs(
 			svcPortName = v.Name
 		}
 
-		instancePorts := make(map[string]uint32, 1)
-		instancePorts["http"] = uint32(ins.Port)
+		if useDns := useDNSMap[ns]; !useDns {
+			ipAdd := net.ParseIP(ins.Ip)
+			if ipAdd == nil { // invalid ip, consider as domain and need to use dns
+				useDNSMap[ns] = true
+			}
+		}
+
+		if useDns := useDNSMap[ns]; !useDns {
+			ipAdd := net.ParseIP(ins.Ip)
+			if ipAdd == nil { // invalid ip, consider as domain and need to use dns
+				useDNSMap[ns] = true
+			}
+		}
 
 		ep := &networkingapi.WorkloadEntry{
-			Address: addr,
+			Address: ins.Ip,
 			Ports:   map[string]uint32{svcPortName: uint32(ins.Port)},
 			Labels:  ins.Metadata,
 		}
-		util.FillWorkloadEntryLocality(ep)
-		endpoints = append(endpoints, ep)
 
-		endpointsMap[ns] = endpoints
+		util.FillWorkloadEntryLocality(ep)
+
+		endpointsMap[ns] = append(endpointsMap[ns], ep)
 	}
-	return endpointsMap, portsMap, useDNSMap
+
+	return endpointsMap, svcPortsMap, useDNSMap
 }
 
 func convertInstanceId(labels map[string]string) {
@@ -315,19 +241,17 @@ func convertInstanceId(labels map[string]string) {
 	}
 }
 
-func getProjectCode(ins *instanceResp) []string {
-	projectCode := make([]string, 0)
-	projectCodeMap := make(map[string]string)
+func getProjectCodeArr(ins *instanceResp) []string {
+	projectCodes := make([]string, 0)
+	projectCodeMap := make(map[string]struct{})
 	for _, instance := range ins.Hosts {
-		for k, v := range instance.Metadata {
-			if k == "projectCode" {
-				projectCodeMap[v] = ""
+		if v, ok := instance.Metadata[ProjectCode]; ok {
+			if _, ok := projectCodeMap[v]; !ok {
+				projectCodes = append(projectCodes, v)
+				projectCodeMap[v] = struct{}{}
 			}
 		}
 	}
 
-	for k := range projectCodeMap {
-		projectCode = append(projectCode, k)
-	}
-	return projectCode
+	return projectCodes
 }
