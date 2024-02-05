@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -50,6 +51,13 @@ const (
 	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
 
 	defaultServiceFilter = ""
+)
+
+const (
+	providerPathSuffix  = "/" + ProviderNode
+	consumerPathSuffix  = "/" + ConfiguratorNode
+	disableConsumerPath = "-"
+	configuratorSuffix  = "/" + ConfiguratorNode
 )
 
 type zkConn struct {
@@ -130,9 +138,18 @@ func WithDynamicConfigOption(addCb func(func(*bootstrap.ZookeeperSourceArgs))) O
 
 func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	// XXX refactor to config
-	if zkSrc := args; zkSrc != nil && zkSrc.GatewayModel {
-		zkSrc.SvcPort = 80
-		zkSrc.InstancePortAsSvcPort = false
+	if args.GatewayModel {
+		args.SvcPort = 80
+		args.InstancePortAsSvcPort = false
+		args.HostSuffix = ".dubbo"
+		// not fetch consumer data by default for gw
+	} else {
+		if args.ConsumerPath == "" {
+			args.ConsumerPath = consumerPathSuffix
+		}
+	}
+	if args.ConsumerPath == disableConsumerPath {
+		args.ConsumerPath = ""
 	}
 
 	ignoreLabels := make(map[string]string, 0)
@@ -709,7 +726,11 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 		}
 
 		var preCallModel map[string]DubboCallModel
-		callModel := convertDubboCallModel(se, convertedSe.InboundEndPoints)
+		interfaceName := se.Hosts[0]
+		if s.args.HostSuffix != "" {
+			interfaceName = strings.TrimSuffix(interfaceName, s.args.HostSuffix)
+		}
+		callModel := convertDubboCallModel(se, interfaceName, convertedSe.InboundEndPoints)
 		s.mut.Lock()
 		preCallModel, s.seDubboCallModels[meta.FullName] = s.seDubboCallModels[meta.FullName], callModel
 		changedApps := calcChangedApps(preCallModel, callModel)

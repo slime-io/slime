@@ -304,7 +304,9 @@ type ZookeeperSourceArgs struct {
 	// all blacklists will be ignored.
 	MethodLBServiceSelectors []*ServiceSelector `json:"MethodLBServiceSelectors,omitempty"`
 
-	// mcp configs
+	HostSuffix string `json:"HostSuffix,omitempty"`
+	// default /consumers, set to `-` to empty it and disable fetching consumer data
+	ConsumerPath string `json:"ConsumerPath,omitempty"`
 }
 
 type WatchingDebounce struct {

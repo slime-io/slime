@@ -158,7 +158,7 @@ func (s *Source) convertServiceEntry(
 		instancePortAsSvcPort = s.args.InstancePortAsSvcPort
 		patchLabel            = s.args.LabelPatch
 		ignoreLabels          = s.ignoreLabelsMap
-		gatewayMode           = s.args.GatewayModel
+		hostSuffix            = s.args.HostSuffix
 		filter                = s.getInstanceFilter()
 	)
 
@@ -275,11 +275,11 @@ func (s *Source) convertServiceEntry(
 			cse = &convertedServiceEntry{se: se}
 			serviceEntryByServiceKey[serviceKey] = cse
 			// XXX 网关模式下，服务host添加".dubbo"后缀
-			if gatewayMode {
-				se.Hosts = []string{serviceKey + DubboHostnameSuffix}
-			} else {
-				se.Hosts = []string{serviceKey}
+			host := serviceKey
+			if hostSuffix != "" {
+				host += hostSuffix
 			}
+			se.Hosts = []string{host}
 			se.Resolution = networkingapi.ServiceEntry_STATIC
 
 			for _, consumer := range consumers {
