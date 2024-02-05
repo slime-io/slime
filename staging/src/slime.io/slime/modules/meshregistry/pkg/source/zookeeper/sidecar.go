@@ -344,11 +344,8 @@ func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvid
 	return to
 }
 
-func convertDubboCallModel(se *networkingapi.ServiceEntry, inboundEndpoints []*networkingapi.WorkloadEntry) map[string]DubboCallModel {
+func convertDubboCallModel(se *networkingapi.ServiceEntry, interfaceName string, inboundEndpoints []*networkingapi.WorkloadEntry) map[string]DubboCallModel {
 	dubboModels := make(map[string]DubboCallModel)
-
-	interfaceName := se.Hosts[0]
-	interfaceName = strings.TrimSuffix(interfaceName, DubboHostnameSuffix)
 
 	type item struct {
 		eps     []*networkingapi.WorkloadEntry

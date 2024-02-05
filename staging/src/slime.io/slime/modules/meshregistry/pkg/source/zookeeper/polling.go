@@ -56,10 +56,10 @@ func (s *Source) iface(service string) {
 	}
 
 	var consumers []string
-	if s.args.GatewayModel {
+	if consumerPath := s.args.ConsumerPath; consumerPath == "" {
 		consumers = make([]string, 0)
 	} else {
-		consumers, err = s.Con.Children(s.args.RegistryRootNode + "/" + service + "/" + ConsumerNode)
+		consumers, err = s.Con.Children(s.args.RegistryRootNode + "/" + service + consumerPath)
 		monitoring.RecordSourceClientRequest(SourceName, err == nil)
 		if err != nil {
 			log.Debugf("zk %s get consumer error: %s", service, err.Error())

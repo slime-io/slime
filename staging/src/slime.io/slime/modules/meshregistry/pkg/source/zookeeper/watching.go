@@ -65,15 +65,12 @@ func (s *Source) Watching() {
 		rootPath:           s.args.RegistryRootNode,
 		endpointUpdateFunc: s.EndpointUpdate,
 		serviceDeleteFunc:  s.ServiceNodeDelete,
-		consumerPath:       consumerPathSuffix,
+		consumerPath:       s.args.ConsumerPath,
 		providerPath:       providerPathSuffix,
 		watchConfigurators: s.args.EnableConfiguratorMeta,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
 		forceUpdateTrigger: s.forceUpdateTrigger,
 		debounceConfig:     s.args.WatchingDebounce,
-	}
-	if s.args.GatewayModel {
-		sw.consumerPath = "" // consumer data is not needed in gateway mode
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -108,12 +105,6 @@ func (s *Source) Watching() {
 	sw.Start(ctx)
 	s.markServiceEntryInitDone()
 }
-
-const (
-	providerPathSuffix = "/providers"
-	consumerPathSuffix = "/consumers"
-	configuratorSuffix = "/configurators"
-)
 
 type EventType int
 
@@ -187,8 +178,7 @@ type EndpointWatcher struct {
 // Start should not block
 func (ew *EndpointWatcher) Start(ctx context.Context) {
 	log.Debugf("zk endpointWatcher %q start watching", ew.servicePath)
-	providerPath, consumerPath := providerPathSuffix, consumerPathSuffix
-	go ew.watchService(ctx, providerPath, consumerPath)
+	go ew.watchService(ctx, ew.providerPath, ew.consumerPath)
 }
 
 func (ew *EndpointWatcher) Exit() {
