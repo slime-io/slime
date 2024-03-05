@@ -8,7 +8,6 @@ package controllers
 import (
 	"fmt"
 	"hash/adler32"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -143,11 +142,11 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			rc.bodyAction = bodyAction
 			vHostRouteName := genVhostRouteName(rc)
 
-			if _, ok := route2RouteConfig[vHostRouteName]; !ok {
+			if old, ok := route2RouteConfig[vHostRouteName]; !ok {
 				route2RouteConfig[vHostRouteName] = []*routeConfig{rc}
 				routeNameList = append(routeNameList, vHostRouteName)
 			} else {
-				route2RouteConfig[vHostRouteName] = append(route2RouteConfig[vHostRouteName], rc)
+				route2RouteConfig[vHostRouteName] = append(old, rc)
 			}
 		}
 	}
@@ -158,24 +157,29 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			continue
 		}
 
-		record := make(map[int]int)
 		bodyactions := make([]*rlBodyAction, 0)
 		rateLimits := make([]*envoy_config_route_v3.RateLimit, 0)
+		// record is used to a bodyaction should be patched to which RateLimit's actions
+		// key is the index of rateLimits, value is the index of bodyactions
+		record := make(map[int]int)
 
 		for _, rc := range rcs {
+			rl := &envoy_config_route_v3.RateLimit{}
+			if len(rc.action) == 0 && rc.bodyAction == nil {
+				// should not be here
+				continue
+			}
+			rateLimits = append(rateLimits, rl)
 			if len(rc.action) > 0 {
-				rateLimits = append(rateLimits, &envoy_config_route_v3.RateLimit{Actions: rc.action})
+				rl.Actions = rc.action
 			}
 			if rc.bodyAction != nil {
 				bodyactions = append(bodyactions, rc.bodyAction)
-				// if rc action is exist
-				if len(rc.action) > 0 {
-					record[len(rateLimits)-1] = len(bodyactions) - 1
-				}
+				record[len(rateLimits)-1] = len(bodyactions) - 1
 			}
 		}
 
-		if len(rateLimits) == 0 && len(bodyactions) == 0 {
+		if len(rateLimits) == 0 {
 			log.Infof("no rate limit action or body action in %s", rn)
 			continue
 		}
@@ -198,7 +202,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 			patch2vhost = true
 			// route name not specified, patch to vhost
 			vh := &envoy_config_route_v3.VirtualHost{RateLimits: rateLimits}
-			vhStruct, err := util.MessageToStruct(vh)
+			vhStruct, err := util.MessageToStructWithOpts(vh, util.UseProtoNames(true))
 			if err != nil {
 				return nil, err
 			}
@@ -212,7 +216,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 					},
 				},
 			}
-			routeStruct, err := util.MessageToStruct(route)
+			routeStruct, err := util.MessageToStructWithOpts(route, util.UseProtoNames(true))
 			if err != nil {
 				return nil, err
 			}
@@ -231,7 +235,7 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 
 func patchBodyActions(patch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, patch2vhost bool, record map[int]int, bodyactions []*rlBodyAction) error {
 	ppv := patch.Patch.Value
-	m, err := util.ProtoToMap(ppv)
+	m, err := util.ProtoToMapWithOpts(ppv, util.UseProtoNames(true))
 	if err != nil {
 		return fmt.Errorf("convert rate_limits proto to map err,%+v", err.Error())
 	}
@@ -264,38 +268,25 @@ func patchBodyActions(patch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, p
 
 func patchBodyActionToRate(rls []interface{}, bodyactions []*rlBodyAction, record map[int]int) []interface{} {
 	log.Debugf("rls is %+v, bodyactions is %+v, record is %+v", rls, bodyactions, record)
-	deleted := make([]int, 0)
 
 	for i := range rls {
-		if actions, ok := rls[i].(map[string]interface{}); ok {
-			if specifier, ok := actions[model.RateLimitActions].([]interface{}); ok {
-				if val, ok := record[i]; ok && val < len(bodyactions) {
-					specifier = append(specifier, bodyactions[val])
-					deleted = append(deleted, val)
+		if rl, ok := rls[i].(map[string]interface{}); ok {
+			val, exist := rl[model.RateLimitActions]
+			if exist {
+				if actions, ok := val.([]interface{}); ok {
+					if bodyIdx, ok := record[i]; ok && bodyIdx < len(bodyactions) {
+						actions = append(actions, bodyactions[bodyIdx])
+						rl[model.RateLimitActions] = actions
+					}
 				}
-				actions[model.RateLimitActions] = specifier
+			} else {
+				if bodyIdx, ok := record[i]; ok && bodyIdx < len(bodyactions) {
+					rl[model.RateLimitActions] = []interface{}{bodyactions[bodyIdx]}
+				}
 			}
 		}
 	}
-
-	bodyactions = deleteAtIndex(bodyactions, deleted)
-
-	for i := range bodyactions {
-		rls = append(rls, map[string]interface{}{
-			model.RateLimitActions: []*rlBodyAction{bodyactions[i]},
-		})
-	}
 	return rls
-}
-
-func deleteAtIndex(slice []*rlBodyAction, indices []int) []*rlBodyAction {
-	sort.Sort(sort.Reverse(sort.IntSlice(indices)))
-	for _, idx := range indices {
-		if idx >= 0 && idx < len(slice) {
-			slice = append(slice[:idx], slice[idx+1:]...)
-		}
-	}
-	return slice
 }
 
 // only enable local rate limit

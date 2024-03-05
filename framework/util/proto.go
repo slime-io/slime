@@ -9,12 +9,23 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-// MessageToStruct converts golang proto msg to struct
-func MessageToStruct(msg proto.Message) (*structpb.Struct, error) {
+type ProtoJSONOpts func(*protojson.MarshalOptions)
+
+func UseProtoNames(useProtoNames bool) ProtoJSONOpts {
+	return func(opts *protojson.MarshalOptions) {
+		opts.UseProtoNames = useProtoNames
+	}
+}
+
+func MessageToStructWithOpts(msg proto.Message, opts ...ProtoJSONOpts) (*structpb.Struct, error) {
 	if msg == nil {
 		return nil, errors.New("nil message")
 	}
-	bs, err := protojson.Marshal(msg)
+	mo := &protojson.MarshalOptions{}
+	for _, opt := range opts {
+		opt(mo)
+	}
+	bs, err := mo.Marshal(msg)
 	if err != nil {
 		return nil, err
 	}
@@ -25,10 +36,19 @@ func MessageToStruct(msg proto.Message) (*structpb.Struct, error) {
 	return pbs, nil
 }
 
-func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
-	if bs, err := protojson.Marshal(pb); err == nil {
+// MessageToStruct converts golang proto msg to struct
+func MessageToStruct(msg proto.Message) (*structpb.Struct, error) {
+	return MessageToStructWithOpts(msg)
+}
+
+func ProtoToMapWithOpts(pb proto.Message, opts ...ProtoJSONOpts) (map[string]interface{}, error) {
+	mo := &protojson.MarshalOptions{}
+	for _, opt := range opts {
+		opt(mo)
+	}
+	if bs, err := mo.Marshal(pb); err == nil {
 		var mapResult map[string]interface{}
-		// 使用 json.Unmarshal(data []byte, v interface{})进行转换,返回 error 信息
+		// use json.Unmarshal(data []byte, v interface{}) to convert and return error information
 		if err := json.Unmarshal(bs, &mapResult); err == nil {
 			return mapResult, nil
 		} else {
@@ -37,6 +57,11 @@ func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
 	} else {
 		return nil, err
 	}
+
+}
+
+func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {
+	return ProtoToMapWithOpts(pb)
 }
 
 func FromJSONMapToMessage(data interface{}, msg proto.Message) error {
