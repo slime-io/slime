@@ -24,7 +24,7 @@ var (
 	)
 
 	// readyTime is the time spent on ready in seconds.
-	readyTime = monitoring.NewGauge(
+	readyTime = monitoring.NewHistogram(
 		model.ModuleName,
 		"ready_time",
 		"Time spent on ready in seconds",

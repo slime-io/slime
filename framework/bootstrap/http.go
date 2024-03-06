@@ -1,12 +1,10 @@
 package bootstrap
 
 import (
-	"contrib.go.opencensus.io/exporter/prometheus"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/pprof"
-	"slime.io/slime/framework/bootstrap/resource"
 	"strconv"
 	"strings"
 	"sync"
@@ -14,6 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kube-openapi/pkg/common"
 
+	"slime.io/slime/framework/bootstrap/resource"
 	"slime.io/slime/framework/util"
 )
 
@@ -104,7 +103,8 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 }
 
 func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pathRedirects map[string]string,
-	readyChecker func() error, pe *prometheus.Exporter) {
+	readyChecker func() error, pe http.Handler,
+) {
 	// register
 	HealthCheckRegister(ph, readyChecker)
 	PprofRegister(ph)
@@ -118,7 +118,7 @@ func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pat
 	}
 }
 
-func ExporterRegister(ph *PathHandler, pe *prometheus.Exporter) {
+func ExporterRegister(ph *PathHandler, pe http.Handler) {
 	if pe == nil {
 		return
 	}
@@ -295,7 +295,7 @@ func iLogLevelHandler() http.Handler {
 			if level[0] != "" {
 				log.Infof("get ilog level setting %s", level[0])
 				parts := strings.Split(level[0], ",")
-				for i, _ := range parts {
+				for i := range parts {
 					items := strings.Split(parts[i], ":")
 					if len(items) != 2 {
 						continue

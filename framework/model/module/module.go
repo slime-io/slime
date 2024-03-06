@@ -12,7 +12,6 @@ import (
 	"sync"
 	"unsafe"
 
-	"contrib.go.opencensus.io/exporter/prometheus"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -466,9 +465,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	// Create the Prometheus exporter.
-	pe, err := prometheus.NewExporter(prometheus.Options{
-		Namespace: util.MetricPrefix,
-	})
+	pe, err := monitoring.NewExporter()
 	if err != nil {
 		log.Fatalf("Failed to create the Prometheus stats exporter: %v", err)
 	}

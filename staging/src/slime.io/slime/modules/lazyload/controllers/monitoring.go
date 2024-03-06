@@ -54,7 +54,7 @@ var (
 		"total number of update extra resource failed",
 	)
 
-	ServicefenceLoads = monitoring.NewGauge(
+	ServicefenceLoads = monitoring.NewHistogram(
 		model.ModuleName,
 		"servicefenc_loads",
 		"total number of servicefence loads",

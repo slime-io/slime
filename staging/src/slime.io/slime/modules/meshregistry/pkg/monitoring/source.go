@@ -21,11 +21,11 @@ var (
 
 var (
 	// pollingTime is the time spent on polling in seconds.
-	pollingTime = monitoring.NewDistribution(
+	pollingTime = monitoring.NewHistogram(
 		model.ModuleName,
 		"polling_time",
 		"Time spent on polling in seconds",
-		[]float64{.5, 1, 3, 5, 8, 10, 20, 30, 60, 90, 120},
+		monitoring.WithHistogramBounds([]float64{.5, 1, 3, 5, 8, 10, 20, 30, 60, 90, 120}...),
 		monitoring.WithUnit(monitoring.UnitSeconds),
 	)
 	// pollingsCount is the number of pollings by source.
