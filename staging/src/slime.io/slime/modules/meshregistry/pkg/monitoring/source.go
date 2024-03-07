@@ -102,6 +102,13 @@ var (
 		"source_client_request_count",
 		"client request count by source, with status.",
 	)
+
+	// sourceConnectionStatus is the connection status of the source.
+	sourceConnectionStatus = monitoring.NewGauge(
+		model.ModuleName,
+		"source_connection_status",
+		"the connection status of the source. 1 for connected, 0 for disconnected.",
+	)
 )
 
 // RecordPolling records the time spent on each polling and increment the number of pollings by source.
@@ -197,4 +204,15 @@ func RecordSourceClientRequest(source string, success bool) {
 		souceLabel.Value(source),
 		statusLabel.Value(fmt.Sprintf("%t", success)),
 	).Increment()
+}
+
+// RecordSourceConnectionStatus records the connection status of the source.
+func RecordSourceConnectionStatus(source string, connected bool) {
+	status := 0
+	if connected {
+		status = 1
+	}
+	sourceConnectionStatus.With(
+		souceLabel.Value(source),
+	).Record(float64(status))
 }
