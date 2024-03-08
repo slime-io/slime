@@ -55,7 +55,7 @@ const (
 
 const (
 	providerPathSuffix  = "/" + ProviderNode
-	consumerPathSuffix  = "/" + ConfiguratorNode
+	consumerPathSuffix  = "/" + ConsumerNode
 	disableConsumerPath = "-"
 	configuratorSuffix  = "/" + ConfiguratorNode
 )
