@@ -244,13 +244,13 @@ func (l zkLogger) Printf(format string, args ...interface{}) {
 }
 
 func (s *Source) reConFunc(reconCh chan<- struct{}) {
+	monitoring.RecordSourceConnectionStatus(SourceName, false)
 	if s.watchingRoot {
 		return // ??
 	}
 
 	// TODO: use the zk.Conn.hostProvider.Len() replace the len(s.args.Address)?
 	connectTimeout := time.Duration(len(s.args.Address)+1) * time.Second
-
 	var curConn *zk.Conn
 	if v := s.Con.Load(); v != nil {
 		curConn = v.(*zk.Conn)
@@ -258,6 +258,7 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	if curConn != nil {
 		if curConn.State() == zk.StateHasSession {
 			log.Infof("the state of zk conn %p is ok with sessionID: %d", curConn, curConn.SessionID())
+			monitoring.RecordSourceConnectionStatus(SourceName, true)
 			return
 		}
 		curConn.Close()
@@ -322,6 +323,7 @@ func (s *Source) reConFunc(reconCh chan<- struct{}) {
 				// replace the connection
 				s.Con.Store(con)
 				log.Infof("zk conn %s connect to zk successfully with sessionID: %d", logCon(), con.SessionID())
+				monitoring.RecordSourceConnectionStatus(SourceName, true)
 				break
 			}
 		}

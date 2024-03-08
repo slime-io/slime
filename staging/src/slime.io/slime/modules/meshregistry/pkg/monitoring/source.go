@@ -21,11 +21,11 @@ var (
 
 var (
 	// pollingTime is the time spent on polling in seconds.
-	pollingTime = monitoring.NewDistribution(
+	pollingTime = monitoring.NewHistogram(
 		model.ModuleName,
 		"polling_time",
 		"Time spent on polling in seconds",
-		[]float64{.5, 1, 3, 5, 8, 10, 20, 30, 60, 90, 120},
+		monitoring.WithHistogramBounds([]float64{.5, 1, 3, 5, 8, 10, 20, 30, 60, 90, 120}...),
 		monitoring.WithUnit(monitoring.UnitSeconds),
 	)
 	// pollingsCount is the number of pollings by source.
@@ -101,6 +101,13 @@ var (
 		model.ModuleName,
 		"source_client_request_count",
 		"client request count by source, with status.",
+	)
+
+	// sourceConnectionStatus is the connection status of the source.
+	sourceConnectionStatus = monitoring.NewGauge(
+		model.ModuleName,
+		"source_connection_status",
+		"the connection status of the source. 1 for connected, 0 for disconnected.",
 	)
 )
 
@@ -197,4 +204,15 @@ func RecordSourceClientRequest(source string, success bool) {
 		souceLabel.Value(source),
 		statusLabel.Value(fmt.Sprintf("%t", success)),
 	).Increment()
+}
+
+// RecordSourceConnectionStatus records the connection status of the source.
+func RecordSourceConnectionStatus(source string, connected bool) {
+	status := 0
+	if connected {
+		status = 1
+	}
+	sourceConnectionStatus.With(
+		souceLabel.Value(source),
+	).Record(float64(status))
 }
