@@ -14,11 +14,10 @@ import (
 	"github.com/jpillora/backoff"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/robfig/cron/v3"
-	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/env"
 
+	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
-	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
 var forceUpdateJitterDuration = env.RegisterDurationVar(
@@ -39,19 +38,7 @@ func jitter(period time.Duration) time.Duration {
 func (s *Source) ServiceNodeDelete(path string) {
 	ss := strings.Split(path, "/")
 	service := ss[len(ss)-2]
-	if ses, ok := s.cache.Get(service); ok {
-		for serviceKey, sem := range ses.Items() {
-			event, err := buildServiceEntryEvent(event.Deleted, sem.ServiceEntry, sem.Meta, false)
-			if err == nil {
-				for _, h := range s.handlers {
-					h.Handle(event)
-				}
-			}
-			monitoring.RecordServiceEntryDeletion(SourceName, true, err == nil)
-			ses.Remove(serviceKey)
-		}
-		s.cache.Remove(service)
-	}
+	s.handleServiceDelete(service, util.NewSet[string]())
 }
 
 func (s *Source) EndpointUpdate(providers, consumers, configurators []string, path string) {

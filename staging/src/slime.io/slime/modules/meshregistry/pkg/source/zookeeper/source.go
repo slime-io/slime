@@ -28,6 +28,7 @@ import (
 	k8slabels "k8s.io/apimachinery/pkg/labels"
 
 	frameworkmodel "slime.io/slime/framework/model"
+	frameworkutil "slime.io/slime/framework/util"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
@@ -650,6 +651,42 @@ func generateMethodLBChecker(selectors []*bootstrap.ServiceSelector) func(*conve
 	}
 }
 
+// handleServiceDelete clean the service entry under the interface node except the ignored ones
+// we do not really delete the service entry, but update it with empty endpoints,
+// so that the contorl plane can handle it as a EDS event
+func (s *Source) handleServiceDelete(iface string, ignoredSes frameworkutil.Set[string]) {
+	// if enable empty protection, we don't need to handle interface node delete
+	if s.args.EnableEmptyProtection {
+		return
+	}
+	if ses, ok := s.cache.Get(iface); ok {
+		for se, sem := range ses.Items() {
+			if ignoredSes.Contains(se) {
+				continue
+			}
+			// del event -> empty-ep update event
+			if len(sem.ServiceEntry.Endpoints) == 0 {
+				continue
+			}
+			seValueCopy := *sem
+			seCopy := *sem.ServiceEntry
+			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
+			seValueCopy.ServiceEntry = &seCopy
+			ses.Set(se, &seValueCopy)
+			event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
+			if err == nil {
+				log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
+				for _, h := range s.handlers {
+					h.Handle(event)
+				}
+			} else {
+				log.Errorf("delete(update) svc %s failed, case: %v", se, err.Error())
+			}
+			monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
+		}
+	}
+}
+
 func (s *Source) handleServiceData(providers, consumers, configutators []string, dubboInterface string) {
 	if _, ok := s.cache.Get(dubboInterface); !ok {
 		s.cache.Set(dubboInterface, cmap.New[*ServiceEntryWithMeta]())
@@ -773,47 +810,11 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 		}
 	}
 
-	// check if svc deleted
-	deleteKey := make([]string, 0)
-	seCache, ok := s.cache.Get(dubboInterface)
-	if !ok {
-		return
+	ignoredSes := frameworkutil.NewSet[string]()
+	for seKey := range freshSeMap {
+		ignoredSes.Insert(seKey)
 	}
-	for serviceKey, seValue := range seCache.Items() {
-		_, exist := freshSeMap[serviceKey]
-		if exist {
-			continue
-		}
-		deleteKey = append(deleteKey, serviceKey)
-
-		// del event -> empty-ep update event
-
-		if len(seValue.ServiceEntry.Endpoints) == 0 {
-			continue
-		}
-
-		seValueCopy := *seValue
-		seCopy := *seValue.ServiceEntry
-		seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
-		seValueCopy.ServiceEntry = &seCopy
-		seCache.Set(serviceKey, &seValueCopy)
-		seValue = &seValueCopy
-
-		ev, err := buildServiceEntryEvent(event.Updated, seValue.ServiceEntry, seValue.Meta, false)
-		if err == nil {
-			log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", seValue.ServiceEntry.Hosts[0], len(seValue.ServiceEntry.Endpoints))
-			for _, h := range s.handlers {
-				h.Handle(ev)
-			}
-		} else {
-			log.Errorf("delete svc failed, case: %v", err.Error())
-		}
-		monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
-	}
-
-	for _, key := range deleteKey {
-		seCache.Remove(key)
-	}
+	s.handleServiceDelete(dubboInterface, ignoredSes)
 }
 
 func (s *Source) getInstanceFilter() func(*dubboInstance) bool {

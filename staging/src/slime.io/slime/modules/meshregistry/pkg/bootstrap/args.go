@@ -147,6 +147,10 @@ type SourceArgs struct {
 	// InstanceMetaRelabel is used to adjust the metadata of the instance.
 	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs to be processed before ServiceNaming
 	InstanceMetaRelabel *InstanceMetaRelabel `json:"InstanceMetaRelabel,omitempty"`
+
+	// EnableEmptyProtection if set to true, the source should ignore conversion of the service with no endpoints, which means
+	// the last conversion result with endpoints will be kept until the source gets the new endpoints.
+	EnableEmptyProtection bool `json:"EnableEmptyProtection,omitempty"`
 }
 
 // IPRanges defines a set of ip with ip list and cidr list

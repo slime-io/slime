@@ -3,9 +3,7 @@ package zookeeper
 import (
 	"time"
 
-	networkingapi "istio.io/api/networking/v1alpha3"
-	"istio.io/libistio/pkg/config/event"
-
+	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
@@ -30,17 +28,17 @@ func (s *Source) Polling() {
 func (s *Source) refresh() {
 	t0 := time.Now()
 	log.Infof("zk refresh start : %d", t0.UnixNano())
-	children, err := s.Con.Children(s.args.RegistryRootNode)
+	interfaces, err := s.Con.Children(s.args.RegistryRootNode)
 	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
 		monitoring.RecordPolling(SourceName, t0, time.Now(), false)
 		log.Errorf("zk path %s get child error: %s", s.args.RegistryRootNode, err.Error())
 		return
 	}
-	for _, child := range children {
-		s.iface(child)
+	for _, iface := range interfaces {
+		s.iface(iface)
 	}
-	s.handleNodeDelete(children)
+	s.handleInterfacesDelete(interfaces)
 	t1 := time.Now()
 	log.Infof("zk refresh finish : %d", t1.UnixNano())
 	monitoring.RecordPolling(SourceName, t0, t1, true)
@@ -77,41 +75,19 @@ func (s *Source) iface(service string) {
 	s.handleServiceData(providers, consumers, configurators, service)
 }
 
-func (s *Source) handleNodeDelete(childrens []string) {
+func (s *Source) handleInterfacesDelete(currInterfaces []string) {
 	existMap := make(map[string]string)
-	for _, child := range childrens {
-		existMap[child] = child
+	for _, iface := range currInterfaces {
+		existMap[iface] = iface
 	}
-	deleteKey := make([]string, 0)
+	deleteInterfaces := make([]string, 0)
 	for service := range s.cache.Items() {
 		if _, exist := existMap[service]; !exist {
-			deleteKey = append(deleteKey, service)
+			deleteInterfaces = append(deleteInterfaces, service)
 		}
 	}
 
-	for _, service := range deleteKey {
-		if ses, ok := s.cache.Get(service); ok {
-			for k, sem := range ses.Items() {
-				if len(sem.ServiceEntry.Endpoints) == 0 {
-					continue
-				}
-				// DELETE ==> empty endpoints
-				seValueCopy := *sem
-				seCopy := *sem.ServiceEntry
-				seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
-				seValueCopy.ServiceEntry = &seCopy
-				ses.Set(k, &seValueCopy)
-				event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
-				if err == nil {
-					log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
-					for _, h := range s.handlers {
-						h.Handle(event)
-					}
-				} else {
-					log.Errorf("delete(update) svc %s failed, case: %v", k, err.Error())
-				}
-				monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
-			}
-		}
+	for _, iface := range deleteInterfaces {
+		s.handleServiceDelete(iface, util.NewSet[string]())
 	}
 }
