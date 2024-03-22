@@ -53,6 +53,8 @@ message GlobalSidecar {
   SidecarInject sidecarInject = 6;
   ResourceRequirements resources = 7;
   bool legacyFilterName = 8;
+  k8s.io.api.core.v1.Affinity affinity = 9;
+  repeated k8s.io.api.core.v1.Toleration tolerations = 10;
 }
 
 message Image {
