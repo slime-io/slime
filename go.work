@@ -13,8 +13,8 @@ use (
 
 replace (
 	// slime lib
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20240116022210-c7970f94037d
-	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20240319031437-de3690e6f139
+	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240319025542-9b29030c6429
 	github.com/go-zookeeper/zk => github.com/slime-io/go-zk v0.0.0-20231205121800-d3e53bc03897
 	slime.io/pkg => github.com/slime-io/pkg v0.0.0-20230517042057-3fbf1159a7a7
 
