@@ -2,6 +2,7 @@ package v1alpha1
 
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
+// +kubebuilder:resource:shortName=slb
 // +kubebuilder:subresource:status
 type SlimeBoot struct {
 	metav1.TypeMeta   `json:",inline,omitempty" yaml:",inline,omitempty"`
