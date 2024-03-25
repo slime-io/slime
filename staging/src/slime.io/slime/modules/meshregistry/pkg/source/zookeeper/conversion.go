@@ -1,11 +1,9 @@
 package zookeeper
 
 import (
-	"encoding/json"
 	"math"
 	"net"
 	"net/url"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,63 +40,12 @@ const (
 	DubboSvcMethodEqLabel         = "istio.io/dubbomethodequal"
 )
 
-const (
-	dns1123LabelMaxLength int    = 63
-	dns1123LabelFmt       string = "[a-zA-Z0-9]([-a-z-A-Z0-9]*[a-zA-Z0-9])?"
-	// a wild-card prefix is an '*', a normal DNS1123 label with a leading '*' or '*-', or a normal DNS1123 label
-	wildcardPrefix = `(\*|(\*|\*-)?` + dns1123LabelFmt + `)`
-
-	// Using kubernetes requirement, a valid key must be a non-empty string consist
-	// of alphanumeric characters, '-', '_' or '.', and must start and end with an
-	// alphanumeric character (e.g. 'MyValue',  or 'my_value',  or '12345'
-	qualifiedNameFmt string = "([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9]"
-)
-
-var wildcardPrefixRegexp = regexp.MustCompile("^" + wildcardPrefix + "$")
-
 type Error struct {
 	msg string
 }
 
 func (e Error) Error() string {
 	return e.msg
-}
-
-func getMetaServicePort(payload ServiceInstancePayload) *networkingapi.Port {
-	if payload.Metadata == nil || len(payload.Metadata) == 0 || payload.Metadata[metaDataServiceKey] == "" {
-		return nil
-	}
-	urlParam := payload.Metadata[metaDataServiceKey]
-
-	urlParamMap := make(map[string]map[string]string)
-	if err := json.Unmarshal([]byte(urlParam), &urlParamMap); err == nil {
-		metadataServiceParam := urlParamMap[DubboPortName]
-		if port, ok := metadataServiceParam["port"]; ok {
-			if portNum, err := strconv.Atoi(port); err == nil {
-				portName := metadataServicePortNamePrefix + port
-				metaServicePort := &networkingapi.Port{
-					Number:   uint32(portNum),
-					Protocol: NetworkProtocolDubbo,
-					Name:     portName,
-				}
-				return metaServicePort
-			}
-		}
-	}
-	return nil
-}
-
-func verifyServiceInstance(si DubboServiceInstance) bool {
-	if net.ParseIP(si.Address) == nil {
-		return false
-	}
-	if si.Name == "" {
-		return false
-	}
-	if si.Payload.Metadata == nil || si.Payload.Metadata[metaDataServiceKey] == "" {
-		return false
-	}
-	return true
 }
 
 // trimSameDubboMethodsLabel removes the dubbo methods label when all endpoints have same methods because in this case
@@ -258,7 +205,6 @@ func (s *Source) convertServiceEntry(
 		if len(methods) > 0 {
 			serviceMethods := methodsByServiceKey[serviceKey]
 			if serviceMethods == nil {
-				serviceMethods = methods
 				methodsByServiceKey[serviceKey] = methods
 			} else {
 				for method := range methods {
