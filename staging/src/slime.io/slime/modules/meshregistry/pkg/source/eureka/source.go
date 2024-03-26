@@ -175,16 +175,25 @@ func (s *Source) updateServiceInfo() error {
 	if err != nil {
 		return fmt.Errorf("get eureka app failed: %v", err)
 	}
-	newServiceEntryMap, err := ConvertServiceEntryMap(
-		apps, s.args.DefaultServiceNs, s.args.AppSuffix, s.args.LabelPatch, s.args.SvcPort,
-		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.EnableProjectCode)
+
+	opts := &convertOptions{
+		patchLabel:            s.args.LabelPatch,
+		enableProjectCode:     s.args.EnableProjectCode,
+		nsHost:                s.args.NsHost,
+		k8sDomainSuffix:       s.args.K8sDomainSuffix,
+		instancePortAsSvcPort: s.args.InstancePortAsSvcPort,
+		svcPort:               s.args.SvcPort,
+		defaultSvcNs:          s.args.DefaultServiceNs,
+		appSuffix:             s.args.AppSuffix,
+	}
+	opts.protocol, opts.protocolName = source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
+	newServiceEntryMap, err := ConvertServiceEntryMap(apps, opts)
 	if err != nil {
 		log.Errorf("convert eureka servceentry map failed: " + err.Error())
 		return fmt.Errorf("convert eureka servceentry map failed: %v", err)
 	}
 
 	cache := s.cacheShallowCopy()
-
 	for seFullName, se := range cache {
 		if _, ok := newServiceEntryMap[seFullName]; !ok {
 			// DELETE ==> set ep size to zero

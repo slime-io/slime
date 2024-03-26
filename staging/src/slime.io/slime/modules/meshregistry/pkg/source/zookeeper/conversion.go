@@ -97,18 +97,23 @@ type convertedServiceEntry struct {
 	InboundEndPoints []*networkingapi.WorkloadEntry
 }
 
-func (s *Source) convertServiceEntry(
-	providers, consumers, configurators []string, service string,
-) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
-	var (
-		svcPort               = s.args.SvcPort
-		instancePortAsSvcPort = s.args.InstancePortAsSvcPort
-		patchLabel            = s.args.LabelPatch
-		ignoreLabels          = s.ignoreLabelsMap
-		hostSuffix            = s.args.HostSuffix
-		filter                = s.getInstanceFilter()
-	)
+type convertOptions struct {
+	patchLabel            bool
+	instancePortAsSvcPort bool
+	svcPort               uint32
+	hostSuffix            string
+	ignoreLabels          map[string]string
+	filter                func(*dubboInstance) bool
 
+	// the protocol used for Port.Protocol
+	protocol string
+	// the protocol name used for Port.Name
+	protocolName string
+}
+
+func (s *Source) convertServiceEntry(
+	providers, consumers, configurators []string, service string, opts *convertOptions,
+) (map[string][]dubboInstance, map[string]*convertedServiceEntry) {
 	registryServicesByServiceKey := make(map[string][]dubboInstance)
 	serviceEntryByServiceKey := make(map[string]*convertedServiceEntry)
 	methodsByServiceKey := make(map[string]map[string]struct{})
@@ -156,7 +161,6 @@ func (s *Source) convertServiceEntry(
 
 	uniquePort := make(map[string]map[uint32]struct{})
 
-	// 获取provider 信息
 	for _, provider := range providers {
 		providerParts := splitUrl(provider)
 		if providerParts == nil {
@@ -176,17 +180,12 @@ func (s *Source) convertServiceEntry(
 			}
 		)
 
-		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, portNum, service, patchLabel, ignoreLabels, methodApplier, extraMeta)
+		// extract dubbo metadata and methods from url
+		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, portNum, service, opts.patchLabel, opts.ignoreLabels, methodApplier, extraMeta)
 		if !ok {
 			continue
 		}
-
 		serviceKey := buildServiceKey(service, meta) // istio service host
-
-		svcPortInUse := svcPort
-		if instancePortAsSvcPort {
-			svcPortInUse = portNum
-		}
 
 		// now we have the necessary info to build the dubboinstance,
 		// so we can filter out the instance if needed
@@ -197,11 +196,11 @@ func (s *Source) convertServiceEntry(
 			Metadata: meta,
 		}
 		registryServicesByServiceKey[serviceKey] = append(registryServicesByServiceKey[serviceKey], instance)
-		if filter != nil && !filter(&instance) {
+		if opts.filter != nil && !opts.filter(&instance) {
 			continue
 		}
 
-		instPort := convertPort(svcPortInUse, portNum)
+		// update methods of the service
 		if len(methods) > 0 {
 			serviceMethods := methodsByServiceKey[serviceKey]
 			if serviceMethods == nil {
@@ -213,6 +212,7 @@ func (s *Source) convertServiceEntry(
 			}
 		}
 
+		// get or create convertedServiceEntry
 		cse := serviceEntryByServiceKey[serviceKey]
 		if cse == nil {
 			se := &networkingapi.ServiceEntry{
@@ -220,62 +220,74 @@ func (s *Source) convertServiceEntry(
 			}
 			cse = &convertedServiceEntry{se: se}
 			serviceEntryByServiceKey[serviceKey] = cse
-			// XXX 网关模式下，服务host添加".dubbo"后缀
+			// append suffix to service host if needed
 			host := serviceKey
-			if hostSuffix != "" {
-				host += hostSuffix
+			if opts.hostSuffix != "" {
+				host += opts.hostSuffix
 			}
 			se.Hosts = []string{host}
 			se.Resolution = networkingapi.ServiceEntry_STATIC
 
+			// try build inbound endpoints
 			for _, consumer := range consumers {
 				consumerParts := splitUrl(consumer)
 				if consumerParts == nil {
 					continue
 				}
 
-				var (
-					cAddr = consumerParts[2]
-					cPort *networkingapi.ServicePort
-				)
-
+				cAddr := consumerParts[2]
 				if idx := strings.Index(cAddr, ":"); idx >= 0 { // consumer url generally does not have port
-					addr, portNum, err := parseAddr(cAddr)
+					addr, _, err := parseAddr(cAddr)
 					if err != nil {
 						// missing consumer port is not that critical, thus we continue to ...
 						log.Debugf("invalid consumer %s of %s", consumer, serviceKey)
 						cAddr = cAddr[:idx]
 					} else {
-						cPort = convertPort(portNum, portNum)
 						cAddr = addr
 					}
 				}
 
 				// XXX optimize inbound ep meta calculation
-				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, portNum, "", patchLabel, ignoreLabels, nil, nil); ok {
+				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, portNum, "", opts.patchLabel, opts.ignoreLabels, nil, nil); ok {
 					meta = consumerMeta(meta)
 					consumerServiceKey := buildServiceKey(service, meta)
 					if consumerServiceKey == serviceKey {
-						cse.InboundEndPoints = append(cse.InboundEndPoints, convertInboundEndpoint(cAddr, meta, cPort))
+						cse.InboundEndPoints = append(cse.InboundEndPoints, convertInboundEndpoint(cAddr, meta))
 					}
 				}
 			}
 		}
 		se := cse.se
 
-		se.Endpoints = append(se.Endpoints, convertEndpoint(addr, meta, instPort))
+		svcPortInUse := opts.svcPort
+		if opts.instancePortAsSvcPort {
+			svcPortInUse = portNum
+		}
 
+		// add endpoint
+		se.Endpoints = append(se.Endpoints,
+			convertEndpoint(addr, meta, &networkingapi.ServicePort{
+				Number:   portNum,
+				Protocol: opts.protocol,
+				Name:     source.PortName(opts.protocolName, svcPortInUse),
+			}),
+		)
+
+		// update ports of the serviceEntry
 		if _, ok := uniquePort[serviceKey]; !ok {
 			uniquePort[serviceKey] = make(map[uint32]struct{})
 		}
-
 		svcPortsToAdd := []uint32{svcPortInUse}
-		if svcPort != 0 && svcPort != svcPortInUse {
-			svcPortsToAdd = append(svcPortsToAdd, svcPort)
+		if opts.svcPort != 0 && opts.svcPort != svcPortInUse {
+			svcPortsToAdd = append(svcPortsToAdd, opts.svcPort)
 		}
 		for _, p := range svcPortsToAdd {
 			if _, ok := uniquePort[serviceKey][p]; !ok {
-				se.Ports = append(se.Ports, convertPort(p, p))
+				se.Ports = append(se.Ports, &networkingapi.ServicePort{
+					Number:   p,
+					Protocol: opts.protocol,
+					Name:     source.PortName(opts.protocolName, p),
+				})
 				uniquePort[serviceKey][p] = struct{}{}
 			}
 		}
@@ -445,14 +457,6 @@ func parseDubboTag(str string, meta map[string]string) {
 	}
 }
 
-func convertPort(svcPort, port uint32) *networkingapi.ServicePort {
-	return &networkingapi.ServicePort{
-		Protocol: NetworkProtocolDubbo,
-		Number:   port,
-		Name:     source.PortName(NetworkProtocolDubbo, svcPort),
-	}
-}
-
 func convertEndpoint(ip string, meta map[string]string, port *networkingapi.ServicePort) *networkingapi.WorkloadEntry {
 	ret := &networkingapi.WorkloadEntry{
 		Address: ip,
@@ -473,15 +477,10 @@ type InboundEndPoint struct {
 	Ports   map[string]uint32
 }
 
-func convertInboundEndpoint(ip string, meta map[string]string, port *networkingapi.ServicePort) *networkingapi.WorkloadEntry {
+func convertInboundEndpoint(ip string, meta map[string]string) *networkingapi.WorkloadEntry {
 	inboundEndpoint := &networkingapi.WorkloadEntry{
 		Address: ip,
 		Labels:  meta,
-	}
-	if port != nil {
-		inboundEndpoint.Ports = map[string]uint32{
-			port.Name: port.Number,
-		}
 	}
 	return inboundEndpoint
 }

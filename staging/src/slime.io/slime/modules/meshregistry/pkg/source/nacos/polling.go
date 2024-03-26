@@ -9,6 +9,7 @@ import (
 	"istio.io/libistio/pkg/config/event"
 
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 )
 
 func (s *Source) Polling() {
@@ -58,10 +59,20 @@ func (s *Source) updateServiceInfo() error {
 		instances = s.reGroupInstances(instances)
 	}
 
-	newServiceEntryMap, err := ConvertServiceEntryMap(
-		instances, s.args.DefaultServiceNs, s.args.DomSuffix, s.args.SvcPort,
-		s.args.InstancePortAsSvcPort, s.args.NsHost, s.args.K8sDomainSuffix, s.args.EnableProjectCode, s.args.LabelPatch,
-		s.getInstanceFilters(), s.getServiceHostAlias())
+	opts := &convertOptions{
+		patchLabel:            s.args.LabelPatch,
+		enableProjectCode:     s.args.EnableProjectCode,
+		nsHost:                s.args.NsHost,
+		k8sDomainSuffix:       s.args.K8sDomainSuffix,
+		instancePortAsSvcPort: s.args.InstancePortAsSvcPort,
+		svcPort:               s.args.SvcPort,
+		defaultSvcNs:          s.args.DefaultServiceNs,
+		domSuffix:             s.args.DomSuffix,
+		filter:                s.getInstanceFilters(),
+		hostAliases:           s.getServiceHostAlias(),
+	}
+	opts.protocol, opts.protocolName = source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
+	newServiceEntryMap, err := ConvertServiceEntryMap(instances, opts)
 	if err != nil {
 		return fmt.Errorf("convert nacos servceentry map failed: %v", err)
 	}

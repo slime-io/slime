@@ -689,7 +689,16 @@ func (s *Source) handleServiceData(providers, consumers, configutators []string,
 		s.cache.Set(dubboInterface, cmap.New[*ServiceEntryWithMeta]())
 	}
 
-	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface)
+	opts := &convertOptions{
+		svcPort:               s.args.SvcPort,
+		instancePortAsSvcPort: s.args.InstancePortAsSvcPort,
+		patchLabel:            s.args.LabelPatch,
+		ignoreLabels:          s.ignoreLabelsMap,
+		hostSuffix:            s.args.HostSuffix,
+		filter:                s.getInstanceFilter(),
+	}
+	opts.protocol, opts.protocolName = source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
+	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface, opts)
 	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
 	s.updateSeCache(freshSeMap, dubboInterface)
 }

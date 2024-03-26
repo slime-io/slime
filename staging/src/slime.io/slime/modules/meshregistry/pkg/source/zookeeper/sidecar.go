@@ -142,7 +142,8 @@ func (s *Source) refreshSidecar(init bool) {
 	s.recordAppSidecarUpdateTime(diff)
 	s.mut.Unlock()
 
-	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.args.ResourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel)
+	protocol, _ := source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
+	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.args.ResourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel, protocol)
 
 	sidecarMap := make(map[resource.FullName]SidecarWithMeta, len(diffSidecars))
 	for _, sc := range diffSidecars {
@@ -386,7 +387,13 @@ func convertDubboCallModel(se *networkingapi.ServiceEntry, interfaceName string,
 	return dubboModels
 }
 
-func convertDubboCallModelConfigToSidecar(resourceNs string, callModel map[string]DubboCallModel, diff map[string]DubboCallModel, dubboWorkloadAppLabel string) ([]SidecarWithMeta, map[resource.FullName]bool) {
+func convertDubboCallModelConfigToSidecar(
+	resourceNs string,
+	callModel map[string]DubboCallModel,
+	diff map[string]DubboCallModel,
+	dubboWorkloadAppLabel string,
+	protocol string,
+) ([]SidecarWithMeta, map[resource.FullName]bool) {
 	var (
 		ret             []SidecarWithMeta
 		deletedSidecars = map[resource.FullName]bool{}
@@ -436,7 +443,7 @@ func convertDubboCallModelConfigToSidecar(resourceNs string, callModel map[strin
 					{
 						Hosts: hosts,
 						Port: &networkingapi.Port{
-							Protocol: NetworkProtocolDubbo,
+							Protocol: protocol,
 						},
 					},
 				},
