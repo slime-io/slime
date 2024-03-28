@@ -12,34 +12,47 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-type Error struct {
-	msg string
-}
-
 const (
 	ProjectCode = "projectCode"
 )
+
+type Error struct {
+	msg string
+}
 
 func (e Error) Error() string {
 	return e.msg
 }
 
-func ConvertServiceEntryMap(
-	apps []*application, defaultSvcNs, appSuffix string, patchLabel bool, svcPort uint32,
-	instancePortAsSvcPort, nsHost, k8sDomainSuffix, enableProjectCode bool,
-) (map[string]*networkingapi.ServiceEntry, error) {
+type convertOptions struct {
+	patchLabel            bool
+	enableProjectCode     bool
+	nsHost                bool
+	k8sDomainSuffix       bool
+	instancePortAsSvcPort bool
+	svcPort               uint32
+	defaultSvcNs          string
+	appSuffix             string
+
+	// the protocol used for Port.Protocol
+	protocol string
+	// the protocol name used for Port.Name
+	protocolName string
+}
+
+func ConvertServiceEntryMap(apps []*application, opts *convertOptions) (map[string]*networkingapi.ServiceEntry, error) {
 	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
-	if apps == nil || len(apps) == 0 {
+	if len(apps) == 0 {
 		return seMap, nil
 	}
 	for _, app := range apps {
 		correctedAppName := strings.ReplaceAll(strings.ToLower(app.Name), "_", "-")
-		if appSuffix != "" {
-			correctedAppName = correctedAppName + "." + appSuffix
+		if opts.appSuffix != "" {
+			correctedAppName = correctedAppName + "." + opts.appSuffix
 		}
 
 		var projectCodes []string
-		if enableProjectCode {
+		if opts.enableProjectCode {
 			projectCodes = getProjectCodeArr(app)
 		} else {
 			projectCodes = append(projectCodes, "")
@@ -54,8 +67,7 @@ func ConvertServiceEntryMap(
 			projectApp := *app
 			projectApp.Name = projectAppName
 
-			for k, v := range convertServiceEntry(
-				&projectApp, defaultSvcNs, projectCode, svcPort, nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel) {
+			for k, v := range convertServiceEntry(&projectApp, projectCode, opts) {
 				seMap[k] = v
 			}
 		}
@@ -68,23 +80,19 @@ func ConvertServiceEntryMap(
 	return seMap, nil
 }
 
-func convertServiceEntry(
-	app *application, defaultNs, projectCode string, svcPort uint32,
-	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
-) map[string]*networkingapi.ServiceEntry {
-	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(
-		app.Instances, defaultNs, projectCode, svcPort, nsHost, instancePortAsSvcPort, patchLabel)
+func convertServiceEntry(app *application, projectCode string, opts *convertOptions) map[string]*networkingapi.ServiceEntry {
+	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(app.Instances, projectCode, opts)
 	if len(nsEndpoints) == 0 {
 		return nil
 	}
 
-	if svcPort != 0 && instancePortAsSvcPort { // add extra svc port
+	if opts.svcPort != 0 && opts.instancePortAsSvcPort { // add extra svc port
 		for _, svcPorts := range nsSvcPorts {
-			if _, ok := svcPorts[svcPort]; !ok {
-				svcPorts[svcPort] = &networkingapi.ServicePort{
-					Number:   svcPort,
-					Protocol: source.ProtocolHTTP,
-					Name:     source.PortName(source.ProtocolHTTP, svcPort),
+			if _, ok := svcPorts[opts.svcPort]; !ok {
+				svcPorts[opts.svcPort] = &networkingapi.ServicePort{
+					Number:   opts.svcPort,
+					Protocol: opts.protocol,
+					Name:     source.PortName(opts.protocolName, opts.svcPort),
 				}
 			}
 		}
@@ -100,10 +108,10 @@ func convertServiceEntry(
 			host   = svcShortName
 			seName = svcShortName
 		)
-		if nsHost && ns != "" {
+		if opts.nsHost && ns != "" {
 			seName += "." + ns
 			host += "." + ns
-			if k8sDomainSuffix {
+			if opts.k8sDomainSuffix {
 				host += ".svc.cluster.local"
 			}
 		}
@@ -139,9 +147,7 @@ func convertServiceEntry(
 	return ses
 }
 
-func convertEndpointsWithNs(
-	instances []*instance, defaultNs, projectCode string, svcPort uint32, withNs, instancePortAsSvcPort,
-	patchLabel bool,
+func convertEndpointsWithNs(instances []*instance, projectCode string, opts *convertOptions,
 ) (map[string][]*networkingapi.WorkloadEntry, map[string]map[uint32]*networkingapi.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
 	svcPortsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
@@ -165,14 +171,14 @@ func convertEndpointsWithNs(
 		}
 
 		metadata := ins.Metadata
-		util.FilterLabels(metadata, patchLabel, ins.IPAddress, "eureka:"+ins.InstanceID)
+		util.FilterLabels(metadata, opts.patchLabel, ins.IPAddress, "eureka:"+ins.InstanceID)
 
 		var ns string
-		if withNs {
+		if opts.nsHost {
 			if v, ok := metadata["k8sNs"]; ok {
 				ns = v
 			} else {
-				ns = defaultNs // "eureka" in old impl
+				ns = opts.defaultSvcNs // "eureka" in old impl
 			}
 		}
 
@@ -183,14 +189,14 @@ func convertEndpointsWithNs(
 			svcPortsMap[ns] = ports
 		}
 
-		svcPortInUse := svcPort
-		if instancePortAsSvcPort {
+		svcPortInUse := opts.svcPort
+		if opts.instancePortAsSvcPort {
 			svcPortInUse = uint32(ins.Port.Port)
 		}
 		if v, ok := ports[svcPortInUse]; !ok {
-			svcPortName = source.PortName(source.ProtocolHTTP, svcPortInUse)
+			svcPortName = source.PortName(opts.protocolName, svcPortInUse)
 			ports[svcPortInUse] = &networkingapi.ServicePort{
-				Protocol: source.ProtocolHTTP,
+				Protocol: opts.protocol,
 				Number:   svcPortInUse,
 				Name:     svcPortName,
 			}

@@ -15,7 +15,12 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-var ProtocolHTTP = "HTTP"
+const (
+	ProtocolHTTP    = "HTTP"
+	ProtocolDUBBO   = "DUBBO"
+	ProtocolTCP     = "TCP"
+	ProtocolGeneric = "GENERIC"
+)
 
 type ServiceEntryMergePortMocker struct {
 	mergeSvcPorts, mergeInstPorts bool
@@ -189,6 +194,20 @@ func ApplyServicePortToEndpoints(se *networkingapi.ServiceEntry) {
 				ep.Ports[svcPort.Name] = defaultInstPort
 			}
 		}
+	}
+}
+
+func ProtocolName(protocol string, generic bool) (string, string) {
+	if generic {
+		return ProtocolGeneric, strings.ToLower(fmt.Sprintf("%s-%s", ProtocolGeneric, protocol))
+	}
+	switch p := strings.ToLower(protocol); p {
+	case "http":
+		return ProtocolHTTP, p
+	case "dubbo":
+		return ProtocolDUBBO, p
+	default:
+		return ProtocolTCP, p
 	}
 }
 

@@ -22,7 +22,6 @@ import (
 	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
-	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/collections"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8slabels "k8s.io/apimachinery/pkg/labels"
@@ -88,9 +87,8 @@ func (z *zkConn) ChildrenW(path string) ([]string, <-chan zk.Event, error) {
 type Source struct {
 	args *bootstrap.ZookeeperSourceArgs
 
-	exceptedResources []collection.Schema
-	ignoreLabelsMap   map[string]string
-	watchingRoot      bool // TODO useless?
+	ignoreLabelsMap map[string]string
+	watchingRoot    bool // TODO useless?
 
 	serviceMethods map[string]string
 
@@ -108,11 +106,10 @@ type Source struct {
 	initedCallback func(string)
 	mut            sync.RWMutex
 
-	seInitCh                               chan struct{}
-	initWg                                 sync.WaitGroup
-	refreshSidecarNotifyCh                 chan struct{}
-	refreshSidecarMockServiceEntryNotifyCh chan struct{}
-	stop                                   chan struct{}
+	seInitCh               chan struct{}
+	initWg                 sync.WaitGroup
+	refreshSidecarNotifyCh chan struct{}
+	stop                   chan struct{}
 
 	Con               *zkConn
 	seMergePortMocker *source.ServiceEntryMergePortMocker
@@ -692,7 +689,16 @@ func (s *Source) handleServiceData(providers, consumers, configutators []string,
 		s.cache.Set(dubboInterface, cmap.New[*ServiceEntryWithMeta]())
 	}
 
-	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface)
+	opts := &convertOptions{
+		svcPort:               s.args.SvcPort,
+		instancePortAsSvcPort: s.args.InstancePortAsSvcPort,
+		patchLabel:            s.args.LabelPatch,
+		ignoreLabels:          s.ignoreLabelsMap,
+		hostSuffix:            s.args.HostSuffix,
+		filter:                s.getInstanceFilter(),
+	}
+	opts.protocol, opts.protocolName = source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
+	freshSvcMap, freshSeMap := s.convertServiceEntry(providers, consumers, configutators, dubboInterface, opts)
 	s.updateRegistryServiceCache(dubboInterface, freshSvcMap)
 	s.updateSeCache(freshSeMap, dubboInterface)
 }

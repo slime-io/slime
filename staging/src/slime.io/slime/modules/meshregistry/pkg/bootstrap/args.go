@@ -113,12 +113,18 @@ type SourceArgs struct {
 	GatewayModel bool `json:"GatewayModel,omitempty"`
 	// patch instances label
 	LabelPatch bool `json:"LabelPatch,omitempty"`
+	// GenericProtocol is used to specify weather using generic protocol as the first protocol in the service entry, default is false.
+	// If true, the final port protocol will be `GENERIC`, and the port name prefix will be `generic-lower(SvcProtocol)`, e.g. `generic-dubbo`.
+	GenericProtocol bool `json:"GenericProtocol,omitempty"`
+	// svc protocol for services, for Eureka and Nacos, default is "HTTP", for Zookeeper, default is "DUBBO"
+	SvcProtocol string `json:"SvcProtocol,omitempty"`
 	// svc port for services, 0 will be ignored
 	SvcPort               uint32 `json:"SvcPort,omitempty"`               // XXX
 	InstancePortAsSvcPort bool   `json:"InstancePortAsSvcPort,omitempty"` // TODO
 	// if empty, those endpoints with ns attr will be aggregated into a no-ns service like "foo"
 	DefaultServiceNs string `json:"DefaultServiceNs,omitempty"`
 	ResourceNs       string `json:"ResourceNs,omitempty"`
+
 	// A list of selectors that specify the set of service instances to be processed.
 	// The selectors are ORed together.
 	EndpointSelectors []*EndpointSelector `json:"EndpointSelectors,omitempty"`
@@ -133,10 +139,15 @@ type SourceArgs struct {
 	// even if the service matches ServicedEndpointSelector
 	AlwaysUseSourceScopedEpSelectors bool `json:"AlwaysUseSourceScopedEpSelectors,omitempty"`
 
-	MockServiceName              string `json:"MockServiceName,omitempty"`
-	MockServiceEntryName         string `json:"MockServiceEntryName,omitempty"`
-	MockServiceMergeInstancePort bool   `json:"MockServiceMergeInstancePort,omitempty"`
-	MockServiceMergeServicePort  bool   `json:"MockServiceMergeServicePort,omitempty"`
+	// MockService used to aggregate all the port of the services
+	// MockServiceName is the host of the mock service
+	MockServiceName string `json:"MockServiceName,omitempty"`
+	// MockServiceEntryName is the name of the converted ServiceEntry
+	MockServiceEntryName string `json:"MockServiceEntryName,omitempty"`
+	// MockServiceMergeInstancePort and MockServiceMergeServicePort are used to specify whether to
+	// merge the instance port and service port into the mock service port, at least one of them should be true.
+	MockServiceMergeInstancePort bool `json:"MockServiceMergeInstancePort,omitempty"`
+	MockServiceMergeServicePort  bool `json:"MockServiceMergeServicePort,omitempty"`
 
 	// ServiceNaming is used to reassign the service to which the instance belongs
 	ServiceNaming *ServiceNameConverter `json:"ServiceNaming,omitempty"`
@@ -490,8 +501,9 @@ func NewRegistryArgs() *RegistryArgs {
 			SourceArgs: SourceArgs{
 				RefreshPeriod:         util.Duration(10 * time.Second),
 				LabelPatch:            true,
-				ResourceNs:            "dubbo",
+				SvcProtocol:           "DUBBO",
 				InstancePortAsSvcPort: true,
+				ResourceNs:            "dubbo",
 			},
 			IgnoreLabel:                 []string{"pid", "timestamp", "dubbo"},
 			Mode:                        "polling",
@@ -507,6 +519,7 @@ func NewRegistryArgs() *RegistryArgs {
 			SourceArgs: SourceArgs{
 				RefreshPeriod:         util.Duration(30 * time.Second),
 				LabelPatch:            true,
+				SvcProtocol:           "HTTP",
 				SvcPort:               80,
 				InstancePortAsSvcPort: true,
 				// should set it to "xx" explicitly to get the same behaviour as before("foo.eureka")
@@ -520,6 +533,7 @@ func NewRegistryArgs() *RegistryArgs {
 			SourceArgs: SourceArgs{
 				RefreshPeriod:         util.Duration(30 * time.Second),
 				LabelPatch:            true,
+				SvcProtocol:           "HTTP",
 				SvcPort:               80,
 				InstancePortAsSvcPort: true,
 				DefaultServiceNs:      "nacos",

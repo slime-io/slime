@@ -11,6 +11,10 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
+const (
+	ProjectCode = "projectCode"
+)
+
 type Error struct {
 	msg string
 }
@@ -19,27 +23,38 @@ func (e Error) Error() string {
 	return e.msg
 }
 
-const (
-	ProjectCode = "projectCode"
-)
+type convertOptions struct {
+	patchLabel            bool
+	enableProjectCode     bool
+	nsHost                bool
+	k8sDomainSuffix       bool
+	instancePortAsSvcPort bool
+	svcPort               uint32
+	defaultSvcNs          string
+	domSuffix             string
 
-func ConvertServiceEntryMap(
-	instances []*instanceResp, defaultSvcNs, domSuffix string, svcPort uint32,
-	instancePortAsSvcPort, nsHost, k8sDomainSuffix, enableProjectCode, patchLabel bool,
-	filter func(*instance) bool, hostAliases map[string][]string,
-) (map[string]*networkingapi.ServiceEntry, error) {
+	// the protocol used for Port.Protocol
+	protocol string
+	// the protocol name used for Port.Name
+	protocolName string
+
+	filter      func(*instance) bool
+	hostAliases map[string][]string
+}
+
+func ConvertServiceEntryMap(instances []*instanceResp, opts *convertOptions) (map[string]*networkingapi.ServiceEntry, error) {
 	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
 	}
 	for _, ins := range instances {
 		correctedDom := strings.ReplaceAll(strings.ToLower(ins.Dom), "_", "-")
-		if domSuffix != "" {
-			correctedDom = correctedDom + "." + domSuffix
+		if opts.domSuffix != "" {
+			correctedDom = correctedDom + "." + opts.domSuffix
 		}
 
 		var projectCodes []string
-		if enableProjectCode {
+		if opts.enableProjectCode {
 			projectCodes = getProjectCodeArr(ins)
 		} else {
 			projectCodes = append(projectCodes, "")
@@ -54,10 +69,7 @@ func ConvertServiceEntryMap(
 			projectIns := *ins
 			projectIns.Dom = projectDom
 
-			for k, v := range convertServiceEntry(
-				&projectIns, defaultSvcNs, projectCode, svcPort,
-				nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel,
-				filter, hostAliases) {
+			for k, v := range convertServiceEntry(&projectIns, projectCode, opts) {
 				seMap[k] = v
 			}
 		}
@@ -70,24 +82,19 @@ func ConvertServiceEntryMap(
 	return seMap, nil
 }
 
-func convertServiceEntry(
-	instanceResp *instanceResp, defaultNs, projectCode string, svcPort uint32,
-	nsHost, k8sDomainSuffix, instancePortAsSvcPort, patchLabel bool,
-	filter func(*instance) bool, hostAliases map[string][]string,
-) map[string]*networkingapi.ServiceEntry {
-	nsEndpoints, nsSvcPorts, useDNSMap := convertEndpointsWithNs(
-		instanceResp.Hosts, defaultNs, projectCode, svcPort, nsHost, instancePortAsSvcPort, patchLabel, filter)
+func convertServiceEntry(instanceResp *instanceResp, projectCode string, opts *convertOptions) map[string]*networkingapi.ServiceEntry {
+	nsEndpoints, nsSvcPorts, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, projectCode, opts)
 	if len(nsEndpoints) == 0 {
 		return nil
 	}
 
-	if svcPort != 0 && instancePortAsSvcPort { // add extra svc port
+	if opts.svcPort != 0 && opts.instancePortAsSvcPort { // add extra svc port
 		for _, svcPorts := range nsSvcPorts {
-			if _, ok := svcPorts[svcPort]; !ok {
-				svcPorts[svcPort] = &networkingapi.ServicePort{
-					Number:   svcPort,
-					Protocol: source.ProtocolHTTP,
-					Name:     source.PortName(source.ProtocolHTTP, svcPort),
+			if _, ok := svcPorts[opts.svcPort]; !ok {
+				svcPorts[opts.svcPort] = &networkingapi.ServicePort{
+					Number:   opts.svcPort,
+					Protocol: opts.protocol,
+					Name:     source.PortName(opts.protocolName, opts.svcPort),
 				}
 			}
 		}
@@ -103,10 +110,10 @@ func convertServiceEntry(
 			host   = svcShortName
 			seName = svcShortName
 		)
-		if nsHost && ns != "" {
+		if opts.nsHost && ns != "" {
 			seName += "." + ns
 			host += "." + ns
-			if k8sDomainSuffix {
+			if opts.k8sDomainSuffix {
 				host += ".svc.cluster.local"
 			}
 		}
@@ -122,8 +129,8 @@ func convertServiceEntry(
 			log.Errorf("found dup se %s, prev %+v", seName, existSe)
 		} else {
 			hosts := []string{host}
-			if hostAliases != nil {
-				hosts = append(hosts, hostAliases[host]...)
+			if opts.hostAliases != nil {
+				hosts = append(hosts, opts.hostAliases[host]...)
 			}
 
 			portMap := nsSvcPorts[ns]
@@ -147,10 +154,7 @@ func convertServiceEntry(
 	return ses
 }
 
-func convertEndpointsWithNs(
-	instances []*instance, defaultNs, projectCode string, svcPort uint32,
-	nsHost, instancePortAsSvcPort, patchLabel bool,
-	filter func(*instance) bool,
+func convertEndpointsWithNs(instances []*instance, projectCode string, opts *convertOptions,
 ) (map[string][]*networkingapi.WorkloadEntry, map[string]map[uint32]*networkingapi.ServicePort, map[string]bool) {
 	endpointsMap := make(map[string][]*networkingapi.WorkloadEntry, 0)
 	svcPortsMap := make(map[string]map[uint32]*networkingapi.ServicePort, 0)
@@ -160,7 +164,7 @@ func convertEndpointsWithNs(
 	})
 
 	for _, ins := range instances {
-		if filter != nil && !filter(ins) {
+		if opts.filter != nil && !opts.filter(ins) {
 			continue
 		}
 		if !ins.Healthy { // nacos-spec
@@ -173,14 +177,14 @@ func convertEndpointsWithNs(
 
 		metadata := ins.Metadata
 		convertInstanceId(metadata) // nacos-spec
-		util.FilterLabels(metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
+		util.FilterLabels(metadata, opts.patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
 		var ns string
-		if nsHost {
+		if opts.nsHost {
 			if v, ok := metadata["k8sNs"]; ok {
 				ns = v
 			} else {
-				ns = defaultNs // "nacos" in old impl
+				ns = opts.defaultSvcNs // "nacos" in old impl
 			}
 		}
 
@@ -191,14 +195,14 @@ func convertEndpointsWithNs(
 			svcPortsMap[ns] = ports
 		}
 
-		svcPortInUse := svcPort
-		if instancePortAsSvcPort {
+		svcPortInUse := opts.svcPort
+		if opts.instancePortAsSvcPort {
 			svcPortInUse = uint32(ins.Port)
 		}
 		if v, ok := ports[svcPortInUse]; !ok {
-			svcPortName = source.PortName(source.ProtocolHTTP, svcPortInUse)
+			svcPortName = source.PortName(opts.protocolName, svcPortInUse)
 			ports[svcPortInUse] = &networkingapi.ServicePort{
-				Protocol: source.ProtocolHTTP,
+				Protocol: opts.protocol,
 				Number:   svcPortInUse,
 				Name:     svcPortName,
 			}
