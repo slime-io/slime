@@ -68,7 +68,7 @@ func convertEndpointsForNacos(service string, instances []model.Instance, patchL
 
 		convertInstanceId(ins.Metadata)
 
-		util.FilterLabels(ins.Metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
+		util.FilterEndpointLabels(ins.Metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
 		ep := &networkingapi.WorkloadEntry{
 			Address: ins.Ip,
@@ -143,7 +143,7 @@ func convertEndpointsWithNsForNacos(service string, instances []model.Instance, 
 
 		metadata := ins.Metadata
 		convertInstanceId(metadata)
-		util.FilterLabels(metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
+		util.FilterEndpointLabels(metadata, patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
 		if ns == "" {
 			nsInLabel, exist := metadata["k8sNs"]

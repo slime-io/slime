@@ -41,7 +41,7 @@ func IsInternalResource(gvk resource2.GroupVersionKind) bool {
 	return gvk.Kind == kindServiceEntry || gvk.Kind == kindSidecar
 }
 
-func FillRevision(meta resource.Metadata) bool {
+func FillRevision(meta *resource.Metadata) bool {
 	if features.IstioRevision != "" {
 		exist, ok := meta.Labels[IstioRevisionKey]
 		meta.Labels[IstioRevisionKey] = features.IstioRevision

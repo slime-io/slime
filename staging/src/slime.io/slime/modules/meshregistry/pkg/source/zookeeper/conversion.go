@@ -437,7 +437,7 @@ func verifyMeta(url string, ip string, port uint32, service string, patchLabel b
 		defaultExtraMetaPatcher.patchExtraMeta(metaKey, meta, extraMeta)
 	}
 
-	util.FilterLabels(meta, patchLabel, ip, "zookeeper:"+ip)
+	util.FilterEndpointLabels(meta, patchLabel, ip, "zookeeper:"+ip)
 	return meta, true
 }
 
