@@ -28,6 +28,12 @@ var (
 
 	ClusterName = env.RegisterStringVar("CLUSTER_ID", "Kubernetes",
 		"defines the cluster that this mesh-registry instance is belongs to").Get()
+
+	RegistryIDMetaKey = env.RegisterStringVar(
+		"REGISTRY_ID_META_KEY",
+		"registry-id",
+		"specify the key of registry id in endpoint's metadata",
+	).Get()
 )
 
 var EndpointRelabelItems = map[string]string{}
