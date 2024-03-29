@@ -15,9 +15,18 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 )
 
-const defaultNacosTokenTTL = 5
+const (
+	namespaceListAPI      = "/nacos/v1/console/namespaces"
+	serviceListAPI        = "/nacos/v1/ns/service/list"
+	catalogServiceListAPI = "/nacos/v1/ns/catalog/services"
+	intancesListAPI       = "/nacos/v1/ns/instance/list"
+	loginAPI              = "/nacos/v1/auth/login"
+
+	defaultNacosTokenTTL = 5
+)
 
 var serviceListPageSize = 1000
 
@@ -68,6 +77,8 @@ type instanceResp struct {
 type Client interface {
 	// Instances registered on the Nacos server
 	Instances() ([]*instanceResp, error)
+	// RegistryInfo returns the registry ID and addresses of the client
+	RegistryInfo() string
 }
 
 type clients []*client
@@ -92,7 +103,7 @@ func (clis clients) Instances() ([]*instanceResp, error) {
 	for _, cli := range clis {
 		insts, err := cli.Instances()
 		if err != nil {
-			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			log.Warningf("fetch instances from server %v failed: %v", cli.urls, err)
 			continue
 		}
 		for _, instResp := range insts {
@@ -107,6 +118,15 @@ func (clis clients) Instances() ([]*instanceResp, error) {
 		})
 	}
 	return ret, nil
+}
+
+func (clis clients) RegistryInfo() string {
+	info := make([]json.RawMessage, 0, len(clis))
+	for _, cli := range clis {
+		info = append(info, json.RawMessage(cli.RegistryInfo()))
+	}
+	jsonInfo, _ := json.MarshalIndent(info, "", "  ")
+	return string(jsonInfo)
 }
 
 type client struct {
@@ -161,13 +181,14 @@ func newClient(
 	return c
 }
 
-const (
-	namespaceListAPI      = "/nacos/v1/console/namespaces"
-	serviceListAPI        = "/nacos/v1/ns/service/list"
-	catalogServiceListAPI = "/nacos/v1/ns/catalog/services"
-	intancesListAPI       = "/nacos/v1/ns/instance/list"
-	loginAPI              = "/nacos/v1/auth/login"
-)
+func (c *client) RegistryInfo() string {
+	info := source.RegistryInfo{
+		RegistryID: c.registryID,
+		Addresses:  c.urls,
+	}
+	jsonInfo, _ := json.MarshalIndent(info, "", "  ")
+	return string(jsonInfo)
+}
 
 func encodeQuery(param map[string]string) string {
 	if len(param) == 0 {

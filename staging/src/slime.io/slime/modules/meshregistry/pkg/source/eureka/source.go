@@ -73,11 +73,6 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 		serviers = []bootstrap.EurekaServer{args.EurekaServer}
 	}
 	client := NewClients(serviers)
-	if client == nil {
-		return nil, nil, Error{
-			msg: "Init eureka client failed",
-		}
-	}
 
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
@@ -126,7 +121,7 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 		ret.initWg.Add(1)
 	}
 
-	return ret, ret.cacheJson, nil
+	return ret, ret.handleHttp, nil
 }
 
 func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
@@ -137,6 +132,20 @@ func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
 		ret[k] = v
 	}
 	return ret
+}
+
+func (s *Source) handleHttp(w http.ResponseWriter, req *http.Request) {
+	queries := req.URL.Query()
+	if queries.Get(source.CacheRegistryInfoQueryKey) == "true" {
+		s.dumpClients(w, req)
+		return
+	}
+	// default cacheJson
+	s.cacheJson(w, req)
+}
+
+func (s *Source) dumpClients(w http.ResponseWriter, _ *http.Request) {
+	_, _ = w.Write([]byte(s.client.RegistryInfo()))
 }
 
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {

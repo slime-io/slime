@@ -141,21 +141,14 @@ func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback fun
 		}
 	}
 
-	if args.Mode == POLLING {
-		servers := args.Servers
-		if len(servers) == 0 {
-			servers = []bootstrap.NacosServer{args.NacosServer}
-		}
-		ret.client = NewClients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
-	} else {
-		namingClient, err := newNamingClient(args.Address, args.Namespace, headers)
-		if err != nil {
-			return nil, nil, Error{
-				msg: fmt.Sprintf("init nacos client failed: %s", err.Error()),
-			}
-		}
-		ret.namingClient = namingClient
+	if args.Mode != POLLING {
+		log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", args.Mode)
 	}
+	servers := args.Servers
+	if len(servers) == 0 {
+		servers = []bootstrap.NacosServer{args.NacosServer}
+	}
+	ret.client = NewClients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
 
 	ret.initWg.Add(1)
 	if ret.seMergePortMocker != nil {
@@ -182,7 +175,7 @@ func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback fun
 		}
 	}
 
-	return ret, ret.cacheJson, nil
+	return ret, ret.handleHttp, nil
 }
 
 func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
@@ -326,6 +319,20 @@ func (s *Source) getSeMetaModifierFactory() func(string) func(*resource.Metadata
 	return s.seMetaModifierFactory
 }
 
+func (s *Source) handleHttp(w http.ResponseWriter, req *http.Request) {
+	queries := req.URL.Query()
+	if queries.Get(source.CacheRegistryInfoQueryKey) == "true" {
+		s.dumpClients(w, req)
+		return
+	}
+	// default cacheJson
+	s.cacheJson(w, req)
+}
+
+func (s *Source) dumpClients(w http.ResponseWriter, r *http.Request) {
+	_, _ = w.Write([]byte(s.client.RegistryInfo()))
+}
+
 func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	b, err := json.MarshalIndent(s.cacheShallowCopy(), "", "  ")
 	if err != nil {
@@ -379,7 +386,8 @@ func (s *Source) Start() {
 		if s.args.Mode == POLLING {
 			go s.Polling()
 		} else {
-			go s.Watching()
+			log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", s.args.Mode)
+			go s.Polling()
 		}
 		<-s.stop
 	}()

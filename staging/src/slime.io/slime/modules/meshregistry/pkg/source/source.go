@@ -14,6 +14,13 @@ import (
 	"istio.io/libistio/pkg/config/schema/collections"
 )
 
+const CacheRegistryInfoQueryKey = "registries"
+
+type RegistryInfo struct {
+	RegistryID string   `json:"registry_id,omitempty"`
+	Addresses  []string `json:"addresses,omitempty"`
+}
+
 var (
 	kindServiceEntry = collections.ServiceEntry.Kind()
 	kindSidecar      = collections.Sidecar.Kind()

@@ -10,6 +10,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 )
 
 const (
@@ -44,6 +45,8 @@ type eurekaMetadata map[string]string
 type Client interface {
 	// Applications registered on the Eureka server
 	Applications() ([]*application, error)
+	// RegistryInfo returns the registry ID and addresses of the client
+	RegistryInfo() string
 }
 
 type clients []*client
@@ -81,6 +84,15 @@ func (clis clients) Applications() ([]*application, error) {
 	return ret, nil
 }
 
+func (clis clients) RegistryInfo() string {
+	info := make([]json.RawMessage, 0, len(clis))
+	for _, cli := range clis {
+		info = append(info, json.RawMessage(cli.RegistryInfo()))
+	}
+	jsonInfo, _ := json.MarshalIndent(info, "", "  ")
+	return string(jsonInfo)
+}
+
 // Minimal client for Eureka server's REST APIs.
 // TODO: caching
 // TODO: Eureka v3 support
@@ -89,6 +101,15 @@ type client struct {
 	registryID string
 	urls       []string
 	index      int
+}
+
+func (c *client) RegistryInfo() string {
+	info := source.RegistryInfo{
+		RegistryID: c.registryID,
+		Addresses:  c.urls,
+	}
+	jsonInfo, _ := json.MarshalIndent(info, "", "  ")
+	return string(jsonInfo)
 }
 
 // NewClient instantiates a new Eureka client
