@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/nacos-group/nacos-sdk-go/v2/clients/naming_client"
 	cmap "github.com/orcaman/concurrent-map/v2"
 	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
@@ -31,7 +30,6 @@ type Source struct {
 
 	// nacos client
 	client            Client
-	namingClient      naming_client.INamingClient
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 
 	// common configs
