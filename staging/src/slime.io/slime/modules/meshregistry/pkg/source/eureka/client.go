@@ -3,12 +3,17 @@ package eureka
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"time"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
+)
+
+const (
+	appsPath = "/apps"
 )
 
 type application struct {
@@ -46,7 +51,7 @@ type clients []*client
 func NewClients(servers []bootstrap.EurekaServer) Client {
 	clis := make(clients, 0, len(servers))
 	for _, server := range servers {
-		clis = append(clis, NewClient(server.Address))
+		clis = append(clis, NewClient(server))
 	}
 	return clis
 }
@@ -59,7 +64,7 @@ func (clis clients) Applications() ([]*application, error) {
 	for _, cli := range clis {
 		insts, err := cli.Applications()
 		if err != nil {
-			log.Warning("fetch instances from server failed: %v", cli.urls, err)
+			log.Warningf("fetch instances from server %q failed: %v", cli.urls, err)
 			continue
 		}
 		for _, instResp := range insts {
@@ -80,25 +85,21 @@ func (clis clients) Applications() ([]*application, error) {
 // TODO: caching
 // TODO: Eureka v3 support
 type client struct {
-	client http.Client
-	urls   []string
-	index  int
+	client     http.Client
+	registryID string
+	urls       []string
+	index      int
 }
 
 // NewClient instantiates a new Eureka client
-func NewClient(urls []string) *client {
+func NewClient(server bootstrap.EurekaServer) *client {
 	return &client{
-		client: http.Client{Timeout: 30 * time.Second},
-		urls:   urls,
-		index:  0,
+		client:     http.Client{Timeout: 30 * time.Second},
+		registryID: server.RegistryID,
+		urls:       server.Address,
+		index:      0,
 	}
 }
-
-const statusUp = "UP"
-
-const (
-	appsPath = "/apps"
-)
 
 type getApplications struct {
 	Applications applications `json:"applications"`
@@ -137,7 +138,7 @@ func (c *client) Applications() ([]*application, error) {
 		return nil, fmt.Errorf("unexpected status code from EurekaSource server: %v", resp.Status)
 	}
 
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -145,6 +146,17 @@ func (c *client) Applications() ([]*application, error) {
 	var apps getApplications
 	if err = json.Unmarshal(data, &apps); err != nil {
 		return nil, err
+	}
+
+	if c.registryID != "" {
+		for _, app := range apps.Applications.Applications {
+			for _, inst := range app.Instances {
+				if inst.Metadata == nil {
+					inst.Metadata = make(eurekaMetadata)
+				}
+				inst.Metadata[features.RegistryIDMetaKey] = c.registryID
+			}
+		}
 	}
 
 	return apps.Applications.Applications, nil

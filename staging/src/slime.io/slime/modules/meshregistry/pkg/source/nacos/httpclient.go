@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 )
 
@@ -109,9 +110,10 @@ func (clis clients) Instances() ([]*instanceResp, error) {
 }
 
 type client struct {
-	client  http.Client
-	urls    []string
-	headers map[string]string
+	client     http.Client
+	registryID string
+	urls       []string
+	headers    map[string]string
 
 	// fetch instances from a specific namespace and group, or from all of the namespaces.
 	namespaceId, group             string // if not set which means public and DEFAULT_GROUP
@@ -134,6 +136,7 @@ func newClient(
 	c := &client{
 		client:             http.Client{Timeout: 30 * time.Second},
 		headers:            headers,
+		registryID:         server.RegistryID,
 		urls:               server.Address,
 		namespaceId:        server.Namespace,
 		group:              server.Group,
@@ -361,6 +364,14 @@ func (c *client) listInstances(namespaceId, groupName, serviceName string) ([]*i
 			if c.metaKeyGroup != "" {
 				inst.Metadata[c.metaKeyGroup] = groupName
 			}
+		}
+	}
+	if c.registryID != "" {
+		for _, inst := range ir.Hosts {
+			if inst.Metadata == nil {
+				inst.Metadata = make(nacosMetadata)
+			}
+			inst.Metadata[features.RegistryIDMetaKey] = c.registryID
 		}
 	}
 	return ir.Hosts, nil

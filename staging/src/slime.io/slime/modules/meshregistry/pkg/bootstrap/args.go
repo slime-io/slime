@@ -360,7 +360,10 @@ type EurekaSourceArgs struct {
 }
 
 type EurekaServer struct {
-	Address []string `json:"Address,omitempty"`
+	// RegistryID is the unique identifier of the eureka server.
+	// If set, the registry id will be used as an entry in the endpoint metadata.
+	RegistryID string   `json:"RegistryID,omitempty"`
+	Address    []string `json:"Address,omitempty"`
 }
 
 func (eurekaServer *EurekaServer) Validate() error {
@@ -411,6 +414,9 @@ type NacosSourceArgs struct {
 }
 
 type NacosServer struct {
+	// RegistryID is the unique identifier of the nacos server.
+	// If set, the registry id will be used as an entry in the endpoint metadata. The key of the entry is defined by env var `REGISTRY_ID_META_KEY`
+	RegistryID string `json:"RegistryID,omitempty"`
 	// addresses of the nacos servers
 	Address []string `json:"Address,omitempty"`
 	// namespace value for nacos client
