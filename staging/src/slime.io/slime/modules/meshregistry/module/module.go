@@ -31,6 +31,7 @@ import (
 	meshregv1alpha1 "slime.io/slime/modules/meshregistry/api/v1alpha1"
 	"slime.io/slime/modules/meshregistry/model"
 	meshregbootstrap "slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/server"
 )
 
@@ -152,7 +153,7 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions, stati
 	//    - or return original static config
 	// 2. init patch configuration Configurator
 	// 	  - watching RegistrySource CR specified by env var WATCHING_REGISTRYSOURCE
-	dynConfigMapName, dynRegistrySource := os.Getenv("DYNAMIC_CONFIG_MAP"), os.Getenv("WATCHING_REGISTRYSOURCE")
+	dynConfigMapName, dynRegistrySource := features.DynamicConfigMap, features.WatchingRegistrySource
 	if dynConfigMapName == "" && dynRegistrySource == "" {
 		return nil, nil
 	}
@@ -295,7 +296,7 @@ func (m *Module) prepareCmDynamicConfigController(
 		return ParseArgsFromModuleConfig(cfgMsg)
 	}
 
-	notify := func(obj, newObj interface{}) {
+	notify := func(_, newObj interface{}) {
 		var cm *corev1.ConfigMap
 		if newObj != nil {
 			newCm, ok := newObj.(*corev1.ConfigMap)
@@ -340,7 +341,7 @@ func (m *Module) prepareCrDynamicConfigController(name string, changeNotifyCh ch
 		},
 	}
 
-	notify := func(obj, newObj interface{}) {
+	notify := func(_, _ interface{}) {
 		select {
 		case changeNotifyCh <- struct{}{}:
 		default:

@@ -451,7 +451,7 @@ func convertDubboCallModelConfigToSidecar(
 			},
 		}
 
-		source.FillRevision(scm.Meta)
+		source.FillRevision(&scm.Meta)
 
 		ret = append(ret, scm)
 	}

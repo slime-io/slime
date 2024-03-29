@@ -171,7 +171,7 @@ func convertEndpointsWithNs(instances []*instance, projectCode string, opts *con
 		}
 
 		metadata := ins.Metadata
-		util.FilterLabels(metadata, opts.patchLabel, ins.IPAddress, "eureka:"+ins.InstanceID)
+		util.FilterEndpointLabels(metadata, opts.patchLabel, ins.IPAddress, "eureka:"+ins.InstanceID)
 
 		var ns string
 		if opts.nsHost {

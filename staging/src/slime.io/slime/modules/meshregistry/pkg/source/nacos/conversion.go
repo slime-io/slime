@@ -177,7 +177,7 @@ func convertEndpointsWithNs(instances []*instance, projectCode string, opts *con
 
 		metadata := ins.Metadata
 		convertInstanceId(metadata) // nacos-spec
-		util.FilterLabels(metadata, opts.patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
+		util.FilterEndpointLabels(metadata, opts.patchLabel, ins.Ip, "nacos :"+ins.InstanceId)
 
 		var ns string
 		if opts.nsHost {

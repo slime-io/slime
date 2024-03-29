@@ -876,10 +876,10 @@ func prepareServiceEntryWithMeta(se *networkingapi.ServiceEntry, meta resource.M
 	meta = meta.Clone()
 
 	var changed bool
-	if source.FillRevision(meta) {
+	if source.FillRevision(&meta) {
 		changed = true
 	}
-	if util.FillSeLabels(se, meta) {
+	if util.FillSeLabels(se, &meta) {
 		changed = true
 	}
 
@@ -905,7 +905,7 @@ func buildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, met
 // buildSidecarEvent assembled the incoming data into an event. Event handle should not modify the data.
 func buildSidecarEvent(kind event.Kind, item *networkingapi.Sidecar, meta resource.Metadata) event.Event {
 	meta = meta.Clone()
-	source.FillRevision(meta)
+	source.FillRevision(&meta)
 	return event.Event{
 		Kind:   kind,
 		Source: collections.Sidecar,

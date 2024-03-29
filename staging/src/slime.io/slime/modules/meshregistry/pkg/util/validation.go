@@ -2,9 +2,7 @@ package util
 
 import (
 	"fmt"
-	"os"
 	"regexp"
-	"strings"
 
 	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/resource"
@@ -16,8 +14,6 @@ import (
 const (
 	DNS1123LabelMaxLength = 63 // Public for testing only.
 	dns1123LabelFmt       = "[a-zA-Z0-9](?:[-a-z-A-Z0-9]*[a-zA-Z0-9])?"
-	// a wild-card prefix is an '*', a normal DNS1123 label with a leading '*' or '*-', or a normal DNS1123 label
-	wildcardPrefix = `(\*|(\*|\*-)?` + dns1123LabelFmt + `)`
 
 	// Using kubernetes requirement, a valid key must be a non-empty string consist
 	// of alphanumeric characters, '-', '_' or '.', and must start and end with an
@@ -30,114 +26,9 @@ const (
 )
 
 var (
-	tagRegexp            = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
-	labelValueRegexp     = regexp.MustCompile("^" + "(" + qualifiedNameFmt + ")?" + "$")
-	dns1123LabelRegexp   = regexp.MustCompile("^" + dns1123LabelFmt + "$")
-	wildcardPrefixRegexp = regexp.MustCompile("^" + wildcardPrefix + "$")
-	seLabelKeys          *seLabelKeysHolder
-	seLabelKeysStr       = "app"
-
-	skipValidateTagValue = func() bool {
-		switch os.Getenv("SKIP_VALIDATE_LABEL_VALUE") {
-		case "1", "t", "T", "true", "TRUE", "True":
-			return true
-		}
-		return false
-	}()
+	tagRegexp        = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
+	labelValueRegexp = regexp.MustCompile("^" + "(" + qualifiedNameFmt + ")?" + "$")
 )
-
-type seLabelKeyItem struct {
-	key, mapKey string
-}
-
-type seLabelKeysHolder struct {
-	// example: app:ourApp
-	instanceLabels []*seLabelKeyItem
-	// $-prefixed meta
-	// support:
-	//   $host : the first host of se. example: $host:theFirstHost
-	seMeta []*seLabelKeyItem
-}
-
-func (h *seLabelKeysHolder) selectLabelsInto(se *networkingapi.ServiceEntry, labels map[string]string) {
-	for _, item := range h.instanceLabels {
-		if _, ok := labels[item.mapKey]; ok {
-			continue
-		}
-
-		for _, ep := range se.Endpoints {
-			if v, exist := ep.Labels[item.key]; exist {
-				labels[item.mapKey] = v
-				break
-			}
-		}
-	}
-
-	for _, item := range h.seMeta {
-		if _, ok := labels[item.mapKey]; ok {
-			continue
-		}
-
-		switch item.key {
-		case "host":
-			var v string
-			if len(se.Hosts) > 0 {
-				v = se.Hosts[0]
-			}
-			labels[item.mapKey] = v
-		}
-	}
-}
-
-func parseSeLabelKeys(s string) (*seLabelKeysHolder, error) {
-	var (
-		instLabels []*seLabelKeyItem
-		seMeta     []*seLabelKeyItem
-	)
-
-	for _, part := range strings.Split(s, ",") {
-		item := &seLabelKeyItem{}
-
-		if strings.HasPrefix(part, "$") {
-			part = part[1:]
-			seMeta = append(seMeta, item)
-		} else {
-			instLabels = append(instLabels, item)
-		}
-
-		if idx := strings.Index(part, ":"); idx >= 0 {
-			item.key = part[:idx]
-			item.mapKey = part[idx+1:]
-		} else {
-			item.key = part
-			item.mapKey = part
-		}
-	}
-
-	if len(instLabels) > 0 || len(seMeta) > 0 {
-		return &seLabelKeysHolder{
-			instanceLabels: instLabels,
-			seMeta:         seMeta,
-		}, nil
-	}
-
-	return nil, nil
-}
-
-func init() {
-	// TODO move to source args
-	if v := os.Getenv("SE_LABEL_SELECTOR_KEYS"); v != "" {
-		// XXX can not override to "" ?
-		seLabelKeysStr = v
-	}
-	if seLabelKeysStr != "" {
-		if v, err := parseSeLabelKeys(seLabelKeysStr); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "invalid seLabelKeysStr %s ignored", seLabelKeysStr)
-		} else {
-			seLabelKeys = v
-		}
-	}
-}
 
 func ValidateTagKey(k string) error {
 	match := tagRegexp.FindStringSubmatch(k)
@@ -160,7 +51,7 @@ func ValidateTagKey(k string) error {
 }
 
 func ValidateTagValue(v string) error {
-	if skipValidateTagValue {
+	if features.SkipValidateTagValue {
 		return nil
 	}
 	if !labelValueRegexp.MatchString(v) {
@@ -169,7 +60,7 @@ func ValidateTagValue(v string) error {
 	return nil
 }
 
-func FilterLabels(labels map[string]string, patchLabel bool, ip string, from string) {
+func FilterEndpointLabels(labels map[string]string, patchLabel bool, ip string, from string) {
 	for k, v := range labels {
 		if k == "@class" {
 			delete(labels, k)
@@ -253,21 +144,12 @@ func CopySe(item *networkingapi.ServiceEntry) *networkingapi.ServiceEntry {
 	return newSe
 }
 
-func SelectLabels(item *networkingapi.ServiceEntry) map[string]string {
-	labels := make(map[string]string, 0)
-
-	if seLabelKeys != nil {
-		seLabelKeys.selectLabelsInto(item, labels)
+func FillSeLabels(se *networkingapi.ServiceEntry, meta *resource.Metadata) bool {
+	if features.SeLabelKeys == nil {
+		return false
 	}
-	return labels
-}
-
-func FillSeLabels(se *networkingapi.ServiceEntry, meta resource.Metadata) bool {
-	var (
-		labels  = SelectLabels(se)
-		changed bool
-	)
-
+	var changed bool
+	labels := features.SeLabelKeys.GenerateSeLabels(se)
 	for k, v := range labels {
 		if exist, ok := meta.Labels[k]; !ok || exist != v {
 			changed = true

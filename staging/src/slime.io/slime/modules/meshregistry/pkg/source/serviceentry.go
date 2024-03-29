@@ -155,8 +155,8 @@ func (m *ServiceEntryMergePortMocker) Handle(e event.Event) {
 }
 
 func BuildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata) event.Event {
-	FillRevision(meta)
-	util.FillSeLabels(se, meta)
+	FillRevision(&meta)
+	util.FillSeLabels(se, &meta)
 	return event.Event{
 		Kind:   kind,
 		Source: collections.ServiceEntry,
