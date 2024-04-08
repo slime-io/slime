@@ -670,6 +670,7 @@ func (s *Source) handleServiceDelete(iface string, ignoredSes frameworkutil.Set[
 			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 			seValueCopy.ServiceEntry = &seCopy
 			ses.Set(se, &seValueCopy)
+			sem = &seValueCopy
 			event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
 			if err == nil {
 				log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
