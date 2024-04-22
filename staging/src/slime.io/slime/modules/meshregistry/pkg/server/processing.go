@@ -28,6 +28,7 @@ import (
 	"istio.io/libistio/pkg/config/schema/collection"
 	"istio.io/libistio/pkg/config/schema/collections"
 	"istio.io/libistio/pkg/config/schema/resource"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -98,6 +99,8 @@ func (p *Processing) Start() (err error) {
 		zookeeperSrc event.Source
 		eurekaSrc    event.Source
 		nacosSrc     event.Source
+
+		srcPreStartHooks []func()
 
 		httpHandle       func(http.ResponseWriter, *http.Request)
 		simpleHttpHandle func(http.ResponseWriter, *http.Request)
@@ -175,7 +178,7 @@ func (p *Processing) Start() (err error) {
 	}
 
 	if clusterCache {
-		p.initMulticluster()
+		srcPreStartHooks = append(srcPreStartHooks, p.initMulticluster())
 	}
 
 	p.httpServer.HandleFunc("/args", p.cacheRegArgs)
@@ -218,6 +221,11 @@ func (p *Processing) Start() (err error) {
 	p.httpServer.ListenerRegistry(mcpController, startWG, p.startXdsOverMcp)
 
 	go func() {
+		for _, hook := range srcPreStartHooks {
+			if hook != nil {
+				hook()
+			}
+		}
 		monitoring.RecordEnabledSource(len(csrc))
 		for _, src := range csrc {
 			src.Start()
@@ -345,11 +353,11 @@ func (p *Processing) Address() net.Addr {
 	return l.Addr()
 }
 
-func (p *Processing) initMulticluster() {
+func (p *Processing) initMulticluster() func() {
 	k, err := p.getDeployKubeClient()
 	if err != nil {
 		log.Errorf("get KubeInterfaces %v", err)
-		return
+		return nil
 	}
 
 	controller := multicluster.NewController(k, p.regArgs.K8S.ClusterRegistriesNamespace, time.Duration(p.regArgs.ResyncPeriod), p.localCLusterID)
@@ -359,6 +367,23 @@ func (p *Processing) initMulticluster() {
 		if err = controller.Run(p.stopCh); err != nil {
 			log.Errorf("start multicluster controller met err %v", err)
 		}
+	}
+	checkInterval := 100 * time.Millisecond
+	timeout := 10 * time.Second
+	if p.regArgs.ResyncPeriod > 0 {
+		timeout = 2 * time.Duration(p.regArgs.ResyncPeriod)
+	}
+	return func() {
+		wait.PollImmediate(
+			checkInterval,
+			timeout,
+			func() (done bool, err error) {
+				if controller.HasSynced() {
+					return true, nil
+				}
+				return false, nil
+			},
+		)
 	}
 }
 

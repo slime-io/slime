@@ -32,8 +32,9 @@ func newNodeCache() *nodeCache {
 }
 
 type nodeCache struct {
-	cache   cmap.ConcurrentMap[string, *metav1.ObjectMeta]
-	Handler cache.ResourceEventHandlerFuncs
+	cache     cmap.ConcurrentMap[string, *metav1.ObjectMeta]
+	Handler   cache.ResourceEventHandlerFuncs
+	hasSynced func() bool
 }
 
 func (nc *nodeCache) GetAll() cmap.ConcurrentMap[string, *metav1.ObjectMeta] {
@@ -51,6 +52,10 @@ func (nc *nodeCache) Get(ip string) (meta *metav1.ObjectMeta, exist bool) {
 func (nc *nodeCache) GetHostKey(key string) (string, bool) {
 	_, exist := nc.cache.Get(key)
 	return key, exist
+}
+
+func (nc *nodeCache) HasSynced() bool {
+	return nc.hasSynced()
 }
 
 func (nc *nodeCache) add(obj interface{}) {
@@ -118,6 +123,7 @@ func (nch *nodeCacheHandler) ClusterAdded(cluster *multicluster.Cluster, stopCh 
 		nch.caches = make(map[string]objectCache[*metav1.ObjectMeta])
 	}
 	nodeCache := newNodeCache()
+	nodeCache.hasSynced = nodeInformer.HasSynced
 	nch.caches[cluster.ID] = nodeCache
 	nodeInformer.AddEventHandler(nodeCache.Handler)
 	go nodeInformer.Run(stopCh)
@@ -136,4 +142,15 @@ func (nch *nodeCacheHandler) ClusterDeleted(clusterID string) error {
 	defer nch.Unlock()
 	delete(nch.caches, clusterID)
 	return nil
+}
+
+func (nch *nodeCacheHandler) HasSynced() bool {
+	nch.Lock()
+	defer nch.Unlock()
+	for _, c := range nch.caches {
+		if !c.HasSynced() {
+			return false
+		}
+	}
+	return true
 }

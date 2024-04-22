@@ -37,8 +37,9 @@ type podWrapper struct {
 }
 
 type podCache struct {
-	cache   cmap.ConcurrentMap[string, *podWrapper]
-	Handler cache.ResourceEventHandlerFuncs
+	cache     cmap.ConcurrentMap[string, *podWrapper]
+	Handler   cache.ResourceEventHandlerFuncs
+	hasSynced func() bool
 }
 
 func (pc *podCache) GetAll() cmap.ConcurrentMap[string, *podWrapper] {
@@ -59,6 +60,10 @@ func (pc *podCache) GetHostKey(ip string) (string, bool) {
 		return value.NodeName, true
 	}
 	return "", false
+}
+
+func (pc *podCache) HasSynced() bool {
+	return pc.hasSynced()
 }
 
 func (pc *podCache) add(obj interface{}) {
@@ -150,6 +155,7 @@ func (pch *podCacheHandler) ClusterAdded(cluster *multicluster.Cluster, stopCh <
 		pch.caches = make(map[string]objectCache[*podWrapper])
 	}
 	podCache := newPodCache()
+	podCache.hasSynced = podInformer.HasSynced
 	pch.caches[cluster.ID] = podCache
 	podInformer.AddEventHandler(podCache.Handler)
 	go podInformer.Run(stopCh)
@@ -168,4 +174,15 @@ func (pch *podCacheHandler) ClusterDeleted(clusterID string) error {
 	defer pch.Unlock()
 	delete(pch.caches, clusterID)
 	return nil
+}
+
+func (pch *podCacheHandler) HasSynced() bool {
+	pch.Lock()
+	defer pch.Unlock()
+	for _, c := range pch.caches {
+		if !c.HasSynced() {
+			return false
+		}
+	}
+	return true
 }

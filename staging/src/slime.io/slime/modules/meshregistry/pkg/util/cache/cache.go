@@ -24,4 +24,5 @@ type objectCache[V any] interface {
 	GetAll() cmap.ConcurrentMap[string, V]
 	Get(string) (*metav1.ObjectMeta, bool)
 	GetHostKey(string) (string, bool)
+	HasSynced() bool
 }
