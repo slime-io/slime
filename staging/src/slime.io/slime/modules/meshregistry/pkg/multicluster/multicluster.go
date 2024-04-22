@@ -40,6 +40,10 @@ type ClusterHandler interface {
 	ClusterDeleted(clusterID string) error
 }
 
+type Synced interface {
+	HasSynced() bool
+}
+
 // Controller is the controller implementation for Secret resources
 type Controller struct {
 	localClusterID     string
@@ -150,6 +154,19 @@ func (c *Controller) Run(stopCh <-chan struct{}) error {
 		c.close()
 	}()
 	return nil
+}
+
+func (c *Controller) HasSynced() bool {
+	if !c.informer.HasSynced() {
+		return false
+	}
+	for _, h := range c.handlers {
+		if s, ok := h.(Synced); ok && !s.HasSynced() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (c *Controller) close() {
