@@ -11,18 +11,6 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-const (
-	ProjectCode = "projectCode"
-)
-
-type Error struct {
-	msg string
-}
-
-func (e Error) Error() string {
-	return e.msg
-}
-
 type convertOptions struct {
 	patchLabel            bool
 	enableProjectCode     bool
@@ -55,7 +43,10 @@ func ConvertServiceEntryMap(instances []*instanceResp, opts *convertOptions) (ma
 
 		var projectCodes []string
 		if opts.enableProjectCode {
-			projectCodes = getProjectCodeArr(ins)
+			projectCodes = source.GetProjectCodeArr(ins,
+				func(ir *instanceResp) []*instance { return ir.Hosts },
+				func(i *instance) map[string]string { return i.Metadata },
+			)
 		} else {
 			projectCodes = append(projectCodes, "")
 		}
@@ -170,8 +161,8 @@ func convertEndpointsWithNs(instances []*instance, projectCode string, opts *con
 		if !ins.Healthy { // nacos-spec
 			continue
 		}
-		// 与要求projectCode不同的服务实例跳过，实现服务实例项目隔离
-		if projectCode != "" && ins.Metadata[ProjectCode] != projectCode {
+		// if the project code is not empty, and the project code of the instance is not equal to the project code, skip it
+		if projectCode != "" && ins.Metadata[source.ProjectCode] != projectCode {
 			continue
 		}
 
@@ -243,19 +234,4 @@ func convertInstanceId(labels map[string]string) {
 	if ok {
 		labels["instanceId"] = strings.ReplaceAll(v, ":", "_")
 	}
-}
-
-func getProjectCodeArr(ins *instanceResp) []string {
-	projectCodes := make([]string, 0)
-	projectCodeMap := make(map[string]struct{})
-	for _, instance := range ins.Hosts {
-		if v, ok := instance.Metadata[ProjectCode]; ok {
-			if _, ok := projectCodeMap[v]; !ok {
-				projectCodes = append(projectCodes, v)
-				projectCodeMap[v] = struct{}{}
-			}
-		}
-	}
-
-	return projectCodes
 }

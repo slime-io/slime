@@ -22,7 +22,6 @@ type HttpServer struct {
 	mux                 *http.ServeMux
 	xdsReady            bool
 	sourceReady         bool
-	sourceReadyMsg      string
 	httpPathHandler     common.PathHandler
 	sources             cmap.ConcurrentMap[string, bool]
 	lock                sync.Mutex

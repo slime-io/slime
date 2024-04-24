@@ -4,13 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"time"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
 	networkingapi "istio.io/api/networking/v1alpha3"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -18,12 +16,25 @@ import (
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
+	"slime.io/slime/modules/meshregistry/pkg/features"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
+const (
+	SourceName = "nacos"
+
+	HttpPath = "/nacos"
+
+	defaultServiceFilter = ""
+)
+
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "nacos")
+
+func init() {
+	source.RegisterSourceInitlizer(SourceName, source.RegistrySourceInitlizer(New))
+}
 
 type Source struct {
 	args *bootstrap.NacosSourceArgs // should only be accessed in `onConfig`
@@ -36,9 +47,8 @@ type Source struct {
 	delay time.Duration
 
 	// source cache
-	cache             map[string]*networkingapi.ServiceEntry
-	namingServiceList cmap.ConcurrentMap[string, bool]
-	handlers          []event.Handler
+	cache    map[string]*networkingapi.ServiceEntry
+	handlers []event.Handler
 
 	mut sync.RWMutex
 
@@ -64,26 +74,16 @@ type Source struct {
 	seMetaModifierFactory func(string) func(*resource.Metadata)
 }
 
-const (
-	SourceName       = "nacos"
-	HttpPath         = "/nacos"
-	POLLING          = "polling"
-	WATCHING         = "watching"
-	clientHeadersEnv = "NACOS_CLIENT_HEADERS"
-
-	defaultServiceFilter = ""
-)
-
-type Option func(s *Source) error
-
-func WithDynamicConfigOption(addCb func(func(*bootstrap.NacosSourceArgs))) Option {
-	return func(s *Source) error {
-		addCb(s.onConfig)
-		return nil
+func New(
+	moduleArgs *bootstrap.RegistryArgs,
+	readyCallback func(string),
+	addOnReArgs func(onReArgsCallback func(args *bootstrap.RegistryArgs)),
+) (event.Source, map[string]http.HandlerFunc, bool, bool, error) {
+	args := moduleArgs.NacosSource
+	if !args.Enabled {
+		return nil, nil, false, true, nil
 	}
-}
 
-func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	var argsCopy *bootstrap.NacosSourceArgs
 	if args.GatewayModel || args.NsfNacos {
 		cp := *args
@@ -98,15 +98,22 @@ func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback fun
 			argsCopy.DomSuffix = ".nsf"
 		}
 	}
-
 	if argsCopy != nil {
 		args = argsCopy
+	}
+
+	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
+		return nil, nil, false, false, fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
+	}
+
+	if args.Mode != source.ModePolling {
+		log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", args.Mode)
 	}
 
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -116,21 +123,23 @@ func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback fun
 			})
 	}
 
-	ret := &Source{
+	src := &Source{
 		args:              args,
-		delay:             delay,
+		delay:             time.Duration(moduleArgs.RegistryStartDelay),
 		started:           false,
 		initedCallback:    readyCallback,
 		cache:             make(map[string]*networkingapi.ServiceEntry),
-		namingServiceList: cmap.New[bool](),
 		stop:              make(chan struct{}),
 		seInitCh:          make(chan struct{}),
 		seMergePortMocker: svcMocker,
 	}
 
+	servers := args.Servers
+	if len(servers) == 0 {
+		servers = []bootstrap.NacosServer{args.NacosServer}
+	}
 	headers := make(map[string]string)
-	nacosHeaders := os.Getenv(clientHeadersEnv)
-	if nacosHeaders != "" {
+	if nacosHeaders := features.NacosClientHeaders; nacosHeaders != "" {
 		for _, header := range strings.Split(nacosHeaders, ",") {
 			items := strings.SplitN(header, "=", 2)
 			if len(items) == 2 {
@@ -138,42 +147,36 @@ func New(args *bootstrap.NacosSourceArgs, delay time.Duration, readyCallback fun
 			}
 		}
 	}
+	src.client = NewClients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
 
-	if args.Mode != POLLING {
-		log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", args.Mode)
-	}
-	servers := args.Servers
-	if len(servers) == 0 {
-		servers = []bootstrap.NacosServer{args.NacosServer}
-	}
-	ret.client = NewClients(servers, args.MetaKeyNamespace, args.MetaKeyGroup, headers)
-
-	ret.initWg.Add(1)
-	if ret.seMergePortMocker != nil {
-		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
-
-		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
+	src.initWg.Add(1) // // service entry init-sync
+	if src.seMergePortMocker != nil {
+		src.handlers = append(src.handlers, src.seMergePortMocker)
+		src.seMergePortMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
 			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
-			for _, h := range ret.handlers {
+			for _, h := range src.handlers {
 				h.Handle(ev)
 			}
 		})
-
-		ret.initWg.Add(1)
+		src.initWg.Add(1)
 	}
 
-	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
-	ret.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
-	ret.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
-	ret.reGroupInstances = reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
+	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	src.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
+	src.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
+	src.reGroupInstances = reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
 
-	for _, op := range options {
-		if err := op(ret); err != nil {
-			return nil, nil, err
-		}
+	if addOnReArgs != nil {
+		addOnReArgs(func(reArgs *bootstrap.RegistryArgs) {
+			src.onConfig(reArgs.NacosSource)
+		})
 	}
 
-	return ret, ret.handleHttp, nil
+	debugHandler := map[string]http.HandlerFunc{
+		HttpPath: src.handleHttp,
+	}
+
+	return src, debugHandler, args.LabelPatch, false, nil
 }
 
 func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
@@ -327,7 +330,7 @@ func (s *Source) handleHttp(w http.ResponseWriter, req *http.Request) {
 	s.cacheJson(w, req)
 }
 
-func (s *Source) dumpClients(w http.ResponseWriter, r *http.Request) {
+func (s *Source) dumpClients(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(s.client.RegistryInfo()))
 }
 
@@ -378,10 +381,18 @@ func (s *Source) Start() {
 			monitoring.RecordReady(SourceName, t0, time.Now())
 			s.initedCallback(SourceName)
 		}()
+
+		// If wait time is set, we will call the initedCallback after wait time.
+		if s.args.WaitTime > 0 {
+			go func() {
+				time.Sleep(time.Duration(s.args.WaitTime))
+				s.initedCallback(SourceName)
+			}()
+		}
 	}
 
 	go func() {
-		if s.args.Mode == POLLING {
+		if s.args.Mode == source.ModePolling {
 			go s.Polling()
 		} else {
 			log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", s.args.Mode)
