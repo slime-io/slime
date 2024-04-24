@@ -67,6 +67,12 @@ var (
 		).Get()
 		return parseSeLabelKeys(seLabelSelectorKeys)
 	}()
+
+	NacosClientHeaders = env.RegisterStringVar(
+		"NACOS_CLIENT_HEADERS",
+		"",
+		"specify the additional headers to send to nacos server",
+	).Get()
 )
 
 func parseEndpointRelabelItems(endpointRelabelItems string) map[string]string {

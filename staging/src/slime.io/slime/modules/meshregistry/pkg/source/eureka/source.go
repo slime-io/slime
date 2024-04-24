@@ -21,7 +21,17 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
+const (
+	SourceName = "eureka"
+
+	HttpPath = "/eureka"
+)
+
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "eureka")
+
+func init() {
+	source.RegisterSourceInitlizer(SourceName, source.RegistrySourceInitlizer(New))
+}
 
 type Source struct {
 	args *bootstrap.EurekaSourceArgs
@@ -43,12 +53,16 @@ type Source struct {
 	client            Client
 }
 
-const (
-	SourceName = "eureka"
-	HttpPath   = "/eureka"
-)
+func New(
+	moduleArgs *bootstrap.RegistryArgs,
+	readyCallback func(string),
+	_ func(func(*bootstrap.RegistryArgs)),
+) (event.Source, map[string]http.HandlerFunc, bool, bool, error) {
+	args := moduleArgs.EurekaSource
+	if !args.Enabled {
+		return nil, nil, false, true, nil
+	}
 
-func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback func(string)) (event.Source, func(http.ResponseWriter, *http.Request), error) {
 	var argsCopy *bootstrap.EurekaSourceArgs
 	if args.GatewayModel || args.NsfEureka {
 		cp := *args
@@ -63,21 +77,18 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 			argsCopy.AppSuffix = ".nsf"
 		}
 	}
-
 	if argsCopy != nil {
 		args = argsCopy
 	}
 
-	serviers := args.Servers
-	if len(serviers) == 0 {
-		serviers = []bootstrap.EurekaServer{args.EurekaServer}
+	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
+		return nil, nil, false, false, fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
 	}
-	client := NewClients(serviers)
 
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -87,41 +98,40 @@ func New(args *bootstrap.EurekaSourceArgs, delay time.Duration, readyCallback fu
 			})
 	}
 
-	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
-		return nil, nil, fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
-	}
-
-	ret := &Source{
-		args:    args,
-		delay:   delay,
-		started: false,
-
-		initedCallback: readyCallback,
-
-		cache: make(map[string]*networkingapi.ServiceEntry),
-
-		stop:     make(chan struct{}),
-		seInitCh: make(chan struct{}),
-
-		client:            client,
+	src := &Source{
+		args:              args,
+		delay:             time.Duration(moduleArgs.RegistryStartDelay),
+		started:           false,
+		initedCallback:    readyCallback,
+		cache:             make(map[string]*networkingapi.ServiceEntry),
+		stop:              make(chan struct{}),
+		seInitCh:          make(chan struct{}),
 		seMergePortMocker: svcMocker,
 	}
 
-	ret.initWg.Add(1) // service entry init-sync
-	if svcMocker != nil {
-		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
+	serviers := args.Servers
+	if len(serviers) == 0 {
+		serviers = []bootstrap.EurekaServer{args.EurekaServer}
+	}
+	src.client = NewClients(serviers)
 
-		svcMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
+	src.initWg.Add(1) // service entry init-sync
+	if src.seMergePortMocker != nil {
+		src.handlers = append(src.handlers, src.seMergePortMocker)
+		src.seMergePortMocker.SetDispatcher(func(meta resource.Metadata, item *networkingapi.ServiceEntry) {
 			ev := source.BuildServiceEntryEvent(event.Updated, item, meta)
-			for _, h := range ret.handlers {
+			for _, h := range src.handlers {
 				h.Handle(ev)
 			}
 		})
-
-		ret.initWg.Add(1)
+		src.initWg.Add(1)
 	}
 
-	return ret, ret.handleHttp, nil
+	debugHandler := map[string]http.HandlerFunc{
+		HttpPath: src.handleHttp,
+	}
+
+	return src, debugHandler, args.LabelPatch, false, nil
 }
 
 func (s *Source) cacheShallowCopy() map[string]*networkingapi.ServiceEntry {
@@ -314,6 +324,14 @@ func (s *Source) Start() {
 			monitoring.RecordReady(SourceName, t0, time.Now())
 			s.initedCallback(SourceName)
 		}()
+
+		// If wait time is set, we will call the initedCallback after wait time.
+		if s.args.WaitTime > 0 {
+			go func() {
+				time.Sleep(time.Duration(s.args.WaitTime))
+				s.initedCallback(SourceName)
+			}()
+		}
 	}
 
 	go func() {

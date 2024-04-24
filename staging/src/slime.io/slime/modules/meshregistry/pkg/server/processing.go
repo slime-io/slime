@@ -23,11 +23,7 @@ import (
 	"time"
 
 	cmap "github.com/orcaman/concurrent-map/v2"
-	"google.golang.org/grpc"
 	"istio.io/libistio/pkg/config/event"
-	"istio.io/libistio/pkg/config/schema/collection"
-	"istio.io/libistio/pkg/config/schema/collections"
-	"istio.io/libistio/pkg/config/schema/resource"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -37,10 +33,7 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/mcpoverxds"
 	"slime.io/slime/modules/meshregistry/pkg/monitoring"
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
-	"slime.io/slime/modules/meshregistry/pkg/source/eureka"
-	"slime.io/slime/modules/meshregistry/pkg/source/k8s/fs"
-	"slime.io/slime/modules/meshregistry/pkg/source/nacos"
-	"slime.io/slime/modules/meshregistry/pkg/source/zookeeper"
+	"slime.io/slime/modules/meshregistry/pkg/source"
 	utilcache "slime.io/slime/modules/meshregistry/pkg/util/cache"
 )
 
@@ -57,12 +50,16 @@ type Processing struct {
 	listener      net.Listener
 	stopCh        chan struct{}
 	httpServer    *HttpServer
-
-	kubeSourceSchemas *collection.Schemas
 }
 
 // NewProcessing returns a new processing component.
 func NewProcessing(args *Args) *Processing {
+	p := &Processing{
+		regArgs:        args.RegistryArgs,
+		addOnRegArgs:   args.AddOnRegArgs,
+		stopCh:         make(chan struct{}),
+		localCLusterID: args.RegistryArgs.K8S.ClusterID,
+	}
 	hs := &HttpServer{
 		addr:            args.RegistryArgs.HTTPServerAddr,
 		mux:             http.NewServeMux(),
@@ -70,140 +67,51 @@ func NewProcessing(args *Args) *Processing {
 		sources:         cmap.New[bool](),
 		httpPathHandler: args.SlimeEnv.HttpPathHandler,
 	}
-
-	if rm := args.SlimeEnv.ReadyManager; rm != nil {
-		rm.AddReadyChecker("ready", hs.ready)
-	}
-
+	hs.HandleFunc("/args", p.cacheRegArgs)
 	hs.HandleFunc("/ready", hs.handleReadyProbe)
 	hs.HandleFunc("/clients", hs.handleClientsInfo)
 	hs.HandleFunc("/pc", hs.pc)
 	hs.HandleFunc("/nc", hs.nc)
-
-	ret := &Processing{
-		regArgs:        args.RegistryArgs,
-		addOnRegArgs:   args.AddOnRegArgs,
-		stopCh:         make(chan struct{}),
-		httpServer:     hs,
-		localCLusterID: args.RegistryArgs.K8S.ClusterID,
+	if rm := args.SlimeEnv.ReadyManager; rm != nil {
+		rm.AddReadyChecker("ready", hs.ready)
 	}
-
-	return ret
+	p.httpServer = hs
+	return p
 }
 
 // Start implements process.Component
 func (p *Processing) Start() (err error) {
-	csrc := make([]event.Source, 0, 5)
-	var (
-		kubeFsSrc    event.Source
-		zookeeperSrc event.Source
-		eurekaSrc    event.Source
-		nacosSrc     event.Source
-
-		srcPreStartHooks []func()
-
-		httpHandle       func(http.ResponseWriter, *http.Request)
-		simpleHttpHandle func(http.ResponseWriter, *http.Request)
-	)
-
-	if p.regArgs.K8SSource.Enabled {
-		if p.regArgs.K8SSource.EnableConfigFile && p.regArgs.K8SSource.ConfigPath != "" {
-			schemas := p.getKubeSourceSchemas()
-			log.Warnf("watching config files in %s", p.regArgs.K8SSource.ConfigPath)
-			log.Warnf("watching config schemas %v", schemas.Kinds())
-			kubeFsSrc, err = fs.New(p.regArgs.K8SSource.ConfigPath, schemas, p.regArgs.K8SSource.WatchConfigFiles)
-			if err != nil {
-				return
-			}
-		}
-	}
-
+	var srcPreStartHooks []func()
 	clusterCache := false
-
-	if srcArgs := p.regArgs.ZookeeperSource.SourceArgs; srcArgs.Enabled {
-		if zookeeperSrc, httpHandle, simpleHttpHandle, err = zookeeper.New(
-			p.regArgs.ZookeeperSource, time.Duration(p.regArgs.RegistryStartDelay),
-			p.httpServer.SourceReadyCallBack, zookeeper.WithDynamicConfigOption(func(onZookeeperArgs func(*bootstrap.ZookeeperSourceArgs)) {
-				if p.addOnRegArgs != nil {
-					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
-						onZookeeperArgs(args.ZookeeperSource)
-					})
-				}
-			})); err != nil {
-			return
+	csrc := make([]event.Source, 0, len(source.RegistrySources()))
+	for registryID, initlizer := range source.RegistrySources() {
+		src, handlers, cacheCluster, skip, err := initlizer(p.regArgs, p.httpServer.SourceReadyCallBack, p.addOnRegArgs)
+		if err != nil {
+			log.Errorf("init registry source %s failed: %v", registryID, err)
+			return err
 		}
-		p.httpServer.HandleFunc(zookeeper.ZkPath, httpHandle)
-		p.httpServer.HandleFunc(zookeeper.ZkSimplePath, simpleHttpHandle)
-		if zkSrc, ok := zookeeperSrc.(*zookeeper.Source); ok {
-			p.httpServer.HandleFunc(zookeeper.DubboCallModelPath, zkSrc.HandleDubboCallModel)
-			p.httpServer.HandleFunc(zookeeper.SidecarDubboCallModelPath, zkSrc.HandleSidecarDubboCallModel)
+		if skip {
+			continue
 		}
-		p.httpServer.SourceRegistry(zookeeper.SourceName)
-		if srcArgs.WaitTime > 0 {
-			p.httpServer.SourceReadyLater(zookeeper.SourceName, time.Duration(srcArgs.WaitTime))
+		p.httpServer.SourceRegistry(registryID)
+		for path, handler := range handlers {
+			p.httpServer.HandleFunc(path, handler)
 		}
-		clusterCache = clusterCache || p.regArgs.ZookeeperSource.LabelPatch
-	}
-
-	if srcArgs := p.regArgs.EurekaSource; srcArgs.Enabled {
-		if eurekaSrc, httpHandle, err = eureka.New(p.regArgs.EurekaSource, time.Duration(p.regArgs.RegistryStartDelay), p.httpServer.SourceReadyCallBack); err != nil {
-			return
-		}
-		p.httpServer.HandleFunc(eureka.HttpPath, httpHandle)
-		p.httpServer.SourceRegistry(eureka.SourceName)
-		if srcArgs.WaitTime > 0 {
-			p.httpServer.SourceReadyLater(eureka.SourceName, time.Duration(srcArgs.WaitTime))
-		}
-		clusterCache = clusterCache || p.regArgs.EurekaSource.LabelPatch
-	}
-
-	if srcArgs := p.regArgs.NacosSource; srcArgs.Enabled {
-		if nacosSrc, httpHandle, err = nacos.New(
-			p.regArgs.NacosSource, time.Duration(p.regArgs.RegistryStartDelay),
-			p.httpServer.SourceReadyCallBack, nacos.WithDynamicConfigOption(func(onNacosArgs func(*bootstrap.NacosSourceArgs)) {
-				if p.addOnRegArgs != nil {
-					p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
-						onNacosArgs(args.NacosSource)
-					})
-				}
-			})); err != nil {
-			return
-		}
-		p.httpServer.HandleFunc(nacos.HttpPath, httpHandle)
-		p.httpServer.SourceRegistry(nacos.SourceName)
-		if srcArgs.WaitTime > 0 {
-			p.httpServer.SourceReadyLater(nacos.SourceName, time.Duration(srcArgs.WaitTime))
-		}
-		clusterCache = clusterCache || p.regArgs.EurekaSource.LabelPatch
+		clusterCache = clusterCache || cacheCluster
+		csrc = append(csrc, src)
 	}
 
 	if clusterCache {
 		srcPreStartHooks = append(srcPreStartHooks, p.initMulticluster())
 	}
 
-	p.httpServer.HandleFunc("/args", p.cacheRegArgs)
 	if p.addOnRegArgs != nil {
 		p.addOnRegArgs(func(args *bootstrap.RegistryArgs) {
 			p.regArgs = args
 		})
 	}
 
-	if kubeFsSrc != nil {
-		csrc = append(csrc, kubeFsSrc)
-	}
-	if zookeeperSrc != nil {
-		csrc = append(csrc, zookeeperSrc)
-	}
-	if eurekaSrc != nil {
-		csrc = append(csrc, eurekaSrc)
-	}
-	if nacosSrc != nil {
-		csrc = append(csrc, nacosSrc)
-	}
-
 	p.httpServer.start()
-	grpc.EnableTracing = p.regArgs.EnableGRPCTracing
-
 	// TODO start sources
 	mcpController, err := mcpoverxds.NewController(p.regArgs)
 	if err != nil {
@@ -268,59 +176,12 @@ func (p *Processing) getDeployKubeClient() (k kubernetes.Interface, err error) {
 
 func (p *Processing) getKubeClient(config *rest.Config, masterUrl, kubeconfigPath string) (k kubernetes.Interface, err error) {
 	if config == nil {
-		config, err = clientcmd.BuildConfigFromFlags(p.regArgs.K8S.ApiServerUrl, p.regArgs.K8S.KubeConfig)
+		config, err = clientcmd.BuildConfigFromFlags(masterUrl, kubeconfigPath)
 		if err != nil {
 			return nil, err
 		}
 	}
 	return kubernetes.NewForConfig(config)
-}
-
-func (p *Processing) getKubeSourceSchemas() collection.Schemas {
-	if p.kubeSourceSchemas == nil {
-		builder := collection.NewSchemasBuilder()
-
-		colMap := make(map[string]struct{})
-		for _, col := range p.regArgs.K8SSource.Collections {
-			colMap[col] = struct{}{}
-		}
-		for _, col := range p.regArgs.Snapshots {
-			colMap[col] = struct{}{}
-		}
-		excludeKindMap := make(map[string]struct{})
-		for _, k := range p.regArgs.K8SSource.ExcludedResourceKinds {
-			excludeKindMap[k] = struct{}{}
-		}
-		for _, col := range p.regArgs.ExcludedResourceKinds {
-			excludeKindMap[col] = struct{}{}
-		}
-		schemaMap := make(map[resource.Schema]struct{})
-		for col := range colMap {
-			var schemas collection.Schemas
-			switch col {
-			case bootstrap.CollectionsAll:
-				schemas = collections.All
-			case bootstrap.CollectionsIstio:
-				schemas = collections.PilotGatewayAPI()
-			case bootstrap.CollectionsLegacyDefault:
-				schemas = collections.LegacyDefault
-			case bootstrap.CollectionsLegacyLocal:
-				schemas = collections.LegacyLocalAnalysis
-			}
-			for _, s := range schemas.All() {
-				if _, ok := excludeKindMap[s.Kind()]; ok {
-					continue
-				}
-				schemaMap[s] = struct{}{}
-			}
-		}
-		for s := range schemaMap {
-			builder.MustAdd(s)
-		}
-		schemas := builder.Build()
-		p.kubeSourceSchemas = &schemas
-	}
-	return *p.kubeSourceSchemas
 }
 
 // Stop implements process.Component

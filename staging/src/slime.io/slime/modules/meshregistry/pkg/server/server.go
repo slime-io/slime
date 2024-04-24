@@ -6,13 +6,12 @@
 package server
 
 import (
-	"os"
+	"google.golang.org/grpc"
 
 	slimebootstrap "slime.io/slime/framework/bootstrap"
-	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
-
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/meshregistry/model"
+	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "server")
@@ -29,11 +28,8 @@ type Args struct {
 }
 
 func NewServer(args *Args) (*Server, error) {
-	os.Setenv("istio-revision", args.RegistryArgs.Revision)
-	os.Setenv("rev-crds", args.RegistryArgs.RevCrds)
-
+	grpc.EnableTracing = args.RegistryArgs.EnableGRPCTracing
 	proc := NewProcessing(args)
-
 	return &Server{
 		p: proc,
 	}, nil

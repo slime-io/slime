@@ -35,30 +35,28 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/util"
 )
 
-var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "zk")
-
 const (
-	SourceName                = "zookeeper"
+	SourceName = "zookeeper"
+
 	ZkPath                    = "/zk"
 	ZkSimplePath              = "/zks"
 	DubboCallModelPath        = "/dubboCallModel"
 	SidecarDubboCallModelPath = "/sidecarDubboCallModel"
-	ConsumerNode              = "consumers"
-	ProviderNode              = "providers"
-	ConfiguratorNode          = "configurators"
-	Polling                   = "polling"
+
+	ConsumerNode        = "consumers"
+	ProviderNode        = "providers"
+	ConfiguratorNode    = "configurators"
+	providerPathSuffix  = "/" + ProviderNode
+	consumerPathSuffix  = "/" + ConsumerNode
+	disableConsumerPath = "-"
+	configuratorSuffix  = "/" + ConfiguratorNode
 
 	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
 
 	defaultServiceFilter = ""
 )
 
-const (
-	providerPathSuffix  = "/" + ProviderNode
-	consumerPathSuffix  = "/" + ConsumerNode
-	disableConsumerPath = "-"
-	configuratorSuffix  = "/" + ConfiguratorNode
-)
+var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "zk")
 
 type zkConn struct {
 	conn atomic.Value // store *zk.Conn
@@ -82,6 +80,10 @@ func (z *zkConn) ChildrenW(path string) ([]string, <-chan zk.Event, error) {
 	children, _, c, err := z.conn.Load().(*zk.Conn).ChildrenW(path)
 	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	return children, c, err
+}
+
+func init() {
+	source.RegisterSourceInitlizer(SourceName, source.RegistrySourceInitlizer(New))
 }
 
 type Source struct {
@@ -125,16 +127,16 @@ type Source struct {
 	forceUpdateTrigger *atomic.Value // store chan struct{}
 }
 
-type Option func(s *Source) error
-
-func WithDynamicConfigOption(addCb func(func(*bootstrap.ZookeeperSourceArgs))) Option {
-	return func(s *Source) error {
-		addCb(s.onConfig)
-		return nil
+func New(
+	moduleArgs *bootstrap.RegistryArgs,
+	readyCallback func(string),
+	addOnReArgs func(onReArgsCallback func(args *bootstrap.RegistryArgs)),
+) (event.Source, map[string]http.HandlerFunc, bool, bool, error) {
+	args := moduleArgs.ZookeeperSource
+	if !args.Enabled {
+		return nil, nil, false, true, nil
 	}
-}
 
-func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback func(string), options ...Option) (event.Source, func(http.ResponseWriter, *http.Request), func(http.ResponseWriter, *http.Request), error) {
 	// XXX refactor to config
 	if args.GatewayModel {
 		args.SvcPort = 80
@@ -158,7 +160,7 @@ func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, nil, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -169,55 +171,58 @@ func New(args *bootstrap.ZookeeperSourceArgs, delay time.Duration, readyCallback
 			})
 	}
 
-	ret := &Source{
-		args:            args,
-		ignoreLabelsMap: ignoreLabels,
-
-		initedCallback: readyCallback,
-
-		serviceMethods:       map[string]string{},
-		registryServiceCache: cmap.New[cmap.ConcurrentMap[string, []dubboInstance]](),
-		cache:                cmap.New[cmap.ConcurrentMap[string, *ServiceEntryWithMeta]](),
-		seDubboCallModels:    map[resource.FullName]map[string]DubboCallModel{},
-		appSidecarUpdateTime: map[string]time.Time{},
-		dubboPortsCache:      map[uint32]*networkingapi.Port{},
-
+	src := &Source{
+		args:                   args,
+		ignoreLabelsMap:        ignoreLabels,
+		initedCallback:         readyCallback,
+		serviceMethods:         map[string]string{},
+		registryServiceCache:   cmap.New[cmap.ConcurrentMap[string, []dubboInstance]](),
+		cache:                  cmap.New[cmap.ConcurrentMap[string, *ServiceEntryWithMeta]](),
+		seDubboCallModels:      map[resource.FullName]map[string]DubboCallModel{},
+		appSidecarUpdateTime:   map[string]time.Time{},
+		dubboPortsCache:        map[uint32]*networkingapi.Port{},
 		seInitCh:               make(chan struct{}),
 		stop:                   make(chan struct{}),
 		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
-
-		Con:                &zkConn{},
-		seMergePortMocker:  svcMocker,
-		forceUpdateTrigger: &atomic.Value{},
+		Con:                    &zkConn{},
+		seMergePortMocker:      svcMocker,
+		forceUpdateTrigger:     &atomic.Value{},
 	}
-	ret.forceUpdateTrigger.Store(make(chan struct{}))
+	src.forceUpdateTrigger.Store(make(chan struct{}))
 
-	ret.handlers = append(
-		ret.handlers,
-		event.HandlerFromFn(ret.serviceEntryHandlerRefreshSidecar),
+	src.handlers = append(
+		src.handlers,
+		event.HandlerFromFn(src.serviceEntryHandlerRefreshSidecar),
 	)
 
-	ret.initWg.Add(1) // ServiceEntry init-sync ready
+	src.initWg.Add(1) // ServiceEntry init-sync ready
 	if args.EnableDubboSidecar {
-		ret.initWg.Add(1) // Sidecar init-sync ready
+		src.initWg.Add(1) // Sidecar init-sync ready
 	}
-	if ret.seMergePortMocker != nil {
-		ret.handlers = append(ret.handlers, ret.seMergePortMocker)
-		svcMocker.SetDispatcher(ret.dispatchMergePortsServiceEntry)
-		ret.initWg.Add(1) // merge ports se init-sync ready
-	}
-
-	ret.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
-	ret.methodLBChecker = generateMethodLBChecker(args.MethodLBServiceSelectors)
-
-	for _, op := range options {
-		if err := op(ret); err != nil {
-			return nil, nil, nil, err
-		}
+	if src.seMergePortMocker != nil {
+		src.handlers = append(src.handlers, src.seMergePortMocker)
+		svcMocker.SetDispatcher(src.dispatchMergePortsServiceEntry)
+		src.initWg.Add(1) // merge ports se init-sync ready
 	}
 
-	return ret, ret.cacheJson, ret.simpleCacheJson, nil
+	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	src.methodLBChecker = generateMethodLBChecker(args.MethodLBServiceSelectors)
+
+	if addOnReArgs != nil {
+		addOnReArgs(func(reArgs *bootstrap.RegistryArgs) {
+			src.onConfig(reArgs.ZookeeperSource)
+		})
+	}
+
+	debugHandler := map[string]http.HandlerFunc{
+		ZkPath:                    src.cacheJson,
+		ZkSimplePath:              src.simpleCacheJson,
+		DubboCallModelPath:        src.HandleDubboCallModel,
+		SidecarDubboCallModelPath: src.HandleSidecarDubboCallModel,
+	}
+
+	return src, debugHandler, args.LabelPatch, false, nil
 }
 
 func (s *Source) dispatchMergePortsServiceEntry(meta resource.Metadata, se *networkingapi.ServiceEntry) {
@@ -418,7 +423,7 @@ func (s *Source) cacheJson(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *Source) isPollingMode() bool {
-	return s.args.Mode == Polling
+	return s.args.Mode == source.ModePolling
 }
 
 func (s *Source) Start() {
@@ -429,6 +434,14 @@ func (s *Source) Start() {
 			monitoring.RecordReady(SourceName, t0, time.Now())
 			s.initedCallback(SourceName)
 		}()
+
+		// If wait time is set, we will call the initedCallback after wait time.
+		if s.args.WaitTime > 0 {
+			go func() {
+				time.Sleep(time.Duration(s.args.WaitTime))
+				s.initedCallback(SourceName)
+			}()
+		}
 	}
 
 	go func() { // do recon
@@ -445,9 +458,6 @@ func (s *Source) Start() {
 				s.reConFunc(reconCh)
 				starter.Do(func() {
 					log.Infof("zk connected, will start fetch-data logic")
-					// s.initPush()
-					// TODO 服务自省模式
-					// go s.doWatchAppication(s.ApplicationRegisterRootNode)
 					if s.isPollingMode() {
 						go s.Polling()
 					} else {
