@@ -104,7 +104,7 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		EnvoyfilterCreations.With(resourceName.Value("envoyplugin")).Increment()
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.Env.RevInScope(foundRev) {
 		log.Debugf("existed envoyfilter %v istioRev %s but our rev %s, skip updating to %+v",
-			req.NamespacedName, found, r.Env.IstioRev(), ef)
+			req.NamespacedName, foundRev, r.Env.IstioRev(), ef)
 	} else {
 		log.Infof("Update a EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion

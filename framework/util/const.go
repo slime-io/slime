@@ -13,7 +13,7 @@ var (
 	EnvoyGenericProxyRouter = "envoy.filters.generic.router"
 	EnvoyDubboRouter        = "envoy.filters.dubbo.router"
 
-	EnvoyGenericProxy = "meta"
+	EnvoyGenericProxyPrefix = "generic-"
 	EnvoyDubboProxy   = "envoy.filters.network.dubbo_proxy"
 )
 

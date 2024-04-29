@@ -20,7 +20,6 @@ require (
 )
 
 require (
-	contrib.go.opencensus.io/exporter/prometheus v0.4.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
@@ -31,9 +30,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.0.2 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/ghodss/yaml v1.0.0 // indirect
-	github.com/go-kit/log v0.2.1 // indirect
-	github.com/go-logfmt/logfmt v0.5.1 // indirect
-	github.com/go-logr/logr v1.3.0 // indirect
+	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-openapi/jsonpointer v0.19.6 // indirect
 	github.com/go-openapi/jsonreference v0.20.2 // indirect
@@ -64,16 +61,14 @@ require (
 	github.com/prometheus/client_model v0.5.0 // indirect
 	github.com/prometheus/common v0.45.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
-	github.com/prometheus/statsd_exporter v0.21.0 // indirect
 	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	go.opencensus.io v0.23.0 // indirect
-	go.opentelemetry.io/otel v1.17.0 // indirect
+	go.opentelemetry.io/otel v1.23.0 // indirect
 	go.opentelemetry.io/otel/exporters/prometheus v0.39.1-0.20230714155235-03b8c47770f2 // indirect
-	go.opentelemetry.io/otel/metric v1.17.0 // indirect
+	go.opentelemetry.io/otel/metric v1.23.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.16.0 // indirect
 	go.opentelemetry.io/otel/sdk/metric v0.39.0 // indirect
-	go.opentelemetry.io/otel/trace v1.17.0 // indirect
+	go.opentelemetry.io/otel/trace v1.23.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
@@ -108,8 +103,8 @@ require (
 )
 
 replace (
-	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20240116022210-c7970f94037d
-	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240104031034-b2f5e0749ccc
+	istio.io/istio-mcp => github.com/slime-io/istio-mcp v0.0.0-20240319031437-de3690e6f139
+	istio.io/libistio => github.com/slime-io/libistio v0.0.0-20240319025542-9b29030c6429
 
 	slime.io/slime/framework => ../../../../../../framework
 )
