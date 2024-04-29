@@ -502,8 +502,11 @@ func applyRawPatch(outputPatch translateOutputConfigPatch) (*networkingapi.Envoy
 
 func (r *PluginManagerReconciler) isKnownProtocol(in *v1alpha1.Plugin) bool {
 	switch in.Protocol {
-	case v1alpha1.Plugin_Generic, v1alpha1.Plugin_Dubbo, v1alpha1.Plugin_HTTP:
+	case v1alpha1.Plugin_Dubbo, v1alpha1.Plugin_HTTP:
 		return true
+	case v1alpha1.Plugin_Generic:
+		// the generic proxy should always provide the app protocol
+		return in.GenericAppProtocol != ""
 	default:
 		return false
 	}
@@ -521,7 +524,7 @@ func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta,
 
 	envoyFilter.Priority = in.Priority
 
-	envoyFilter.ConfigPatches = make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
+	envoyFilter.ConfigPatches = make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0, len(in.Plugin))
 	for _, p := range in.Plugin {
 		if !p.Enable {
 			continue
@@ -547,7 +550,7 @@ func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta,
 func (r *PluginManagerReconciler) getListenerFilterName(in *v1alpha1.Plugin) string {
 	switch in.Protocol {
 	case v1alpha1.Plugin_Generic:
-		return util.EnvoyGenericProxy
+		return util.EnvoyGenericProxyPrefix + in.GenericAppProtocol
 	case v1alpha1.Plugin_HTTP:
 		return util.EnvoyHTTPConnectionManager
 	case v1alpha1.Plugin_Dubbo:
