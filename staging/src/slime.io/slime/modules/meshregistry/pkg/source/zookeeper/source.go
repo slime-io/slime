@@ -119,6 +119,8 @@ type Source struct {
 	// instanceFilter fitler which instance of a service should be include
 	// Updates are only allowed when the configuration is loaded or reloaded.
 	instanceFilter func(*dubboInstance) bool
+	// instanceMetaModifier build from args.InstanceMetaRelabel used to adjust the metadata of the instance.
+	instanceMetaModifier func(*map[string]string)
 
 	// methodLBChecker check whether the method-lb feature is enabled for the service
 	// NOTICE: support dynamic config and thus should be accessed with lock.
@@ -207,6 +209,7 @@ func New(
 	}
 
 	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	src.instanceMetaModifier = source.BuildInstanceMetaModifier(args.InstanceMetaRelabel)
 	src.methodLBChecker = generateMethodLBChecker(args.MethodLBServiceSelectors)
 
 	if addOnReArgs != nil {
@@ -599,6 +602,12 @@ func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
 		s.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
 		updateDetails = multierror.Append(updateDetails, fmt.Errorf("instance filter updated, prev %+v, cur %+v", prevArgs.EndpointSelectors, args.EndpointSelectors))
+		shouldForceUpdate = true
+	}
+
+	if !reflect.DeepEqual(prevArgs.InstanceMetaRelabel, args.InstanceMetaRelabel) {
+		s.instanceMetaModifier = source.BuildInstanceMetaModifier(args.InstanceMetaRelabel)
+		updateDetails = multierror.Append(updateDetails, fmt.Errorf("instance meta modifier updated, prev %+v, cur %+v", prevArgs.InstanceMetaRelabel, args.InstanceMetaRelabel))
 		shouldForceUpdate = true
 	}
 
