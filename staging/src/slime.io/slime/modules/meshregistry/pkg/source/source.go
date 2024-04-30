@@ -104,3 +104,47 @@ func GetProjectCodeArr[T, I any](t T, instances func(T) []I, meta func(I) map[st
 
 	return projectCodes
 }
+
+func BuildInstanceMetaModifier(rl *bootstrap.InstanceMetaRelabel) func(*map[string]string) {
+	if rl == nil || len(rl.Items) == 0 {
+		return nil
+	}
+	var relabelFuncs []func(*map[string]string) = make([]func(*map[string]string), 0, len(rl.Items))
+	for _, relabel := range rl.Items {
+		f := func(item *bootstrap.InstanceMetaRelabelItem) func(*map[string]string) {
+			return func(mPtr *map[string]string) {
+				m := *mPtr
+				if item.Key == "" || item.TargetKey == "" {
+					return
+				}
+				if len(m) == 0 && item.CreatedWithValue == "" {
+					return
+				}
+				if m == nil {
+					m = make(map[string]string)
+				}
+				v, exist := m[item.Key]
+				if !exist && item.CreatedWithValue != "" {
+					v, exist = item.CreatedWithValue, true
+				}
+				if !exist {
+					return
+				} else {
+					if nv, ok := item.ValuesMapping[v]; ok {
+						v = nv
+					}
+				}
+				if _, exist := m[item.TargetKey]; !exist || item.Overwrite {
+					m[item.TargetKey] = v
+				}
+				*mPtr = m
+			}
+		}(relabel)
+		relabelFuncs = append(relabelFuncs, f)
+	}
+	return func(mPtr *map[string]string) {
+		for _, f := range relabelFuncs {
+			f(mPtr)
+		}
+	}
+}

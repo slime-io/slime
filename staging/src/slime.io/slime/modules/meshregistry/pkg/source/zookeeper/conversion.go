@@ -185,6 +185,9 @@ func (s *Source) convertServiceEntry(
 		if !ok {
 			continue
 		}
+		if s.instanceMetaModifier != nil {
+			s.instanceMetaModifier(&meta)
+		}
 		serviceKey := buildServiceKey(service, meta) // istio service host
 
 		// now we have the necessary info to build the dubboinstance,

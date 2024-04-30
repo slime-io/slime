@@ -433,33 +433,12 @@ func reGroupInstances(rl *bootstrap.InstanceMetaRelabel, c *bootstrap.ServiceNam
 
 	var instanceRelabel func(inst *instance) = func(inst *instance) { /*do nothing*/ }
 	if rl != nil {
-		var relabelFuncs []func(inst *instance)
-		for _, relabel := range rl.Items {
-			f := func(item *bootstrap.InstanceMetaRelabelItem) func(inst *instance) {
-				return func(inst *instance) {
-					if len(inst.Metadata) == 0 ||
-						item.Key == "" || item.TargetKey == "" {
-						return
-					}
-					v, exist := inst.Metadata[item.Key]
-					if !exist {
-						return
-					} else {
-						if nv, exist := item.ValuesMapping[v]; exist {
-							v = nv
-						}
-					}
-					if _, exist := inst.Metadata[item.TargetKey]; !exist || item.Overwrite {
-						inst.Metadata[item.TargetKey] = v
-					}
-				}
-			}(relabel)
-			relabelFuncs = append(relabelFuncs, f)
-		}
+		instanceMetaModifier := source.BuildInstanceMetaModifier(rl)
 		instanceRelabel = func(inst *instance) {
-			for _, f := range relabelFuncs {
-				f(inst)
+			if instanceMetaModifier == nil {
+				return
 			}
+			instanceMetaModifier((*map[string]string)(&inst.Metadata))
 		}
 	}
 
