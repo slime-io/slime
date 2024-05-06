@@ -245,7 +245,7 @@ type InstanceMetaRelabelItem struct {
 	Overwrite bool `json:"Overwrite,omitempty"`
 	// If the CreatedWithValue is not empty and the Key is not found in the instance metadata,
 	// the TargetKey will be set to the CreatedWithValue value.
-	CreatedWithValue string `json:"CreatedWithDeafult,omitempty"`
+	CreatedWithValue string `json:"CreatedWithValue,omitempty"`
 	// ValuesMapping is a map that associates values of the Key to values of the TargetKey.
 	// If the Key's value is found in the map, the corresponding value is used for the TargetKey.
 	// If not, the original value is used for the TargetKey.
