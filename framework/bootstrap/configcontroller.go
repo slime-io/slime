@@ -14,12 +14,12 @@ import (
 	mcpc "istio.io/istio-mcp/pkg/mcp/client"
 	xdsc "istio.io/istio-mcp/pkg/mcp/xds/client"
 	mcpmodel "istio.io/istio-mcp/pkg/model"
+	"istio.io/libistio/pkg/config/schema/collections"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap/adsc"
-	"slime.io/slime/framework/bootstrap/collections"
 	"slime.io/slime/framework/bootstrap/resource"
 	"slime.io/slime/framework/bootstrap/serviceregistry/kube"
 	"slime.io/slime/framework/bootstrap/serviceregistry/model"
@@ -56,8 +56,6 @@ func RunIstioController(c ConfigController, config *bootconfig.Config) (ConfigCo
 	}
 	xdsSourceEnableIncPush := config.Global.Misc["xdsSourceEnableIncPush"] == "true"
 	stop := cc.stop
-
-	go cc.Run(stop)
 	for _, mc := range cc.monitorControllers {
 		switch mc.kind {
 		case McpOverXds:
@@ -66,6 +64,8 @@ func RunIstioController(c ConfigController, config *bootconfig.Config) (ConfigCo
 			}
 		}
 	}
+
+	go cc.Run(stop)
 	log.Infof("start IstioConfigController successfully")
 	return cc, nil
 }
@@ -132,7 +132,6 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 
 	// use cc to register handler for istio resources
 	if config.Global.EnableConvertSeToIstioRes {
-
 		seToIstioResHandler := func(old resource.Config, cfg resource.Config, e Event) {
 			switch e {
 			case EventAdd:
@@ -348,8 +347,6 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 		cc.RegisterEventHandler(resource.Endpoints, epsToIstioResHandler)
 	}
 
-	go cc.Run(stop)
-
 	for _, mc := range mcs {
 		switch mc.kind {
 		case Kubernetes:
@@ -362,6 +359,8 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 			}
 		}
 	}
+
+	go cc.Run(stop)
 
 	log.Infof("start ConfigController successfully")
 	return cc, nil
@@ -436,7 +435,7 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 			var match bool
 			gvk, err := resource.ParseGroupVersionKind(req.TypeUrl)
 			if err != nil {
-				log.Errorf("parse req.TypeUrl %s error: %+v", err)
+				log.Errorf("parse req.TypeUrl %s error: %+v", req.TypeUrl, err)
 				continue
 			}
 			for _, t := range types {
@@ -486,7 +485,7 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 			}
 
 			cfg := resource.Config{
-				ConfigMeta: resource.ConfigMeta{
+				Meta: resource.Meta{
 					GroupVersionKind:  gvk,
 					Name:              mcpcfg.Name,
 					Namespace:         mcpcfg.Namespace,
@@ -542,21 +541,26 @@ func startXdsMonitorController(mc *monitorController, configRevision string, xds
 	configHandlerAdapter.A = mcpCli
 
 	// xdsMCP handles xds data
-	xdsMCP, err := xdsc.New(&meshconfig.ProxyConfig{
-		DiscoveryAddress: srcAddress.Host,
-	}, &xdsc.Config{
-		Meta: resource.NodeMetadata{
-			Generator:     "api",
-			IstioRevision: configRevision,
-		}.ToStruct(),
-		InitialDiscoveryRequests: initReqs,
-		DiscoveryHandler:         mcpCli,
-		StateNotifier: func(state xdsc.State) {
-			if state == xdsc.StateConnected {
-				configHandlerAdapter.Reset()
-			}
+	xdsMCP, err := xdsc.New(
+		&meshconfig.ProxyConfig{
+			DiscoveryAddress: srcAddress.Host,
 		},
-	})
+		&xdsc.Config{
+			Meta: resource.NodeMetadata{
+				Generator:     "api",
+				IstioRevision: configRevision,
+			}.ToStruct(),
+			InitialDiscoveryRequests: initReqs,
+			DiscoveryHandler:         mcpCli,
+			StateNotifier: func(state xdsc.State) {
+				if state == xdsc.StateConnected {
+					configHandlerAdapter.Reset()
+				}
+			},
+		})
+	if err != nil {
+		return fmt.Errorf("create xds client error: %v", err)
+	}
 
 	go func() {
 		log.Infof("MCP: connect xds source and wait sync in background")
