@@ -2,6 +2,8 @@ package bootstrap
 
 import (
 	"github.com/hashicorp/go-multierror"
+	"istio.io/libistio/pkg/config/schema/collection"
+
 	"slime.io/slime/framework/bootstrap/resource"
 	"slime.io/slime/framework/bootstrap/viewstore"
 )
@@ -17,16 +19,16 @@ type viewerStore struct {
 
 // makeXdsViewerStore creates aggregated viewer store from several config stores
 func makeViewerStore(mcs []*monitorController) (viewstore.ViewerStore, error) {
-	union := resource.NewSchemasBuilder()
+	union := collection.NewSchemasBuilder()
 	storeTypes := make(map[resource.GroupVersionKind][]ConfigStore)
 	for _, mc := range mcs {
-		for _, gvk := range mc.Schemas().All() {
-			if len(storeTypes[gvk]) == 0 {
-				if err := union.Add(gvk); err != nil {
+		for _, schema := range mc.Schemas().All() {
+			if len(storeTypes[schema.GroupVersionKind()]) == 0 {
+				if err := union.Add(schema); err != nil {
 					return nil, err
 				}
 			}
-			storeTypes[gvk] = append(storeTypes[gvk], mc)
+			storeTypes[schema.GroupVersionKind()] = append(storeTypes[schema.GroupVersionKind()], mc)
 		}
 	}
 

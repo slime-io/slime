@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"istio.io/libistio/pkg/config/event"
+	"istio.io/libistio/pkg/config/schema/collections"
 
-	"slime.io/slime/framework/bootstrap/collections"
 	"slime.io/slime/framework/monitoring"
 	"slime.io/slime/modules/meshregistry/model"
 )
@@ -15,8 +15,8 @@ var (
 	// configTypeLabel is the label for the type of the config.
 	configTypeLabel = monitoring.MustCreateLabel("config_type")
 
-	servceEntryType = collections.IstioNetworkingV1Alpha3Serviceentries.String()
-	sidecarType     = collections.IstioNetworkingV1Alpha3Sidecars.String()
+	servceEntryType = collections.ServiceEntry.String()
+	sidecarType     = collections.Sidecar.String()
 )
 
 var (

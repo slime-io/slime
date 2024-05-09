@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"google.golang.org/protobuf/proto"
+	istionetworkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,7 +16,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	istioapi "slime.io/slime/framework/apis"
 	basecontroller "slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/module"
@@ -44,7 +44,7 @@ func (m *Module) InitScheme(scheme *runtime.Scheme) error {
 	for _, f := range []func(*runtime.Scheme) error{
 		clientgoscheme.AddToScheme,
 		lazyloadapiv1alpha1.AddToScheme,
-		istioapi.AddToScheme,
+		istionetworkingv1alpha3.AddToScheme,
 	} {
 		if err := f(scheme); err != nil {
 			return err

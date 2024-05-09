@@ -9,9 +9,7 @@ import (
 	"slime.io/slime/framework/bootstrap/resource"
 )
 
-var (
-	errNotFound = errors.New("item not found")
-)
+var errNotFound = errors.New("item not found")
 
 const ResourceVersion string = "ResourceVersion"
 
@@ -50,8 +48,8 @@ func makeConfigStore(schemas resource.Schemas) ConfigStore {
 		schemas: schemas,
 		data:    make(map[resource.GroupVersionKind]map[string]*sync.Map),
 	}
-	for _, gvk := range schemas.All() {
-		out.data[gvk] = make(map[string]*sync.Map)
+	for _, schema := range schemas.All() {
+		out.data[schema.GroupVersionKind()] = make(map[string]*sync.Map)
 	}
 	return &out
 }
@@ -148,7 +146,7 @@ func (cr *configStore) Create(config resource.Config) (string, error) {
 		ns.Store(config.Name, config)
 		return config.ResourceVersion, nil
 	}
-	return "", errors.New(fmt.Sprintf("%s %s/%s already exists", config.GroupVersionKind.String(), config.Namespace, config.Name))
+	return "", fmt.Errorf("%s %s/%s already exists", config.GroupVersionKind.String(), config.Namespace, config.Name)
 }
 
 func (cr *configStore) Update(config resource.Config) (string, error) {

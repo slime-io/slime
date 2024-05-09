@@ -56,7 +56,7 @@ func (s *Service) String() string {
 
 func (s *Service) ConvertConfig() resource.Config {
 	cfg := resource.Config{
-		ConfigMeta: resource.ConfigMeta{
+		Meta: resource.Meta{
 			GroupVersionKind:  resource.IstioService,
 			Name:              string(s.Hostname),
 			Namespace:         s.Attributes.Namespace,
@@ -138,7 +138,7 @@ func (ep *IstioEndpoint) DeepCopy() *IstioEndpoint {
 
 func (ep *IstioEndpoint) ConvertConfig() resource.Config {
 	cfg := resource.Config{
-		ConfigMeta: resource.ConfigMeta{
+		Meta: resource.Meta{
 			GroupVersionKind:  resource.IstioEndpoint,
 			Name:              ep.ServiceName + "/" + ep.ServicePortName + "/" + ep.Address + ":" + strconv.Itoa(int(ep.EndpointPort)),
 			Namespace:         ep.Namespace,
@@ -329,9 +329,9 @@ func (i LabelsInstance) Validate() error {
 		}
 		_ = v
 		// Due to dubbo improper tag value.
-		//if !labelValueRegexp.MatchString(v) {
-		//	errs = multierror.Append(errs, fmt.Errorf("invalid tag value: %q", v))
-		//}
+		// if !labelValueRegexp.MatchString(v) {
+		//	 errs = multierror.Append(errs, fmt.Errorf("invalid tag value: %q", v))
+		// }
 	}
 	return errs
 }

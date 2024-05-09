@@ -2,6 +2,7 @@ package bootstrap
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	"slime.io/slime/framework/bootstrap/resource"
 )
 
@@ -35,7 +36,7 @@ func newBufferedMonitor(store ConfigStore, bufferSize int) Monitor {
 	handlers := make(map[resource.GroupVersionKind][]Handler)
 
 	for _, s := range store.Schemas().All() {
-		handlers[s] = make([]Handler, 0)
+		handlers[s.GroupVersionKind()] = make([]Handler, 0)
 	}
 
 	return &monitor{

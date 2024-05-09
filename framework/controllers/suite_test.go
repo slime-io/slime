@@ -22,11 +22,11 @@ import (
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	networkingistioiov1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	networkingistioiov1alpha3 "slime.io/slime/framework/apis"
 	// +kubebuilder:scaffold:imports
 )
 
