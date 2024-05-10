@@ -22,7 +22,7 @@ type application struct {
 	Instances []*instance `json:"instance"`
 }
 
-type instance struct { // nolint: maligned
+type instance struct {
 	InstanceID string `json:"instanceId"`
 	Hostname   string `json:"hostName"`
 	IPAddress  string `json:"ipAddr"`
@@ -154,7 +154,7 @@ func (c *client) Applications() ([]*application, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("unexpected status code from EurekaSource server: %v", resp.Status)
 	}

@@ -4,6 +4,7 @@ import (
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheus "github.com/prometheus/client_golang/api/prometheus/v1"
 	prometheusModel "github.com/prometheus/common/model"
+
 	"slime.io/slime/framework/model/trigger"
 )
 

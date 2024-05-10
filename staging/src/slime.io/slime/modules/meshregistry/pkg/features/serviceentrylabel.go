@@ -21,7 +21,7 @@ type seLabelKeysHolder struct {
 }
 
 func (h *seLabelKeysHolder) GenerateSeLabels(se *networkingapi.ServiceEntry) map[string]string {
-	var labels map[string]string = map[string]string{}
+	labels := map[string]string{}
 	for _, item := range h.instanceLabels {
 		if _, ok := labels[item.mapKey]; ok {
 			continue

@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"strings"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
 	prometheusApi "github.com/prometheus/client_golang/api"
 	prometheusV1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/json"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
@@ -54,7 +53,7 @@ func (r *SmartLimiterReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 }
 
 // handleTickerEvent is triggered by ticker
-func (r *SmartLimiterReconciler) handleTickerEvent(event trigger.TickerEvent) metric.QueryMap {
+func (r *SmartLimiterReconciler) handleTickerEvent(_ trigger.TickerEvent) metric.QueryMap {
 	log.Debugf("ticker trigger handleTickerEvent")
 	queryMap := make(map[string][]metric.Handler, 0)
 	// traverse interest map, if gw, skip
@@ -114,18 +113,22 @@ func (r *SmartLimiterReconciler) handleLocalEvent(meta SmartLimiterMeta, loc typ
 // handlePrometheusEvent means construct query map as following
 // example: handler is a map
 // cpu.max => max(container_cpu_usage_seconds_total{namespace="$namespace",pod=~"$pod_name",image=""})
-func (r *SmartLimiterReconciler) handlePrometheusEvent(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
-	if r.env.Config == nil || r.env.Config.Metric == nil || r.env.Config.Metric.Prometheus == nil || r.env.Config.Metric.Prometheus.Handlers == nil {
+func (r *SmartLimiterReconciler) handlePrometheusEvent(
+	limiterMeta SmartLimiterMeta,
+	loc types.NamespacedName,
+) metric.QueryMap {
+	if r.env.Config == nil || r.env.Config.Metric == nil ||
+		r.env.Config.Metric.Prometheus == nil || r.env.Config.Metric.Prometheus.Handlers == nil {
 		log.Infof("query handler is empty, skip query")
 		return nil
 	}
 	handlers := r.env.Config.Metric.Prometheus.Handlers
 
 	// TODO workloadSelector
-	if len(LimiterMeta.workloadSelector) > 0 {
+	if len(limiterMeta.workloadSelector) > 0 {
 		log.Warnf("promql is closed when workloadSelector is specified in %s", loc)
 		return nil
-	} else if host := LimiterMeta.seHost; host != "" {
+	} else if host := limiterMeta.seHost; host != "" {
 		log.Warnf("promql is closed when se host is specified in %s", loc)
 		return nil
 	}
@@ -159,8 +162,9 @@ func queryServicePods(c client.Client, loc types.NamespacedName) ([]v1.Pod, erro
 func queryPodsWithWorkloadSelector(c client.Client, workloadSelector map[string]string, ns string) ([]v1.Pod, error) {
 	pods := make([]v1.Pod, 0)
 
+	ctx := context.TODO()
 	podLists := &v1.PodList{}
-	if err := c.List(context.TODO(), podLists, client.InNamespace(ns), client.MatchingLabels(workloadSelector)); err != nil {
+	if err := c.List(ctx, podLists, client.InNamespace(ns), client.MatchingLabels(workloadSelector)); err != nil {
 		return pods, fmt.Errorf("list pods with selector %+v failed", workloadSelector)
 	}
 
@@ -221,10 +225,13 @@ func append2Base(subsetsPods map[string][]string, pod v1.Pod) {
 }
 
 // GenerateQueryString
-func generateQueryString(subsetsPods map[string][]string, loc types.NamespacedName, handlers map[string]*v1alpha1.Prometheus_Source_Handler) map[string][]metric.Handler {
+func generateQueryString(
+	subsetsPods map[string][]string,
+	loc types.NamespacedName,
+	handlers map[string]*v1alpha1.Prometheus_Source_Handler,
+) map[string][]metric.Handler {
 	queryMap := make(map[string][]metric.Handler, 0)
 	queryHandlers := make([]metric.Handler, 0)
-	isGroup := make(map[string]bool)
 
 	m := make(map[string]int)
 	for key, item := range subsetsPods {
@@ -238,6 +245,7 @@ func generateQueryString(subsetsPods map[string][]string, loc types.NamespacedNa
 		if handler.Query == "" {
 			continue
 		}
+		var isGroup map[string]bool
 		queryHandlers, isGroup = replaceQueryString(customMetricName, handler.Query, handler.Type, loc, subsetsPods)
 
 		for name, group := range isGroup {
@@ -248,6 +256,7 @@ func generateQueryString(subsetsPods map[string][]string, loc types.NamespacedNa
 	if metaInfo == "" {
 		return queryMap
 	}
+	// XXX why only append with the last queryHandlers?
 	queryMap[metaInfo] = append(queryMap[metaInfo], queryHandlers...)
 	return queryMap
 }
@@ -273,7 +282,13 @@ func generateMeta(subsetsPods map[string]int, loc types.NamespacedName) StaticMe
 	return meta
 }
 
-func replaceQueryString(metricName string, query string, typ v1alpha1.Prometheus_Source_Type, loc types.NamespacedName, subsetsPods map[string][]string) ([]metric.Handler, map[string]bool) {
+func replaceQueryString(
+	metricName string,
+	query string,
+	typ v1alpha1.Prometheus_Source_Type,
+	loc types.NamespacedName,
+	subsetsPods map[string][]string,
+) ([]metric.Handler, map[string]bool) {
 	handlers := make([]metric.Handler, 0)
 	isGroup := make(map[string]bool)
 	query = strings.ReplaceAll(query, "$namespace", loc.Namespace)
@@ -328,7 +343,10 @@ func newPrometheusSourceConfig(env bootstrap.Environment) (metric.PrometheusSour
 	}, nil
 }
 
-func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta SmartLimiterMeta, loc types.NamespacedName) map[string][]metric.Handler {
+func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(
+	limiterMeta SmartLimiterMeta,
+	loc types.NamespacedName,
+) map[string][]metric.Handler {
 	// here, there is such a semantics
 	// if it is under istioNs, it will match all the pods in cluster
 	// other it will only match the real ns in cluster
@@ -337,7 +355,7 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta Sma
 	if loc.Namespace == r.env.Config.Global.IstioNamespace {
 		ns = ""
 	}
-	pods, err := queryPodsWithWorkloadSelector(r.Client, LimiterMeta.workloadSelector, ns)
+	pods, err := queryPodsWithWorkloadSelector(r.Client, limiterMeta.workloadSelector, ns)
 	if err != nil {
 		log.Errorf("get err in queryServicePodsWithWorkloadSelector, %+v", err.Error())
 		return nil
@@ -356,7 +374,10 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(LimiterMeta Sma
 	return queryMap
 }
 
-func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(host string, loc types.NamespacedName) map[string][]metric.Handler {
+func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(
+	host string,
+	loc types.NamespacedName,
+) map[string][]metric.Handler {
 	queryMap := make(map[string][]metric.Handler, 0)
 
 	svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})

@@ -20,6 +20,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/workqueue"
+
 	"slime.io/slime/framework/bootstrap"
 )
 
@@ -38,7 +39,11 @@ type Controller struct {
 	stop         <-chan struct{}
 }
 
-func New(env *bootstrap.Environment, subscriber []func(*kubernetes.Clientset), unSubscriber []func(string)) *Controller {
+func New(
+	env *bootstrap.Environment,
+	subscriber []func(*kubernetes.Clientset),
+	unSubscriber []func(string),
+) *Controller {
 	c := &Controller{
 		k8sClient:    env.K8SClient,
 		stop:         env.Stop,

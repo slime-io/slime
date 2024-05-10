@@ -138,23 +138,26 @@ func configMapModuleKey(name string) string {
 	return "cfg_" + name
 }
 
-func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions, staticRegArgs *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
+func (m *Module) prepareDynamicConfigController(
+	opts module.ModuleOptions,
+	staticRegArgs *meshregbootstrap.RegistryArgs,
+) (*meshregbootstrap.RegistryArgs, error) {
 	// TODO:
 	// We define and use two types of configuration Configurator for hot updates:
 	//   - FullConfigurator for replace behavior
 	//   - PatchConfigurator for patch behavior
 	// Currently, instead of providing a common framework for registering and executing these configuration events,
 	// We directly 'hardcode' in the `prepareDynamicConfigController` method. It is expected that a universal
-	// configuration hot update framework will be implemented in the Framework module to replace the internal implementation
-	// of the meshregistry module and can be used by other module.
+	// configuration hot update framework will be implemented in the Framework module to replace the internal
+	// implementation of the meshregistry module and can be used by other module.
 
 	// 1. init full configuration Configurator
 	//    - load dynamic config from ConfigMap specified by env var DYNAMIC_CONFIG_MAP
 	//    - or return original static config
 	// 2. init patch configuration Configurator
 	// 	  - watching RegistrySource CR specified by env var WATCHING_REGISTRYSOURCE
-	dynConfigMapName, dynRegistrySource := features.DynamicConfigMap, features.WatchingRegistrySource
-	if dynConfigMapName == "" && dynRegistrySource == "" {
+	dynCmName, dynRegistrySource := features.DynamicConfigMap, features.WatchingRegistrySource
+	if dynCmName == "" && dynRegistrySource == "" {
 		return nil, nil
 	}
 
@@ -166,12 +169,11 @@ func (m *Module) prepareDynamicConfigController(opts module.ModuleOptions, stati
 		wait              func() bool
 	)
 
-	if dynConfigMapName != "" {
-		fullConfigurator, wait = m.prepareCmDynamicConfigController(dynConfigMapName, changeNotifyCh, opts, staticRegArgs)
+	if dynCmName != "" {
+		fullConfigurator, wait = m.prepareCmDynamicConfigController(dynCmName, changeNotifyCh, opts, staticRegArgs)
 		if !wait() {
 			return nil, fmt.Errorf("failed to wait for configmap cache sync")
 		}
-
 	} else {
 		fullConfigurator = func() (*meshregbootstrap.RegistryArgs, error) {
 			cp, err := copystructure.Copy(staticRegArgs)
@@ -327,7 +329,11 @@ func (m *Module) prepareCmDynamicConfigController(
 	}
 }
 
-func (m *Module) prepareCrDynamicConfigController(name string, changeNotifyCh chan struct{}, opts module.ModuleOptions) (func(*meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error), func() bool) {
+func (m *Module) prepareCrDynamicConfigController(
+	name string,
+	changeNotifyCh chan struct{},
+	opts module.ModuleOptions,
+) (func(*meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error), func() bool) {
 	client := opts.Env.DynamicClient
 	ctx := context.Background() // TODO
 
@@ -348,11 +354,12 @@ func (m *Module) prepareCrDynamicConfigController(name string, changeNotifyCh ch
 		}
 	}
 
-	store, controller := cache.NewInformer(lw, &unstructured.Unstructured{}, 60*time.Second, cache.ResourceEventHandlerFuncs{
-		AddFunc:    func(obj interface{}) { notify(nil, obj) },
-		UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
-		DeleteFunc: func(obj interface{}) { notify(obj, nil) },
-	})
+	store, controller := cache.NewInformer(lw, &unstructured.Unstructured{}, 60*time.Second,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc:    func(obj interface{}) { notify(nil, obj) },
+			UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
+			DeleteFunc: func(obj interface{}) { notify(obj, nil) },
+		})
 	go controller.Run(ctx.Done())
 
 	patcher := func(src *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
@@ -374,7 +381,7 @@ func (m *Module) prepareCrDynamicConfigController(name string, changeNotifyCh ch
 		}
 
 		var patch meshregbootstrap.RegistryArgs
-		meshregv1alpha1.ConvertRegistrySourceToArgs(&rs, &patch)
+		_ = meshregv1alpha1.ConvertRegistrySourceToArgs(&rs, &patch)
 		return patchRegistryArgs(src, &patch)
 	}
 

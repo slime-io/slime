@@ -2,7 +2,6 @@ package util
 
 import (
 	"flag"
-	"os"
 	"strings"
 )
 
@@ -28,13 +27,9 @@ func UnityHost(host string, namespace string) string {
 	if len(strings.Split(host, ".")) == 1 {
 		return host + "." + namespace + WellknownK8sSuffix
 	}
-	if svc, ns, ok := IsK8SService(host); !ok {
+	svc, ns, ok := IsK8SService(host)
+	if !ok {
 		return host
-	} else {
-		return svc + "." + ns + WellknownK8sSuffix
 	}
-}
-
-func Fatal() {
-	os.Exit(1)
+	return svc + "." + ns + WellknownK8sSuffix
 }

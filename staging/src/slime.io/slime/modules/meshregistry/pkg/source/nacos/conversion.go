@@ -30,7 +30,10 @@ type convertOptions struct {
 	hostAliases map[string][]string
 }
 
-func ConvertServiceEntryMap(instances []*instanceResp, opts *convertOptions) (map[string]*networkingapi.ServiceEntry, error) {
+func ConvertServiceEntryMap(
+	instances []*instanceResp,
+	opts *convertOptions,
+) (map[string]*networkingapi.ServiceEntry, error) {
 	seMap := make(map[string]*networkingapi.ServiceEntry, 0)
 	if len(instances) == 0 {
 		return seMap, nil
@@ -73,7 +76,11 @@ func ConvertServiceEntryMap(instances []*instanceResp, opts *convertOptions) (ma
 	return seMap, nil
 }
 
-func convertServiceEntry(instanceResp *instanceResp, projectCode string, opts *convertOptions) map[string]*networkingapi.ServiceEntry {
+func convertServiceEntry(
+	instanceResp *instanceResp,
+	projectCode string,
+	opts *convertOptions,
+) map[string]*networkingapi.ServiceEntry {
 	nsEndpoints, nsSvcPorts, useDNSMap := convertEndpointsWithNs(instanceResp.Hosts, projectCode, opts)
 	if len(nsEndpoints) == 0 {
 		return nil

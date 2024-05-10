@@ -63,7 +63,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 		return err
 	}
 
-	if err := m.setupWithLeaderElection(opts.LeaderElectionCbs); err != nil {
+	if err := m.setupWithLeaderElection(opts.LeaderElectionCbs); err != nil { //nolint: revive
 		return err
 	}
 	return nil

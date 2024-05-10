@@ -11,7 +11,7 @@ type EnvoyPlugin struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   EnvoyPluginSpec   `json:"spec,omitempty"`
+	Spec EnvoyPluginSpec `json:"spec,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -30,7 +30,7 @@ type PluginManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PluginManagerSpec   `json:"spec,omitempty"`
+	Spec PluginManagerSpec `json:"spec,omitempty"`
 }
 
 //+kubebuilder:object:root=true

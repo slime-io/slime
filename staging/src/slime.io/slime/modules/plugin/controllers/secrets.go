@@ -16,12 +16,12 @@ package controllers
 
 import (
 	"fmt"
-	"k8s.io/client-go/informers"
 	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/informers"
 	informersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
 	listersv1 "k8s.io/client-go/listers/core/v1"
@@ -34,16 +34,19 @@ type CredentialsController struct {
 }
 
 func NewCredentialsController(kubeInformer informers.SharedInformerFactory) *CredentialsController {
-	informer := kubeInformer.InformerFor(&v1.Secret{}, func(k kubernetes.Interface, resync time.Duration) cache.SharedIndexInformer {
-		return informersv1.NewFilteredSecretInformer(
-			k, metav1.NamespaceAll, resync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
-			func(options *metav1.ListOptions) {
-				options.FieldSelector = fields.AndSelectors(
-					fields.OneTermEqualSelector("type", string(v1.SecretTypeDockerConfigJson)),
-				).String()
-			},
-		)
-	})
+	informer := kubeInformer.InformerFor(
+		&v1.Secret{},
+		func(k kubernetes.Interface, resync time.Duration) cache.SharedIndexInformer {
+			return informersv1.NewFilteredSecretInformer(
+				k, metav1.NamespaceAll, resync, cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+				func(options *metav1.ListOptions) {
+					options.FieldSelector = fields.AndSelectors(
+						fields.OneTermEqualSelector("type", string(v1.SecretTypeDockerConfigJson)),
+					).String()
+				},
+			)
+		},
+	)
 
 	return &CredentialsController{
 		secrets:      informerAdapter{listersv1.NewSecretLister(informer.GetIndexer()), informer},

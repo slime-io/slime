@@ -34,7 +34,6 @@ func (r *ServicefenceReconciler) cachePort(istioSvcs []*model.Service) {
 
 	for _, svc := range istioSvcs {
 		for _, port := range svc.Ports {
-
 			if !protocolFilter(filter, port.Protocol) {
 				continue
 			}

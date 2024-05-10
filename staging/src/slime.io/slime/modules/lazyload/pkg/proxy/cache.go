@@ -1,8 +1,9 @@
 package proxy
 
 import (
-	"k8s.io/apimachinery/pkg/types"
 	"sync"
+
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type Cache struct {

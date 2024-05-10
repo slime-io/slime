@@ -53,8 +53,11 @@ const (
 
 // genGatewayInlineCfps is a custom func to handle EnvoyPlugin gateway
 // default is nil, ignore gateway
-var genGatewayInlineCfps func(in *v1alpha1.EnvoyPluginSpec, namespace string, t target, patchCtx networkingapi.EnvoyFilter_PatchContext,
-	p *v1alpha1.Plugin, m *v1alpha1.Inline) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
+var genGatewayInlineCfps func(
+	in *v1alpha1.EnvoyPluginSpec, namespace string,
+	t target, patchCtx networkingapi.EnvoyFilter_PatchContext,
+	p *v1alpha1.Plugin, m *v1alpha1.Inline,
+) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 
 type target struct {
 	applyToVh   bool
@@ -121,7 +124,9 @@ func translatePluginToPatchValue(name, typeURL string, setting *structpb.Struct)
 					StructValue: &structpb.Struct{
 						Fields: map[string]*structpb.Value{
 							name: {
-								Kind: &structpb.Value_StructValue{StructValue: valueToTypedStructValue(typeURL, setting)},
+								Kind: &structpb.Value_StructValue{
+									StructValue: valueToTypedStructValue(typeURL, setting),
+								},
 							},
 						},
 					},
@@ -131,7 +136,10 @@ func translatePluginToPatchValue(name, typeURL string, setting *structpb.Struct)
 	}
 }
 
-func translateRlsAndCorsToDirectPatch(settings *structpb.Struct, applyToHTTPRoute bool) *networkingapi.EnvoyFilter_Patch {
+func translateRlsAndCorsToDirectPatch(
+	settings *structpb.Struct,
+	applyToHTTPRoute bool,
+) *networkingapi.EnvoyFilter_Patch {
 	fieldPatchTo := ""
 	if applyToHTTPRoute {
 		fieldPatchTo = "route"
@@ -276,7 +284,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				if patchCtx == networkingapi.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == networkingapi.EnvoyFilter_GATEWAY {
 					// ':*' is appended if port info is not specified in outbound and gateway
 					// it will match all port in same host after istio adapted
-					if len(t.host) > 0 && strings.Index(t.host, ":") == -1 {
+					if len(t.host) > 0 && !strings.Contains(t.host, ":") {
 						t.host += ":*"
 					}
 				}
@@ -413,7 +421,11 @@ func generateInlineCfp(t target, patchCtx networkingapi.EnvoyFilter_PatchContext
 	}
 }
 
-func translateGenericPluginToPatch(name string, typeUrl string, settings *structpb.Struct) *networkingapi.EnvoyFilter_Patch {
+func translateGenericPluginToPatch(
+	name string,
+	typeUrl string,
+	settings *structpb.Struct,
+) *networkingapi.EnvoyFilter_Patch {
 	// onMatch:
 	//  action:
 	//    typedConfig:
@@ -427,8 +439,9 @@ func translateGenericPluginToPatch(name string, typeUrl string, settings *struct
 			"onMatch", wrapStructToStruct(
 				"action", wrapStructToStruct(
 					"typedConfig", wrapStructToStructWrapper(
-						"perFilterConfig", wrapStructToStruct(name, valueToTypedStructValue(typeUrl, settings))).AddStringField(
-						"@type", util.TypeURLGenericProxyRouteAction).Get(),
+						"perFilterConfig",
+						wrapStructToStruct(name, valueToTypedStructValue(typeUrl, settings)),
+					).AddStringField("@type", util.TypeURLGenericProxyRouteAction).Get(),
 				),
 			)),
 	}
@@ -513,7 +526,10 @@ func (r *PluginManagerReconciler) isKnownProtocol(in *v1alpha1.Plugin) bool {
 }
 
 // translate PluginManager
-func (r *PluginManagerReconciler) translatePluginManager(meta metav1.ObjectMeta, in *v1alpha1.PluginManagerSpec) translateOutput {
+func (r *PluginManagerReconciler) translatePluginManager(
+	meta metav1.ObjectMeta,
+	in *v1alpha1.PluginManagerSpec,
+) translateOutput {
 	var (
 		envoyFilter   = &networkingapi.EnvoyFilter{}
 		configPatches []translateOutputConfigPatch
@@ -591,7 +607,10 @@ func getConfigDiscoveryFilterFullName(ns, name string) string {
 	return fmt.Sprintf("%s.%s", ns, name)
 }
 
-func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, in *v1alpha1.Plugin) ([]translateOutputConfigPatch, error) {
+func (r *PluginManagerReconciler) convertPluginToPatch(
+	meta metav1.ObjectMeta,
+	in *v1alpha1.Plugin,
+) ([]translateOutputConfigPatch, error) {
 	listener := &networkingapi.EnvoyFilter_ListenerMatch{
 		FilterChain: &networkingapi.EnvoyFilter_ListenerMatch_FilterChainMatch{
 			Filter: &networkingapi.EnvoyFilter_ListenerMatch_FilterMatch{
@@ -673,7 +692,8 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 		converter func(name string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error),
 	) error {
 		fullResourceName := getConfigDiscoveryFilterFullName(meta.Namespace, resourceName)
-		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL, r.getConfigDiscoveryDefaultConfig(pluginTypeURL), out.Patch.Value); err != nil {
+		if err := r.applyConfigDiscoveryPlugin(fullResourceName, pluginTypeURL,
+			r.getConfigDiscoveryDefaultConfig(pluginTypeURL), out.Patch.Value); err != nil {
 			return err
 		}
 		filterConfigStruct, err := converter(fullResourceName, meta, in)
@@ -687,17 +707,19 @@ func (r *PluginManagerReconciler) convertPluginToPatch(meta metav1.ObjectMeta, i
 
 	switch m := in.PluginSettings.(type) {
 	case *v1alpha1.Plugin_Wasm:
-		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm, func(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error) {
-			wasmFilterConfig, err := r.convertWasmFilterConfig(resourceName, meta, in)
-			if err != nil {
-				return nil, err
-			}
-			return util.MessageToStruct(wasmFilterConfig)
-		}); err != nil {
+		if err := applyConfigDiscoveryPlugin(in.Name, util.TypeURLEnvoyFilterHTTPWasm,
+			func(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error) {
+				wasmFilterConfig, err := r.convertWasmFilterConfig(resourceName, meta, in)
+				if err != nil {
+					return nil, err
+				}
+				return util.MessageToStruct(wasmFilterConfig)
+			}); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Rider:
-		if err := applyConfigDiscoveryPlugin(getFullRiderPluginName(in.Name), util.TypeURLEnvoyFilterHTTPRider, r.convertRiderFilterConfig); err != nil {
+		if err := applyConfigDiscoveryPlugin(getFullRiderPluginName(in.Name),
+			util.TypeURLEnvoyFilterHTTPRider, r.convertRiderFilterConfig); err != nil {
 			return nil, err
 		}
 	case *v1alpha1.Plugin_Inline:
@@ -717,7 +739,12 @@ func toTypedConfig(atType, typeURL string, value *structpb.Struct) *structpb.Str
 	return value
 }
 
-func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settings *v1alpha1.Plugin_Inline, out *structpb.Struct) error {
+func (r *PluginManagerReconciler) applyInlinePlugin(
+	name string,
+	typeURL string,
+	settings *v1alpha1.Plugin_Inline,
+	out *structpb.Struct,
+) error {
 	out.Fields[util.StructHttpFilterName] = &structpb.Value{
 		Kind: &structpb.Value_StringValue{
 			StringValue: name,
@@ -751,7 +778,12 @@ func (r *PluginManagerReconciler) applyInlinePlugin(name, typeURL string, settin
 	return nil
 }
 
-func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL string, defaultConfig *structpb.Struct, out *structpb.Struct) error {
+func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(
+	filterName string,
+	typeURL string,
+	defaultConfig *structpb.Struct,
+	out *structpb.Struct,
+) error {
 	out.Fields[util.StructHttpFilterName] = &structpb.Value{
 		Kind: &structpb.Value_StringValue{
 			StringValue: filterName,
@@ -759,12 +791,32 @@ func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL
 	}
 
 	configDiscoveryFields := map[string]*structpb.Value{
-		util.StructHttpFilterConfigSource: {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{
-			util.StructHttpFilterAds: {Kind: &structpb.Value_StructValue{StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{}}}},
-		}}}},
-		util.StructHttpFilterTypeURLs: {Kind: &structpb.Value_ListValue{ListValue: &structpb.ListValue{Values: []*structpb.Value{
-			{Kind: &structpb.Value_StringValue{StringValue: typeURL}},
-		}}}},
+		util.StructHttpFilterConfigSource: {
+			Kind: &structpb.Value_StructValue{
+				StructValue: &structpb.Struct{Fields: map[string]*structpb.Value{
+					util.StructHttpFilterAds: {
+						Kind: &structpb.Value_StructValue{
+							StructValue: &structpb.Struct{
+								Fields: map[string]*structpb.Value{},
+							},
+						},
+					},
+				}},
+			},
+		},
+		util.StructHttpFilterTypeURLs: {
+			Kind: &structpb.Value_ListValue{
+				ListValue: &structpb.ListValue{
+					Values: []*structpb.Value{
+						{
+							Kind: &structpb.Value_StringValue{
+								StringValue: typeURL,
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 	if defaultConfig != nil {
 		configDiscoveryFields[util.StructHttpFilterDefaultConfig] = &structpb.Value{
@@ -778,7 +830,12 @@ func (r *PluginManagerReconciler) applyConfigDiscoveryPlugin(filterName, typeURL
 	return nil
 }
 
-func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, value *structpb.Struct, p *v1alpha1.Plugin, target *[]translateOutputConfigPatch) error {
+func (r *PluginManagerReconciler) addExtensionConfigPath(
+	filterName string,
+	value *structpb.Struct,
+	p *v1alpha1.Plugin,
+	target *[]translateOutputConfigPatch,
+) error {
 	out := &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{
 		ApplyTo: networkingapi.EnvoyFilter_EXTENSION_CONFIG,
 		Patch: &networkingapi.EnvoyFilter_Patch{
@@ -796,7 +853,11 @@ func (r *PluginManagerReconciler) addExtensionConfigPath(filterName string, valu
 	return nil
 }
 
-func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*envoyextensionsfilterswasmv3.Wasm, error) {
+func (r *PluginManagerReconciler) convertWasmFilterConfig(
+	resourceName string,
+	meta metav1.ObjectMeta,
+	in *v1alpha1.Plugin,
+) (*envoyextensionsfilterswasmv3.Wasm, error) {
 	var (
 		wasmEnv    *envoyextensionswasmv3.EnvironmentVariables
 		pluginWasm = in.PluginSettings.(*v1alpha1.Plugin_Wasm)
@@ -808,7 +869,7 @@ func (r *PluginManagerReconciler) convertWasmFilterConfig(resourceName string, m
 	}
 
 	if datasource.GetRemote() != nil {
-		imagePullSecretContent, err := r.convertImagePullSecret(pluginWasm.Wasm.GetImagePullSecretName(), pluginWasm.Wasm.GetImagePullSecretContent(), meta.Namespace)
+		imagePullSecretContent, err := r.convertImagePullSecret(pluginWasm.Wasm.GetImagePullSecretName(), pluginWasm.Wasm.GetImagePullSecretContent(), meta.Namespace) //nolint: lll
 		if err != nil {
 			return nil, err
 		}
@@ -872,14 +933,17 @@ func convertWasmConfigurationToStringValue(pluginSettings *structpb.Struct) (*wr
 	}
 
 	// to json string to align with istio behaviour
-	if settingsBytes, err := protojson.Marshal(pluginSettings); err != nil {
+	settingsBytes, err := protojson.Marshal(pluginSettings)
+	if err != nil {
 		return nil, err
-	} else {
-		return &wrappers.StringValue{Value: string(settingsBytes)}, nil
 	}
+	return &wrappers.StringValue{Value: string(settingsBytes)}, nil
 }
 
-func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, meta metav1.ObjectMeta, in *v1alpha1.Plugin) (*structpb.Struct, error) {
+func (r *PluginManagerReconciler) convertRiderFilterConfig(_ string,
+	meta metav1.ObjectMeta,
+	in *v1alpha1.Plugin,
+) (*structpb.Struct, error) {
 	var (
 		pluginRider            = in.PluginSettings.(*v1alpha1.Plugin_Rider)
 		imagePullSecretContent string
@@ -928,7 +992,11 @@ func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, 
 		envSt := config.Fields[RiderEnvKey].GetStructValue()
 		if envSt == nil {
 			envSt = &structpb.Struct{Fields: map[string]*structpb.Value{}}
-			config.Fields[RiderEnvKey] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: envSt}}
+			config.Fields[RiderEnvKey] = &structpb.Value{
+				Kind: &structpb.Value_StructValue{
+					StructValue: envSt,
+				},
+			}
 		}
 		if envSt.Fields == nil {
 			envSt.Fields = map[string]*structpb.Value{}
@@ -936,11 +1004,19 @@ func (r *PluginManagerReconciler) convertRiderFilterConfig(resourceName string, 
 		return envSt
 	}
 	if imagePullSecretContent != "" {
-		ensureEnv().Fields[WasmSecretEnv] = &structpb.Value{Kind: &structpb.Value_StringValue{StringValue: imagePullSecretContent}}
+		ensureEnv().Fields[WasmSecretEnv] = &structpb.Value{
+			Kind: &structpb.Value_StringValue{
+				StringValue: imagePullSecretContent,
+			},
+		}
 	}
 
 	if config != nil {
-		riderPluginConfig.Fields["config"] = &structpb.Value{Kind: &structpb.Value_StructValue{StructValue: config}}
+		riderPluginConfig.Fields["config"] = &structpb.Value{
+			Kind: &structpb.Value_StructValue{
+				StructValue: config,
+			},
+		}
 	}
 
 	return riderFilterConfig, nil
@@ -951,11 +1027,11 @@ func convertDataSource(urlStr, sha256 string) (*envoyconfigcorev3.AsyncDataSourc
 		imageURL   *url.URL
 		datasource *envoyconfigcorev3.AsyncDataSource
 	)
-	if v, err := url.Parse(urlStr); err != nil {
+	v, err := url.Parse(urlStr)
+	if err != nil {
 		return nil, err
-	} else {
-		imageURL = v
 	}
+	imageURL = v
 
 	// when no scheme is given, default to oci scheme
 	if imageURL.Scheme == "" {

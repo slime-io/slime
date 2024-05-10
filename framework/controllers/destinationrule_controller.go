@@ -39,6 +39,7 @@ type DestinationRuleReconciler struct {
 	Env    *bootstrap.Environment
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=networking.istio.io,resources=destinationrules,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=destinationrules/status,verbs=get;update;patch
 
@@ -53,10 +54,9 @@ func (r *DestinationRuleReconciler) Reconcile(_ context.Context, req ctrl.Reques
 			// TODO del event not handled. should re-calc the data accordingly
 			log.Infof("destinationrule is deleted")
 			return reconcile.Result{}, nil
-		} else {
-			log.Errorf("get destinationRule error, %+v", err)
-			return reconcile.Result{}, err
 		}
+		log.Errorf("get destinationRule error, %+v", err)
+		return reconcile.Result{}, err
 	}
 
 	istioRev := model.IstioRevFromLabel(instance.Labels)

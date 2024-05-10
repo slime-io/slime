@@ -46,14 +46,10 @@ func genVhostRouteName(rc *routeConfig) string {
 }
 
 func getTarget(inner, outer *microservicev1alpha2.Target) *microservicev1alpha2.Target {
-	target := &microservicev1alpha2.Target{}
-
 	if inner != nil {
-		target = inner
-	} else {
-		target = outer
+		return inner
 	}
-	return target
+	return outer
 }
 
 func generateRouteConfigs(inner, outer *microservicev1alpha2.Target, gw bool) []*routeConfig {
@@ -124,7 +120,10 @@ func generateDefaultInboundRouteConfigs(target *microservicev1alpha2.Target) []*
 	return rcs
 }
 
-func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) ([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
+func generateHttpRouterPatch(
+	descriptors []*microservicev1alpha2.SmartLimitDescriptor,
+	params *LimiterSpec,
+) ([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, error) {
 	patches := make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	// route2RouteConfig store the vhostName/routeName => routeConfig
 	route2RouteConfig := make(map[string][]*routeConfig)
@@ -225,15 +224,21 @@ func generateHttpRouterPatch(descriptors []*microservicev1alpha2.SmartLimitDescr
 		}
 
 		if len(bodyactions) > 0 {
-			patchBodyActions(patch, patch2vhost, record, bodyactions)
+			if err := patchBodyActions(patch, patch2vhost, record, bodyactions); err != nil {
+				log.Errorf("patch body actions for route %s failed,%+v", rn, err.Error())
+			}
 		}
-
 		patches = append(patches, patch)
 	}
 	return patches, nil
 }
 
-func patchBodyActions(patch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, patch2vhost bool, record map[int]int, bodyactions []*rlBodyAction) error {
+func patchBodyActions(
+	patch *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch,
+	patch2vhost bool,
+	record map[int]int,
+	bodyactions []*rlBodyAction,
+) error {
 	ppv := patch.Patch.Value
 	m, err := util.ProtoToMapWithOpts(ppv, util.UseProtoNames(true))
 	if err != nil {
@@ -290,7 +295,8 @@ func patchBodyActionToRate(rls []interface{}, bodyactions []*rlBodyAction, recor
 }
 
 // only enable local rate limit
-func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string,
+) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	localRateLimit := &envoy_extensions_filters_http_local_ratelimit_v3.LocalRateLimit{
 		StatPrefix: util.StructEnvoyLocalRateLimitLimiter,
 	}
@@ -334,7 +340,10 @@ func generateHttpFilterLocalRateLimitPatch(context, proxyVersion string) *networ
 	return patch
 }
 
-func generateRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateRateLimitPerFilterPatch(
+	descriptors []*microservicev1alpha2.SmartLimitDescriptor,
+	params *LimiterSpec,
+) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	patches := make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
 	route2RouteConfig := make(map[string][]*routeConfig)
@@ -378,16 +387,18 @@ func generateRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLi
 		if rcs[0].routeName == "" {
 			// route name not specified, patch to vhost, skip
 			return patches
-		} else {
-			patch.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 		}
+		patch.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 		patches = append(patches, patch)
 	}
 
 	return patches
 }
 
-func generateLocalRateLimitPerFilterPatch(descriptors []*microservicev1alpha2.SmartLimitDescriptor, params *LimiterSpec) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateLocalRateLimitPerFilterPatch(
+	descriptors []*microservicev1alpha2.SmartLimitDescriptor,
+	params *LimiterSpec,
+) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	patches := make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
 	route2Descriptors := make(map[string][]*microservicev1alpha2.SmartLimitDescriptor)
 	route2RouteConfig := make(map[string][]*routeConfig)
@@ -485,7 +496,10 @@ func patchBodyMatchToRateLimitDescriptors(ss *structpb.Struct) (*structpb.Struct
 // PresentMatch(name是否存在)互斥
 // 这里之前打算在pb声明为oneof,但是用kubebuilder生成api的过程中无法识别相关interface{}
 */
-func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) ([]*envoy_config_route_v3.RateLimit_Action, *rlBodyAction) {
+func generateRouteRateLimitAction(
+	descriptor *microservicev1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName,
+) ([]*envoy_config_route_v3.RateLimit_Action, *rlBodyAction) {
 	actions := make([]*envoy_config_route_v3.RateLimit_Action, 0)
 	var bodyAction *rlBodyAction
 
@@ -495,7 +509,7 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 	}
 
 	if descriptor.CustomKey != "" && descriptor.CustomValue != "" {
-		log.Infof("customKey/customValue is not empty, users should apply a envoyplugin with same customKey/customValue")
+		log.Infof("customKey/customValue is not empty, users should apply a envoyplugin with same kv pair")
 		return nil, bodyAction
 	} else if len(descriptor.Match) == 0 {
 		// no match specified in smartLimiter, gen DescriptorValue as normal
@@ -533,7 +547,7 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 				}
 			}
 
-			if useSourceIp {
+			if useSourceIp { //nolint: gocritic
 				ips = append(ips, match.ExactMatch)
 			} else if useJsonBody {
 				if bodymatch, err := generateBodyMatch(match); err == nil {
@@ -611,7 +625,10 @@ func generateRouteRateLimitAction(descriptor *microservicev1alpha2.SmartLimitDes
 	return actions, bodyAction
 }
 
-func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) ([]*envoy_ratelimit_v3.LocalRateLimitDescriptor, bool) {
+func generateLocalRateLimitDescriptors(
+	descriptors []*microservicev1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName,
+) ([]*envoy_ratelimit_v3.LocalRateLimitDescriptor, bool) {
 	localRateLimitDescriptors := make([]*envoy_ratelimit_v3.LocalRateLimitDescriptor, 0)
 	existBodyMatch := false
 	for _, item := range descriptors {
@@ -629,21 +646,24 @@ func generateLocalRateLimitDescriptors(descriptors []*microservicev1alpha2.Smart
 }
 
 // generateLocalRateLimitDescriptorEntries gen entries like above
-func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) ([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, bool) {
+func generateLocalRateLimitDescriptorEntries(
+	descriptor *microservicev1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName,
+) ([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, bool) {
 	var useJsonBody, useQuery, useHeader, useSourceIp bool
 	entry := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 	entries := make([]*envoy_ratelimit_v3.RateLimitDescriptor_Entry, 0)
 
-	if des.CustomKey != "" && des.CustomValue != "" {
-		entry.Key = des.CustomKey
-		entry.Value = des.CustomValue
+	if descriptor.CustomKey != "" && descriptor.CustomValue != "" {
+		entry.Key = descriptor.CustomKey
+		entry.Value = descriptor.CustomValue
 		entries = append(entries, entry)
-	} else if len(des.Match) == 0 {
+	} else if len(descriptor.Match) == 0 {
 		entry.Key = model.GenericKey
-		entry.Value = generateDescriptorValue(des, loc)
+		entry.Value = generateDescriptorValue(descriptor, loc)
 		entries = append(entries, entry)
 	} else {
-		for _, match := range des.Match {
+		for _, match := range descriptor.Match {
 			switch match.MatchSource {
 			case microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch:
 				useSourceIp = true
@@ -666,28 +686,28 @@ func generateLocalRateLimitDescriptorEntries(des *microservicev1alpha2.SmartLimi
 		if useQuery {
 			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 			item.Key = model.QueryMatch
-			item.Value = generateDescriptorValue(des, loc)
+			item.Value = generateDescriptorValue(descriptor, loc)
 			entries = append(entries, item)
 		}
 
 		if useHeader {
 			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 			item.Key = model.HeaderValueMatch
-			item.Value = generateDescriptorValue(des, loc)
+			item.Value = generateDescriptorValue(descriptor, loc)
 			entries = append(entries, item)
 		}
 
 		if useSourceIp {
 			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 			item.Key = model.RemoteAddress
-			item.Value = generateRemoteAddressDescriptorValue(des)
+			item.Value = generateRemoteAddressDescriptorValue(descriptor)
 			entries = append(entries, item)
 		}
 
 		if useJsonBody {
 			item := &envoy_ratelimit_v3.RateLimitDescriptor_Entry{}
 			item.Key = model.BodyMatch
-			item.Value = generateDescriptorValue(des, loc)
+			item.Value = generateDescriptorValue(descriptor, loc)
 			entries = append(entries, item)
 		}
 	}
@@ -722,7 +742,8 @@ func generateRemoteAddressDescriptorValue(item *microservicev1alpha2.SmartLimitD
 	return model.MockSourceIp
 }
 
-func generateSafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.HeaderMatcher_SafeRegexMatch {
+func generateSafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.HeaderMatcher_SafeRegexMatch {
 	return &envoy_config_route_v3.HeaderMatcher_SafeRegexMatch{
 		SafeRegexMatch: &envoy_match_v3.RegexMatcher{
 			EngineType: &envoy_match_v3.RegexMatcher_GoogleRe2{
@@ -733,15 +754,18 @@ func generateSafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_Mat
 	}
 }
 
-func generatePrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.HeaderMatcher_PrefixMatch {
+func generatePrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.HeaderMatcher_PrefixMatch {
 	return &envoy_config_route_v3.HeaderMatcher_PrefixMatch{PrefixMatch: match.PrefixMatch}
 }
 
-func generateSuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.HeaderMatcher_SuffixMatch {
+func generateSuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.HeaderMatcher_SuffixMatch {
 	return &envoy_config_route_v3.HeaderMatcher_SuffixMatch{SuffixMatch: match.SuffixMatch}
 }
 
-func generateExactMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.HeaderMatcher_ExactMatch {
+func generateExactMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.HeaderMatcher_ExactMatch {
 	return &envoy_config_route_v3.HeaderMatcher_ExactMatch{ExactMatch: match.ExactMatch}
 }
 
@@ -749,7 +773,8 @@ func generateInvertMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matche
 	return match.InvertMatch
 }
 
-func generatePresentMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.HeaderMatcher_PresentMatch {
+func generatePresentMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.HeaderMatcher_PresentMatch {
 	return &envoy_config_route_v3.HeaderMatcher_PresentMatch{PresentMatch: match.PresentMatch}
 }
 
@@ -776,7 +801,8 @@ func generateEnvoyLocalRateLimitEnabled() *envoy_core_v3.RuntimeFractionalPercen
 	}
 }
 
-//	% of requests that will enforce the local rate limit decision for a given route_key specified in the local rate limit configuration.
+// % of requests that will enforce the local rate limit decision for
+// a given route_key specified in the local rate limit configuration.
 //
 // Defaults to 0. This can be used to test what would happen before fully enforcing the outcome.
 func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPercent {
@@ -789,7 +815,8 @@ func generateEnvoyLocalRateLimitEnforced() *envoy_core_v3.RuntimeFractionalPerce
 	}
 }
 
-func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescriptor) []*envoy_core_v3.HeaderValueOption {
+func generateResponseHeaderToAdd(items []*microservicev1alpha2.SmartLimitDescriptor,
+) []*envoy_core_v3.HeaderValueOption {
 	headers := make([]*envoy_core_v3.HeaderValueOption, 0)
 	for _, item := range items {
 		for _, item := range item.Action.HeadersToAdd {
@@ -851,6 +878,7 @@ func generateEnvoyVhostMatch(rc *routeConfig, proxyVersion string) *networkingap
 	return match
 }
 
+// nolint: lll
 func generateRatelimitPerFilterPatch() *networkingapi.EnvoyFilter_Patch {
 	return &networkingapi.EnvoyFilter_Patch{
 		Operation: networkingapi.EnvoyFilter_Patch_MERGE,
@@ -975,7 +1003,8 @@ func generateBodyMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher)
 }
 
 // generateQueryMatchAction	gen query match in rateLimit action
-func generateQueryMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) (*envoy_config_route_v3.QueryParameterMatcher, error) {
+func generateQueryMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) (*envoy_config_route_v3.QueryParameterMatcher, error) {
 	var err error
 	query := &envoy_config_route_v3.QueryParameterMatcher{}
 
@@ -996,7 +1025,8 @@ func generateQueryMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_M
 }
 
 // generateHeaderMatchAction gen header match in rateLimit action
-func generateHeaderMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) (*envoy_config_route_v3.HeaderMatcher, error) {
+func generateHeaderMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) (*envoy_config_route_v3.HeaderMatcher, error) {
 	var err error
 	header := &envoy_config_route_v3.HeaderMatcher{}
 
@@ -1021,7 +1051,8 @@ func generateHeaderMatchAction(match *microservicev1alpha2.SmartLimitDescriptor_
 	return header, err
 }
 
-func generateQuerySafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+func generateQuerySafeRegexMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
 	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
 		StringMatch: &envoy_match_v3.StringMatcher{
 			MatchPattern: &envoy_match_v3.StringMatcher_SafeRegex{SafeRegex: &envoy_match_v3.RegexMatcher{
@@ -1034,7 +1065,8 @@ func generateQuerySafeRegexMatch(match *microservicev1alpha2.SmartLimitDescripto
 	}
 }
 
-func generateQueryPrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+func generateQueryPrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
 	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
 		StringMatch: &envoy_match_v3.StringMatcher{
 			MatchPattern: &envoy_match_v3.StringMatcher_Prefix{Prefix: match.PrefixMatch},
@@ -1042,7 +1074,8 @@ func generateQueryPrefixMatch(match *microservicev1alpha2.SmartLimitDescriptor_M
 	}
 }
 
-func generateQuerySuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+func generateQuerySuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
 	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
 		StringMatch: &envoy_match_v3.StringMatcher{
 			MatchPattern: &envoy_match_v3.StringMatcher_Suffix{Suffix: match.SuffixMatch},
@@ -1050,7 +1083,8 @@ func generateQuerySuffixMatch(match *microservicev1alpha2.SmartLimitDescriptor_M
 	}
 }
 
-func generateQueryExactMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
+func generateQueryExactMatch(match *microservicev1alpha2.SmartLimitDescriptor_Matcher,
+) *envoy_config_route_v3.QueryParameterMatcher_StringMatch {
 	return &envoy_config_route_v3.QueryParameterMatcher_StringMatch{
 		StringMatch: &envoy_match_v3.StringMatcher{
 			MatchPattern: &envoy_match_v3.StringMatcher_Exact{Exact: match.ExactMatch},

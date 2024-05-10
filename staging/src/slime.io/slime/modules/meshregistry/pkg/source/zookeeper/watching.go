@@ -20,11 +20,15 @@ import (
 	"slime.io/slime/modules/meshregistry/pkg/bootstrap"
 )
 
-var forceUpdateJitterDuration = env.RegisterDurationVar(
-	"FORCE_UPDATE_JITTER_DURATION",
-	time.Minute,
-	"Jitter time window for doing forced updates, default to 1 minute",
-).Get()
+var (
+	forceUpdateJitterDuration = env.RegisterDurationVar(
+		"FORCE_UPDATE_JITTER_DURATION",
+		time.Minute,
+		"Jitter time window for doing forced updates, default to 1 minute",
+	).Get()
+
+	cronOption = cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor
+)
 
 func waitDoForceUpdate() {
 	time.Sleep(jitter(forceUpdateJitterDuration))
@@ -73,7 +77,7 @@ func (s *Source) Watching() {
 		}
 		log.Infof("watching add rewatch cron job with specs: %q", s.args.WatchingResyncCron)
 		c := cron.New(
-			cron.WithParser(cron.NewParser(cron.SecondOptional|cron.Minute|cron.Hour|cron.Dom|cron.Month|cron.Dow|cron.Descriptor)),
+			cron.WithParser(cron.NewParser(cronOption)),
 			cron.WithLogger(cron.VerbosePrintfLogger(log)),
 		)
 		for _, spec := range strings.Split(s.args.WatchingResyncCron, ",") {
@@ -249,9 +253,9 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 		// Try to initialize, but it is not required to be completed,
 		// because the service may have been deleted or for others.
 		// So we consider both either valid data or fetch-err as init-done.
-		providerInit, consumerInit, configuratorInit          = providerPath == "", consumerPath == "", !ew.watchConfigurators
+		providerInit, consumerInit, configuratorInit          = providerPath == "", consumerPath == "", !ew.watchConfigurators //nolint: lll
 		initCallBack                                          = ew.initCallback
-		providerEventCh, consumerEventCh, configuratorEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem), make(chan simpleWatchItem)
+		providerEventCh, consumerEventCh, configuratorEventCh = make(chan simpleWatchItem), make(chan simpleWatchItem), make(chan simpleWatchItem) //nolint: lll
 	)
 
 	defer func() {

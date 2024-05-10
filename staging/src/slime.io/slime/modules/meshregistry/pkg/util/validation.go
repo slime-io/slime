@@ -26,7 +26,9 @@ const (
 )
 
 var (
-	tagRegexp        = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
+	// label value can be an empty string
+	// TODO: replace by framework's definition
+	tagRegexp        = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$")
 	labelValueRegexp = regexp.MustCompile("^" + "(" + qualifiedNameFmt + ")?" + "$")
 )
 

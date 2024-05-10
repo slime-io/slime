@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"k8s.io/apimachinery/pkg/types"
+
 	"slime.io/slime/framework/model/source"
 )
 

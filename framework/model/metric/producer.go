@@ -30,18 +30,18 @@ func NewProducer(config *ProducerConfig, source Source) {
 			tp.Stop()
 		}
 		log.Infof("all producers stopped")
-		return
 	}()
 }
 
 func NewSource(config *ProducerConfig) Source {
 	// init source
 	var source Source
-	if config.EnablePrometheusSource {
+	switch {
+	case config.EnablePrometheusSource:
 		source = NewPrometheusSource(config.PrometheusSourceConfig)
-	} else if config.EnableMockSource {
+	case config.EnableMockSource:
 		source = NewMockSource()
-	} else {
+	default:
 		source = NewAccessLogSource(config.AccessLogSourceConfig)
 	}
 	return source

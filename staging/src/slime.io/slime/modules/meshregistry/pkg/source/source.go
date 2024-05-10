@@ -32,13 +32,15 @@ type RegistryInfo struct {
 	Addresses  []string `json:"addresses,omitempty"`
 }
 
-// RegistrySourceInitlizer is the initlizer of registry source, it will be called when the registry source is needed created.
+// RegistrySourceInitlizer is the initlizer of registry source,
+// it will be called when the registry source is needed created.
 type RegistrySourceInitlizer func(
 	// args is the args of the meshregistry, it is used to initialize the registry source.
 	args *bootstrap.RegistryArgs,
 	// sourceReadyCallback is the callback function that will be called by the registry source when it is ready.
 	sourceReadyCallback func(string),
-	// addOnReArgs is used to register a callback function that will be called when the args of the meshregistry is changed.
+	// addOnReArgs is used to register a callback function that will
+	// be called when the args of the meshregistry is changed.
 	addOnReArgs func(onReArgsCallback func(args *bootstrap.RegistryArgs)),
 ) (
 	// source is the event.Source implementation of the registry source.
@@ -47,7 +49,8 @@ type RegistrySourceInitlizer func(
 	debugHandler map[string]http.HandlerFunc,
 	// cacheCluster is the flag that indicates whether the meshregistry should cache the cluster info.
 	cacheCluster bool,
-	// skip is the flag that indicates whether the meshregistry should skip the initialization process for the registry source.
+	// skip is the flag that indicates whether the meshregistry should
+	// skip the initialization process for the registry source.
 	skip bool,
 	// err is the error that may occur during the initialization process.
 	err error,
@@ -109,7 +112,7 @@ func BuildInstanceMetaModifier(rl *bootstrap.InstanceMetaRelabel) func(*map[stri
 	if rl == nil || len(rl.Items) == 0 {
 		return nil
 	}
-	var relabelFuncs []func(*map[string]string) = make([]func(*map[string]string), 0, len(rl.Items))
+	relabelFuncs := make([]func(*map[string]string), 0, len(rl.Items))
 	for _, relabel := range rl.Items {
 		f := func(item *bootstrap.InstanceMetaRelabelItem) func(*map[string]string) {
 			return func(mPtr *map[string]string) {
@@ -129,11 +132,11 @@ func BuildInstanceMetaModifier(rl *bootstrap.InstanceMetaRelabel) func(*map[stri
 				}
 				if !exist {
 					return
-				} else {
-					if nv, ok := item.ValuesMapping[v]; ok {
-						v = nv
-					}
 				}
+				if nv, ok := item.ValuesMapping[v]; ok {
+					v = nv
+				}
+
 				if _, exist := m[item.TargetKey]; !exist || item.Overwrite {
 					m[item.TargetKey] = v
 				}

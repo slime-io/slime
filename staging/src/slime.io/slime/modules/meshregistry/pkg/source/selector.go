@@ -234,7 +234,7 @@ func ConvertEndpointSelectorToHookConfig(sels []*bootstrap.EndpointSelector, opt
 			cfg.LabelSelector = sel.LabelSelector
 		}
 		if sel.ExcludeIPRanges != nil {
-			var ipSel = IPSelector{IncludeIP: false}
+			ipSel := IPSelector{IncludeIP: false}
 			if len(sel.ExcludeIPRanges.IPs) != 0 {
 				ipSel.IPs = append(ipSel.IPs, sel.ExcludeIPRanges.IPs...)
 			}

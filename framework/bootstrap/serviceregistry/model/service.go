@@ -95,7 +95,7 @@ func (s *ServiceAttributes) Reset() {
 }
 
 func (s *ServiceAttributes) String() string {
-	return fmt.Sprintf("{s.ServiceRegistry: %s, s.Name: %s, s.Namespace: %s, s.Labels: %+v, s.Annotations: %+v, s.LabelSelectors: %+v}",
+	return fmt.Sprintf("{s.ServiceRegistry: %s, s.Name: %s, s.Namespace: %s, s.Labels: %+v, s.Annotations: %+v, s.LabelSelectors: %+v}", //nolint: lll
 		s.ServiceRegistry, s.Name, s.Namespace, s.Labels, s.Annotations, s.LabelSelectors)
 }
 
@@ -128,7 +128,7 @@ func (ep *IstioEndpoint) Reset() {
 }
 
 func (ep *IstioEndpoint) String() string {
-	return fmt.Sprintf("{ep.Address: %s, ep.Labels: %+v, ep.Hostnames: %+v, ep.ServiceName: %s, ep.Namespace: %s, ep.ServicePortName: %s, ep.EndpointPort: %d}",
+	return fmt.Sprintf("{ep.Address: %s, ep.Labels: %+v, ep.Hostnames: %+v, ep.ServiceName: %s, ep.Namespace: %s, ep.ServicePortName: %s, ep.EndpointPort: %d}", //nolint: lll
 		ep.Address, ep.Labels, ep.Hostnames, ep.ServiceName, ep.Namespace, ep.ServicePortName, ep.EndpointPort)
 }
 
@@ -140,7 +140,7 @@ func (ep *IstioEndpoint) ConvertConfig() resource.Config {
 	cfg := resource.Config{
 		Meta: resource.Meta{
 			GroupVersionKind:  resource.IstioEndpoint,
-			Name:              ep.ServiceName + "/" + ep.ServicePortName + "/" + ep.Address + ":" + strconv.Itoa(int(ep.EndpointPort)),
+			Name:              BuildIstioEpName(ep.ServiceName, ep.ServicePortName, ep.Address, int(ep.EndpointPort)),
 			Namespace:         ep.Namespace,
 			Domain:            "",
 			Labels:            ep.Labels,
@@ -151,6 +151,10 @@ func (ep *IstioEndpoint) ConvertConfig() resource.Config {
 		Spec: ep,
 	}
 	return cfg
+}
+
+func BuildIstioEpName(serviceName, portName, addr string, port int) string {
+	return serviceName + "/" + portName + "/" + addr + ":" + strconv.Itoa(port)
 }
 
 type Port struct {
@@ -183,7 +187,8 @@ func copyInternal(v interface{}) interface{} {
 	if err != nil {
 		// There are 2 locations where errors are generated in copystructure.Copy:
 		//  * The reflection walk over the structure fails, which should never happen
-		//  * A configurable copy function returns an error. This is only used for copying times, which never returns an error.
+		//  * A configurable copy function returns an error. This is only used for copying times,
+		//    which never returns an error.
 		// Therefore, this should never happen
 		panic(err)
 	}
@@ -286,7 +291,8 @@ const (
 	dnsNamePrefixMaxLength = 253
 )
 
-var tagRegexp = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$") // label value can be an empty string
+// label value can be an empty string
+var tagRegexp = regexp.MustCompile("^(" + dnsNamePrefixFmt + ")?(" + qualifiedNameFmt + ")$")
 
 // LabelsInstance is a non empty map of arbitrary strings. Each version of a service can
 // be differentiated by a unique set of labels associated with the version. These

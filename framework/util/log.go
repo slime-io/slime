@@ -8,14 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/natefinch/lumberjack.v2"
-
-	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
-
 	log "github.com/sirupsen/logrus"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 	ilog "istio.io/libistio/pkg/log"
 	"k8s.io/klog"
+
+	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 )
 
 func TimeEncoder(t time.Time, enc zapcore.PrimitiveArrayEncoder) {
@@ -73,8 +72,8 @@ func InitLog(logConfig *bootconfig.Log) error {
 	return nil
 }
 
-func SetLevel(LogLevel string) error {
-	level, err := log.ParseLevel(LogLevel)
+func SetLevel(logLevel string) error {
+	level, err := log.ParseLevel(logLevel)
 	if err != nil {
 		return err
 	}
@@ -94,22 +93,22 @@ func GetLevel() string {
 }
 
 // initKlog while x<= KlogLevel in the klog.V("x").info("hello"), log will be record
-func initKlog(KlogLevel int32, output io.Writer) {
+func initKlog(klogLevel int32, output io.Writer) {
 	fs = flag.NewFlagSet("klog", flag.ContinueOnError)
 	klog.InitFlags(fs)
 
 	// set log output
 	if output != nil {
-		fs.Set("logtostderr", "false")
+		_ = fs.Set("logtostderr", "false")
 		klog.SetOutput(output)
 	}
 
-	SetKlogLevel(KlogLevel)
+	SetKlogLevel(klogLevel)
 }
 
 // SetKlogLevel Warning: not thread safe
 func SetKlogLevel(number int32) {
-	fs.Set("v", fmt.Sprintf("%d", number))
+	_ = fs.Set("v", fmt.Sprintf("%d", number))
 }
 
 func GetKlogLevel() string {
@@ -136,7 +135,6 @@ func SetiLog(settings map[string]string) {
 	}
 
 	for name, scope := range ilog.Scopes() {
-
 		level := stringToLevel[defaultLevel]
 		if v, ok := settings[name]; ok {
 			level = stringToLevel[v]

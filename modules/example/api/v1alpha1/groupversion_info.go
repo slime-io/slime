@@ -1,6 +1,6 @@
 // Package v1alpha1 contains API Schema definitions for the microservice v1alpha1 API group
-//+kubebuilder:object:generate=true
-//+groupName=microservice.slime.io
+// +kubebuilder:object:generate=true
+// +groupName=microservice.slime.io
 package v1alpha1
 
 import (

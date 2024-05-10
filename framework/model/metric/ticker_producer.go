@@ -2,6 +2,7 @@ package metric
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	"slime.io/slime/framework/model/trigger"
 )
 
@@ -28,16 +29,16 @@ func NewTickerProducer(config TickerProducerConfig, source Source) *TickerProduc
 }
 
 func (p *TickerProducer) HandleTickerEvent() {
-	log := log.WithField("reporter", "TickerProducer").WithField("function", "HandleTriggerEvent")
+	l := log.WithField("reporter", "TickerProducer").WithField("function", "HandleTriggerEvent")
 	for {
 		select {
 		case <-p.StopChan:
-			log.Infof("ticker producer exited")
+			l.Infof("ticker producer exited")
 			return
 		// handle ticker event
 		case event, ok := <-p.tickerTrigger.EventChan():
 			if !ok {
-				log.Warningf("ticker event channel closed, break process loop")
+				l.Warningf("ticker event channel closed, break process loop")
 				return
 			}
 
@@ -50,7 +51,7 @@ func (p *TickerProducer) HandleTickerEvent() {
 			// get metric
 			metric, err := p.source.QueryMetric(queryMap)
 			if err != nil {
-				log.Errorf("%v", err)
+				l.Errorf("%v", err)
 				continue
 			}
 
@@ -59,14 +60,13 @@ func (p *TickerProducer) HandleTickerEvent() {
 			}
 			// produce metric event
 			p.MetricChan <- metric
-
 		}
 	}
 }
 
 func (p *TickerProducer) Start() {
 	p.tickerTrigger.Start()
-	p.source.Start()
+	_ = p.source.Start()
 }
 
 func (p *TickerProducer) Stop() {

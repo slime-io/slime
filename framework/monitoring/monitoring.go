@@ -188,14 +188,15 @@ func (g *MetricGauge) With(lbls ...attribute.KeyValue) *MetricGauge {
 	}
 	opts := make([]api.ObserveOption, 0, len(g.opts)+len(lbls))
 	opts = append(opts, g.opts...)
+	opts = append(opts, api.WithAttributes(lbls...))
 	ng := &MetricGauge{
 		gauge:       g.gauge,
 		initializer: g.initializer,
 		curValue:    atomic.Value{},
 		derived:     make(map[string]*MetricGauge),
+		opts:        opts,
 	}
 	ng.curValue.Store(float64(0))
-	ng.opts = append(opts, api.WithAttributes(lbls...))
 	g.derived[key] = ng
 	return ng
 }

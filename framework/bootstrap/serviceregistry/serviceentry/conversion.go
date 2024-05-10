@@ -63,7 +63,7 @@ func ConvertSvcsAndEps(cfg resource.Config, seLabelSelectorKeys string) ([]*mode
 }
 
 // convertIstioEndpoints transforms a ServiceEntry config to a list of IstioEndpoint.
-func convertIstioEndpoints(serviceEntry *networkingapi.ServiceEntry, svcName, svcNamespace string) []*model.IstioEndpoint {
+func convertIstioEndpoints(serviceEntry *networkingapi.ServiceEntry, svcName, svcNs string) []*model.IstioEndpoint {
 	out := make([]*model.IstioEndpoint, 0)
 
 	var hosts []model.Name
@@ -75,11 +75,11 @@ func convertIstioEndpoints(serviceEntry *networkingapi.ServiceEntry, svcName, sv
 		wles := serviceEntry.Endpoints
 		for _, wle := range wles {
 			for _, port := range serviceEntry.Ports {
-				ep := convertIstioEndpoint(svcName, svcNamespace, port, wle, hosts)
+				ep := convertIstioEndpoint(svcName, svcNs, port, wle, hosts)
 				out = append(out, ep)
 			}
 		}
-	} else if serviceEntry.WorkloadSelector != nil {
+	} else if serviceEntry.WorkloadSelector != nil { //nolint: staticcheck,revive
 		// TODO ServiceEntry.Spec.WorkloadSelector -> match WorkloadEntry and Pod -> IstioEndpoints
 	}
 
@@ -89,21 +89,27 @@ func convertIstioEndpoints(serviceEntry *networkingapi.ServiceEntry, svcName, sv
 func convertIstioEndpoint(svcName, svcNamespace string, servicePort *networkingapi.ServicePort,
 	endpoint *networkingapi.WorkloadEntry, hosts []model.Name,
 ) *model.IstioEndpoint {
-	var instancePort uint32
+	// default use servicePort.Number as endpoint port name
+	instancePort := servicePort.Number
 	addr := endpoint.GetAddress()
+
+	// if targetPort is set, use it instead
+	if servicePort.TargetPort > 0 {
+		instancePort = servicePort.TargetPort
+	}
+
+	// endpoint port map takes precedence then targetPort
+	if len(endpoint.Ports) > 0 {
+		epPort := endpoint.Ports[servicePort.Name]
+		if epPort != 0 {
+			instancePort = servicePort.Number
+		}
+	}
+
+	// if addr is unix socket, use 0 as endpoint port name
 	if strings.HasPrefix(addr, model.UnixAddressPrefix) {
 		instancePort = 0
 		addr = strings.TrimPrefix(addr, model.UnixAddressPrefix)
-	} else if len(endpoint.Ports) > 0 { // endpoint port map takes precedence
-		instancePort = endpoint.Ports[servicePort.Name]
-		if instancePort == 0 {
-			instancePort = servicePort.Number
-		}
-	} else if servicePort.TargetPort > 0 {
-		instancePort = servicePort.TargetPort
-	} else {
-		// final fallback is to the service port value
-		instancePort = servicePort.Number
 	}
 
 	return &model.IstioEndpoint{

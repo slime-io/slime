@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	networkingapi "istio.io/api/networking/v1alpha3"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -15,7 +15,7 @@ import (
 	"slime.io/slime/framework/controllers"
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/limiter/api/config"
-	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
+	limiterv1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
 )
 
@@ -31,10 +31,9 @@ type LimiterSpec struct {
 	enableRatelimitPlaceholderInRoute bool
 
 	context string
-	rlsNs   string
 	// svc hostname
 	host   string
-	target *microservicev1alpha2.Target
+	target *limiterv1alpha2.Target
 
 	domain       string
 	rlsConfigmap *config.RlsConfigMap
@@ -42,13 +41,13 @@ type LimiterSpec struct {
 	proxyVersion string
 }
 
-func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.SmartLimiterSpec,
+func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec limiterv1alpha2.SmartLimiterSpec,
 	material map[string]string, loc types.NamespacedName) (
-	map[string]*networkingapi.EnvoyFilter, map[string]*microservicev1alpha2.SmartLimitDescriptors, []*model.Descriptor, error,
+	map[string]*networkingapi.EnvoyFilter, map[string]*limiterv1alpha2.SmartLimitDescriptors, []*model.Descriptor, error,
 ) {
 	materialInterface := util.MapToMapInterface(material)
 	setsEnvoyFilter := make(map[string]*networkingapi.EnvoyFilter)
-	setsSmartLimitDescriptor := make(map[string]*microservicev1alpha2.SmartLimitDescriptors)
+	setsSmartLimitDescriptor := make(map[string]*limiterv1alpha2.SmartLimitDescriptors)
 	globalDescriptors := make([]*model.Descriptor, 0)
 	params := &LimiterSpec{
 		rls:                               r.cfg.GetRls(),
@@ -98,7 +97,7 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 			// the set must be deleted in the DestinationRule set
 			setsEnvoyFilter[set.Name] = nil
 		} else {
-			validDescriptor := &microservicev1alpha2.SmartLimitDescriptors{}
+			validDescriptor := &limiterv1alpha2.SmartLimitDescriptors{}
 			for _, des := range setDescriptor.Descriptor_ {
 				// update the EnvoyFilter when condition value is true after calculate
 				if shouldUpdate, err := util.CalculateTemplateBool(des.Condition, materialInterface); err != nil {
@@ -106,27 +105,25 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 					continue
 				} else if !shouldUpdate {
 					log.Infof("the value of condition %s is false", des.Condition)
-				} else {
+				} else if des.Action != nil {
 					// update
-					if des.Action != nil {
-						if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err != nil {
-							log.Errorf("calculate quota %s err, %+v", des.Action.Quota, err.Error())
+					if rateLimitValue, err := util.CalculateTemplate(des.Action.Quota, materialInterface); err != nil {
+						log.Errorf("calculate quota %s err, %+v", des.Action.Quota, err.Error())
+					} else {
+						ips := exactIPs(des)
+						if ips == nil {
+							sd := warpDescriptors(des, rateLimitValue)
+							validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
 						} else {
-							ips := exactIPs(des)
-							if ips == nil {
+							for _, ip := range ips {
 								sd := warpDescriptors(des, rateLimitValue)
-								validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
-							} else {
-								for _, ip := range ips {
-									sd := warpDescriptors(des, rateLimitValue)
-									for i := range sd.Match {
-										if sd.Match[i].MatchSource == microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
-											sd.Match[i].ExactMatch = ip
-											break
-										}
+								for i := range sd.Match {
+									if sd.Match[i].MatchSource == limiterv1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
+										sd.Match[i].ExactMatch = ip
+										break
 									}
-									validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
 								}
+								validDescriptor.Descriptor_ = append(validDescriptor.Descriptor_, sd)
 							}
 						}
 					}
@@ -154,11 +151,11 @@ func (r *SmartLimiterReconciler) GenerateEnvoyConfigs(spec microservicev1alpha2.
 	return setsEnvoyFilter, setsSmartLimitDescriptor, globalDescriptors, nil
 }
 
-func warpDescriptors(descriptor *microservicev1alpha2.SmartLimitDescriptor, rateLimitValue int) *microservicev1alpha2.SmartLimitDescriptor {
-	des := descriptor.DeepCopy()
-	sd := &microservicev1alpha2.SmartLimitDescriptor{
-		Action: &microservicev1alpha2.SmartLimitDescriptor_Action{
-			Quota:        fmt.Sprintf("%d", rateLimitValue),
+func warpDescriptors(desc *limiterv1alpha2.SmartLimitDescriptor, quota int) *limiterv1alpha2.SmartLimitDescriptor {
+	des := desc.DeepCopy()
+	sd := &limiterv1alpha2.SmartLimitDescriptor{
+		Action: &limiterv1alpha2.SmartLimitDescriptor_Action{
+			Quota:        fmt.Sprintf("%d", quota),
 			FillInterval: des.Action.FillInterval,
 			Strategy:     des.Action.Strategy,
 		},
@@ -172,27 +169,29 @@ func warpDescriptors(descriptor *microservicev1alpha2.SmartLimitDescriptor, rate
 	return sd
 }
 
-func exactIPs(des *microservicev1alpha2.SmartLimitDescriptor) []string {
-	for _, m := range des.Match {
-		if m.MatchSource == microservicev1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
+func exactIPs(desc *limiterv1alpha2.SmartLimitDescriptor) []string {
+	for _, m := range desc.Match {
+		if m.MatchSource == limiterv1alpha2.SmartLimitDescriptor_Matcher_SourceIpMatch {
 			return strings.Split(m.ExactMatch, ",")
 		}
 	}
 	return nil
 }
 
-func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDescriptor, labels map[string]string, params *LimiterSpec) *networkingapi.EnvoyFilter {
+func descriptorsToEnvoyFilter(descs []*limiterv1alpha2.SmartLimitDescriptor, labels map[string]string,
+	params *LimiterSpec,
+) *networkingapi.EnvoyFilter {
 	ef := &networkingapi.EnvoyFilter{}
 	ef.ConfigPatches = make([]*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch, 0)
-	globalDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
-	localDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
+	globalDescriptors := make([]*limiterv1alpha2.SmartLimitDescriptor, 0)
+	localDescriptors := make([]*limiterv1alpha2.SmartLimitDescriptor, 0)
 
 	if len(labels) > 0 {
 		ef.WorkloadSelector = &networkingapi.WorkloadSelector{Labels: labels}
 	}
 
 	// split descriptors due to different envoy plugins
-	for _, descriptor := range descriptors {
+	for _, descriptor := range descs {
 		if descriptor.Action != nil {
 			if descriptor.Action.Strategy == model.GlobalSmartLimiter {
 				globalDescriptors = append(globalDescriptors, descriptor)
@@ -203,7 +202,7 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 	}
 
 	// http router
-	httpRouterPatches, err := generateHttpRouterPatch(descriptors, params)
+	httpRouterPatches, err := generateHttpRouterPatch(descs, params)
 	if err != nil {
 		log.Errorf("generateHttpRouterPatch err: %+v", err.Error())
 		return nil
@@ -213,7 +212,6 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 
 	// if global ratelimit is not disabled, config plugin envoy.filters.http.ratelimit
 	if !params.disableGlobalRateLimit && len(globalDescriptors) > 0 {
-
 		// disable insert envoy.filters.http.ratelimit before router
 		if !params.disableInsertGlobalRateLimit {
 			server, err := getRateLimiterService(params.rls)
@@ -221,12 +219,12 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 				log.Errorf("getRateLimiterService err: %s, skip", err.Error())
 			}
 			domain := getDomain(params.domain)
-			httpFilterEnvoyRateLimitPatch := generateEnvoyHttpFilterGlobalRateLimitPatch(params.context, server, domain, params.proxyVersion)
+			httpFilterEnvoyRateLimitPatch := generateEnvoyHttpFilterGlobalRateLimitPatch(params.context, server, domain, params.proxyVersion) //nolint: lll
 			if httpFilterEnvoyRateLimitPatch != nil {
 				ef.ConfigPatches = append(ef.ConfigPatches, httpFilterEnvoyRateLimitPatch)
 			}
 		} else {
-			log.Debugf("disableInsertGlobalRateLimit set true, skip insert envoy.filters.http.ratelimit before router automatically")
+			log.Debugf("skip insert envoy.filters.http.ratelimit before router because disableInsertGlobalRateLimit")
 		}
 
 		// optimize: only load plugins in routers with ratelimit
@@ -238,8 +236,9 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 
 	// enable and config plugin envoy.filters.http.local_ratelimit
 	if len(localDescriptors) > 0 {
-		// if disableInsertLocalRateLimit=false in gw, multi smartlimiter will patch duplicate configurations, This will lead dysfunctional behavior.
-		// so disable it, and apply envoyfilter like staging/src/slime.io/slime/modules/limiter/install/gw_limiter_envoyfilter.yaml to your gw pilot
+		// If disableInsertLocalRateLimit=false in gw, multi smartlimiter will patch duplicate configurations,
+		// this will lead dysfunctional behavior. So disable it, and apply envoyfilter like:
+		// staging/src/slime.io/slime/modules/limiter/install/gw_limiter_envoyfilter.yaml to your gw pilot
 		if !params.disableInsertLocalRateLimit {
 			httpFilterLocalRateLimitPatch := generateHttpFilterLocalRateLimitPatch(params.context, params.proxyVersion)
 			ef.ConfigPatches = append(ef.ConfigPatches, httpFilterLocalRateLimitPatch)
@@ -252,9 +251,12 @@ func descriptorsToEnvoyFilter(descriptors []*microservicev1alpha2.SmartLimitDesc
 	return ef
 }
 
-func descriptorsToGlobalRateLimit(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*model.Descriptor {
-	globalDescriptors := make([]*microservicev1alpha2.SmartLimitDescriptor, 0)
-	for _, descriptor := range descriptors {
+func descriptorsToGlobalRateLimit(
+	descs []*limiterv1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName,
+) []*model.Descriptor {
+	globalDescriptors := make([]*limiterv1alpha2.SmartLimitDescriptor, 0)
+	for _, descriptor := range descs {
 		if descriptor.Action.Strategy == model.GlobalSmartLimiter {
 			globalDescriptors = append(globalDescriptors, descriptor)
 		}
@@ -309,15 +311,14 @@ func getIstioService(r *SmartLimiterReconciler, nn types.NamespacedName) (*slime
 // if the svc arrives later than smartlimiter,
 // ticker mechanism will ensure modules get the svc
 func getK8sServiceLabels(r *SmartLimiterReconciler, spec *LimiterSpec) (map[string]string, error) {
-	svc := &v1.Service{}
+	svc := &corev1.Service{}
 
 	err := r.Client.Get(context.TODO(), spec.loc, svc)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return nil, fmt.Errorf("k8s svc %s is not found", spec.loc)
-		} else {
-			return nil, fmt.Errorf("get k8s svc %s err: %+v", spec.loc, err.Error())
 		}
+		return nil, fmt.Errorf("get k8s svc %s err: %+v", spec.loc, err.Error())
 	}
 	return svc.Spec.Selector, nil
 }
@@ -334,10 +335,10 @@ func formatLabels(selector map[string]string) map[string]string {
 	return labels
 }
 
-func generateHeadersToAdd(des *microservicev1alpha2.SmartLimitDescriptor) []*microservicev1alpha2.Header {
-	headers := make([]*microservicev1alpha2.Header, 0)
+func generateHeadersToAdd(des *limiterv1alpha2.SmartLimitDescriptor) []*limiterv1alpha2.Header {
+	headers := make([]*limiterv1alpha2.Header, 0)
 	for _, item := range des.Action.HeadersToAdd {
-		headers = append(headers, &microservicev1alpha2.Header{
+		headers = append(headers, &limiterv1alpha2.Header{
 			Key:   item.GetKey(),
 			Value: item.GetValue(),
 		})

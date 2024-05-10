@@ -94,7 +94,7 @@ func (args *RegistryArgs) Validate() error {
 	if err := args.EurekaSource.Validate(); err != nil {
 		return err
 	}
-	if err := args.NacosSource.Validate(); err != nil {
+	if err := args.NacosSource.Validate(); err != nil { //nolint: revive
 		return err
 	}
 	return nil
@@ -113,8 +113,9 @@ type SourceArgs struct {
 	GatewayModel bool `json:"GatewayModel,omitempty"`
 	// patch instances label
 	LabelPatch bool `json:"LabelPatch,omitempty"`
-	// GenericProtocol is used to specify weather using generic protocol as the first protocol in the service entry, default is false.
-	// If true, the final port protocol will be `GENERIC`, and the port name prefix will be `generic-lower(SvcProtocol)`, e.g. `generic-dubbo`.
+	// GenericProtocol is used to specify weather using generic protocol as the first protocol in the service entry,
+	// default is false. If true, the final port protocol will be `GENERIC`, and the port name prefix will be
+	// `generic-lower(SvcProtocol)`, e.g. `generic-dubbo`.
 	GenericProtocol bool `json:"GenericProtocol,omitempty"`
 	// svc protocol for services, for Eureka and Nacos, default is "HTTP", for Zookeeper, default is "DUBBO"
 	SvcProtocol string `json:"SvcProtocol,omitempty"`
@@ -133,7 +134,7 @@ type SourceArgs struct {
 	// If the service matches ServicedEndpointSelector, the source scoped EndpointSelectors should be ignored,
 	// unless AlwaysUseSourceScopedEpSelectors is set to true.
 	ServicedEndpointSelectors map[string][]*EndpointSelector `json:"ServicedEndpointSelectors,omitempty"`
-	// EmptyEpSelectorsExcludeAll if set to true, when no ep selectors are configured, the source should exclude all eps.
+	// EmptyEpSelectorsExcludeAll is set to true and no ep selectors are configured, the source should exclude all eps.
 	EmptyEpSelectorsExcludeAll bool `json:"EmptyEpSelectorsExcludeAll,omitempty"`
 	// AlwaysUseSourceScopedEpSelectors if set to true, the source scoped EndpointSelectors should be processed
 	// even if the service matches ServicedEndpointSelector
@@ -153,14 +154,16 @@ type SourceArgs struct {
 	ServiceNaming *ServiceNameConverter `json:"ServiceNaming,omitempty"`
 	// ServiceHostAliases allows configuring additional aliases for the specified service host
 	ServiceHostAliases []*ServiceHostAlias `json:"ServiceHostAliases,omitempty"`
-	// ServiceAdditionalMetas allows configuring additional metadata for the specified service when converting to a ServiceEntry
+	// ServiceAdditionalMetas allows configuring additional metadata for the specified service
+	// when converting to a ServiceEntry.
 	ServiceAdditionalMetas map[string]*MetadataWrapper `json:"ServiceAdditionalMetas,omitempty"`
 	// InstanceMetaRelabel is used to adjust the metadata of the instance.
-	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs to be processed before ServiceNaming
+	// Note that ServiceNaming may refer to instance metadata, the InstanceMetaRelabel needs
+	// to be processed before ServiceNaming.
 	InstanceMetaRelabel *InstanceMetaRelabel `json:"InstanceMetaRelabel,omitempty"`
 
-	// EnableEmptyProtection if set to true, the source should ignore conversion of the service with no endpoints, which means
-	// the last conversion result with endpoints will be kept until the source gets the new endpoints.
+	// EnableEmptyProtection if set to true, the source should ignore conversion of the service with no endpoints,
+	// which means the last conversion result with endpoints will be kept until the source gets the new endpoints.
 	EnableEmptyProtection bool `json:"EnableEmptyProtection,omitempty"`
 }
 
@@ -211,9 +214,9 @@ var (
 	InstanceMetadataKind  ServiceNameItemKind = "meta"
 	StaticKind            ServiceNameItemKind = "static"
 
-	InstanceBasicInfoSvc  string = "service"
-	InstanceBasicInfoIP   string = "ip"
-	InstanceBasicInfoPort string = "port"
+	InstanceBasicInfoSvc  = "service"
+	InstanceBasicInfoIP   = "ip"
+	InstanceBasicInfoPort = "port"
 )
 
 // ServiceNamingItem configure how a service name substring is generated.
@@ -418,7 +421,8 @@ type NacosSourceArgs struct {
 
 type NacosServer struct {
 	// RegistryID is the unique identifier of the nacos server.
-	// If set, the registry id will be used as an entry in the endpoint metadata. The key of the entry is defined by env var `REGISTRY_ID_META_KEY`
+	// If set, the registry id will be used as an entry in the endpoint metadata.
+	// The key of the entry is defined by env var `REGISTRY_ID_META_KEY`
 	RegistryID string `json:"RegistryID,omitempty"`
 	// addresses of the nacos servers
 	Address []string `json:"Address,omitempty"`

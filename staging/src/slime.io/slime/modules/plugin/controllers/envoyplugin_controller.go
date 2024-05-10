@@ -42,6 +42,7 @@ type EnvoyPluginReconciler struct {
 	Cfg    *config.PluginModule
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=envoyplugins,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=envoyplugins/status,verbs=get;update;patch
 
@@ -53,10 +54,9 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			return reconcile.Result{}, nil
-		} else {
-			EnvoypluginReconcilesFailed.Increment()
-			return reconcile.Result{}, err
 		}
+		EnvoypluginReconcilesFailed.Increment()
+		return reconcile.Result{}, err
 	}
 
 	istioRev := model.IstioRevFromLabel(instance.Labels)
@@ -86,7 +86,6 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	err = r.Client.Get(ctx, types.NamespacedName{Name: ef.Name, Namespace: ef.Namespace}, found)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			err = nil
 			found = nil
 		} else {
 			EnvoypluginReconcilesFailed.Increment()
@@ -119,7 +118,8 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	return ctrl.Result{}, nil
 }
 
-func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin) *networkingv1alpha3.EnvoyFilter {
+func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin,
+) *networkingv1alpha3.EnvoyFilter {
 	out := r.translateEnvoyPlugin(cr)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {

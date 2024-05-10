@@ -20,7 +20,7 @@ type ExampleReconciler struct {
 	Env    *bootstrap.Environment
 }
 
-func (r *ExampleReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+func (r *ExampleReconciler) Reconcile(_ context.Context, _ ctrl.Request) (ctrl.Result, error) {
 	return ctrl.Result{}, nil
 }
 

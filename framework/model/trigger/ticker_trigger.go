@@ -30,11 +30,11 @@ func NewTickerTrigger(config TickerTriggerConfig) *TickerTrigger {
 }
 
 func (t *TickerTrigger) Start() {
-	log := log.WithField("reporter", "TickerTrigger").WithField("function", "Start")
+	l := log.WithField("reporter", "TickerTrigger").WithField("function", "Start")
 
 	for _, duration := range t.durations {
 		t.durationsMap[duration] = make(chan struct{})
-		log.Infof("add timer %s to metric trigger", duration.String())
+		l.Infof("add timer %s to metric trigger", duration.String())
 	}
 
 	for duration, channel := range t.durationsMap {
@@ -44,11 +44,11 @@ func (t *TickerTrigger) Start() {
 				select {
 				case _, ok := <-ch:
 					if !ok {
-						log.Debugf("stop a timer")
+						l.Debugf("stop a timer")
 						return
 					}
 				case <-ticker.C:
-					log.Debugf("got timer event: duration %v", du)
+					l.Debugf("got timer event: duration %v", du)
 					event := TickerEvent{
 						Duration: du,
 					}

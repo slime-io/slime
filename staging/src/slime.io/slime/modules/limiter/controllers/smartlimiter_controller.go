@@ -22,15 +22,11 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
-	"slime.io/slime/framework/util"
-
 	cmap "github.com/orcaman/concurrent-map/v2"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -39,6 +35,7 @@ import (
 	slime_model "slime.io/slime/framework/model"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
+	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/limiter/api/config"
 	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
@@ -66,6 +63,7 @@ type SmartLimiterReconciler struct {
 	Source            metric.Source
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=smartlimiters/status,verbs=get;update;patch
 
@@ -77,7 +75,6 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			instance = nil
-			err = nil
 			log.Infof("smartlimiter %v not found", req.NamespacedName)
 		} else {
 			log.Errorf("get smartlimiter %v err, %s", req.NamespacedName, err)
@@ -90,25 +87,27 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		r.RemoveInterested(req)
 		log.Infof("%v is deleted", req)
 		return reconcile.Result{}, nil
-	} else {
-		// add or update
-		log.Infof("%v is added or updated", req)
-		if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
-			log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
-				req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
-			return ctrl.Result{}, nil
-		}
-
-		if sidecarOutbound, gateway, err := r.Validate(instance); err != nil {
-			log.Errorf("invalid smartlimiter, %s", err)
-			ValidationFailedTotal.Increment()
-			return reconcile.Result{}, nil
-		} else {
-			r.RegisterInterest(instance, req, sidecarOutbound, gateway)
-		}
-		log.Debugf("update start")
-		r.RefreshResource(instance)
 	}
+
+	// add or update
+	log.Infof("%v is added or updated", req)
+	if !r.env.RevInScope(slime_model.IstioRevFromLabel(instance.Labels)) {
+		log.Debugf("existing smartlimiter %v istiorev %s but our %s, skip ...",
+			req.NamespacedName, slime_model.IstioRevFromLabel(instance.Labels), r.env.IstioRev())
+		return ctrl.Result{}, nil
+	}
+
+	sidecarOutbound, gateway, err := r.Validate(instance)
+	if err != nil {
+		log.Errorf("invalid smartlimiter, %s", err)
+		ValidationFailedTotal.Increment()
+		return reconcile.Result{}, nil
+	}
+	r.RegisterInterest(instance, req, sidecarOutbound, gateway)
+
+	log.Debugf("update start")
+	r.RefreshResource(instance)
+
 	return ctrl.Result{}, nil
 }
 
@@ -184,7 +183,12 @@ func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.
 	return pc, nil
 }
 
-func (r *SmartLimiterReconciler) RegisterInterest(instance *microservicev1alpha2.SmartLimiter, req ctrl.Request, sidecarOutbound, gateway bool) {
+func (r *SmartLimiterReconciler) RegisterInterest(
+	instance *microservicev1alpha2.SmartLimiter,
+	req ctrl.Request,
+	sidecarOutbound bool,
+	gateway bool,
+) {
 	// set interest mapping
 	meta := SmartLimiterMeta{}
 	meta.gateway = gateway
@@ -235,7 +239,6 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 
 	for _, descriptors := range instance.Spec.Sets {
 		for _, descriptor := range descriptors.Descriptor_ {
-
 			if descriptor.Target == nil && instance.Spec.Target == nil {
 				return sidecarOutbound, gateway, fmt.Errorf("invalid target")
 			}
@@ -283,9 +286,9 @@ func (r *SmartLimiterReconciler) RefreshResource(instance *microservicev1alpha2.
 
 	metric, err := r.Source.QueryMetric(queryMap)
 	if err != nil {
-		log.Errorf("query metric failed: %s", err.Error())
+		log.Errorf("query metric of %s/%s failed: %s", instance.Namespace, instance.Name, err.Error())
 	} else if len(metric) == 0 {
-		log.Errorf("query metric get empty: %s", err.Error())
+		log.Errorf("query metric of %s/%s get empty", instance.Namespace, instance.Name)
 	} else {
 		log.Debugf("get metric %+v", metric)
 		r.ConsumeMetric(metric)

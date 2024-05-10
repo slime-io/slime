@@ -23,7 +23,9 @@ import (
 	"slime.io/slime/modules/limiter/model"
 )
 
-func generateEnvoyHttpFilterGlobalRateLimitPatch(context, server, domain, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
+func generateEnvoyHttpFilterGlobalRateLimitPatch(
+	context, server, domain, proxyVersion string,
+) *networkingapi.EnvoyFilter_EnvoyConfigObjectPatch {
 	rateLimitServiceConfig := generateRateLimitService(server)
 	rs, err := util.MessageToStruct(rateLimitServiceConfig)
 	if err != nil {
@@ -50,7 +52,10 @@ func generateRateLimitService(clusterName string) *envoy_config_ratelimit_v3.Rat
 	return rateLimitServiceConfig
 }
 
-func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networkingapi.EnvoyFilter_EnvoyConfigObjectMatch {
+func generateEnvoyHttpFilterMatch(
+	context string,
+	proxyVersion string,
+) *networkingapi.EnvoyFilter_EnvoyConfigObjectMatch {
 	match := &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
 		Context: networkingapi.EnvoyFilter_SIDECAR_INBOUND,
 		ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_Listener{
@@ -81,7 +86,10 @@ func generateEnvoyHttpFilterMatch(context string, proxyVersion string) *networki
 	return match
 }
 
-func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain string) *networkingapi.EnvoyFilter_Patch {
+func generateEnvoyHttpFilterRateLimitServicePatch(
+	rs *structpb.Struct,
+	domain string,
+) *networkingapi.EnvoyFilter_Patch {
 	return &networkingapi.EnvoyFilter_Patch{
 		Operation: networkingapi.EnvoyFilter_Patch_INSERT_BEFORE,
 		Value: &structpb.Struct{
@@ -122,9 +130,12 @@ func generateEnvoyHttpFilterRateLimitServicePatch(rs *structpb.Struct, domain st
 	}
 }
 
-func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) []*model.Descriptor {
+func generateGlobalRateLimitDescriptor(
+	descs []*microservicev1alpha2.SmartLimitDescriptor,
+	loc types.NamespacedName,
+) []*model.Descriptor {
 	desc := make([]*model.Descriptor, 0)
-	for _, descriptor := range descriptors {
+	for _, descriptor := range descs {
 		quota, unit, err := calculateQuotaPerUnit(descriptor)
 		if err != nil {
 			log.Errorf("calculateQuotaPerUnit err: %+v", err)
@@ -141,8 +152,7 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 			item.RateLimit = ratelimit
 			item.Value = generateDescriptorValue(descriptor, loc)
 			desc = append(desc, item)
-
-		} else if containsHeaderRequest(descriptors) {
+		} else if containsHeaderRequest(descs) {
 			item := &model.Descriptor{}
 			item.Key = model.GenericKey
 			item.Value = generateDescriptorValue(descriptor, loc)
@@ -177,17 +187,18 @@ func generateGlobalRateLimitDescriptor(descriptors []*microservicev1alpha2.Smart
 	return desc
 }
 
-func generateDescriptor(descriptor *microservicev1alpha2.SmartLimitDescriptor, useQuery, useHeader,
-	useSourceIP bool, loc types.NamespacedName, ratelimit *model.RateLimit,
+func generateDescriptor(descriptor *microservicev1alpha2.SmartLimitDescriptor,
+	useQuery, useHeader, useSourceIP bool,
+	loc types.NamespacedName,
+	ratelimit *model.RateLimit,
 ) *model.Descriptor {
-	desc := model.Descriptor{}
 	var sourceIPDesc, headerDesc, queryDesc model.Descriptor
 
 	val := generateDescriptorValue(descriptor, loc)
 
 	// suquence:  query > header > sourceIp
 	if useSourceIP {
-		desc = createDescriptor(model.RemoteAddress, generateRemoteAddressDescriptorValue(descriptor), ratelimit)
+		desc := createDescriptor(model.RemoteAddress, generateRemoteAddressDescriptorValue(descriptor), ratelimit)
 		sourceIPDesc = createDescriptor(model.GenericKey, val, nil)
 		sourceIPDesc.Descriptors = []model.Descriptor{desc}
 	}
@@ -213,13 +224,11 @@ func generateDescriptor(descriptor *microservicev1alpha2.SmartLimitDescriptor, u
 	}
 
 	if useQuery {
-		desc = queryDesc
+		return &queryDesc
 	} else if useHeader {
-		desc = headerDesc
-	} else {
-		desc = sourceIPDesc
+		return &headerDesc
 	}
-	return &desc
+	return &sourceIPDesc
 }
 
 func createDescriptor(key, value string, ratelimit *model.RateLimit) model.Descriptor {

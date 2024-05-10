@@ -3,7 +3,6 @@ package bootstrap
 import (
 	"fmt"
 	"net/url"
-	"strconv"
 	"strings"
 	"time"
 
@@ -77,22 +76,22 @@ func NewConfigController(configSources []*bootconfig.ConfigSource, stop <-chan s
 	imc, err := initIstioMonitorController()
 	if err != nil {
 		return nil, err
-	} else {
-		mcs = append(mcs, imc)
 	}
+	mcs = append(mcs, imc)
+
 	for _, configSource := range configSources {
 		if strings.HasPrefix(configSource.Address, McpOverXdsConfigSourcePrefix) {
-			if mc, err := initXdsMonitorController(configSource); err != nil {
+			mc, err := initXdsMonitorController(configSource)
+			if err != nil {
 				return nil, err
-			} else {
-				mcs = append(mcs, mc)
 			}
+			mcs = append(mcs, mc)
 		} else if strings.HasPrefix(configSource.Address, KubernetesConfigSourcePrefix) {
-			if mc, err := initK8sMonitorController(configSource); err != nil {
+			mc, err := initK8sMonitorController(configSource)
+			if err != nil {
 				return nil, err
-			} else {
-				mcs = append(mcs, mc)
 			}
+			mcs = append(mcs, mc)
 		} else {
 			log.Warnf("configsource address %s is not supported", configSource.Address)
 		}
@@ -301,7 +300,7 @@ func RunController(c ConfigController, config *bootconfig.Config, cfg *rest.Conf
 					return
 				}
 				for _, oldIep := range oldIeps {
-					oldIepName := oldIep.ServiceName + "/" + oldIep.ServicePortName + "/" + oldIep.Address + ":" + strconv.Itoa(int(oldIep.EndpointPort))
+					oldIepName := model.BuildIstioEpName(oldIep.ServiceName, oldIep.ServicePortName, oldIep.Address, int(oldIep.EndpointPort)) //nolint: lll
 					if err = imc.Delete(resource.IstioEndpoint, oldIepName, oldIep.Namespace); err != nil {
 						log.Errorf("[epsToIstioResHandler] [EventUpdate] delete old IstioEndpoint error: %+v", err)
 						return
@@ -387,7 +386,10 @@ func (c *configController) List(gvk resource.GroupVersionKind, namespace string)
 	return c.viewerStore.List(gvk, namespace)
 }
 
-func (c *configController) RegisterEventHandler(kind resource.GroupVersionKind, handler func(resource.Config, resource.Config, Event)) {
+func (c *configController) RegisterEventHandler(
+	kind resource.GroupVersionKind,
+	handler func(resource.Config, resource.Config, Event),
+) {
 	for _, mc := range c.monitorControllers {
 		if _, exists := mc.Schemas().FindByGroupVersionKind(kind); exists {
 			mc.RegisterEventHandler(kind, handler)
@@ -421,7 +423,12 @@ func initXdsMonitorController(configSource *bootconfig.ConfigSource) (*monitorCo
 	return mc, nil
 }
 
-func startXdsMonitorController(mc *monitorController, configRevision string, xdsSourceEnableIncPush bool, stop <-chan struct{}) error {
+func startXdsMonitorController(
+	mc *monitorController,
+	configRevision string,
+	xdsSourceEnableIncPush bool,
+	stop <-chan struct{},
+) error {
 	srcAddress, err := url.Parse(mc.configSource.Address)
 	if err != nil {
 		return fmt.Errorf("invalid xds config source %s: %v", mc.configSource.Address, err)

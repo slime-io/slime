@@ -46,18 +46,16 @@ func ProtoToMapWithOpts(pb proto.Message, opts ...ProtoJSONOpts) (map[string]int
 	for _, opt := range opts {
 		opt(mo)
 	}
-	if bs, err := mo.Marshal(pb); err == nil {
-		var mapResult map[string]interface{}
-		// use json.Unmarshal(data []byte, v interface{}) to convert and return error information
-		if err := json.Unmarshal(bs, &mapResult); err == nil {
-			return mapResult, nil
-		} else {
-			return nil, err
-		}
-	} else {
+	bs, err := mo.Marshal(pb)
+	if err != nil {
 		return nil, err
 	}
-
+	var mapResult map[string]interface{}
+	// use json.Unmarshal(data []byte, v interface{}) to convert and return error information
+	if err := json.Unmarshal(bs, &mapResult); err != nil {
+		return nil, err
+	}
+	return mapResult, nil
 }
 
 func ProtoToMap(pb proto.Message) (map[string]interface{}, error) {

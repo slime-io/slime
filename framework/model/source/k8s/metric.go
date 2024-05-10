@@ -43,16 +43,16 @@ func metricWatcherHandler(m *Source, e watch.Event) {
 func metricTimerHandler(m *Source) {
 	m.RLock()
 	for k := range m.Interest.Items() {
-		if index := strings.Index(k, "/"); index == -1 || index == len(k)-1 {
+		index := strings.Index(k, "/")
+		if index == -1 || index == len(k)-1 {
 			continue
-		} else {
-			ns := k[:index]
-			name := k[index+1:]
-			update(m, types.NamespacedName{
-				Namespace: ns,
-				Name:      name,
-			})
 		}
+		ns := k[:index]
+		name := k[index+1:]
+		update(m, types.NamespacedName{
+			Namespace: ns,
+			Name:      name,
+		})
 	}
 	m.RUnlock()
 }

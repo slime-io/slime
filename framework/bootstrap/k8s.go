@@ -46,10 +46,10 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 		getInformer  func(informers.SharedInformerFactory, istioinformers.SharedInformerFactory) cache.SharedIndexInformer
 		eventHandler cache.ResourceEventHandlerFuncs
 	}
-	var builders []*buildHelper = []*buildHelper{
+	builders := []*buildHelper{
 		{
 			// pod
-			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer {
+			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer { //nolint: lll
 				return i.Core().V1().Pods().Informer()
 			},
 			eventHandler: cache.ResourceEventHandlerFuncs{
@@ -60,7 +60,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 		},
 		{
 			// ep
-			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer {
+			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer { //nolint: lll
 				return i.Core().V1().Endpoints().Informer()
 			},
 			eventHandler: cache.ResourceEventHandlerFuncs{
@@ -71,7 +71,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 		},
 		{
 			// svc
-			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer {
+			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer { //nolint: lll
 				return i.Core().V1().Services().Informer()
 			},
 			eventHandler: cache.ResourceEventHandlerFuncs{
@@ -82,7 +82,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 		},
 		{
 			// cm
-			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer {
+			getInformer: func(i informers.SharedInformerFactory, _ istioinformers.SharedInformerFactory) cache.SharedIndexInformer { //nolint: lll
 				return i.Core().V1().ConfigMaps().Informer()
 			},
 			eventHandler: cache.ResourceEventHandlerFuncs{
@@ -93,7 +93,7 @@ func startK8sMonitorController(mc *monitorController, cfg *rest.Config, stopCh <
 		},
 		{
 			// serviceEntry
-			getInformer: func(_ informers.SharedInformerFactory, i istioinformers.SharedInformerFactory) cache.SharedIndexInformer {
+			getInformer: func(_ informers.SharedInformerFactory, i istioinformers.SharedInformerFactory) cache.SharedIndexInformer { //nolint: lll
 				return i.Networking().V1alpha3().ServiceEntries().Informer()
 			},
 			eventHandler: cache.ResourceEventHandlerFuncs{
@@ -146,7 +146,7 @@ func addFuncFactory[T metav1.Object](mc *monitorController, gvk resource.GroupVe
 	}
 }
 
-func updateFuncFactory[T metav1.Object](mc *monitorController, gvk resource.GroupVersionKind) func(oldObj, newObj interface{}) {
+func updateFuncFactory[T metav1.Object](mc *monitorController, gvk resource.GroupVersionKind) func(oldObj, newObj interface{}) { //nolint: lll
 	return func(_, obj interface{}) {
 		re, ok := obj.(T)
 		if !ok {

@@ -58,15 +58,15 @@ type Controller struct {
 }
 
 // NewController returns a new secret controller
-func NewController(kubeClient kubernetes.Interface, namespace string, resyncPeriod time.Duration, localClusterID string) *Controller {
+func NewController(kubeClient kubernetes.Interface, ns, localCluster string, resyncPeriod time.Duration) *Controller {
 	lw := &cache.ListWatch{
 		ListFunc: func(opts metav1.ListOptions) (runtime.Object, error) {
 			opts.LabelSelector = multiClusterSecretLabel + "=true"
-			return kubeClient.CoreV1().Secrets(namespace).List(context.TODO(), opts)
+			return kubeClient.CoreV1().Secrets(ns).List(context.TODO(), opts)
 		},
 		WatchFunc: func(opts metav1.ListOptions) (watch.Interface, error) {
 			opts.LabelSelector = multiClusterSecretLabel + "=true"
-			return kubeClient.CoreV1().Secrets(namespace).Watch(context.TODO(), opts)
+			return kubeClient.CoreV1().Secrets(ns).Watch(context.TODO(), opts)
 		},
 	}
 	informer := cache.NewSharedIndexInformer(lw, &corev1.Secret{}, resyncPeriod,
@@ -75,7 +75,7 @@ func NewController(kubeClient kubernetes.Interface, namespace string, resyncPeri
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	controller := &Controller{
 		resyncPeriod:       resyncPeriod,
-		localClusterID:     localClusterID,
+		localClusterID:     localCluster,
 		localClusterClient: kubeClient,
 		cs:                 newClustersStore(),
 		informer:           informer,
@@ -241,12 +241,12 @@ func (c *Controller) addSecret(secretKey string, s *corev1.Secret) {
 			action, callback = "Updating", c.handleUpdate
 			kubeConfigSha := sha256.Sum256(kubeConfig)
 			if bytes.Equal(kubeConfigSha[:], prev.kubeConfigSha[:]) {
-				log.Infof("skipping update of cluster_id=%v from secret=%v: (kubeconfig are identical)", clusterID, secretKey)
+				log.Infof("skip update cluster %v from secret %v: kubeconfig are equal", clusterID, secretKey)
 				continue
 			}
 		}
 		if clusterID == c.localClusterID {
-			log.Infof("ignoring %s cluster %v from secret %v as it would overwrite the local cluster", action, clusterID, secretKey)
+			log.Infof("ignore %s cluster %v from secret %v as it is the local cluster", action, clusterID, secretKey)
 			continue
 		}
 		log.Infof("%s cluster %v from secret %v", action, clusterID, secretKey)
@@ -275,7 +275,7 @@ func (c *Controller) deleteSecret(secretKey string) {
 	}()
 	for clusterID, cluster := range c.cs.remoteClusters[secretKey] {
 		if clusterID == c.localClusterID {
-			log.Infof("ignoring delete cluster %v from secret %v as it would overwrite the local cluster", clusterID, secretKey)
+			log.Infof("ignore delete cluster %v from secret %v as it is the local cluster", clusterID, secretKey)
 			continue
 		}
 		log.Infof("Deleting cluster_id=%v configured by secret=%v", clusterID, secretKey)
@@ -313,16 +313,15 @@ func BuildClientsFromConfig(kubeConfig []byte) (kubernetes.Interface, error) {
 	return kubernetes.NewForConfig(restConfig)
 }
 
-func (c *Controller) createRemoteCluster(kubeConfig []byte, ID string) (*Cluster, error) {
+func (c *Controller) createRemoteCluster(kubeConfig []byte, id string) (*Cluster, error) {
 	clients, err := BuildClientsFromConfig(kubeConfig)
 	if err != nil {
 		return nil, err
 	}
-	informers := informers.NewSharedInformerFactory(clients, c.resyncPeriod)
 	return &Cluster{
-		ID:            ID,
+		ID:            id,
 		KubeClient:    clients,
-		KubeInformer:  informers,
+		KubeInformer:  informers.NewSharedInformerFactory(clients, c.resyncPeriod),
 		stop:          make(chan struct{}),
 		kubeConfigSha: sha256.Sum256(kubeConfig),
 	}, nil

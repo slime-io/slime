@@ -88,7 +88,8 @@ func New(
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false,
+				fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -222,7 +223,8 @@ func (s *Source) updateServiceInfo() error {
 			se = &seCopy
 			event, err := buildEvent(event.Updated, se, seFullName, s.args.ResourceNs)
 			if err == nil {
-				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ", se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
+				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ",
+					se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
@@ -238,7 +240,8 @@ func (s *Source) updateServiceInfo() error {
 			// ADD
 			event, err := buildEvent(event.Added, newEntry, seFullName, s.args.ResourceNs)
 			if err == nil {
-				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
+				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ",
+					newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
@@ -246,20 +249,19 @@ func (s *Source) updateServiceInfo() error {
 				log.Errorf("build add event for %s failed: %v", seFullName, err)
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
-		} else {
-			if !proto.Equal(oldEntry, newEntry) {
-				// UPDATE
-				event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs)
-				if err == nil {
-					log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ", newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
-					for _, h := range s.handlers {
-						h.Handle(event)
-					}
-				} else {
-					log.Errorf("build update event for %s failed: %v", seFullName, err)
+		} else if !proto.Equal(oldEntry, newEntry) {
+			// UPDATE
+			event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs)
+			if err == nil {
+				log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ",
+					newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
+				for _, h := range s.handlers {
+					h.Handle(event)
 				}
-				monitoring.RecordServiceEntryUpdate(SourceName, err == nil)
+			} else {
+				log.Errorf("build update event for %s failed: %v", seFullName, err)
 			}
+			monitoring.RecordServiceEntryUpdate(SourceName, err == nil)
 		}
 	}
 

@@ -14,7 +14,7 @@ var (
 	EnvoyDubboRouter        = "envoy.filters.dubbo.router"
 
 	EnvoyGenericProxyPrefix = "generic-"
-	EnvoyDubboProxy   = "envoy.filters.network.dubbo_proxy"
+	EnvoyDubboProxy         = "envoy.filters.network.dubbo_proxy"
 )
 
 func init() {
@@ -82,8 +82,8 @@ const (
 	TypeURLEnvoyFilterHTTPRider    = "type.googleapis.com/proxy.filters.http.rider.v3alpha1.FilterConfig"
 	TypeURLStringValue             = "type.googleapis.com/google.protobuf.StringValue"
 	TypeURLUDPATypedStruct         = "type.googleapis.com/udpa.type.v1.TypedStruct"
-	TypeURLEnvoyLocalRateLimit     = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"
-	TypeURLGenericProxyRouteAction = "type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction"
+	TypeURLEnvoyLocalRateLimit     = "type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit"      //nolint: lll
+	TypeURLGenericProxyRouteAction = "type.googleapis.com/envoy.extensions.filters.network.generic_proxy.action.v3.RouteAction" //nolint: lll
 	TypeURLFiterConfig             = "type.googleapis.com/envoy.config.route.v3.FilterConfig"
 	TypeURLConfigEmpty             = "type.googleapis.com/google.protobuf.Empty"
 

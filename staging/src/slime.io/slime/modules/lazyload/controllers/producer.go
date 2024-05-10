@@ -9,10 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"k8s.io/apimachinery/pkg/types"
-
-	"slime.io/slime/modules/lazyload/api/config"
-
 	envoy_config_core "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	data_accesslog "github.com/envoyproxy/go-control-plane/envoy/data/accesslog/v3"
 	prometheusApi "github.com/prometheus/client_golang/api"
@@ -20,10 +16,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
+
 	"slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/metric"
 	"slime.io/slime/framework/model/trigger"
+	"slime.io/slime/modules/lazyload/api/config"
 	lazyloadapiv1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 )
 
@@ -73,7 +72,7 @@ func (r *ServicefenceReconciler) handleWatcherEvent(event trigger.WatcherEvent) 
 }
 
 // call back function for ticker producer
-func (r *ServicefenceReconciler) handleTickerEvent(event trigger.TickerEvent) metric.QueryMap {
+func (r *ServicefenceReconciler) handleTickerEvent(_ trigger.TickerEvent) metric.QueryMap {
 	// no need to check time duration
 
 	// generate query map for producer
@@ -181,6 +180,7 @@ func NewProducerConfig(env bootstrap.Environment, cfg config.Fence) (*metric.Pro
 	return pc, nil
 }
 
+// nolint: lll
 func (r *ServicefenceReconciler) LogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry) (map[string]map[string]string, error) {
 	return accessLogHandler(logEntry, r.ipToSvcCache, r.svcToIpsCache, r.ipTofence, r.fenceToIp, r.cfg.EnableShortDomain)
 }
@@ -243,14 +243,13 @@ func NewCache(env bootstrap.Environment) (map[string]map[string]string, error) {
 }
 
 func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCache *IpToSvcCache,
-	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, fenceToIpCache *FenceToIp, enableShortDomain bool,
+	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, _ *FenceToIp, enableShortDomain bool,
 ) (map[string]map[string]string, error) {
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
 	result := make(map[string]map[string]string)
 	tmpResult := make(map[string]map[string]int)
 
 	for _, entry := range logEntry {
-
 		// fetch sourceEp
 		sourceIp, err := fetchSourceIp(entry)
 		if err != nil {
@@ -321,7 +320,8 @@ func fetchSourceIp(entry *data_accesslog.HTTPAccessLogEntry) (string, error) {
 		log.Debugf("DownstreamDirectRemoteAddress is nil, skip")
 		return "", nil
 	}
-	downstreamSock, ok := entry.CommonProperties.DownstreamDirectRemoteAddress.Address.(*envoy_config_core.Address_SocketAddress)
+	addr := entry.CommonProperties.DownstreamDirectRemoteAddress.Address
+	downstreamSock, ok := addr.(*envoy_config_core.Address_SocketAddress)
 	if !ok {
 		return "", stderrors.New("wrong type of DownstreamDirectRemoteAddress")
 	}
@@ -359,7 +359,13 @@ func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.Namespaced
 	return nil, nil
 }
 
-func spliceDestinationSvc(entry *data_accesslog.HTTPAccessLogEntry, sourceSvcs []string, svcToIpsCache *SvcToIpsCache, fenceNN *types.NamespacedName, enableShortDomain bool) []string {
+func spliceDestinationSvc(
+	entry *data_accesslog.HTTPAccessLogEntry,
+	sourceSvcs []string,
+	svcToIpsCache *SvcToIpsCache,
+	fenceNN *types.NamespacedName,
+	enableShortDomain bool,
+) []string {
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "spliceDestinationSvc")
 	var destSvcs []string
 

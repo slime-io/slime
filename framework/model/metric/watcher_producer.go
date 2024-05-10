@@ -2,6 +2,7 @@ package metric
 
 import (
 	log "github.com/sirupsen/logrus"
+
 	"slime.io/slime/framework/model/trigger"
 )
 
@@ -28,43 +29,42 @@ func NewWatcherProducer(config WatcherProducerConfig, source Source) *WatcherPro
 }
 
 func (p *WatcherProducer) HandleWatcherEvent() {
-	log := log.WithField("reporter", "WatcherProducer").WithField("function", "HandleWatcherEvent")
+	l := log.WithField("reporter", "WatcherProducer").WithField("function", "HandleWatcherEvent")
 	for {
 		select {
 		case <-p.StopChan:
-			log.Infof("watcher producer exited")
+			l.Infof("watcher producer exited")
 			return
 		// handle watcher event
 		case event, ok := <-p.watcherTrigger.EventChan():
 			if !ok {
-				log.Warningf("watcher event channel closed, break process loop")
+				l.Warningf("watcher event channel closed, break process loop")
 				return
 			}
-			log.Debugf("got watcher trigger event")
+			l.Debugf("got watcher trigger event")
 			// reconciler callback
 			queryMap := p.needUpdateMetricHandler(event)
 			if queryMap == nil {
-				log.Debugf("queryMap is nil, finish")
+				l.Debugf("queryMap is nil, finish")
 				continue
 			}
 
 			// get metric
 			metric, err := p.source.QueryMetric(queryMap)
 			if err != nil {
-				log.Errorf("%v", err)
+				l.Errorf("%v", err)
 				continue
 			}
 
 			// produce metric event
 			p.MetricChan <- metric
-
 		}
 	}
 }
 
 func (p *WatcherProducer) Start() {
 	p.watcherTrigger.Start()
-	p.source.Start()
+	_ = p.source.Start()
 }
 
 func (p *WatcherProducer) Stop() {

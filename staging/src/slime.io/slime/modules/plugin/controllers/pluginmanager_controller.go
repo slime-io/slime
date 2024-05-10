@@ -55,7 +55,12 @@ type PluginManagerReconciler struct {
 	leaderCtx            context.Context
 }
 
-func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client, scheme *runtime.Scheme, cfg *config.PluginModule) *PluginManagerReconciler {
+func NewPluginManagerReconciler(
+	env bootstrap.Environment,
+	client client.Client,
+	scheme *runtime.Scheme,
+	cfg *config.PluginModule,
+) *PluginManagerReconciler {
 	return &PluginManagerReconciler{
 		client:               client,
 		scheme:               scheme,
@@ -68,6 +73,7 @@ func NewPluginManagerReconciler(env bootstrap.Environment, client client.Client,
 	}
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=pluginmanagers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io.my.domain,resources=pluginmanagers/status,verbs=get;update;patch
 
@@ -84,10 +90,9 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 		if errors.IsNotFound(err) {
 			// TODO del relevant resource
 			return reconcile.Result{}, nil
-		} else {
-			PluginManagerReconcilesFailed.Increment()
-			return reconcile.Result{}, err
 		}
+		PluginManagerReconcilesFailed.Increment()
+		return reconcile.Result{}, err
 	}
 
 	istioRev := model.IstioRevFromLabel(instance.Labels)
@@ -157,7 +162,10 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	return ctrl.Result{}, nil
 }
 
-func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(cr *v1alpha1.PluginManager, pluginManager *v1alpha1.PluginManagerSpec) *networkingv1alpha3.EnvoyFilter {
+func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(
+	cr *v1alpha1.PluginManager,
+	pluginManager *v1alpha1.PluginManagerSpec,
+) *networkingv1alpha3.EnvoyFilter {
 	out := r.translatePluginManager(cr.ObjectMeta, pluginManager)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
 	if err != nil {
@@ -247,7 +255,10 @@ func (r *PluginManagerReconciler) handleSecretChange() {
 	}
 }
 
-func (r *PluginManagerReconciler) updateWatchSecrets(nn types.NamespacedName, secrets map[types.NamespacedName]struct{}) {
+func (r *PluginManagerReconciler) updateWatchSecrets(
+	nn types.NamespacedName,
+	secrets map[types.NamespacedName]struct{},
+) {
 	r.mut.Lock()
 	defer r.mut.Unlock()
 
