@@ -101,7 +101,7 @@ func (m *Source) SourceClusterHandler() func(*kubernetes.Clientset) {
 	return f
 }
 
-func (m *Source) subscribe(key string, value interface{}) {
+func (m *Source) subscribe(key string, _ interface{}) {
 	if name, ns, ok := util.IsK8SService(key); ok {
 		m.Get(types.NamespacedName{Namespace: ns, Name: name})
 	}

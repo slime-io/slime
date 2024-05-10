@@ -21,7 +21,11 @@ type controller struct {
 	informer cache.Controller
 }
 
-func NewController(indexer cache.Indexer, queue workqueue.RateLimitingInterface, informer cache.Controller) *controller {
+func NewController(
+	indexer cache.Indexer,
+	queue workqueue.RateLimitingInterface,
+	informer cache.Controller,
+) *controller {
 	return &controller{
 		indexer:  indexer,
 		queue:    queue,
@@ -109,7 +113,7 @@ func convertToConfigMap(obj interface{}) (*corev1.ConfigMap, error) {
 
 func extractWormholePorts(rawCfg string) map[int]struct{} {
 	log.Debugf("ExtractWormholePorts with rawCfg: %q", rawCfg)
-	var ctr = struct {
+	ctr := struct {
 		WormholePorts []int
 	}{}
 	err := yaml.Unmarshal([]byte(rawCfg), &ctr)
@@ -117,7 +121,7 @@ func extractWormholePorts(rawCfg string) map[int]struct{} {
 		log.Warnf("Unmarshal %s falied: %v", rawCfg, err)
 		return nil
 	}
-	var ret = map[int]struct{}{}
+	ret := map[int]struct{}{}
 	for _, port := range ctr.WormholePorts {
 		ret[port] = struct{}{}
 	}

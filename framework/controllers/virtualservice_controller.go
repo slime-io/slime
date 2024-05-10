@@ -38,6 +38,7 @@ type VirtualServiceReconciler struct {
 	Env    *bootstrap.Environment
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.istio.io,resources=virtualservices/status,verbs=get;update;patch
 
@@ -51,10 +52,9 @@ func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request
 			// TODO del event not handled. should re-calc the data accordingly
 			log.Infof("virtualService is deleted")
 			return reconcile.Result{}, nil
-		} else {
-			log.Errorf("get virtualService error, %+v", err)
-			return reconcile.Result{}, err
 		}
+		log.Errorf("get virtualService error, %+v", err)
+		return reconcile.Result{}, err
 	}
 
 	istioRev := model.IstioRevFromLabel(instance.Labels)

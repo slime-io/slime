@@ -1,7 +1,6 @@
 package metric
 
 import (
-	"fmt"
 	"net"
 	"strings"
 
@@ -51,7 +50,7 @@ func (s *AccessLogSource) StreamAccessLogs(logServer service_accesslog.AccessLog
 // Start grpc server
 func (s *AccessLogSource) Start() error {
 	log := log.WithField("reporter", "AccessLogSource").WithField("function", "Start")
-	lis, err := net.Listen("tcp", fmt.Sprintf("%s", s.servePort))
+	lis, err := net.Listen("tcp", s.servePort)
 	if err != nil {
 		return err
 	}
@@ -92,7 +91,6 @@ func (s *AccessLogSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 				log.Debugf("%s add metric from accesslog %+v", meta, result)
 			}
 		}
-
 	}
 
 	log.Debugf("successfully get metric from accesslog")
@@ -107,7 +105,7 @@ func (s *AccessLogSource) Reset(info string) error {
 		convertor.convertorLock.Lock()
 
 		// reset ns/name
-		for k, _ := range convertor.cacheResult {
+		for k := range convertor.cacheResult {
 			// it will reset all svf in ns if svc is empty
 			if name == "" {
 				if ns == strings.Split(k, "/")[0] {
@@ -138,7 +136,6 @@ func (s *AccessLogSource) Reset(info string) error {
 }
 
 func (s *AccessLogSource) Fullfill(cache map[string]map[string]string) error {
-
 	for _, convertor := range s.convertors {
 		convertor.convertorLock.Lock()
 		for meta, value := range cache {

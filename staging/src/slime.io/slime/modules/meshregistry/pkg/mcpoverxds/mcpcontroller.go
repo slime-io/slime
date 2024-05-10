@@ -69,18 +69,15 @@ func NewController(args *bootstrap.RegistryArgs) (*McpController, error) {
 		},
 		ServerUrl: args.Mcp.ServerUrl,
 	})
-
 	if err != nil {
 		return nil, fmt.Errorf("new xds server with url %s met err %v", args.Mcp.ServerUrl, err)
-	} else {
-		impl.mcpServer = svr
 	}
-
+	impl.mcpServer = svr
 	impl.ctx, impl.cancel = context.WithCancel(context.Background())
 	return impl, nil
 }
 
-func (c *McpController) HandleClientsInfo(w http.ResponseWriter, r *http.Request) {
+func (c *McpController) HandleClientsInfo(w http.ResponseWriter, _ *http.Request) {
 	b, err := json.MarshalIndent(c.mcpServer.ClientsInfo(), "", "  ")
 	if err != nil {
 		_, _ = fmt.Fprintf(w, "unable to marshal node cahce se cache: %v", err)
@@ -101,20 +98,20 @@ func (c *McpController) HandleClientsInfo(w http.ResponseWriter, r *http.Request
 //	k8sRsc: whether to convert config to k8s resource format obj
 func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 	const (
-		LayoutGroupByGvk = "gvk"   // map[typeUrl][]config
-		LayoutList       = "list"  // []config
-		LayoutPlain      = "plain" // config <separator> config ... . Use `\n---\n` for yaml format
+		layoutGroupByGvk = "gvk"   // map[typeUrl][]config
+		layoutList       = "list"  // []config
+		layoutPlain      = "plain" // config <separator> config ... . Use `\n---\n` for yaml format
 
-		FormatYaml = "yaml"
-		FormatJson = "json"
+		formatYaml = "yaml"
+		formatJson = "json"
 	)
 
 	var (
-		format = FormatJson
-		layout = LayoutGroupByGvk
+		format = formatJson
+		layout = layoutGroupByGvk
 
 		serializers = map[string]func(interface{}, *bytes.Buffer) error{
-			FormatYaml: func(data interface{}, buf *bytes.Buffer) error {
+			formatYaml: func(data interface{}, buf *bytes.Buffer) error {
 				bs, err := yaml.Marshal(data)
 				if err != nil {
 					return err
@@ -124,7 +121,7 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 				}
 				return nil
 			},
-			FormatJson: func(data interface{}, buf *bytes.Buffer) error {
+			formatJson: func(data interface{}, buf *bytes.Buffer) error {
 				bs, err := json.MarshalIndent(data, "", "  ")
 				if err != nil {
 					return err
@@ -240,9 +237,9 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 	)
 
 	switch layout {
-	case LayoutList:
+	case layoutList:
 		data = convertConfigs(configs)
-	case LayoutPlain:
+	case layoutPlain:
 		prevSer := ser
 		ser = func(data interface{}, buffer *bytes.Buffer) error {
 			listData, ok := data.([]interface{})
@@ -258,7 +255,7 @@ func (c *McpController) HandleXdsCache(w http.ResponseWriter, r *http.Request) {
 			return nil
 		}
 		data = convertConfigs(configs)
-	case LayoutGroupByGvk:
+	case layoutGroupByGvk:
 		gvkConfigs := map[string][]interface{}{}
 		for _, config := range configs {
 			typeUrl := config.GroupVersionKind.String()

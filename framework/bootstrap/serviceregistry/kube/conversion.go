@@ -2,13 +2,14 @@ package kube
 
 import (
 	"fmt"
-	"slime.io/slime/framework/bootstrap/viewstore"
 	"strings"
 	"time"
 
-	"k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
+
 	"slime.io/slime/framework/bootstrap/resource"
 	"slime.io/slime/framework/bootstrap/serviceregistry/model"
+	"slime.io/slime/framework/bootstrap/viewstore"
 )
 
 const (
@@ -32,9 +33,8 @@ var (
 )
 
 func ConvertSvcAndEps(cfg resource.Config, vs viewstore.ViewerStore) (*model.Service, []*model.IstioEndpoint, error) {
-
 	// prepare service
-	svc := cfg.Spec.(*v1.Service)
+	svc := cfg.Spec.(*corev1.Service)
 
 	// prepare endpoint
 	var endpoint *resource.Config
@@ -52,15 +52,15 @@ func ConvertSvcAndEps(cfg resource.Config, vs viewstore.ViewerStore) (*model.Ser
 	if !gotEndpoint {
 		return nil, nil, fmt.Errorf("failed to get related endpoint: %s/%s", cfg.Namespace, cfg.Name)
 	}
-	ep := (*endpoint).Spec.(*v1.Endpoints)
+	ep := endpoint.Spec.(*corev1.Endpoints)
 
 	addr := model.UnspecifiedIP
-	if svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != v1.ClusterIPNone {
+	if svc.Spec.ClusterIP != "" && svc.Spec.ClusterIP != corev1.ClusterIPNone {
 		addr = svc.Spec.ClusterIP
 	}
 
 	var labelSelectors map[string]string
-	if svc.Spec.ClusterIP != v1.ClusterIPNone && svc.Spec.Type != v1.ServiceTypeExternalName {
+	if svc.Spec.ClusterIP != corev1.ClusterIPNone && svc.Spec.Type != corev1.ServiceTypeExternalName {
 		labelSelectors = svc.Spec.Selector
 	}
 
@@ -97,8 +97,9 @@ func ConvertSvcAndEps(cfg resource.Config, vs viewstore.ViewerStore) (*model.Ser
 }
 
 // ConvertIstioEndpoints transforms endpoints config to a list of IstioEndpoints.
-func ConvertIstioEndpoints(ep *v1.Endpoints, host model.Name, svcName, svcNamespace string,
-	vs viewstore.ViewerStore) ([]*model.IstioEndpoint, error) {
+func ConvertIstioEndpoints(ep *corev1.Endpoints, host model.Name, svcName, svcNamespace string,
+	vs viewstore.ViewerStore,
+) ([]*model.IstioEndpoint, error) {
 	out := make([]*model.IstioEndpoint, 0)
 
 	// prepare pods
@@ -136,20 +137,20 @@ func ConvertIstioEndpoints(ep *v1.Endpoints, host model.Name, svcName, svcNamesp
 	return out, nil
 }
 
-func generatePods(vs viewstore.ViewerStore) ([]*v1.Pod, error) {
+func generatePods(vs viewstore.ViewerStore) ([]*corev1.Pod, error) {
 	podCfgs, err := vs.List(resource.Pod, "")
 	if err != nil {
 		return nil, fmt.Errorf("list pods from view store error: %v", err)
 	}
-	var pods []*v1.Pod
+	var pods []*corev1.Pod
 	for _, c := range podCfgs {
-		pod := c.Spec.(*v1.Pod)
+		pod := c.Spec.(*corev1.Pod)
 		pods = append(pods, pod)
 	}
 	return pods, nil
 }
 
-func getPodByIP(ip string, pods []*v1.Pod) *v1.Pod {
+func getPodByIP(ip string, pods []*corev1.Pod) *corev1.Pod {
 	for _, pod := range pods {
 		if ip == pod.Status.PodIP {
 			return pod
@@ -158,7 +159,7 @@ func getPodByIP(ip string, pods []*v1.Pod) *v1.Pod {
 	return nil
 }
 
-func convertPort(port v1.ServicePort) *model.Port {
+func convertPort(port corev1.ServicePort) *model.Port {
 	return &model.Port{
 		Name:     port.Name,
 		Port:     int(port.Port),
@@ -166,8 +167,8 @@ func convertPort(port v1.ServicePort) *model.Port {
 	}
 }
 
-func convertProtocol(port int32, portName string, proto v1.Protocol) model.Instance {
-	if proto == v1.ProtocolUDP {
+func convertProtocol(port int32, portName string, proto corev1.Protocol) model.Instance {
+	if proto == corev1.ProtocolUDP {
 		return model.UDP
 	}
 

@@ -143,7 +143,7 @@ func (p *Processing) Start() (err error) {
 	return nil
 }
 
-func (p *Processing) startXdsOverMcp(mcpController *mcpoverxds.McpController, startWG *sync.WaitGroup) {
+func (p *Processing) startXdsOverMcp(mcpController *mcpoverxds.McpController, _ *sync.WaitGroup) {
 	var prevReady bool
 	p.httpServer.lock.Lock()
 	prevReady, p.httpServer.xdsReady = p.httpServer.xdsReady, true
@@ -174,7 +174,11 @@ func (p *Processing) getDeployKubeClient() (k kubernetes.Interface, err error) {
 	return p.getKubeClient(p.regArgs.K8S.KubeRestConfig, p.regArgs.K8S.ApiServerUrlForDeploy, p.regArgs.K8S.KubeConfig)
 }
 
-func (p *Processing) getKubeClient(config *rest.Config, masterUrl, kubeconfigPath string) (k kubernetes.Interface, err error) {
+func (p *Processing) getKubeClient(
+	config *rest.Config,
+	masterUrl string,
+	kubeconfigPath string,
+) (k kubernetes.Interface, err error) {
 	if config == nil {
 		config, err = clientcmd.BuildConfigFromFlags(masterUrl, kubeconfigPath)
 		if err != nil {
@@ -221,7 +225,8 @@ func (p *Processing) initMulticluster() func() {
 		return nil
 	}
 
-	controller := multicluster.NewController(k, p.regArgs.K8S.ClusterRegistriesNamespace, time.Duration(p.regArgs.ResyncPeriod), p.localCLusterID)
+	watchedNs, localClusterID := p.regArgs.K8S.ClusterRegistriesNamespace, p.localCLusterID
+	controller := multicluster.NewController(k, watchedNs, localClusterID, time.Duration(p.regArgs.ResyncPeriod))
 	if controller != nil {
 		controller.AddHandler(utilcache.K8sPodCaches)
 		controller.AddHandler(utilcache.K8sNodeCaches)
@@ -248,7 +253,7 @@ func (p *Processing) initMulticluster() func() {
 	}
 }
 
-func (p *Processing) cacheRegArgs(w http.ResponseWriter, r *http.Request) {
+func (p *Processing) cacheRegArgs(w http.ResponseWriter, _ *http.Request) {
 	regArgs := p.regArgs
 	b, err := json.MarshalIndent(regArgs, "", "  ")
 	if err != nil {

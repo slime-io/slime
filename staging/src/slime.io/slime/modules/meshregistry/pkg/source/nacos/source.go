@@ -113,7 +113,8 @@ func New(
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false,
+				fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -161,7 +162,7 @@ func New(
 		src.initWg.Add(1)
 	}
 
-	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors) //nolint: lll
 	src.serviceHostAliases = generateServiceHostAliases(args.ServiceHostAliases)
 	src.seMetaModifierFactory = generateSeMetaModifierFactory(args.ServiceAdditionalMetas)
 	src.reGroupInstances = reGroupInstances(args.InstanceMetaRelabel, args.ServiceNaming)
@@ -195,11 +196,12 @@ func generateInstanceFilter(
 	emptySelectorsReturn bool,
 	alwaysUseSourceScopedEpSelectors bool,
 ) func(*instance) bool {
+	withEmptySelectorsReturnOpt := source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn)
 	cfgs := make(map[string]source.HookConfig, len(svcSel))
 	for svc, selectors := range svcSel {
-		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, withEmptySelectorsReturnOpt)
 	}
-	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, withEmptySelectorsReturnOpt)
 	hookStore := source.NewHookStore(cfgs)
 	return func(i *instance) bool {
 		param := source.NewHookParam(source.HookParamWithLabels(i.Metadata))
@@ -227,7 +229,8 @@ func generateServiceHostAliases(hostAliases []*bootstrap.ServiceHostAlias) map[s
 	return nil
 }
 
-func generateSeMetaModifierFactory(additionalMetas map[string]*bootstrap.MetadataWrapper) func(string) func(*resource.Metadata) {
+func generateSeMetaModifierFactory(additionalMetas map[string]*bootstrap.MetadataWrapper,
+) func(string) func(*resource.Metadata) {
 	return func(s string) func(*resource.Metadata) {
 		additionalMeta, exist := additionalMetas[s]
 		if !exist || additionalMeta == nil {
@@ -279,7 +282,7 @@ func (s *Source) onConfig(args *bootstrap.NacosSourceArgs) {
 	s.mut.Lock()
 	if !reflect.DeepEqual(prevArgs.EndpointSelectors, args.EndpointSelectors) ||
 		!reflect.DeepEqual(prevArgs.ServicedEndpointSelectors, args.ServicedEndpointSelectors) {
-		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+		newInstSel := generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors) //nolint: lll
 		s.instanceFilter = newInstSel
 	}
 
@@ -343,7 +346,13 @@ func (s *Source) cacheJson(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, seFullName, resourceNs string, metaModifier func(meta *resource.Metadata)) (event.Event, error) {
+func buildEvent(
+	kind event.Kind,
+	item *networkingapi.ServiceEntry,
+	seFullName string,
+	resourceNs string,
+	metaModifier func(meta *resource.Metadata),
+) (event.Event, error) {
 	se := util.CopySe(item)
 	items := strings.Split(seFullName, ".")
 	ns := resourceNs
@@ -426,12 +435,15 @@ func printEps(eps []*networkingapi.WorkloadEntry) string {
 	return strings.Join(ips, ",")
 }
 
-func reGroupInstances(rl *bootstrap.InstanceMetaRelabel, c *bootstrap.ServiceNameConverter) func(in []*instanceResp) []*instanceResp {
+func reGroupInstances(
+	rl *bootstrap.InstanceMetaRelabel,
+	c *bootstrap.ServiceNameConverter,
+) func(in []*instanceResp) []*instanceResp {
 	if rl == nil && c == nil {
 		return nil
 	}
 
-	var instanceRelabel func(inst *instance) = func(inst *instance) { /*do nothing*/ }
+	instanceRelabel := func(inst *instance) { /*do nothing*/ }
 	if rl != nil {
 		instanceMetaModifier := source.BuildInstanceMetaModifier(rl)
 		instanceRelabel = func(inst *instance) {
@@ -442,7 +454,7 @@ func reGroupInstances(rl *bootstrap.InstanceMetaRelabel, c *bootstrap.ServiceNam
 		}
 	}
 
-	var instanceDom func(inst *instance) string = func(inst *instance) string { return inst.ServiceName }
+	instanceDom := func(inst *instance) string { return inst.ServiceName }
 	if c != nil {
 		var substrFuncs []func(inst *instance) string
 		for _, item := range c.Items {

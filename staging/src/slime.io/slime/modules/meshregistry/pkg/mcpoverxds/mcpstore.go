@@ -27,7 +27,12 @@ func strNow() string {
 	return time.Now().String()
 }
 
-func (s *McpConfigStore) Update(ns string, gvk resource.GroupVersionKind, name string, config *mcpmodel.Config) (revChanged bool) {
+func (s *McpConfigStore) Update(
+	ns string,
+	gvk resource.GroupVersionKind,
+	name string,
+	config *mcpmodel.Config,
+) (revChanged bool) {
 	var prev *mcpmodel.Config
 
 	s.Lock()
@@ -100,11 +105,11 @@ func (s *McpConfigStore) Version(ns string) string {
 	return ret
 }
 
-func (s *McpConfigStore) Get(gvk resource.GroupVersionKind, namespace, name string) (*mcpmodel.Config, error) {
+func (s *McpConfigStore) Get(gvk resource.GroupVersionKind, ns, name string) (*mcpmodel.Config, error) {
 	s.RLock()
 	defer s.RUnlock()
 
-	cfg := s.snaps[namespace][gvk][name]
+	cfg := s.snaps[ns][gvk][name]
 	if cfg == nil {
 		return nil, nil
 	}
@@ -113,7 +118,7 @@ func (s *McpConfigStore) Get(gvk resource.GroupVersionKind, namespace, name stri
 	return &cfgCopy, nil
 }
 
-func (s *McpConfigStore) List(gvk resource.GroupVersionKind, namespace, ver string) ([]mcpmodel.Config, string, error) {
+func (s *McpConfigStore) List(gvk resource.GroupVersionKind, ns, ver string) ([]mcpmodel.Config, string, error) {
 	var (
 		ret    []mcpmodel.Config
 		retVer string
@@ -123,9 +128,9 @@ func (s *McpConfigStore) List(gvk resource.GroupVersionKind, namespace, ver stri
 	defer s.RUnlock()
 
 	snaps := s.snaps
-	if namespace != resource.AllNamespace {
+	if ns != resource.AllNamespace {
 		snaps = map[string]map[resource.GroupVersionKind]map[string]*mcpmodel.Config{
-			namespace: snaps[namespace],
+			ns: snaps[ns],
 		}
 	}
 
@@ -178,9 +183,8 @@ func (s *McpConfigStore) Print(ns string, gvk resource.GroupVersionKind, name st
 			for resName, conf := range gvkConfigs {
 				if name != "" && resName != name {
 					continue
-				} else {
-					res[gvk] = append(res[gvk], conf)
 				}
+				res[gvk] = append(res[gvk], conf)
 			}
 		}
 	}
@@ -193,11 +197,11 @@ func (s *McpConfigStore) Print(ns string, gvk resource.GroupVersionKind, name st
 	return res1
 }
 
-func (s *McpConfigStore) Snapshot(ns string) mcpmodel.ConfigSnapshot {
+func (s *McpConfigStore) Snapshot(_ string) mcpmodel.ConfigSnapshot {
 	return nil
 }
 
-func (s *McpConfigStore) VersionSnapshot(version, ns string) mcpmodel.ConfigSnapshot {
+func (s *McpConfigStore) VersionSnapshot(_, _ string) mcpmodel.ConfigSnapshot {
 	// TODO
 	return nil
 }
@@ -212,7 +216,9 @@ func (s *McpConfigStore) dumpGvkResourceVersions() map[resource.GroupVersionKind
 	return ret
 }
 
-func (s *McpConfigStore) ClearZombie(gvkMinVers map[resource.GroupVersionKind]string) map[resource.GroupVersionKind]int {
+func (s *McpConfigStore) ClearZombie(
+	gvkMinVers map[resource.GroupVersionKind]string,
+) map[resource.GroupVersionKind]int {
 	cnt := map[resource.GroupVersionKind]int{}
 	s.Lock()
 	defer s.Unlock()

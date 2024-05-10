@@ -26,16 +26,6 @@ type ServiceFenceList struct {
 	Items           []ServiceFence `json:"items"`
 }
 
-// GetSpec from a wrapper
-func (in *ServiceFence) GetSpec() map[string]interface{} {
-	return nil
-}
-
-// GetObjectMeta from a wrapper
-func (in *ServiceFence) GetObjectMeta() metav1.ObjectMeta {
-	return in.ObjectMeta
-}
-
 func init() {
 	SchemeBuilder.Register(&ServiceFence{}, &ServiceFenceList{})
 }

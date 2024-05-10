@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"time"
 )
 
 func startSvcCache(ctx context.Context) error {
@@ -48,7 +49,7 @@ func startSvcCache(ctx context.Context) error {
 	return nil
 }
 
-func handleSvcUpdate(old, obj interface{}) {
+func handleSvcUpdate(_, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
 		return

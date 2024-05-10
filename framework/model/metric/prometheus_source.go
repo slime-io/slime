@@ -2,7 +2,6 @@ package metric
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -45,11 +44,13 @@ func (ps *PrometheusSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 		for _, handler := range handlers {
 			queryValue, w, e := ps.api.Query(context.Background(), handler.Query, time.Now())
 			if e != nil {
-				log.Debugf("failed get metric from prometheus, name: %s, query: %s, error: %+v", handler.Name, handler.Query, e)
-				return nil, errors.New(fmt.Sprintf("failed to get metric from prometheus, error: %+v", e))
+				log.Debugf("failed get metric from prometheus, name: %s, query: %s, error: %+v",
+					handler.Name, handler.Query, e)
+				return nil, fmt.Errorf("failed to get metric from prometheus, error: %+v", e)
 			} else if w != nil {
-				log.Debugf("failed get metric from prometheus, name: %s, query: %s, warning: %s", handler.Name, handler.Query, strings.Join(w, ";"))
-				return nil, errors.New(fmt.Sprintf("failed to get metric from prometheus, warning: %s", strings.Join(w, ";")))
+				log.Debugf("failed get metric from prometheus, name: %s, query: %s, warning: %s",
+					handler.Name, handler.Query, strings.Join(w, ";"))
+				return nil, fmt.Errorf("failed to get metric from prometheus, warning: %s", strings.Join(w, ";"))
 			}
 			result := Result{
 				Name:  handler.Name,
@@ -57,17 +58,16 @@ func (ps *PrometheusSource) QueryMetric(queryMap QueryMap) (Metric, error) {
 			}
 			metric[meta] = append(metric[meta], result)
 		}
-
 	}
 	log.Debugf("successfully get metric from prometheus")
 	return metric, nil
 }
 
-func (ps *PrometheusSource) Reset(info string) error {
+func (ps *PrometheusSource) Reset(_ string) error {
 	return nil
 }
 
-func (ps *PrometheusSource) Fullfill(cache map[string]map[string]string) error {
+func (ps *PrometheusSource) Fullfill(_ map[string]map[string]string) error {
 	return nil
 }
 
@@ -88,7 +88,7 @@ func defaultConvertor(qv prometheusModel.Value) map[string]string {
 		for _, sampleStream := range matrix {
 			v := ""
 			for _, sp := range sampleStream.Values {
-				v = v + sp.String()
+				v += sp.String()
 			}
 			result[sampleStream.Metric.String()] = v
 		}

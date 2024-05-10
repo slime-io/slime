@@ -131,7 +131,11 @@ func (hs *HttpServer) SourceRegistry(registry string) {
 	hs.sourceReady = false
 }
 
-func (hs *HttpServer) ListenerRegistry(mcpController *mcpoverxds.McpController, startWG *sync.WaitGroup, sourceReadyCallback func(*mcpoverxds.McpController, *sync.WaitGroup)) {
+func (hs *HttpServer) ListenerRegistry(
+	mcpController *mcpoverxds.McpController,
+	startWG *sync.WaitGroup,
+	sourceReadyCallback func(*mcpoverxds.McpController, *sync.WaitGroup),
+) {
 	hs.lock.Lock()
 	defer hs.lock.Unlock()
 	hs.mcpController = mcpController

@@ -2,10 +2,12 @@ package bootstrap
 
 import (
 	"errors"
+	"sync"
+
 	log "github.com/sirupsen/logrus"
+
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap/resource"
-	"sync"
 )
 
 type monitorController struct {
@@ -39,7 +41,10 @@ func (c *monitorController) SetReady() {
 	c.Unlock()
 }
 
-func (c *monitorController) RegisterEventHandler(kind resource.GroupVersionKind, f func(resource.Config, resource.Config, Event)) {
+func (c *monitorController) RegisterEventHandler(
+	kind resource.GroupVersionKind,
+	f func(resource.Config, resource.Config, Event),
+) {
 	c.monitor.AppendEventHandler(kind, f)
 }
 

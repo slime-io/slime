@@ -53,7 +53,9 @@ func NewServiceEntryMergePortMocker(
 }
 
 // SetDispatcher should be called before `Run`
-func (m *ServiceEntryMergePortMocker) SetDispatcher(dispatcher func(meta resource.Metadata, item *networkingapi.ServiceEntry)) {
+func (m *ServiceEntryMergePortMocker) SetDispatcher(
+	dispatcher func(meta resource.Metadata, item *networkingapi.ServiceEntry),
+) {
 	m.dispatcher = dispatcher
 }
 
@@ -80,7 +82,10 @@ func (m *ServiceEntryMergePortMocker) Refresh() {
 			lbls[k] = v
 		}
 		meta := resource.Metadata{
-			FullName:    resource.FullName{Namespace: resource.Namespace(m.resourceNs), Name: resource.LocalName(m.resourceName)},
+			FullName: resource.FullName{
+				Namespace: resource.Namespace(m.resourceNs),
+				Name:      resource.LocalName(m.resourceName),
+			},
 			CreateTime:  now,
 			Version:     resource.Version(now.String()),
 			Labels:      lbls,

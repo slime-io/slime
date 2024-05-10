@@ -71,7 +71,11 @@ func ConvertServiceEntryMap(apps []*application, opts *convertOptions) (map[stri
 	return seMap, nil
 }
 
-func convertServiceEntry(app *application, projectCode string, opts *convertOptions) map[string]*networkingapi.ServiceEntry {
+func convertServiceEntry(
+	app *application,
+	projectCode string,
+	opts *convertOptions,
+) map[string]*networkingapi.ServiceEntry {
 	nsEndpoints, nsSvcPorts, nsUseDnsMap := convertEndpointsWithNs(app.Instances, projectCode, opts)
 	if len(nsEndpoints) == 0 {
 		return nil

@@ -56,7 +56,7 @@ type catalogServiceListResp struct {
 
 type nacosMetadata map[string]string
 
-type instance struct { // nolint: maligned
+type instance struct {
 	Ip          string        `json:"ip"`
 	Port        int           `json:"port"`
 	Healthy     bool          `json:"healthy"`
@@ -201,7 +201,7 @@ func encodeQuery(param map[string]string) string {
 	return enc.Encode()
 }
 
-func (c *client) call(api string, method string, header map[string]string, queryParam map[string]string, body io.Reader) ([]byte, error) {
+func (c *client) call(api, method string, header, queryParam map[string]string, body io.Reader) ([]byte, error) {
 	query := encodeQuery(queryParam)
 	appendUrl := func(url string) string {
 		if query == "" {
@@ -249,7 +249,7 @@ func (c *client) doCall(url string, method string, header map[string]string, bod
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close() // nolint: errcheck
+	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		errMsg, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("unexpected status code %q when request to nacos: %s", resp.Status, string(errMsg))
@@ -441,7 +441,8 @@ func (c *client) namespacedInstances(namespaceId string) (map[string][]*instance
 	for _, svc := range svcs {
 		instances, err := c.listInstances(namespaceId, svc.GroupName, svc.Name)
 		if err != nil {
-			log.Warnf("list instances of service %q in namespace %q group %q failed: %s", namespaceId, svc.GroupName, svc.Name, err)
+			log.Warnf("list instances of service %q in namespace %q group %q failed: %s",
+				namespaceId, svc.GroupName, svc.Name, err)
 			// try best
 			continue
 		}

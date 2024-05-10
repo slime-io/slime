@@ -3,7 +3,6 @@ package common
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"text/template"
 
@@ -63,7 +62,7 @@ func initReg() RegistryList {
 		return registry
 	}
 
-	fileContent, err := ioutil.ReadFile(repoList)
+	fileContent, err := os.ReadFile(repoList)
 	if err != nil {
 		panic(fmt.Errorf("Error reading '%v' file contents: %v", repoList, err))
 	}

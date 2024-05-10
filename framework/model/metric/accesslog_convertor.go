@@ -40,7 +40,7 @@ func (alc *AccessLogConvertor) CacheResultCopy() map[string]map[string]string {
 }
 
 func (alc *AccessLogConvertor) Convert(logEntry []*data_accesslog.HTTPAccessLogEntry) error {
-	log := log.WithField("reporter", "AccessLogConvertor").WithField("function", "Convert")
+	l := log.WithField("reporter", "AccessLogConvertor").WithField("function", "Convert")
 	tmpResult, err := alc.handler(logEntry)
 	if err != nil {
 		return err
@@ -56,10 +56,9 @@ func (alc *AccessLogConvertor) Convert(logEntry []*data_accesslog.HTTPAccessLogE
 	needUpdate := false
 	// merge result, copy on write
 	for meta, value := range tmpResult {
-
 		if _, ok := alc.cacheResult[meta]; !ok {
 			// new meta
-			log.Debugf("alc.cacheResult[%s] is not ok, inits", meta)
+			l.Debugf("alc.cacheResult[%s] is not ok, inits", meta)
 			needUpdate = true
 			alc.cacheResult[meta] = value
 			continue
@@ -69,7 +68,6 @@ func (alc *AccessLogConvertor) Convert(logEntry []*data_accesslog.HTTPAccessLogE
 		if updated := valueMerge(alc.cacheResult[meta], value); updated {
 			needUpdate = updated
 		}
-
 	}
 
 	if needUpdate {

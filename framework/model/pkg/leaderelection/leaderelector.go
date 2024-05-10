@@ -2,8 +2,9 @@ package leaderelection
 
 import (
 	"context"
-	log "github.com/sirupsen/logrus"
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // LeaderCallbacks is used to register callback functions

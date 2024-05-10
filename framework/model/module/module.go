@@ -42,11 +42,6 @@ type moduleConfig struct {
 	config *bootconfig.Config
 }
 
-type configH struct {
-	config      *bootconfig.Config
-	generalJson []byte
-}
-
 // ModuleOptions carries the framework context for setting a module.
 // For fields marked with REQUIRED, the framework will ensure their existence,
 // and the module can be used directly.
@@ -55,6 +50,7 @@ type configH struct {
 // The framework will close the LeaderElection and ends the process after
 // the Manager exits. Therefore, when implementing a module, the scenario of
 // becoming the leader again may not be considered.
+// nolint: revive
 type ModuleOptions struct {
 	// Env is the common environment context used by the module.
 	// REQUIRED
@@ -144,7 +140,11 @@ func (rm *moduleReadyManager) check() error {
 	return errors.New(buf.String())
 }
 
-func LoadModule(name string, modGetter func(modCfg *bootconfig.Config) Module, bundleConfig *bootconfig.Config) (Module, *bootstrap.ParsedModuleConfig, error) {
+func LoadModule(
+	name string,
+	modGetter func(modCfg *bootconfig.Config) Module,
+	bundleConfig *bootconfig.Config,
+) (Module, *bootstrap.ParsedModuleConfig, error) {
 	pmCfg, err := bootstrap.GetModuleConfig(name)
 	if err != nil {
 		return nil, nil, err
@@ -158,7 +158,11 @@ func LoadModule(name string, modGetter func(modCfg *bootconfig.Config) Module, b
 	return mod, pmCfg, nil
 }
 
-func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(modCfg *bootconfig.Config) Module, bundleConfig *bootconfig.Config) (Module, error) {
+func LoadModuleFromConfig(
+	pmCfg *bootstrap.ParsedModuleConfig,
+	modGetter func(modCfg *bootconfig.Config) Module,
+	bundleConfig *bootconfig.Config,
+) (Module, error) {
 	mod := modGetter(pmCfg.Config)
 	modCfg := pmCfg.Config
 	if modCfg.Bundle != nil || mod == nil {
@@ -199,7 +203,7 @@ func LoadModuleFromConfig(pmCfg *bootstrap.ParsedModuleConfig, modGetter func(mo
 }
 
 func fatal() {
-	os.Exit(1)
+	os.Exit(1) //nolint: revive
 }
 
 func Main(bundle string, modules []Module) {
@@ -298,7 +302,7 @@ func Main(bundle string, modules []Module) {
 	if mainModConfig.Global != nil && mainModConfig.Global.GetMasterUrl() != "" {
 		if conf, err = clientcmd.BuildConfigFromFlags(mainModConfig.Global.GetMasterUrl(), ""); err != nil {
 			log.Errorf("unable to build rest client by %s", mainModConfig.Global.GetMasterUrl())
-			os.Exit(1)
+			fatal()
 		}
 	} else {
 		conf = ctrl.GetConfigOrDie()
@@ -312,7 +316,6 @@ func Main(bundle string, modules []Module) {
 
 	// setup for leaderelection
 	if mainModConfig.Global.Misc["enableLeaderElection"] == "on" {
-
 		deployRev := mainModConfig.Global.GetDeployRev()
 		if deployRev != "" {
 			bundle = fmt.Sprintf("%s-%s", bundle, deployRev)
@@ -341,13 +344,13 @@ func Main(bundle string, modules []Module) {
 	clientSet, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("create a new clientSet failed, %+v", err)
-		os.Exit(1)
+		fatal()
 	}
 
 	dynamicClient, err := dynamic.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		log.Errorf("create a new dynamic client failed, %+v", err)
-		os.Exit(1)
+		fatal()
 	}
 
 	var startups []func(ctx context.Context)
@@ -378,6 +381,7 @@ func Main(bundle string, modules []Module) {
 
 	var once sync.Once
 	ctx, cancel := context.WithCancel(ctrl.SetupSignalHandler())
+	defer once.Do(cancel)
 
 	// init ConfigController
 	var configController, istioConfigController bootstrap.ConfigController
@@ -391,7 +395,8 @@ func Main(bundle string, modules []Module) {
 	}
 
 	if mainModConfig.GetGlobal() != nil && mainModConfig.GetGlobal().IstioConfigSource != nil {
-		istioConfigController, err = bootstrap.NewConfigController([]*bootconfig.ConfigSource{mainModConfig.GetGlobal().IstioConfigSource}, ctx.Done())
+		istioConfigController, err = bootstrap.NewConfigController(
+			[]*bootconfig.ConfigSource{mainModConfig.GetGlobal().IstioConfigSource}, ctx.Done())
 		if err != nil {
 			log.Warnf("new IstioConfigController error: %+v", err)
 			istioConfigController = nil
@@ -449,7 +454,7 @@ func Main(bundle string, modules []Module) {
 
 	// run ConfigController
 	if configController != nil {
-		configController, err = bootstrap.RunController(configController, mainModConfig, mgr.GetConfig())
+		_, err = bootstrap.RunController(configController, mainModConfig, mgr.GetConfig())
 		if err != nil {
 			log.Errorf("run config controller failed: %s", err)
 			return
@@ -457,7 +462,7 @@ func Main(bundle string, modules []Module) {
 	}
 
 	if istioConfigController != nil {
-		istioConfigController, err = bootstrap.RunIstioController(istioConfigController, mainModConfig)
+		_, err = bootstrap.RunIstioController(istioConfigController, mainModConfig)
 		if err != nil {
 			log.Errorf("run config controller failed: %s", err)
 			return
@@ -467,12 +472,13 @@ func Main(bundle string, modules []Module) {
 	// Create the Prometheus exporter.
 	pe, err := monitoring.NewExporter()
 	if err != nil {
-		log.Fatalf("Failed to create the Prometheus stats exporter: %v", err)
+		log.Errorf("Failed to create the Prometheus stats exporter: %v", err)
+		fatal()
 	}
 
 	go func() {
 		auxAddr := mainModConfig.Global.Misc["aux-addr"]
-		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, pathRedirects, readyMgr.check, pe)
+		bootstrap.AuxiliaryHttpServerStart(env, ph, auxAddr, readyMgr.check, pe)
 	}()
 
 	// Run the runnable function registered by the submodule

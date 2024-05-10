@@ -141,7 +141,7 @@ func GetLocalityLabelOrDefault(label, defaultLabel string) string {
 			return label
 		}
 		// replace "." with "/"
-		return strings.Replace(label, k8sSeparator, "/", -1)
+		return strings.ReplaceAll(label, k8sSeparator, "/")
 	}
 	return defaultLabel
 }

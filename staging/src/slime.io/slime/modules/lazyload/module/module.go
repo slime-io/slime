@@ -96,7 +96,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if err != nil {
 		return fmt.Errorf("GetCacheFromServicefence occured err: %s", err)
 	}
-	source.Fullfill(cache)
+	_ = source.Fullfill(cache)
 	log.Debugf("GetCacheFromServicefence %+v", cache)
 
 	// register svf reset
@@ -151,7 +151,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 			log.Warnf("GetCacheFromServicefence occured err in StartedLeading: %s", err)
 			return
 		}
-		source.Fullfill(cache)
+		_ = source.Fullfill(cache)
 		log.Debugf("GetCacheFromServicefence is %+v", cache)
 	})
 
@@ -176,9 +176,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	}
 
 	if env.Config.Global != nil && env.Config.Global.Misc["enableLeaderElection"] == "on" {
-
 		log.Infof("add/delete leader label in StartedLeading/stoppedLeading")
-
 		le.AddOnStartedLeading(func(ctx context.Context) {
 			first := make(chan struct{}, 1)
 			first <- struct{}{}
@@ -226,7 +224,6 @@ func deleteLeaderLabelUntilSucceed(client *kubernetes.Clientset, podNs, podName 
 		select {
 		case <-first:
 		case <-retry:
-			retry = nil
 		}
 
 		if err := deletePodLabel(context.TODO(), client, podNs, podName); err != nil {

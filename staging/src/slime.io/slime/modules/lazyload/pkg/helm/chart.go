@@ -14,7 +14,7 @@ import (
 
 func LoadChartFromFS(fsys fs.FS, chartRoot string) (*chart.Chart, error) {
 	files := []string{}
-	fs.WalkDir(fsys, chartRoot, func(path string, d fs.DirEntry, err error) error {
+	if err := fs.WalkDir(fsys, chartRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -23,7 +23,9 @@ func LoadChartFromFS(fsys fs.FS, chartRoot string) (*chart.Chart, error) {
 		}
 		files = append(files, path)
 		return nil
-	})
+	}); err != nil {
+		return nil, err
+	}
 
 	var bfs []*loader.BufferedFile
 	for _, file := range files {
@@ -87,7 +89,7 @@ func splitManifests(bigFile string) []string {
 
 		d = strings.TrimSpace(d)
 		res = append(res, d)
-		count = count + 1
+		count++
 	}
 	return res
 }

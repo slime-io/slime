@@ -4,18 +4,16 @@ import (
 	"fmt"
 
 	"google.golang.org/protobuf/proto"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"slime.io/slime/framework/model/module"
 	"slime.io/slime/modules/plugin/api/config"
 	pluginapiv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 	"slime.io/slime/modules/plugin/controllers"
 	"slime.io/slime/modules/plugin/model"
 )
-
-var log = model.ModuleLog
 
 type Module struct {
 	config config.PluginModule

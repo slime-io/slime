@@ -6,3 +6,5 @@ import (
 )
 
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "controllers")
+
+var _ = log

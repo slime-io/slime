@@ -2,9 +2,11 @@ package server
 
 import (
 	"fmt"
+	"net/http"
+
 	log "github.com/sirupsen/logrus"
 	"k8s.io/kube-openapi/pkg/common"
-	"net/http"
+
 	"slime.io/slime/framework/model/metric"
 )
 
@@ -22,7 +24,6 @@ func (s *Handler) HandleFunc(pattern string, handler func(http.ResponseWriter, *
 // SvfResetSetting ns is needed, it will reset all svf in ns if svc is empty
 // otherwise, ns/name will reset
 func (s *Handler) SvfResetSetting(w http.ResponseWriter, r *http.Request) {
-
 	ns := r.URL.Query().Get("ns")
 	name := r.URL.Query().Get("name")
 	if ns == "" {

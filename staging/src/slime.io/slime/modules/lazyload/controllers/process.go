@@ -3,13 +3,13 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/watch"
@@ -86,7 +86,6 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 	if err != nil {
 		if errors.IsNotFound(err) {
 			sf = nil
-			err = nil
 		} else {
 			log.Errorf("can not get ServiceFence %s, %+v", req.NamespacedName.Name, err)
 			return reconcile.Result{}, err
@@ -102,7 +101,8 @@ func (r *ServicefenceReconciler) Refresh(req reconcile.Request, value map[string
 		return reconcile.Result{}, nil
 	}
 
-	log.Debugf("refresh with servicefence %s metricstatus old: %v, new: %v", req.NamespacedName, sf.Status.MetricStatus, value)
+	log.Debugf("refresh with servicefence %s metricstatus old: %v, new: %v",
+		req.NamespacedName, sf.Status.MetricStatus, value)
 	// skip refresh when metric result has not changed
 	if mapStrStrEqual(sf.Status.MetricStatus, value) {
 		return reconcile.Result{}, nil
@@ -178,17 +178,14 @@ func (r *ServicefenceReconciler) isServiceFenced(ctx context.Context, svc *corev
 			return false, err
 		}
 
-		if ns != nil {
-			if fenced, ok := r.isNsFenced(ns); ok {
-				return fenced, nil
-			}
+		if fenced, ok := r.isNsFenced(ns); ok {
+			return fenced, nil
 		}
 		return r.cfg.DefaultFence, nil
 	}
 }
 
 func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-
 	log.Debugf("reconcile service %s", req.NamespacedName)
 	r.reconcileLock.Lock()
 	defer r.reconcileLock.Unlock()
@@ -196,20 +193,17 @@ func (r *ServicefenceReconciler) ReconcileService(ctx context.Context, req ctrl.
 	return r.refreshFenceStatusOfService(ctx, nil, req.NamespacedName)
 }
 
-func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ret ctrl.Result, err error) {
-
+func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log.Debugf("reconcile namespace %s", req.Name)
 	// Fetch the namespace instance
 	ns := &corev1.Namespace{}
-	err = r.Client.Get(ctx, req.NamespacedName, ns)
+	err := r.Client.Get(ctx, req.NamespacedName, ns)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			ns = nil
 			return reconcile.Result{}, nil // do not process deletion ...
-		} else {
-			log.Errorf("get namespace %s error, %+v", req.NamespacedName, err)
-			return reconcile.Result{}, err
 		}
+		log.Errorf("get namespace %s error, %+v", req.NamespacedName, err)
+		return reconcile.Result{}, err
 	}
 
 	r.reconcileLock.Lock()
@@ -217,13 +211,13 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 
 	// refresh service fenced status
 	services := &corev1.ServiceList{}
-	if err = r.Client.List(ctx, services, client.InNamespace(req.Name)); err != nil {
+	if err := r.Client.List(ctx, services, client.InNamespace(req.Name)); err != nil {
 		log.Errorf("list services %s failed, %+v", req.Name, err)
 		return reconcile.Result{}, err
 	}
 
 	for _, svc := range services.Items {
-		if ret, err = r.refreshFenceStatusOfService(ctx, &svc, types.NamespacedName{}); err != nil {
+		if ret, err := r.refreshFenceStatusOfService(ctx, &svc, types.NamespacedName{}); err != nil {
 			log.Errorf("refreshFenceStatusOfService services %s failed, %+v", svc.Name, err)
 			return ret, err
 		}
@@ -233,8 +227,11 @@ func (r *ServicefenceReconciler) ReconcileNamespace(ctx context.Context, req ctr
 }
 
 // refreshFenceStatusOfService caller should hold the reconcile lock.
-func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context, svc *corev1.Service, nn types.NamespacedName) (reconcile.Result, error) {
-
+func (r *ServicefenceReconciler) refreshFenceStatusOfService(
+	ctx context.Context,
+	svc *corev1.Service,
+	nn types.NamespacedName,
+) (reconcile.Result, error) {
 	// if ns not in scope, clean related svf and return
 	if in, err := r.nsInScope(ctx, svc, nn); err != nil {
 		log.Errorf("nsFilterAndClean error, %+v", err)
@@ -278,9 +275,7 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 
 	if sf == nil {
 		// ignore services without label selector
-		if svc != nil && &(svc.Spec) != nil && svc.Spec.Selector != nil &&
-			len(svc.Spec.Selector) > 0 {
-
+		if svc != nil && len(svc.Spec.Selector) > 0 {
 			if fenced, err := r.isServiceFenced(ctx, svc); err != nil {
 				return reconcile.Result{}, err
 			} else if fenced {
@@ -316,7 +311,6 @@ func (r *ServicefenceReconciler) refreshFenceStatusOfService(ctx context.Context
 		log.Errorf("existed fence %v istioRev %s but our rev %s, skip ...",
 			nn, rev, r.env.IstioRev())
 	} else if isFenceCreatedByController(sf) {
-
 		if svc == nil {
 			log.Infof("svc is nil and delete svf %s:%s", sf.Namespace, sf.Name)
 			if err := r.Client.Delete(ctx, sf); err != nil {
@@ -409,14 +403,14 @@ func (r *ServicefenceReconciler) handlePodUpdate(ctx context.Context, _, obj int
 				r.appendIpToFence(namespacedName, pod.Status.PodIP)
 				return
 			}
-			log.Errorf("create fence %s for workload selector by '%s=%s' failed: %s", namespacedName, r.workloadFenceLabelKey, v, err)
+			log.Errorf("create fence %s for workload selector by '%s=%s' failed: %s",
+				namespacedName, r.workloadFenceLabelKey, v, err)
 			ServiceFenceFailedCreations.Increment()
-			// Todo: need retry
+			// TODO: need retry
 			return
-		} else {
-			ServiceFenceCreations.Increment()
-			r.appendIpToFence(namespacedName, pod.Status.PodIP)
 		}
+		ServiceFenceCreations.Increment()
+		r.appendIpToFence(namespacedName, pod.Status.PodIP)
 		log.Infof("create fence %s for workload selector by '%s=%s' ", namespacedName, r.workloadFenceLabelKey, v)
 	}
 }
@@ -455,7 +449,10 @@ func (r *ServicefenceReconciler) handlePodDelete(ctx context.Context, obj interf
 	}
 }
 
-func (r *ServicefenceReconciler) NewPodController(client kubernetes.Interface, fenceLabelKeyAlias string) cache.Controller {
+func (r *ServicefenceReconciler) NewPodController(
+	client kubernetes.Interface,
+	fenceLabelKeyAlias string,
+) cache.Controller {
 	ctx := context.Background()
 	if fenceLabelKeyAlias == "" {
 		fenceLabelKeyAlias = "app"
@@ -511,7 +508,7 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 	defer r.fenceToIp.Unlock()
 	ips := r.fenceToIp.Data[namespacedName]
 	delete(ips, ip)
-	if ips == nil || len(ips) == 0 {
+	if len(ips) == 0 {
 		delete(r.fenceToIp.Data, namespacedName)
 		return true
 	}
@@ -523,7 +520,6 @@ func (r *ServicefenceReconciler) delIpFromFence(namespacedName types.NamespacedN
 // 1. in our custom controller to cache svc and ep info
 // 2. in reconcile() to generate a new svf
 func (r *ServicefenceReconciler) inScope(ns string, detailNs *corev1.Namespace) bool {
-
 	// namespace list is set
 	if r.cfg.GetNamespaceList() != nil {
 		switch list := r.cfg.NamespaceList.(type) {
@@ -576,8 +572,11 @@ func (r *ServicefenceReconciler) managementSelectorsMatch(selectors []*metav1.La
 	return false
 }
 
-func (r *ServicefenceReconciler) nsInScope(ctx context.Context, svc *corev1.Service, nn types.NamespacedName) (bool, error) {
-
+func (r *ServicefenceReconciler) nsInScope(
+	ctx context.Context,
+	svc *corev1.Service,
+	nn types.NamespacedName,
+) (bool, error) {
 	validNN := nn
 	if svc != nil {
 		validNN.Namespace = svc.Namespace
@@ -592,9 +591,8 @@ func (r *ServicefenceReconciler) nsInScope(ctx context.Context, svc *corev1.Serv
 			if errors.IsNotFound(err) {
 				log.Warnf("refreshFenceStatusOfService: namespace %s is not found", validNN.Namespace)
 				return false, nil // deleted
-			} else {
-				return false, fmt.Errorf("refreshFenceStatusOfService: get namespace %s error %+v", validNN.Namespace, err)
 			}
+			return false, fmt.Errorf("refreshFenceStatusOfService: get namespace %s error %+v", validNN.Namespace, err)
 		}
 		ns = detailNs
 	}
@@ -607,12 +605,10 @@ func (r *ServicefenceReconciler) nsInScope(ctx context.Context, svc *corev1.Serv
 		err := r.Client.Get(ctx, validNN, sf)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				sf = nil
 				return false, nil
-			} else {
-				log.Errorf("refreshFenceStatusOfService: get serviceFence %s error, %+v", validNN, err)
-				return false, err
 			}
+			log.Errorf("refreshFenceStatusOfService: get serviceFence %s error, %+v", validNN, err)
+			return false, err
 		}
 
 		// if fence is created by controller, delete it

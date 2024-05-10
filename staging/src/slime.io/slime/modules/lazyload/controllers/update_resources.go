@@ -9,20 +9,18 @@ import (
 	"strings"
 	"sync"
 
-	"slime.io/slime/framework/model"
-
 	"github.com/buger/jsonparser"
-	"k8s.io/apimachinery/pkg/runtime"
-
 	"helm.sh/helm/v3/pkg/chart"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
 
 	config "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
+	"slime.io/slime/framework/model"
 	"slime.io/slime/modules/lazyload/charts"
 	"slime.io/slime/modules/lazyload/pkg/helm"
 	"slime.io/slime/modules/lazyload/pkg/kube"
@@ -169,7 +167,10 @@ func updateResources(wormholePort []string, env *bootstrap.Environment) bool {
 	return true
 }
 
-func generateValuesFormSlimeboot(wormholePort []string, env *bootstrap.Environment) (*config.SlimeBoot, map[string]interface{}, error) {
+func generateValuesFormSlimeboot(
+	wormholePort []string,
+	env *bootstrap.Environment,
+) (*config.SlimeBoot, map[string]interface{}, error) {
 	// Deserialize to config.SlimeBoot
 	specJson, slimeBoot, err := getSlimeboot(env)
 	if err != nil {
@@ -281,12 +282,16 @@ func getSlimeboot(env *bootstrap.Environment) (string, *config.SlimeBoot, error)
 	return string(raw), &slimeBoot, nil
 }
 
-func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Environment) (*unstructured.Unstructured, error) {
+func getSlimebootByOwnerRef(
+	slimeBootNs, deployName string,
+	env *bootstrap.Environment,
+) (*unstructured.Unstructured, error) {
 	kubeCli := env.K8SClient
 	dynCli := env.DynamicClient
+	ctx := context.TODO()
 
 	// get slimeboot cr name
-	deploy, err := kubeCli.AppsV1().Deployments(slimeBootNs).Get(context.TODO(), deployName, metav1.GetOptions{})
+	deploy, err := kubeCli.AppsV1().Deployments(slimeBootNs).Get(ctx, deployName, metav1.GetOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("get lazyload deployment [%s/%s] error: %+v", slimeBootNs, deployName, err)
 	}
@@ -296,7 +301,7 @@ func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Envir
 	slimeBootName := deploy.OwnerReferences[0].Name
 
 	// Unstructured
-	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(context.TODO(), slimeBootName, metav1.GetOptions{}, "")
+	utd, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).Get(ctx, slimeBootName, metav1.GetOptions{}, "")
 	if err != nil {
 		return nil, fmt.Errorf("get slimeboot [%s/%s] error: %+v", slimeBootNs, slimeBootName, err)
 	}
@@ -306,7 +311,10 @@ func getSlimebootByOwnerRef(slimeBootNs, deployName string, env *bootstrap.Envir
 
 var slimebootSelectorTpl = "slime.io/slimeboot=%s"
 
-func getSlimebootByLabelSelector(slimeBootNs, deployName string, env *bootstrap.Environment) (*unstructured.Unstructured, error) {
+func getSlimebootByLabelSelector(
+	slimeBootNs, deployName string,
+	env *bootstrap.Environment,
+) (*unstructured.Unstructured, error) {
 	dynCli := env.DynamicClient
 	utdList, err := dynCli.Resource(slimeBootGvr).Namespace(slimeBootNs).List(context.TODO(), metav1.ListOptions{
 		LabelSelector: fmt.Sprintf(slimebootSelectorTpl, deployName),
@@ -321,7 +329,10 @@ func getSlimebootByLabelSelector(slimeBootNs, deployName string, env *bootstrap.
 	return &utdList.Items[0], nil
 }
 
-func generateNewReources(chrt *chart.Chart, values map[string]interface{}) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
+func generateNewReources(
+	chrt *chart.Chart,
+	values map[string]interface{},
+) (map[schema.GroupVersionResource][]*unstructured.Unstructured, error) {
 	manifests, err := helm.RenderChartWithValues(chrt, values)
 	if err != nil {
 		return nil, fmt.Errorf("render global sidecar chart with values error: %v", err)

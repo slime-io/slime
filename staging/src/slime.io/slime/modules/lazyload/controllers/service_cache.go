@@ -3,21 +3,21 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/client-go/informers"
 	"reflect"
-	"slime.io/slime/modules/lazyload/model"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/client-go/informers"
 	"k8s.io/client-go/tools/cache"
+
+	"slime.io/slime/modules/lazyload/model"
 )
 
 func (r *ServicefenceReconciler) StartCache(ctx context.Context) {
-
 	factory := informers.NewSharedInformerFactory(r.env.K8SClient, 0)
 	r.factory = factory
 
@@ -53,7 +53,7 @@ func (r *ServicefenceReconciler) StartCache(ctx context.Context) {
 	log.Infof("factory has synced in startCache")
 }
 
-func (r *ServicefenceReconciler) handleSvcAdd(ctx context.Context, obj interface{}) {
+func (r *ServicefenceReconciler) handleSvcAdd(_ context.Context, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
 		return
@@ -64,7 +64,7 @@ func (r *ServicefenceReconciler) handleSvcAdd(ctx context.Context, obj interface
 	r.addPortProtocolCache(svc)
 }
 
-func (r *ServicefenceReconciler) handleSvcUpdate(ctx context.Context, old, obj interface{}) {
+func (r *ServicefenceReconciler) handleSvcUpdate(_ context.Context, old, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
 		return
@@ -89,7 +89,7 @@ func (r *ServicefenceReconciler) handleSvcUpdate(ctx context.Context, old, obj i
 	r.addPortProtocolCache(svc)
 }
 
-func (r *ServicefenceReconciler) handleSvcDelete(ctx context.Context, obj interface{}) {
+func (r *ServicefenceReconciler) handleSvcDelete(_ context.Context, obj interface{}) {
 	svc, ok := obj.(*corev1.Service)
 	if !ok {
 		return
@@ -153,7 +153,6 @@ func (r *ServicefenceReconciler) deleteNsSvcCache(svc *corev1.Service) {
 }
 
 func (r *ServicefenceReconciler) addPortProtocolCache(svc *corev1.Service) {
-
 	// portProtocolCache have all ports of all services except global-sidecar
 	if svc.Name == model.GlobalSidecar {
 		return
@@ -178,7 +177,6 @@ func (r *ServicefenceReconciler) addPortProtocolCache(svc *corev1.Service) {
 }
 
 func (r *ServicefenceReconciler) deletePortProtocolCache(svc *corev1.Service) {
-
 	// portProtocolCache have all ports of all services except global-sidecar
 	if svc.Name == model.GlobalSidecar {
 		return
@@ -300,8 +298,11 @@ func isHttp(port corev1.ServicePort, supportH2 bool) bool {
 	return false
 }
 
-func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCache, cleaupWormholePort bool) ([]string, bool) {
-
+func reloadWormholePort(
+	wormholePort []string,
+	portProtocolCache *PortProtocolCache,
+	cleaupWormholePort bool,
+) ([]string, bool) {
 	updated := false
 	ports := make([]string, 0)
 
@@ -349,7 +350,7 @@ func reloadWormholePort(wormholePort []string, portProtocolCache *PortProtocolCa
 	return wormholePort, updated
 }
 
-func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{}) {
+func (r *ServicefenceReconciler) handleEpAdd(_ context.Context, obj interface{}) {
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -358,7 +359,7 @@ func (r *ServicefenceReconciler) handleEpAdd(ctx context.Context, obj interface{
 	r.addIpWithEp(ep)
 }
 
-func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj interface{}) {
+func (r *ServicefenceReconciler) handleEpUpdate(_ context.Context, old, obj interface{}) {
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -377,7 +378,7 @@ func (r *ServicefenceReconciler) handleEpUpdate(ctx context.Context, old, obj in
 	r.addIpWithEp(ep)
 }
 
-func (r *ServicefenceReconciler) handleEpDelete(ctx context.Context, obj interface{}) {
+func (r *ServicefenceReconciler) handleEpDelete(_ context.Context, obj interface{}) {
 	ep, ok := obj.(*corev1.Endpoints)
 	if !ok {
 		return
@@ -441,7 +442,6 @@ func (r *ServicefenceReconciler) deleteIpFromEp(ep *corev1.Endpoints) {
 }
 
 func (r *ServicefenceReconciler) isNamespaceManaged(ns string) bool {
-
 	obj, exists, err := r.factory.Core().V1().Namespaces().Informer().GetIndexer().GetByKey(ns)
 	if err != nil {
 		log.Errorf("get namespace %s from cache failed: %v", ns, err)

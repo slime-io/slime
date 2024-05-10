@@ -62,7 +62,7 @@ func (r *SmartLimiterReconciler) ConsumeMetric(metricMap metric.Metric) {
 	defer r.Unlock()
 
 	for metaInfo, results := range metricMap {
-		Info := make(map[string]string)
+		info := make(map[string]string)
 		meta := &StaticMeta{}
 		if err := json.Unmarshal([]byte(metaInfo), meta); err != nil {
 			log.Errorf("unmarshal static meta info err, %+v", err.Error())
@@ -84,9 +84,9 @@ func (r *SmartLimiterReconciler) ConsumeMetric(metricMap metric.Metric) {
 				for _, value := range result.Value {
 					metricValue = value
 				}
-				Info[metricName] = metricValue
+				info[metricName] = metricValue
 			} else {
-				Info = result.Value
+				info = result.Value
 			}
 		}
 
@@ -95,11 +95,11 @@ func (r *SmartLimiterReconciler) ConsumeMetric(metricMap metric.Metric) {
 			if number == 0 {
 				continue
 			}
-			Info[subset] = strconv.Itoa(number)
+			info[subset] = strconv.Itoa(number)
 		}
-		log.Debugf("exact metric info, %v", Info)
+		log.Debugf("exact metric info, %v", info)
 		// use info to refresh SmartLimiter's status
-		if _, err := r.Refresh(reconcile.Request{NamespacedName: loc}, Info); err != nil {
+		if _, err := r.Refresh(reconcile.Request{NamespacedName: loc}, info); err != nil {
 			log.Errorf("refresh error:%v", err)
 		}
 	}
@@ -119,7 +119,6 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 				ep.Info[key] = value
 			}
 			ep.Lock.Unlock()
-
 		}
 	}
 
@@ -131,10 +130,9 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
 			// Return and don't requeue
 			return reconcile.Result{}, nil
-		} else {
-			// Error reading the object - requeue the request.
-			return reconcile.Result{}, err
 		}
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
 	}
 
 	// if rev not in scope, skip
@@ -146,9 +144,8 @@ func (r *SmartLimiterReconciler) Refresh(request reconcile.Request, args map[str
 
 	if result, err := r.refresh(instance); err == nil {
 		return result, nil
-	} else {
-		return reconcile.Result{}, err
 	}
+	return reconcile.Result{}, err
 }
 
 // refresh envoy filters and configmap
@@ -209,24 +206,6 @@ func (r *SmartLimiterReconciler) refresh(instance *microservicev1alpha2.SmartLim
 	return reconcile.Result{}, nil
 }
 
-// TODO different with old version
-// the function will not trigger if subset is changed
-// if subset is deleted, how to delete the exist envoyfilters, add anohter function to delete the efs ?
-func (r *SmartLimiterReconciler) subscribe(host string, subset interface{}) {
-	if name, ns, ok := util.IsK8SService(host); ok {
-		loc := types.NamespacedName{Name: name, Namespace: ns}
-		instance := &microservicev1alpha2.SmartLimiter{}
-		err := r.Client.Get(context.TODO(), loc, instance)
-		if err != nil {
-			if !errors.IsNotFound(err) {
-				log.Errorf("failed to get smartlimiter, host:%s, %+v", host, err)
-			}
-		} else {
-			_, _ = r.refresh(instance)
-		}
-	}
-}
-
 func (r *SmartLimiterReconciler) getMaterial(loc types.NamespacedName) map[string]string {
 	if ep, ok := r.metricInfo.Get(loc.Namespace + "/" + loc.Name); ok {
 		return util.CopyMap(ep.Info)
@@ -234,7 +213,12 @@ func (r *SmartLimiterReconciler) getMaterial(loc types.NamespacedName) map[strin
 	return nil
 }
 
-func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLimiterReconciler, obj *networkingv1alpha3.EnvoyFilter, ef *networkingapi.EnvoyFilter) (reconcile.Result, error) {
+func refreshEnvoyFilter(
+	instance *microservicev1alpha2.SmartLimiter,
+	r *SmartLimiterReconciler,
+	obj *networkingv1alpha3.EnvoyFilter,
+	ef *networkingapi.EnvoyFilter,
+) (reconcile.Result, error) {
 	if err := controllerutil.SetControllerReference(instance, obj, r.Scheme); err != nil {
 		return reconcile.Result{}, err
 	}
@@ -265,9 +249,8 @@ func refreshEnvoyFilter(instance *microservicev1alpha2.SmartLimiter, r *SmartLim
 			EnvoyFilterCreations.Increment()
 			log.Infof("creating a new EnvoyFilter,%+v", loc)
 			return reconcile.Result{}, nil
-		} else {
-			log.Debugf("envoyfilter %+v is not found, and obj spec is nil, skip ", loc)
 		}
+		log.Debugf("envoyfilter %+v is not found, and obj spec is nil, skip ", loc)
 	} else if foundRev := slime_model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
 			loc, foundRev, r.env.IstioRev())

@@ -10,10 +10,9 @@ import (
 
 	networkingapi "istio.io/api/networking/v1alpha3"
 
+	"slime.io/pkg/text"
 	"slime.io/slime/modules/meshregistry/pkg/source"
 	"slime.io/slime/modules/meshregistry/pkg/util"
-
-	"slime.io/pkg/text"
 )
 
 const (
@@ -181,7 +180,7 @@ func (s *Source) convertServiceEntry(
 		)
 
 		// extract dubbo metadata and methods from url
-		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, portNum, service, opts.patchLabel, opts.ignoreLabels, methodApplier, extraMeta)
+		meta, ok := verifyMeta(providerParts[len(providerParts)-1], addr, portNum, service, opts.patchLabel, opts.ignoreLabels, methodApplier, extraMeta) //nolint: lll
 		if !ok {
 			continue
 		}
@@ -251,7 +250,7 @@ func (s *Source) convertServiceEntry(
 				}
 
 				// XXX optimize inbound ep meta calculation
-				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, portNum, "", opts.patchLabel, opts.ignoreLabels, nil, nil); ok {
+				if meta, ok := verifyMeta(consumerParts[len(consumerParts)-1], cAddr, portNum, "", opts.patchLabel, opts.ignoreLabels, nil, nil); ok { //nolint: lll
 					meta = consumerMeta(meta)
 					consumerServiceKey := buildServiceKey(service, meta)
 					if consumerServiceKey == serviceKey {
@@ -346,23 +345,22 @@ func parseServiceFromKey(serviceKey string) string {
 func parseAddr(addr string) (ip string, port uint32, err error) {
 	addrParts := strings.Split(addr, ":")
 	if len(addrParts) != 2 {
-		err = util.ValueError
+		err = util.ErrValue
 		return
 	}
 
 	if net.ParseIP(addrParts[0]) == nil {
-		err = util.ValueError
+		err = util.ErrValue
 		return
-	} else {
-		ip = addrParts[0]
 	}
+	ip = addrParts[0]
 
 	if v, curErr := strconv.Atoi(addrParts[1]); curErr != nil {
 		err = curErr
 		return
 	} else if v > math.MaxUint16 || v <= 0 {
 		// istio port定义为int32，xds定义将范围变小 -->   uint32 port_value = 1 [(validate.rules).uint32.lte = 65535];
-		err = util.ValueError
+		err = util.ErrValue
 		return
 	} else {
 		port = uint32(v)
@@ -380,6 +378,7 @@ func consumerMeta(labels map[string]string) map[string]string {
 	return labels
 }
 
+// XXX aggregate the parameters
 func verifyMeta(url string, ip string, port uint32, service string, patchLabel bool, ignoreLabels map[string]string,
 	methodApplier func(string), extraMeta map[configuratorMetaKey]map[string]string,
 ) (map[string]string, bool) {

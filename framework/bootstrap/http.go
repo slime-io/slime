@@ -102,8 +102,12 @@ func (m PrefixPathHandlerManager) Handle(path string, handler http.Handler) {
 	m.PathHandler.Handle("/"+m.Prefix+"/"+path, handler)
 }
 
-func AuxiliaryHttpServerStart(env Environment, ph *PathHandler, addr string, pathRedirects map[string]string,
-	readyChecker func() error, pe http.Handler,
+func AuxiliaryHttpServerStart(
+	env Environment,
+	ph *PathHandler,
+	addr string,
+	readyChecker func() error,
+	pe http.Handler,
 ) {
 	// register
 	HealthCheckRegister(ph, readyChecker)

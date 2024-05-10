@@ -7,15 +7,15 @@ import (
 )
 
 func CalculateTemplate(expression string, material map[string]interface{}) (int, error) {
-	if s, err := parse1(expression, material); err != nil {
+	s, err := parse1(expression, material)
+	if err != nil {
 		return 0, err
-	} else {
-		if a, err := Calculate(s); err != nil {
-			return 0, err
-		} else {
-			return a, nil
-		}
 	}
+	a, err := Calculate(s)
+	if err != nil {
+		return 0, err
+	}
+	return a, nil
 }
 
 func CalculateTemplateString(expression string, strMaterial map[string]string) (int, error) {
@@ -33,16 +33,14 @@ func CalculateTemplateBool(expression string, material map[string]interface{}) (
 	if expression == "false" {
 		return false, nil
 	}
-	if s, err := parse1(expression, material); err != nil {
+	s, err := parse1(expression, material)
+	if err != nil {
 		return false, err
-	} else {
-		if a, err := Calculate(s); err != nil {
-			return false, err
-		} else {
-			if a == 1 {
-				return true, nil
-			}
-		}
+	}
+	if a, err := Calculate(s); err != nil {
+		return false, err
+	} else if a == 1 {
+		return true, nil
 	}
 	return false, nil
 }
@@ -71,13 +69,14 @@ type Node struct {
 }
 
 func Calculate(expression string) (int, error) {
-	if m := parse2(expression); m.value == "error" {
+	m := parse2(expression)
+	if m.value == "error" {
 		return 0, Error{M: "invaild input"}
-	} else {
-		return parse3(m), nil
 	}
+	return parse3(m), nil
 }
 
+// nolint: revive
 func parse2(expression string) *Node {
 	c := &Node{
 		Left:  nil,
@@ -88,32 +87,32 @@ func parse2(expression string) *Node {
 	flag := false
 	for i := range expression {
 		var nodeLevel int
-		if expression[i] == '.' {
-			r = r + string(expression[i])
+		switch expression[i] {
+		case '.':
+			r += string(expression[i])
 			continue
-		}
-		if expression[i] >= '0' && expression[i] <= '9' {
-			r = r + string(expression[i])
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+			r += string(expression[i])
 			flag = true
 			continue
-		} else if expression[i] == '(' {
+		case '(':
 			if flag {
 				return &Node{value: "error"}
 			}
 			s.Push('(')
 			continue
-		} else if expression[i] == ')' {
+		case ')':
 			s.Pop()
 			continue
-		} else if expression[i] == '/' || expression[i] == '*' {
+		case '/', '*':
 			nodeLevel = s.Length()*10 + 3
-		} else if expression[i] == '+' || expression[i] == '-' {
+		case '+', '-':
 			nodeLevel = s.Length()*10 + 2
-		} else if expression[i] == '>' || expression[i] == '<' {
+		case '>', '<':
 			nodeLevel = s.Length()*10 + 1
-		} else if expression[i] == '|' || expression[i] == '&' {
+		case '|', '&':
 			nodeLevel = s.Length() * 10
-		} else {
+		default:
 			return &Node{value: "error"}
 		}
 		flag = false
@@ -171,6 +170,7 @@ func parse2(expression string) *Node {
 	return c
 }
 
+// nolint: revive
 func parse3(node *Node) int {
 	switch node.value {
 	case "*":

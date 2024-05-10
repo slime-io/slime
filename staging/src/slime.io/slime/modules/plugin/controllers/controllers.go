@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"k8s.io/apimachinery/pkg/types"
+
 	frameworkmodel "slime.io/slime/framework/model"
 	"slime.io/slime/modules/plugin/model"
 )

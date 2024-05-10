@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"k8s.io/apimachinery/pkg/types"
 	"net"
 	"net/http"
 	"strconv"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
@@ -23,7 +23,7 @@ const (
 
 type HealthzProxy struct{}
 
-func (p *HealthzProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (p *HealthzProxy) ServeHTTP(_ http.ResponseWriter, _ *http.Request) {
 	// health check, return 200 directly
 }
 
@@ -89,12 +89,13 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 
 		if idx := strings.LastIndex(origDest, ":"); idx >= 0 {
 			destIp = origDest[:idx]
-			if v, err := strconv.Atoi(origDest[idx+1:]); err != nil {
-				http.Error(w, fmt.Sprintf("invalid header %s value: %s", HeaderOrigDest, origDest), http.StatusBadRequest)
+			port, err := strconv.Atoi(origDest[idx+1:])
+			if err != nil {
+				errMsg := fmt.Sprintf("invalid header %s value: %s", HeaderOrigDest, origDest)
+				http.Error(w, errMsg, http.StatusBadRequest)
 				return
-			} else {
-				destPort = v
 			}
+			destPort = port
 		} else {
 			destIp = origDest
 		}
@@ -103,12 +104,12 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		var reqPort int
 		if idx := strings.LastIndex(reqHost, ":"); idx >= 0 {
 			destIp = reqHost[:idx]
-			if v, err := strconv.Atoi(reqHost[idx+1:]); err != nil {
+			v, err := strconv.Atoi(reqHost[idx+1:])
+			if err != nil {
 				http.Error(w, fmt.Sprintf("invalid host %s value: %s", reqHost, reqHost), http.StatusBadRequest)
 				return
-			} else {
-				reqPort = v
 			}
+			reqPort = v
 		} else {
 			destIp = reqHost
 			reqPort = defaultHTTPPort
@@ -127,8 +128,7 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	req.URL.Host = reqHost
 	req.Host = reqHost
 	req.RequestURI = ""
-	newCtx, _ := context.WithCancel(reqCtx)
-	req = req.WithContext(newCtx)
+	req = req.WithContext(reqCtx)
 
 	dialer := &net.Dialer{
 		// Timeout:   30 * time.Second,
@@ -137,8 +137,8 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			addr = fmt.Sprintf("%s:%d", destIp, destPort)
-			return dialer.DialContext(ctx, network, addr)
+			realReqAddr := fmt.Sprintf("%s:%d", destIp, destPort)
+			return dialer.DialContext(ctx, network, realReqAddr)
 		},
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,

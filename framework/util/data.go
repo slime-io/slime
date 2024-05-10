@@ -58,15 +58,16 @@ func createSubmap(ks []string, value string) map[string]interface{} {
 func findSubNode(ks []string, root map[string]interface{}) (map[string]interface{}, []string, error) {
 	if len(ks) == 0 {
 		return root, ks, nil
-	} else if _, ok := root[ks[0]]; !ok {
-		return root, ks, nil
-	} else {
-		if m, ok := root[ks[0]].(map[string]interface{}); !ok {
-			return nil, ks, fmt.Errorf("leaf node reached,%v", ks)
-		} else {
-			return findSubNode(ks[1:], m)
-		}
 	}
+	v, ok := root[ks[0]]
+	if !ok {
+		return root, ks, nil
+	}
+	m, ok := v.(map[string]interface{})
+	if !ok {
+		return nil, ks, fmt.Errorf("leaf node reached,%v", ks)
+	}
+	return findSubNode(ks[1:], m)
 }
 
 // Subscribeable map

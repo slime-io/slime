@@ -73,7 +73,7 @@ func (b ObjectReconcilerBuilder) Build(mgr ctrl.Manager) error {
 
 	for idx, item := range b.items {
 		if err := checkItem(idx, item); err != nil {
-			if item.Optional {
+			if item.Optional { //nolint: revive
 				// TODO add log
 			} else {
 				return err
@@ -83,7 +83,7 @@ func (b ObjectReconcilerBuilder) Build(mgr ctrl.Manager) error {
 
 	for idx, item := range b.items {
 		if err := processItem(idx, item); err != nil {
-			if item.Optional {
+			if item.Optional { //nolint: revive
 				// TODO add log
 			} else {
 				return err

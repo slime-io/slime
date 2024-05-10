@@ -43,7 +43,7 @@ func NewWatcherTrigger(config WatcherTriggerConfig) *WatcherTrigger {
 }
 
 func (t *WatcherTrigger) Start() {
-	log := log.WithField("reporter", "WatcherTrigger").WithField("function", "Start")
+	l := log.WithField("reporter", "WatcherTrigger").WithField("function", "Start")
 
 	t.watchersMap = make(map[watch.Interface]chan struct{})
 
@@ -61,7 +61,7 @@ func (t *WatcherTrigger) Start() {
 		}
 		_, _, watcher, _ := watchtools.NewIndexerInformerWatcher(lw, &unstructured.Unstructured{})
 		t.watchersMap[watcher] = make(chan struct{})
-		log.Infof("add watcher %s to watcher trigger", gvr.String())
+		l.Infof("add watcher %s to watcher trigger", gvr.String())
 	}
 
 	for wat, channel := range t.watchersMap {
@@ -70,18 +70,18 @@ func (t *WatcherTrigger) Start() {
 				select {
 				case _, ok := <-ch:
 					if !ok {
-						log.Debugf("stop a watcher")
+						l.Debugf("stop a watcher")
 						return
 					}
 				case e, ok := <-w.ResultChan():
-					log.Debugf("got watcher event: type %v, kind %v", e.Type, e.Object.GetObjectKind().GroupVersionKind())
+					l.Debugf("got watcher event: type %v, kind %v", e.Type, e.Object.GetObjectKind().GroupVersionKind())
 					if !ok {
-						log.Warningf("a result chan of watcher is closed, break process loop")
+						l.Warningf("a result chan of watcher is closed, break process loop")
 						return
 					}
 					object, ok := e.Object.(*unstructured.Unstructured)
 					if !ok {
-						log.Errorf("invalid type of object in watcher event")
+						l.Errorf("invalid type of object in watcher event")
 						continue
 					}
 					event := WatcherEvent{
@@ -92,7 +92,6 @@ func (t *WatcherTrigger) Start() {
 						},
 					}
 					t.eventChan <- event
-					// log.Debugf("sent watcher event to controller: type %s, kind %s", e.Type, e.Object.GetObjectKind().GroupVersionKind().String())
 				}
 			}
 		}(wat, channel)

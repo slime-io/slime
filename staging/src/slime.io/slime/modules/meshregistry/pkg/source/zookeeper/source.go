@@ -145,10 +145,8 @@ func New(
 		args.InstancePortAsSvcPort = false
 		args.HostSuffix = ".dubbo"
 		// not fetch consumer data by default for gw
-	} else {
-		if args.ConsumerPath == "" {
-			args.ConsumerPath = consumerPathSuffix
-		}
+	} else if args.ConsumerPath == "" {
+		args.ConsumerPath = consumerPathSuffix
 	}
 	if args.ConsumerPath == disableConsumerPath {
 		args.ConsumerPath = ""
@@ -162,7 +160,8 @@ func New(
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
 		if args.MockServiceName == "" {
-			return nil, nil, false, false, fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+			return nil, nil, false, false,
+				fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
 		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
@@ -208,7 +207,7 @@ func New(
 		src.initWg.Add(1) // merge ports se init-sync ready
 	}
 
-	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors)
+	src.instanceFilter = generateInstanceFilter(args.ServicedEndpointSelectors, args.EndpointSelectors, !args.EmptyEpSelectorsExcludeAll, args.AlwaysUseSourceScopedEpSelectors) //nolint: lll
 	src.instanceMetaModifier = source.BuildInstanceMetaModifier(args.InstanceMetaRelabel)
 	src.methodLBChecker = generateMethodLBChecker(args.MethodLBServiceSelectors)
 
@@ -358,7 +357,12 @@ func (s *Source) simpleCacheJson(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
-func internalCacheJson[V any](s *Source, w http.ResponseWriter, req *http.Request, cache cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, V]]) {
+func internalCacheJson[V any](
+	s *Source,
+	w http.ResponseWriter,
+	req *http.Request,
+	cache cmap.ConcurrentMap[string, cmap.ConcurrentMap[string, V]],
+) {
 	temp := cache
 	cacheData := map[string]map[string]interface{}{}
 	var result interface{}
@@ -509,12 +513,11 @@ func (s *Source) cacheInfo(iface string) interface{} {
 		if service == iface {
 			info[service] = seCache
 			break
-		} else {
-			for serviceKey, value := range seCache.Items() {
-				if serviceKey == iface {
-					info[serviceKey] = value
-					break
-				}
+		}
+		for serviceKey, value := range seCache.Items() {
+			if serviceKey == iface {
+				info[serviceKey] = value
+				break
 			}
 		}
 	}
@@ -589,6 +592,7 @@ func (s *Source) markServiceEntryInitDone() {
 	}
 }
 
+// nolint: lll
 func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 	var prevArgs *bootstrap.ZookeeperSourceArgs
 	prevArgs, s.args = s.args, args // XXX should be atomic
@@ -692,7 +696,8 @@ func (s *Source) handleServiceDelete(iface string, ignoredSes frameworkutil.Set[
 			sem = &seValueCopy
 			event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
 			if err == nil {
-				log.Infof("delete(update) zk se, hosts: %s, ep size: %d ", sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
+				log.Infof("delete(update) zk se, hosts: %s, ep size: %d ",
+					sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
@@ -765,7 +770,10 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 		now := time.Now()
 
 		meta := resource.Metadata{
-			FullName:   resource.FullName{Namespace: resource.Namespace(s.args.ResourceNs), Name: resource.LocalName(serviceKey)},
+			FullName: resource.FullName{
+				Namespace: resource.Namespace(s.args.ResourceNs),
+				Name:      resource.LocalName(serviceKey),
+			},
 			CreateTime: now,
 			Version:    resource.Version(now.String()),
 			Labels: map[string]string{
@@ -779,7 +787,7 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 			meta.Labels[k] = v
 		}
 
-		newSeWithMeta, _ := prepareServiceEntryWithMeta(se, meta)
+		newMetaSe, _ := prepareServiceEntryWithMeta(se, meta)
 
 		s.mut.Lock()
 		s.serviceMethods[serviceKey] = convertedSe.methodsLabel
@@ -811,23 +819,25 @@ func (s *Source) updateSeCache(freshSeMap map[string]*convertedServiceEntry, dub
 		s.mut.Unlock()
 
 		if oldSem, exist := interfaceSeCache.Get(serviceKey); !exist {
-			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			ev, err := buildServiceEntryEvent(event.Added, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, attachCallModel)
+			interfaceSeCache.Set(serviceKey, newMetaSe)
+			ev, err := buildServiceEntryEvent(event.Added, newMetaSe.ServiceEntry, newMetaSe.Meta, attachCallModel)
 			if err == nil {
-				log.Infof("add zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				log.Infof("add zk se, hosts: %s, ep size: %d ",
+					newMetaSe.ServiceEntry.Hosts[0], len(newMetaSe.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
 			}
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else {
-			if oldSem.Equals(*newSeWithMeta) && !attachCallModel {
+			if oldSem.Equals(*newMetaSe) && !attachCallModel {
 				continue
 			}
-			interfaceSeCache.Set(serviceKey, newSeWithMeta)
-			ev, err := buildServiceEntryEvent(event.Updated, newSeWithMeta.ServiceEntry, newSeWithMeta.Meta, attachCallModel)
+			interfaceSeCache.Set(serviceKey, newMetaSe)
+			ev, err := buildServiceEntryEvent(event.Updated, newMetaSe.ServiceEntry, newMetaSe.Meta, attachCallModel)
 			if err == nil {
-				log.Infof("update zk se, hosts: %s, ep size: %d ", newSeWithMeta.ServiceEntry.Hosts[0], len(newSeWithMeta.ServiceEntry.Endpoints))
+				log.Infof("update zk se, hosts: %s, ep size: %d ",
+					newMetaSe.ServiceEntry.Hosts[0], len(newMetaSe.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(ev)
 				}
@@ -855,11 +865,12 @@ func generateInstanceFilter(
 	emptySelectorsReturn bool,
 	alwaysUseSourceScopedEpSelectors bool,
 ) func(*dubboInstance) bool {
+	withEmptySelectorsReturnOpt := source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn)
 	cfgs := make(map[string]source.HookConfig, len(svcSel))
 	for svc, selectors := range svcSel {
-		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+		cfgs[svc] = source.ConvertEndpointSelectorToHookConfig(selectors, withEmptySelectorsReturnOpt)
 	}
-	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, source.HookConfigWithEmptySelectorsReturn(emptySelectorsReturn))
+	cfgs[defaultServiceFilter] = source.ConvertEndpointSelectorToHookConfig(epSel, withEmptySelectorsReturnOpt)
 	hookStore := source.NewHookStore(cfgs)
 	return func(i *dubboInstance) bool {
 		param := source.NewHookParam(
@@ -910,7 +921,12 @@ func prepareServiceEntryWithMeta(se *networkingapi.ServiceEntry, meta resource.M
 }
 
 // buildServiceEntryEvent assembled the incoming data into an event. Event handle should not modify the data.
-func buildServiceEntryEvent(kind event.Kind, se *networkingapi.ServiceEntry, meta resource.Metadata, attachCallModel bool) (event.Event, error) {
+func buildServiceEntryEvent(
+	kind event.Kind,
+	se *networkingapi.ServiceEntry,
+	meta resource.Metadata,
+	attachCallModel bool,
+) (event.Event, error) {
 	return event.Event{
 		Kind:   kind,
 		Source: collections.ServiceEntry,

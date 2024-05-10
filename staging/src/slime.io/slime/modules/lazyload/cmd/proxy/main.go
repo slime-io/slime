@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"k8s.io/apimachinery/pkg/types"
 	"net"
 	"net/http"
 	"os"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"strconv"
 	"sync"
 	"syscall"
@@ -16,10 +14,12 @@ import (
 	"golang.org/x/sys/unix"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
+	ctrl "sigs.k8s.io/controller-runtime"
 
 	"slime.io/slime/modules/lazyload/pkg/proxy"
 )
@@ -58,7 +58,6 @@ func init() {
 }
 
 func main() {
-
 	// set log config
 	if logLevel == "" {
 		logLevel = "info"
@@ -109,9 +108,10 @@ func newConfigMapController() (*controller, error) {
 	if err != nil {
 		return nil, err
 	}
-	lw := cache.NewFilteredListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", os.Getenv(EnvPodNamespace), func(options *metav1.ListOptions) {
-		options.LabelSelector = configLabelSelector
-	})
+	lw := cache.NewFilteredListWatchFromClient(client.CoreV1().RESTClient(), "configmaps", os.Getenv(EnvPodNamespace),
+		func(options *metav1.ListOptions) {
+			options.LabelSelector = configLabelSelector
+		})
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 	indexer, informer := cache.NewIndexerInformer(lw, &corev1.ConfigMap{}, 0, cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -143,7 +143,9 @@ func stopListenAndServe() {
 	for _, srv := range servers {
 		wg.Add(1)
 		go func(s *http.Server) {
-			shutdownServer(s)
+			if err := shutdownServer(s); err != nil {
+				log.Errorf("shutdown server %s error: %v", s.Addr, err)
+			}
 			wg.Done()
 		}(srv)
 	}
@@ -187,6 +189,7 @@ func startListenAndServe(wormholePorts map[int]struct{}) {
 			if _, exist := wormholePorts[whPort]; !exist {
 				log.Infof("remove wormhole port %d", whPort)
 				delete(servers, whPort)
+				//nolint: errcheck
 				go shutdownServer(srv)
 			}
 		}

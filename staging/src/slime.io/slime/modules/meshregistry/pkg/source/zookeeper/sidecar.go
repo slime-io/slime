@@ -122,10 +122,9 @@ func (s *Source) refreshSidecar(init bool) {
 		log.Debugf("%d app changed, but merged call models no change(size %d)",
 			len(changedApps), len(mergedCallModels))
 		return
-	} else {
-		v, err := json.MarshalIndent(diff, "", "  ")
-		log.Infof("dubbo call model diff: %s, json marshal err %v", string(v), err)
 	}
+	v, err := json.MarshalIndent(diff, "", "  ")
+	log.Infof("dubbo call model diff: %s, json marshal err %v", string(v), err)
 
 	filtered := s.filterDubboCallModelDiff(diff)
 	if len(diff) == 0 {
@@ -143,7 +142,7 @@ func (s *Source) refreshSidecar(init bool) {
 	s.mut.Unlock()
 
 	protocol, _ := source.ProtocolName(s.args.SvcProtocol, s.args.GenericProtocol)
-	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.args.ResourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel, protocol)
+	diffSidecars, deletedSidecars := convertDubboCallModelConfigToSidecar(s.args.ResourceNs, mergedCallModels, diff, s.args.DubboWorkloadAppLabel, protocol) //nolint: lll
 
 	sidecarMap := make(map[resource.FullName]SidecarWithMeta, len(diffSidecars))
 	for _, sc := range diffSidecars {
@@ -210,7 +209,11 @@ func (s *Source) refreshSidecar(init bool) {
 	}
 }
 
-func mergeDubboCallModels(seCallModels map[resource.FullName]map[string]DubboCallModel, includeProvider, selfConsume bool) map[string]DubboCallModel {
+func mergeDubboCallModels(
+	seCallModels map[resource.FullName]map[string]DubboCallModel,
+	includeProvider bool,
+	selfConsume bool,
+) map[string]DubboCallModel {
 	ret := make(map[string]DubboCallModel, len(seCallModels))
 
 	for _, curCallModels := range seCallModels {
@@ -317,7 +320,7 @@ func (s *Source) recordAppSidecarUpdateTime(diff map[string]DubboCallModel) {
 	}
 }
 
-func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvider bool, selfConsume bool) DubboCallModel {
+func mergeToDubboCallModel(from, to DubboCallModel, includeProvider, selfConsume bool) DubboCallModel {
 	if to.Application == "" {
 		to.Application = from.Application
 	}
@@ -345,7 +348,11 @@ func mergeToDubboCallModel(from DubboCallModel, to DubboCallModel, includeProvid
 	return to
 }
 
-func convertDubboCallModel(se *networkingapi.ServiceEntry, interfaceName string, inboundEndpoints []*networkingapi.WorkloadEntry) map[string]DubboCallModel {
+func convertDubboCallModel(
+	se *networkingapi.ServiceEntry,
+	interfaceName string,
+	inboundEndpoints []*networkingapi.WorkloadEntry,
+) map[string]DubboCallModel {
 	dubboModels := make(map[string]DubboCallModel)
 
 	type item struct {
@@ -401,7 +408,8 @@ func convertDubboCallModelConfigToSidecar(
 
 	now := time.Now()
 	for app, m := range callModel {
-		fullName := resource.FullName{Namespace: resource.Namespace(resourceNs), Name: resource.LocalName(fmt.Sprintf("%s.dubbo.generated", m.Application))}
+		name := fmt.Sprintf("%s.dubbo.generated", m.Application)
+		fullName := resource.FullName{Namespace: resource.Namespace(resourceNs), Name: resource.LocalName(name)}
 		if diff != nil {
 			if _, ok := diff[app+suffixDel]; ok {
 				// handle app-del standalone

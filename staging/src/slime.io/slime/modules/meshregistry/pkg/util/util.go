@@ -11,7 +11,7 @@ import (
 
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "util")
 
-var ValueError = errors.New("value error")
+var ErrValue = errors.New("value error")
 
 type Duration time.Duration
 

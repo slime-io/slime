@@ -138,6 +138,7 @@ func (r *ServicefenceReconciler) Clear() {
 	// r.enabledNamespaces = map[string]bool{}
 }
 
+//nolint: lll
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=microservice.slime.io,resources=servicefences/status,verbs=get;update;patch
 
@@ -159,10 +160,9 @@ func (r *ServicefenceReconciler) Reconcile(ctx context.Context, req ctrl.Request
 			delete(r.interestMeta, req.NamespacedName.String())
 			r.updateInterestMetaCopy()
 			return r.refreshFenceStatusOfService(context.TODO(), nil, req.NamespacedName)
-		} else {
-			log.Errorf("get serviceFence error,%+v", err)
-			return reconcile.Result{}, err
 		}
+		log.Errorf("get serviceFence error,%+v", err)
+		return reconcile.Result{}, err
 	}
 
 	if rev := model.IstioRevFromLabel(instance.Labels); !r.env.RevInScope(rev) { // remove watch ?
@@ -220,11 +220,9 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	found := &networkingv1alpha3.Sidecar{}
 	nsName := types.NamespacedName{Name: sidecar.Name, Namespace: sidecar.Namespace}
 	err = r.Client.Get(context.TODO(), nsName, found)
-
 	if err != nil {
 		if errors.IsNotFound(err) {
 			found = nil
-			err = nil
 		} else {
 			return err
 		}
@@ -241,16 +239,14 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Infof("existed sidecar %v istioRev %s but our rev %s, skip update ...",
 			nsName, foundRev, r.env.IstioRev())
-	} else {
-		if !reflect.DeepEqual(found.Spec, sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
-			log.Infof("Update a Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
-			sidecar.ResourceVersion = found.ResourceVersion
-			err = r.Client.Update(context.TODO(), sidecar)
-			if err != nil {
-				return err
-			}
-			SidecarRefreshes.Increment()
+	} else if !reflect.DeepEqual(found.Spec, sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
+		log.Infof("Update a Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
+		sidecar.ResourceVersion = found.ResourceVersion
+		err = r.Client.Update(context.TODO(), sidecar)
+		if err != nil {
+			return err
 		}
+		SidecarRefreshes.Increment()
 	}
 	return nil
 }
@@ -273,10 +269,12 @@ func (r *ServicefenceReconciler) updateServicefenceDomain(sf *lazyloadv1alpha1.S
 
 	_ = r.Client.Status().Update(context.TODO(), sf)
 	ServiceFenceRefresh.Increment()
-	return
 }
 
-func (r *ServicefenceReconciler) genDomains(sf *lazyloadv1alpha1.ServiceFence, rules []*domainAliasRule) map[string]*lazyloadv1alpha1.Destinations {
+func (r *ServicefenceReconciler) genDomains(
+	sf *lazyloadv1alpha1.ServiceFence,
+	rules []*domainAliasRule,
+) map[string]*lazyloadv1alpha1.Destinations {
 	domains := make(map[string]*lazyloadv1alpha1.Destinations)
 
 	addDomainsWithHost(domains, sf, r.nsSvcCache, rules)
@@ -287,7 +285,10 @@ func (r *ServicefenceReconciler) genDomains(sf *lazyloadv1alpha1.ServiceFence, r
 }
 
 // update domains with spec.host
-func addDomainsWithHost(domains map[string]*lazyloadv1alpha1.Destinations, sf *lazyloadv1alpha1.ServiceFence, nsSvcCache *NsSvcCache,
+func addDomainsWithHost(
+	domains map[string]*lazyloadv1alpha1.Destinations,
+	sf *lazyloadv1alpha1.ServiceFence,
+	nsSvcCache *NsSvcCache,
 	rules []*domainAliasRule,
 ) {
 	checkStatus := func(now int64, strategy *lazyloadv1alpha1.RecyclingStrategy) lazyloadv1alpha1.Destinations_Status {
@@ -319,7 +320,12 @@ func addDomainsWithHost(domains map[string]*lazyloadv1alpha1.Destinations, sf *l
 	}
 }
 
-func handleNsHost(h string, domains map[string]*lazyloadv1alpha1.Destinations, nsSvcCache *NsSvcCache, rules []*domainAliasRule) {
+func handleNsHost(
+	h string,
+	domains map[string]*lazyloadv1alpha1.Destinations,
+	nsSvcCache *NsSvcCache,
+	rules []*domainAliasRule,
+) {
 	hostParts := strings.Split(h, "/")
 	if len(hostParts) != 2 {
 		log.Errorf("%s is invalid host, skip", h)
@@ -368,7 +374,7 @@ func handleNsHost(h string, domains map[string]*lazyloadv1alpha1.Destinations, n
 
 func handleSvcHost(fullHost string, strategy *lazyloadv1alpha1.RecyclingStrategy,
 	checkStatus func(now int64, strategy *lazyloadv1alpha1.RecyclingStrategy) lazyloadv1alpha1.Destinations_Status,
-	domains map[string]*lazyloadv1alpha1.Destinations, sf *lazyloadv1alpha1.ServiceFence, rules []*domainAliasRule,
+	domains map[string]*lazyloadv1alpha1.Destinations, _ *lazyloadv1alpha1.ServiceFence, rules []*domainAliasRule,
 ) {
 	now := time.Now().Unix()
 
@@ -402,7 +408,6 @@ func addDomainsWithLabelSelector(domains map[string]*lazyloadv1alpha1.Destinatio
 	defer labelSvcCache.RUnlock()
 
 	for _, selector := range sf.Spec.LabelSelector {
-
 		var result map[string]struct{}
 		// generate result for this selector
 		for k, v := range selector.Selector {
@@ -445,12 +450,15 @@ func addDomainsWithLabelSelector(domains map[string]*lazyloadv1alpha1.Destinatio
 				addToDomains(domains, fh)
 			}
 		}
-
 	}
 }
 
 // update domains with Status.MetricStatus
-func addDomainsWithMetricStatus(domains map[string]*lazyloadv1alpha1.Destinations, sf *lazyloadv1alpha1.ServiceFence, rules []*domainAliasRule) {
+func addDomainsWithMetricStatus(
+	domains map[string]*lazyloadv1alpha1.Destinations,
+	sf *lazyloadv1alpha1.ServiceFence,
+	rules []*domainAliasRule,
+) {
 	for metricName := range sf.Status.MetricStatus {
 		metricName = strings.Trim(metricName, "{}")
 		if !strings.HasPrefix(metricName, "destination_service") && !strings.HasPrefix(metricName, "request_host") {
@@ -460,12 +468,12 @@ func addDomainsWithMetricStatus(domains map[string]*lazyloadv1alpha1.Destination
 
 		var fullHost string
 		// trim ""
-		if ss := strings.Split(metricName, "\""); len(ss) != 3 {
+		ss := strings.Split(metricName, "\"")
+		if len(ss) != 3 {
 			continue
-		} else {
-			// remove port
-			fullHost = strings.SplitN(ss[1], ":", 2)[0]
 		}
+		// remove port
+		fullHost = strings.SplitN(ss[1], ":", 2)[0]
 
 		if !isValidHost(fullHost) {
 			continue
@@ -478,7 +486,10 @@ func addDomainsWithMetricStatus(domains map[string]*lazyloadv1alpha1.Destination
 	}
 }
 
-func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, env bootstrap.Environment) (*networkingv1alpha3.Sidecar, error) {
+func (r *ServicefenceReconciler) newSidecar(
+	sf *lazyloadv1alpha1.ServiceFence,
+	env bootstrap.Environment,
+) (*networkingv1alpha3.Sidecar, error) {
 	hosts := make([]string, 0)
 
 	if !sf.Spec.Enable {
@@ -571,10 +582,9 @@ func (r *ServicefenceReconciler) newSidecar(sf *lazyloadv1alpha1.ServiceFence, e
 			if errors.IsNotFound(err) {
 				log.Warningf("cannot find service %s for servicefence, skip sidecar generating", nsName)
 				return nil, nil
-			} else {
-				log.Errorf("get service %s error, %+v", nsName, err)
-				return nil, err
 			}
+			log.Errorf("get service %s error, %+v", nsName, err)
+			return nil, err
 		}
 		for k, v := range svc.Spec.Selector {
 			sidecar.WorkloadSelector.Labels[k] = v
