@@ -132,3 +132,11 @@ MODULE_NAME?=
 .PHONY: new-module
 new-module:
 	bash bin/gen_module.sh $(MODULE_NAME)
+
+.PHONY: format-go
+format-go:
+	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run --fix -c ./.golangci-format.yaml
+
+.PHONY: lint-go
+lint-go:
+	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run
