@@ -28,6 +28,7 @@ ENV ISTIO_TOOLS_VERSION=1.19.1
 ENV GOLANG_PROTOBUF_VERSION=v1.31.0
 ENV PROTOC_VERSION=3.20.1
 ENV K8S_API_VERSION=0.26.0
+ENV GOLANGCI_LINT_VERSION=v1.53.3
 
 RUN \
     # install controller-gen
@@ -36,7 +37,8 @@ RUN \
     CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' google.golang.org/protobuf/cmd/protoc-gen-go@${GOLANG_PROTOBUF_VERSION} && \
     # install istio code-generator
     CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-jsonshim@${ISTIO_TOOLS_VERSION} && \
-    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-deepcopy@${ISTIO_TOOLS_VERSION}
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-deepcopy@${ISTIO_TOOLS_VERSION} && \
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}
 
 # install k8s api protobuf
 RUN mkdir -p ${GOPATH}/src/k8s.io && \

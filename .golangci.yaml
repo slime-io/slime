@@ -1,0 +1,130 @@
+run:
+  concurrency: 4
+  timeout: "5m"
+  issues-exit-code: 1
+  tests: false
+  go: "1.20"
+
+output:
+  sort-results: true
+  sort-order:
+    - file
+    - linter
+  show-stats: true
+
+issues:
+  exclude-rules:
+    # we don't want to run these linters on e2e tests
+    - path: "./*test/e2e/.*"
+      linters:
+        - gocritic
+        - govet
+        - lll
+        - revive
+        - staticcheck
+        - unused
+
+linters:
+  # fast: true
+  disable-all: true
+  enable:
+    - errcheck
+    - gci
+    - gocritic
+    - gofumpt
+    - goimports
+    - gosimple
+    - govet
+    - ineffassign
+    - lll
+    - revive
+    - staticcheck
+    - unused
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (net/http.ResponseWriter).Write
+      - syscall.SetsockoptInt
+      - (go.opentelemetry.io/otel/metric.Meter).RegisterCallback
+      - k8s.io/apimachinery/pkg/util/wait.PollImmediate
+      - (k8s.io/client-go/tools/cache.SharedInformer).AddEventHandler
+  gci:
+    sections:
+      - standard
+      - default
+      - prefix(slime.io/)
+  gocritic:
+    enable-all: true
+    disabled-checks:
+      - singleCaseSwitch
+      - assignOp
+    settings:
+      ifElseChain:
+        minThreshold: 4
+  goimports:
+    local-prefixes: "slime.io"
+  govet:
+    disable:
+      - copylocks
+      - shadow
+  lll:
+    line-length: 120
+  revive:
+    confidence: 0.0
+    rules:
+      - name: atomic
+      - name: blank-imports
+      - name: bool-literal-in-expr
+      - name: call-to-gc
+      - name: constant-logical-expr
+      - name: datarace
+      - name: deep-exit
+      - name: defer
+        arguments:
+          - ["call-chain", "loop"]
+      - name: dot-imports
+      - name: duplicated-imports
+      - name: empty-block
+      - name: empty-lines
+      - name: error-naming
+      - name: error-return
+      - name: error-strings
+      - name: errorf
+      - name: identical-branches
+      - name: if-return
+      - name: indent-error-flow
+        arguments:
+          - "preserveScope"
+      - name: modifies-parameter
+      - name: modifies-value-receiver
+      - name: range-val-in-closure
+      - name: range-val-address
+      - name: receiver-naming
+      - name: superfluous-else
+        arguments:
+          - "preserveScope"
+      - name: time-equal
+      - name: time-naming
+      - name: unconditional-recursion
+      - name: unexported-naming
+      - name: unreachable-code
+      - name: unused-parameter
+      - name: useless-break
+      - name: var-declaration
+      - name: waitgroup-by-value
+      # maybe enable in the future
+      - name: argument-limit
+        disabled: true
+        arguments: [5]
+      - name: cyclomatic
+        disabled: true
+        arguments: [15]
+      - name: exported
+        disabled: true
+        arguments:
+          - "preserveScope"
+          - "checkPrivateReceivers"
+          - "sayRepetitiveInsteadOfStutters"
+      - name: package-comments
+        disabled: true

@@ -1,0 +1,28 @@
+run:
+  concurrency: 4
+  timeout: "5m"
+  issues-exit-code: 1
+  tests: false
+  go: "1.20"
+
+issues:
+  exclude-files:
+    - ".*\\.pb\\.go"
+    - ".*\\.gen\\.go"
+    - "zz_generated.*\\.go"
+
+linters:
+  disable-all: true
+  enable:
+    - gci
+    - goimports
+    - gofumpt
+
+linters-settings:
+  gci:
+    sections:
+      - standard 
+      - default 
+      - prefix(slime.io/) 
+  goimports:
+    local-prefixes: slime.io
