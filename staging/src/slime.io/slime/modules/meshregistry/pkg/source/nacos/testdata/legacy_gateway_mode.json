@@ -1,0 +1,54 @@
+[
+    {
+        "hosts": [
+            {
+                "instanceId": "10.0.0.1#8080#DEFAULT#DEFAULT_GROUP@@service-a",
+                "ip": "10.0.0.1",
+                "port": 8080,
+                "healthy": true,
+                "enabled": true,
+                "ephemeral": true,
+                "clusterName": "DEFAULT",
+                "serviceName": "DEFAULT_GROUP@@service-a",
+                "metadata": {
+                    "environment": "test",
+                    "version": "v1"
+                }
+            },
+            {
+                "instanceId": "10.0.0.2#8080#DEFAULT#DEFAULT_GROUP@@service-a",
+                "ip": "10.0.0.2",
+                "port": 8080,
+                "healthy": true,
+                "enabled": true,
+                "ephemeral": true,
+                "clusterName": "DEFAULT",
+                "serviceName": "DEFAULT_GROUP@@service-a",
+                "metadata": {
+                    "environment": "test",
+                    "version": "v2"
+                }
+            }
+        ],
+        "dom": "service-a"
+    },
+    {
+        "hosts": [
+            {
+                "instanceId": "10.0.1.1#9000#DEFAULT#DEFAULT_GROUP@@service-b",
+                "ip": "10.0.1.1",
+                "port": 9000,
+                "healthy": true,
+                "enabled": true,
+                "ephemeral": true,
+                "clusterName": "DEFAULT",
+                "serviceName": "DEFAULT_GROUP@@service-b",
+                "metadata": {
+                    "environment": "test",
+                    "version": "v1"
+                }
+            }
+        ],
+        "dom": "service-b"
+    }
+]

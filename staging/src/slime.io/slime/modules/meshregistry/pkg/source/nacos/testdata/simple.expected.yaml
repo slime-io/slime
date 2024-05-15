@@ -1,0 +1,54 @@
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: service-a
+  namespace: nacos
+  labels:
+    registry: nacos
+  annotations: {}
+spec:
+  hosts:
+    - service-a
+  ports:
+    - number: 8080
+      protocol: HTTP
+      name: http-8080
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.0.1
+      ports:
+        http-8080: 8080
+      labels:
+        environment: test
+        version: v1
+    - address: 10.0.0.2
+      ports:
+        http-8080: 8080
+      labels:
+        environment: test
+        version: v2
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: service-b
+  namespace: nacos
+  labels:
+    registry: nacos
+  annotations: {}
+spec:
+  hosts:
+    - service-b
+  ports:
+    - number: 9000
+      protocol: HTTP
+      name: http-9000
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.1.1
+      ports:
+        http-9000: 9000
+      labels:
+        environment: test
+        version: v1

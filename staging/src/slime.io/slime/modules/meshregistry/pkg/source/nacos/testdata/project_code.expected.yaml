@@ -1,0 +1,75 @@
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: service-a.nsf.project1.nacos
+  namespace: nacos
+  labels:
+    registry: nacos
+  annotations: {}
+spec:
+  hosts:
+    - service-a.nsf.project1.nacos
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.0.1
+      ports:
+        http-80: 8080
+      labels:
+        environment: test
+        version: v1
+        projectCode: project1
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: service-a.nsf.project2.nacos
+  namespace: nacos
+  labels:
+    registry: nacos
+  annotations: {}
+spec:
+  hosts:
+    - service-a.nsf.project2.nacos
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.0.2
+      ports:
+        http-80: 8080
+      labels:
+        environment: test
+        version: v2
+        projectCode: project2
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: service-b.nsf.project1.nacos
+  namespace: nacos
+  labels:
+    registry: nacos
+  annotations: {}
+spec:
+  hosts:
+    - service-b.nsf.project1.nacos
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.1.1
+      ports:
+        http-80: 9000
+      labels:
+        environment: test
+        version: v1
+        projectCode: project1

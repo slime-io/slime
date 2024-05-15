@@ -95,7 +95,7 @@ func New(
 		}
 		if args.NsfNacos {
 			argsCopy.EnableProjectCode = true
-			argsCopy.DomSuffix = ".nsf"
+			argsCopy.DomSuffix = "nsf"
 		}
 	}
 	if argsCopy != nil {
@@ -231,29 +231,37 @@ func generateServiceHostAliases(hostAliases []*bootstrap.ServiceHostAlias) map[s
 
 func generateSeMetaModifierFactory(additionalMetas map[string]*bootstrap.MetadataWrapper,
 ) func(string) func(*resource.Metadata) {
+	store := map[string]func(*resource.Metadata){}
 	return func(s string) func(*resource.Metadata) {
+		modifier, ok := store[s]
+		if ok {
+			return modifier
+		}
 		additionalMeta, exist := additionalMetas[s]
 		if !exist || additionalMeta == nil {
-			return func(_ *resource.Metadata) { /*do nothing*/ }
-		}
-		return func(m *resource.Metadata) {
-			if len(additionalMeta.Labels) > 0 {
-				if m.Labels == nil {
-					m.Labels = make(resource.StringMap, len(additionalMeta.Labels))
+			modifier = func(m *resource.Metadata) { /*do nothing*/ }
+		} else {
+			modifier = func(m *resource.Metadata) {
+				if len(additionalMeta.Labels) > 0 {
+					if m.Labels == nil {
+						m.Labels = make(resource.StringMap, len(additionalMeta.Labels))
+					}
+					for k, v := range additionalMeta.Labels {
+						m.Labels[k] = v
+					}
 				}
-				for k, v := range additionalMeta.Labels {
-					m.Labels[k] = v
+				if len(additionalMeta.Annotations) > 0 {
+					if m.Annotations == nil {
+						m.Annotations = make(resource.StringMap, len(additionalMeta.Annotations))
+					}
+					for k, v := range additionalMeta.Annotations {
+						m.Annotations[k] = v
+					}
 				}
 			}
-			if len(additionalMeta.Annotations) > 0 {
-				if m.Annotations == nil {
-					m.Annotations = make(resource.StringMap, len(additionalMeta.Annotations))
-				}
-				for k, v := range additionalMeta.Annotations {
-					m.Annotations[k] = v
-				}
-			}
 		}
+		store[s] = modifier
+		return modifier
 	}
 }
 
@@ -352,12 +360,16 @@ func buildEvent(
 	seFullName string,
 	resourceNs string,
 	metaModifier func(meta *resource.Metadata),
+	nsHost bool,
 ) (event.Event, error) {
 	se := util.CopySe(item)
-	items := strings.Split(seFullName, ".")
 	ns := resourceNs
-	if len(items) > 1 {
-		ns = items[1]
+	if nsHost {
+		// pick the last one as Namespace if the NsHost is enabled.
+		items := strings.Split(seFullName, ".")
+		if len(items) > 1 {
+			ns = items[len(items)-1]
+		}
 	}
 	now := time.Now()
 	meta := resource.Metadata{
