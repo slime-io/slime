@@ -1,0 +1,72 @@
+[
+    {
+      "name": "ApplicationA",
+      "instance": [
+        {
+          "instanceId": "appA-instance-1",
+          "hostName": "192.168.2.10",
+          "ipAddr": "192.168.2.10",
+          "status": "UP",
+          "port": {
+            "$": 8000,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 8443,
+            "@enabled": "false"
+          },
+          "app": "ApplicationA",
+          "metadata": {
+            "version": "2.1.0",
+            "zone": "eu-west-1a",
+            "projectCode": "project1"
+          }
+        },
+        {
+          "instanceId": "appA-instance-2",
+          "hostName": "192.168.2.11",
+          "ipAddr": "192.168.2.11",
+          "status": "UP",
+          "port": {
+            "$": 8001,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 8444,
+            "@enabled": "false"
+          },
+          "app": "ApplicationA",
+          "metadata": {
+            "version": "2.1.0",
+            "zone": "eu-west-1b",
+            "projectCode": "project2"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ApplicationB",
+      "instance": [
+        {
+          "instanceId": "appB-instance-1",
+          "hostName": "192.168.3.10",
+          "ipAddr": "192.168.3.10",
+          "status": "UP",
+          "port": {
+            "$": 9000,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 9443,
+            "@enabled": "false"
+          },
+          "app": "ApplicationB",
+          "metadata": {
+            "version": "1.2.0",
+            "zone": "ap-southeast-1a",
+            "projectCode": "project3"
+          }
+        }
+      ]
+    }
+  ]

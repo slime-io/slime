@@ -74,7 +74,7 @@ func New(
 		}
 		if args.NsfEureka {
 			argsCopy.EnableProjectCode = true
-			argsCopy.AppSuffix = ".nsf"
+			argsCopy.AppSuffix = "nsf"
 		}
 	}
 	if argsCopy != nil {
@@ -221,7 +221,7 @@ func (s *Source) updateServiceInfo() error {
 			seCopy.Endpoints = make([]*networkingapi.WorkloadEntry, 0)
 			newServiceEntryMap[seFullName] = &seCopy
 			se = &seCopy
-			event, err := buildEvent(event.Updated, se, seFullName, s.args.ResourceNs)
+			event, err := buildEvent(event.Updated, se, seFullName, s.args.ResourceNs, s.args.NsHost)
 			if err == nil {
 				log.Infof("delete(update) eureka se, hosts: %s ,ep: %s ,size : %d ",
 					se.Hosts[0], printEps(se.Endpoints), len(se.Endpoints))
@@ -238,7 +238,7 @@ func (s *Source) updateServiceInfo() error {
 	for seFullName, newEntry := range newServiceEntryMap {
 		if oldEntry, ok := cache[seFullName]; !ok {
 			// ADD
-			event, err := buildEvent(event.Added, newEntry, seFullName, s.args.ResourceNs)
+			event, err := buildEvent(event.Added, newEntry, seFullName, s.args.ResourceNs, s.args.NsHost)
 			if err == nil {
 				log.Infof("add eureka se, hosts: %s ,ep: %s, size: %d ",
 					newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
@@ -251,7 +251,7 @@ func (s *Source) updateServiceInfo() error {
 			monitoring.RecordServiceEntryCreation(SourceName, err == nil)
 		} else if !proto.Equal(oldEntry, newEntry) {
 			// UPDATE
-			event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs)
+			event, err := buildEvent(event.Updated, newEntry, seFullName, s.args.ResourceNs, s.args.NsHost)
 			if err == nil {
 				log.Infof("update eureka se, hosts: %s, ep: %s, size: %d ",
 					newEntry.Hosts[0], printEps(newEntry.Endpoints), len(newEntry.Endpoints))
@@ -272,12 +272,21 @@ func (s *Source) updateServiceInfo() error {
 	return nil
 }
 
-func buildEvent(kind event.Kind, item *networkingapi.ServiceEntry, seFullName, resourceNs string) (event.Event, error) {
+func buildEvent(
+	kind event.Kind,
+	item *networkingapi.ServiceEntry,
+	seFullName string,
+	resourceNs string,
+	nsHost bool,
+) (event.Event, error) {
 	se := util.CopySe(item)
-	items := strings.Split(seFullName, ".")
 	ns := resourceNs
-	if len(items) > 1 {
-		ns = items[1]
+	if nsHost {
+		// pick the last one as Namespace if the NsHost is enabled.
+		items := strings.Split(seFullName, ".")
+		if len(items) > 1 {
+			ns = items[len(items)-1]
+		}
 	}
 	now := time.Now()
 	meta := resource.Metadata{

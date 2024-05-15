@@ -1,0 +1,88 @@
+[
+    {
+      "name": "ApplicationA",
+      "instance": [
+        {
+          "instanceId": "appA-instance-1",
+          "hostName": "192.168.2.10",
+          "ipAddr": "192.168.2.10",
+          "status": "UP",
+          "port": {
+            "$": 8000,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 8443,
+            "@enabled": "false"
+          },
+          "app": "ApplicationA",
+          "metadata": {
+            "version": "2.1.0",
+            "zone": "eu-west-1a"
+          }
+        },
+        {
+          "instanceId": "appA-instance-2",
+          "hostName": "192.168.2.11",
+          "ipAddr": "192.168.2.11",
+          "status": "DOWN",
+          "port": {
+            "$": 8001,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 8444,
+            "@enabled": "false"
+          },
+          "app": "ApplicationA",
+          "metadata": {
+            "version": "2.1.0",
+            "zone": "eu-west-1b"
+          }
+        },
+        {
+          "instanceId": "appA-instance-3",
+          "hostName": "192.168.2.12",
+          "ipAddr": "192.168.2.12",
+          "status": "DOWN",
+          "port": {
+            "$": 8002,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 8444,
+            "@enabled": "false"
+          },
+          "app": "ApplicationA",
+          "metadata": {
+            "version": "2.1.0",
+            "zone": "eu-west-1b"
+          }
+        }
+      ]
+    },
+    {
+      "name": "ApplicationB",
+      "instance": [
+        {
+          "instanceId": "appB-instance-1",
+          "hostName": "192.168.3.10",
+          "ipAddr": "192.168.3.10",
+          "status": "DOWN",
+          "port": {
+            "$": 9000,
+            "@enabled": "true"
+          },
+          "securePort": {
+            "$": 9443,
+            "@enabled": "false"
+          },
+          "app": "ApplicationB",
+          "metadata": {
+            "version": "1.2.0",
+            "zone": "ap-southeast-1a"
+          }
+        }
+      ]
+    }
+  ]

@@ -1,0 +1,41 @@
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: applicationa
+  namespace: eureka
+  labels:
+    registry: eureka
+  annotations: {}
+spec:
+  hosts:
+    - applicationa
+  ports:
+    - number: 8000
+      protocol: HTTP
+      name: http-8000
+  resolution: STATIC
+  endpoints:
+    - address: 192.168.2.10
+      ports:
+        http-8000: 8000
+      labels:
+        version: 2.1.0
+        zone: eu-west-1a
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: applicationb
+  namespace: eureka
+  labels:
+    registry: eureka
+  annotations: {}
+spec:
+  hosts:
+    - applicationb
+  ports:
+    - number: 9000
+      protocol: HTTP
+      name: http-9000
+  resolution: STATIC

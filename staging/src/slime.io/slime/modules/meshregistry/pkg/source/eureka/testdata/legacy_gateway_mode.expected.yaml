@@ -1,0 +1,54 @@
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: applicationa.eureka
+  namespace: eureka
+  labels:
+    registry: eureka
+  annotations: {}
+spec:
+  hosts:
+    - applicationa.eureka
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 192.168.2.10
+      ports:
+        http-80: 8000
+      labels:
+        version: 2.1.0
+        zone: eu-west-1a
+    - address: 192.168.2.11
+      ports:
+        http-80: 8001
+      labels:
+        version: 2.1.0
+        zone: eu-west-1b
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: applicationb.eureka
+  namespace: eureka
+  labels:
+    registry: eureka
+  annotations: {}
+spec:
+  hosts:
+    - applicationb.eureka
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 192.168.3.10
+      ports:
+        http-80: 9000
+      labels:
+        version: 1.2.0
+        zone: ap-southeast-1a
