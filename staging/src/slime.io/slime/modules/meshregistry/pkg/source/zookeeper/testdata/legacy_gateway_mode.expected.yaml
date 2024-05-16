@@ -1,0 +1,149 @@
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: com.example.service.ServiceA:g:0.0.1
+  namespace: dubbo
+  labels:
+    path: com.example.service.ServiceA
+    registry: zookeeper
+  annotations: {}
+spec:
+  hosts:
+    - 'com.example.service.ServiceA:g:0.0.1.dubbo'
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.0.1
+      ports:
+        http-80: 20880
+      labels:
+        application: service-a
+        group: g
+        interface: com.example.service.ServiceA
+        side: provider
+        version: 0.0.1
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: com.example.service.ServiceA:g:0.0.2
+  namespace: dubbo
+  labels:
+    path: com.example.service.ServiceA
+    registry: zookeeper
+  annotations: {}
+spec:
+  hosts:
+    - 'com.example.service.ServiceA:g:0.0.2.dubbo'
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.0.2
+      ports:
+        http-80: 20880
+      labels:
+        application: service-a
+        group: g
+        interface: com.example.service.ServiceA
+        side: provider
+        version: 0.0.2
+    - address: 10.0.0.3
+      ports:
+        http-80: 20880
+      labels:
+        application: service-a
+        group: g
+        interface: com.example.service.ServiceA
+        side: provider
+        version: 0.0.2
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: com.example.service.ServiceB:g:0.0.1
+  namespace: dubbo
+  labels:
+    path: com.example.service.ServiceB
+    registry: zookeeper
+  annotations: {}
+spec:
+  hosts:
+    - 'com.example.service.ServiceB:g:0.0.1.dubbo'
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.1.1
+      ports:
+        http-80: 20881
+      labels:
+        application: service-b
+        group: g
+        interface: com.example.service.ServiceB
+        side: provider
+        version: 0.0.1
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: com.example.service.ServiceB:g2:0.0.1
+  namespace: dubbo
+  labels:
+    path: com.example.service.ServiceB
+    registry: zookeeper
+  annotations: {}
+spec:
+  hosts:
+    - 'com.example.service.ServiceB:g2:0.0.1.dubbo'
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.1.2
+      ports:
+        http-80: 20881
+      labels:
+        application: service-b
+        group: g2
+        interface: com.example.service.ServiceB
+        side: provider
+        version: 0.0.1
+---
+kind: ServiceEntry
+apiVersion: networking.istio.io/v1alpha3
+metadata:
+  name: com.example.service.ServiceC:g2:0.0.1
+  namespace: dubbo
+  labels:
+    path: com.example.service.ServiceC
+    registry: zookeeper
+  annotations: {}
+spec:
+  hosts:
+    - 'com.example.service.ServiceC:g2:0.0.1.dubbo'
+  ports:
+    - number: 80
+      protocol: HTTP
+      name: http-80
+  resolution: STATIC
+  endpoints:
+    - address: 10.0.2.1
+      ports:
+        http-80: 20882
+      labels:
+        application: service-c
+        group: g2
+        interface: com.example.service.ServiceC
+        side: provider
+        version: 0.0.1

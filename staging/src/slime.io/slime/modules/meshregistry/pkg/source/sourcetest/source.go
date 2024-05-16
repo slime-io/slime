@@ -4,9 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
+	"github.com/go-zookeeper/zk"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
 	"istio.io/libistio/pkg/config"
 	"istio.io/libistio/pkg/config/event"
 	"istio.io/libistio/pkg/config/resource"
@@ -57,6 +61,9 @@ func (s *simpleConfigStore) Handle(e event.Event) {
 	}
 }
 
+// AssertEventHandler is a helper for testing `event.Source`.
+// It loads the expected configs from a yaml format file, and
+// processes events from `event.Source` to build the got configs.
 type AssertEventHandler struct {
 	schemas collection.Schemas
 
@@ -66,6 +73,7 @@ type AssertEventHandler struct {
 	got *simpleConfigStore
 }
 
+// NewAssertEventHandler creates a new AssertEventHandler.
 func NewAssertEventHandler() *AssertEventHandler {
 	schemas := collection.SchemasFor(collections.ServiceEntry, collections.Sidecar)
 	expected := &simpleConfigStore{
@@ -85,10 +93,12 @@ func NewAssertEventHandler() *AssertEventHandler {
 	}
 }
 
+// Handle handles an event.Event. Implement `event.Handler`.
 func (h *AssertEventHandler) Handle(e event.Event) {
 	h.got.Handle(e)
 }
 
+// LoadExpected loads the expected configs from a yaml format file.
 func (h *AssertEventHandler) LoadExpected(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -97,12 +107,14 @@ func (h *AssertEventHandler) LoadExpected(path string) error {
 	return h.expectedHelper.ApplyContent(path, string(data))
 }
 
+// Reset clears both the expected and got configs.
 func (h *AssertEventHandler) Reset() {
 	h.expected.clear()
 	h.expectedHelper.Clear()
 	h.got.clear()
 }
 
+// Assert asserts that the expected and got configs are equal.
 func (h *AssertEventHandler) Assert(t *testing.T) {
 	for _, schema := range h.schemas.All() {
 		expected := h.expected.listByGVK(schema.GroupVersionKind())
@@ -212,4 +224,87 @@ func (m *MockPollingClient[T]) load() error {
 	}
 	m.services = apps
 	return nil
+}
+
+// ZkNode is a node in the Zookeeper tree.
+type ZkNode struct {
+	// FullPath is the full path of the node, including the leading slash.
+	FullPath string `json:"fullPath,omitempty" yaml:"fullPath"`
+	// Data is the data of the node. Optional.
+	Data string `json:"data,omitempty" yaml:"data"`
+	// Children is the children of the node. Optional.
+	Children map[string]*ZkNode `json:"children,omitempty" yaml:"children"`
+}
+
+func (n *ZkNode) GetChildren(path string) []string {
+	if n.FullPath == path {
+		children := make([]string, 0, len(n.Children))
+		for _, child := range n.Children {
+			children = append(children, filepath.Base(child.FullPath))
+		}
+		return children
+	}
+	if strings.HasPrefix(path, n.FullPath) {
+		for _, child := range n.Children {
+			if !strings.HasPrefix(path, child.FullPath) {
+				continue
+			}
+			children := child.GetChildren(path)
+			if len(children) > 0 {
+				return children
+			}
+		}
+	}
+	return nil
+}
+
+type MockZookeeperClient struct {
+	err  error
+	root *ZkNode
+	path string
+}
+
+func NewMockZookeeperClient() *MockZookeeperClient {
+	return &MockZookeeperClient{}
+}
+
+func (m *MockZookeeperClient) Load(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	var root ZkNode
+	if err := yaml.Unmarshal(data, &root); err != nil {
+		return err
+	}
+	m.root = &root
+	return nil
+}
+
+func (m *MockZookeeperClient) Children(path string) ([]string, error) {
+	children := m.root.GetChildren(path)
+	if children == nil {
+		return nil, fmt.Errorf("children of path %s not found", path)
+	}
+	return children, nil
+}
+
+func (m *MockZookeeperClient) ChildrenW(_ string) ([]string, <-chan zk.Event, error) {
+	panic("implement me")
+}
+
+func (m *MockZookeeperClient) Reset() {
+	m.root = nil
+}
+
+func (m *MockZookeeperClient) SetError(err error) {
+	m.err = err
+}
+
+func (m *MockZookeeperClient) SetRoot(root *ZkNode) {
+	m.root = root
+}
+
+func (m *MockZookeeperClient) SetPath(path string) {
+	m.path = path
 }

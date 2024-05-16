@@ -365,7 +365,7 @@ func convertDubboCallModel(
 		{eps: inboundEndpoints, inbound: true},
 	} {
 		for _, e := range it.eps {
-			app, ok := e.Labels[DubboSvcAppLabel]
+			app, ok := e.Labels[dubboSvcAppLabel]
 			if !ok {
 				continue
 			}

@@ -1,0 +1,72 @@
+# three dubbo interfaces:
+# 
+# - com.example.service.ServiceA
+# - com.example.service.ServiceB
+# - com.example.service.ServiceC
+# 
+# with the following call chain:
+# 
+#   ServiceA -> ServiceB -> ServiceC
+#
+fullPath: "/"
+children:
+  dubbo:
+    fullPath: "/dubbo"
+    children:
+      com.example.service.ServiceA:
+        fullPath: "/dubbo/com.example.service.ServiceA"
+        children:
+          providers:
+            fullPath: "/dubbo/com.example.service.ServiceA/providers"
+            children:
+              # dubbo://10.0.0.1:20880/com.example.service.ServiceA?application=service-a&group=g&interface=com.example.service.ServiceA&methods=sayHelllo&side=provider&version=0.0.1
+              dubbo%3A%2F%2F10.0.0.1%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.0.1%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1"
+              # dubbo://10.0.0.2:20880/com.example.service.ServiceA?application=service-a&group=g&interface=com.example.service.ServiceA&methods=sayHelllo&side=provider&version=0.0.2
+              dubbo%3A%2F%2F10.0.0.2%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.2:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.0.2%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.2"
+              # dubbo://10.0.0.3:20880/com.example.service.ServiceA?application=service-a&group=g&interface=com.example.service.ServiceA&methods=sayHelllo&side=provider&version=0.0.2
+              dubbo%3A%2F%2F10.0.0.3%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.2:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.0.3%3A20880%2Fcom.example.service.ServiceA%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceA%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.2"
+      com.example.service.ServiceB:
+        fullPath: "/dubbo/com.example.service.ServiceB"
+        children:
+          providers:
+            fullPath: "/dubbo/com.example.service.ServiceB/providers"
+            children:
+              # dubbo://10.0.1.1:20881/com.example.service.ServiceB?application=service-b&group=g&interface=com.example.service.ServiceB&methods=sayHelllo&side=provider&version=0.0.1
+              dubbo%3A%2F%2F10.0.1.1%3A20881%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-b%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.1.1%3A20881%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-b%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1"
+              # dubbo://10.0.1.2:20881/com.example.service.ServiceB?application=service-b&group=g2&interface=com.example.service.ServiceB&methods=sayHelllo&side=provider&version=0.0.1
+              dubbo%3A%2F%2F10.0.1.2%3A20881%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.1.2%3A20881%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1"
+          consumers:
+            fullPath: "/dubbo/com.example.service.ServiceB/consumers"
+            children:
+              # consumer://10.0.0.1/com.example.service.ServiceB?application=service-a&group=g2&interface=com.example.service.ServiceB&methods=sayHelllo&side=consumer&version=0.0.1
+              consumer%3A%2F%2F10.0.0.1%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg2%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceB/consumers/consumer%3A%2F%2F10.0.0.1%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg2%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1"
+              # consumer://10.0.0.2/com.example.service.ServiceB?application=service-a&group=g&interface=com.example.service.ServiceB&methods=sayHelllo&side=consumer&version=0.0.1
+              consumer%3A%2F%2F10.0.0.2%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceB/consumers/consumer%3A%2F%2F10.0.0.2%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1"
+              # consumer://10.0.0.3/com.example.service.ServiceB?application=service-a&group=g&interface=com.example.service.ServiceB&methods=sayHelllo&side=consumer&version=0.0.1
+              consumer%3A%2F%2F10.0.0.3%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceB/consumers/consumer%3A%2F%2F10.0.0.3%2Fcom.example.service.ServiceB%3Fapplication%3Dservice-a%26group%3Dg%26interface%3Dcom.example.service.ServiceB%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1"
+      com.example.service.ServiceC:
+        fullPath: "/dubbo/com.example.service.ServiceC"
+        children:
+          providers:
+            fullPath: "/dubbo/com.example.service.ServiceC/providers"
+            children:
+              # dubbo://10.0.2.1:20882/com.example.service.ServiceC?application=service-c&group=g2&interface=com.example.service.ServiceC&methods=sayHelllo&side=provider&version=0.0.1
+              dubbo%3A%2F%2F10.0.2.1%3A20882%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-c%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceA/providers/dubbo%3A%2F%2F10.0.2.1%3A20882%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-c%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dprovider%26version%3D0.0.1"
+          consumers:
+            fullPath: "/dubbo/com.example.service.ServiceC/consumers"
+            children:
+              # consumer://10.0.1.1/com.example.service.ServiceC?application=service-b&group=g2&interface=com.example.service.ServiceC&methods=sayHelllo&side=consumer&version=0.0.1
+              consumer%3A%2F%2F10.0.1.1%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceC/consumers/consumer%3A%2F%2F10.0.1.1%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1"
+              # consumer://10.0.1.2/com.example.service.ServiceC?application=service-b&group=g2&interface=com.example.service.ServiceC&methods=sayHelllo&side=consumer&version=0.0.1
+              consumer%3A%2F%2F10.0.1.2%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1:
+                fullPath: "/dubbo/com.example.service.ServiceC/consumers/consumer%3A%2F%2F10.0.1.2%2Fcom.example.service.ServiceC%3Fapplication%3Dservice-b%26group%3Dg2%26interface%3Dcom.example.service.ServiceC%26methods%3DsayHelllo%26side%3Dconsumer%26version%3D0.0.1"

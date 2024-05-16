@@ -16,27 +16,23 @@ import (
 )
 
 const (
-	Dubbo                        = "dubbo://"
-	Consumer                     = "consumer://"
-	NetworkProtocolDubbo         = "dubbo" // XXX change to DUBBO
-	DubboPortName                = "dubbo"
-	DubboServiceModelInterface   = "interface"
-	DubboServiceModelApplication = "application"
-	DubboServiceKeySep           = ":"
-)
+	schemeDubbo    = "dubbo://"
+	schemeConsumer = "consumer://"
 
-const (
-	dubboParamGroupKey            = "group"
-	dubboParamDefaultGroupKey     = "default.group"
-	dubboParamVersionKey          = "version"
-	dubboParamDefaultVersionKey   = "default.version"
-	dubboTag                      = "dubbo.tag"
-	dubboParamMethods             = "methods"
+	dubboSvcAppLabel      = "application"
+	dubboSvcMethodEqLabel = "istio.io/dubbomethodequal"
+
+	dubboParamInterfaceKey      = "interface"
+	dubboParamGroupKey          = "group"
+	dubboParamDefaultGroupKey   = "default.group"
+	dubboParamVersionKey        = "version"
+	dubboParamDefaultVersionKey = "default.version"
+	dubboParamMethods           = "methods"
+	dubboTag                    = "dubbo.tag"
+
 	metaDataServiceKey            = "dubbo.metadata-service.url-params"
 	metadataServicePortNamePrefix = "metadata-service-port-"
-	DubboHostnameSuffix           = ".dubbo"
-	DubboSvcAppLabel              = "application"
-	DubboSvcMethodEqLabel         = "istio.io/dubbomethodequal"
+	dubboServiceKeySep            = ":"
 )
 
 type Error struct {
@@ -121,7 +117,7 @@ func (s *Source) convertServiceEntry(
 		for k, cse := range serviceEntryByServiceKey {
 			cse.labels = map[string]string{}
 			if s.args.SingleAppService {
-				cse.labels[DubboSvcAppLabel] = getEndpointsLabel(cse.se.Endpoints, DubboSvcAppLabel, false)
+				cse.labels[dubboSvcAppLabel] = getEndpointsLabel(cse.se.Endpoints, dubboSvcAppLabel, false)
 			}
 
 			var enableMethodLB bool
@@ -134,7 +130,7 @@ func (s *Source) convertServiceEntry(
 
 			if !trimSameDubboMethodsLabel(cse.se) && enableMethodLB {
 				// to trigger svc change/full push in istio sidecar when eq -> uneq or uneq -> eq
-				cse.labels[DubboSvcMethodEqLabel] = strconv.FormatBool(false)
+				cse.labels[dubboSvcMethodEqLabel] = strconv.FormatBool(false)
 			}
 			if v := methodsByServiceKey[k]; len(v) > 0 {
 				methods := make([]string, 0, len(v))
@@ -331,11 +327,11 @@ func buildServiceKey(service string, meta map[string]string) string {
 	}
 	parts = parts[:i+1]
 	// NOTE: this hostname format will be used in istiod. Any change should be syned with that.
-	return strings.Join(parts, DubboServiceKeySep)
+	return strings.Join(parts, dubboServiceKeySep)
 }
 
 func parseServiceFromKey(serviceKey string) string {
-	idx := strings.Index(serviceKey, DubboServiceKeySep)
+	idx := strings.Index(serviceKey, dubboServiceKeySep)
 	if idx < 0 {
 		return serviceKey
 	}
@@ -371,7 +367,13 @@ func parseAddr(addr string) (ip string, port uint32, err error) {
 
 func consumerMeta(labels map[string]string) map[string]string {
 	for k := range labels {
-		if k != "application" && k != "interface" && k != "side" && k != "group" && k != "version" {
+		switch k {
+		case dubboSvcAppLabel, // consumer's app label
+			dubboParamInterfaceKey, // provider's own interface/group/version
+			dubboParamGroupKey, dubboParamDefaultGroupKey,
+			dubboParamVersionKey, dubboParamDefaultVersionKey:
+			continue
+		default:
 			delete(labels, k)
 		}
 	}
@@ -421,11 +423,6 @@ func verifyMeta(url string, ip string, port uint32, service string, patchLabel b
 		v = strings.ReplaceAll(v, ",", "_")
 		v = strings.ReplaceAll(v, ":", "_")
 		meta[k] = v
-		/*		if wildcardPrefixRegexp.MatchString(kv[1]) {
-
-				} else {
-					log.Warnf("invalid tag value: %s", kv[1])
-				}*/
 	}
 
 	if extraMeta != nil && defaultExtraMetaPatcher != nil {
@@ -493,7 +490,7 @@ func splitUrl(zkChild string) []string {
 		log.Errorf(err.Error())
 		return nil
 	}
-	if !strings.HasPrefix(path, Dubbo) && !strings.HasPrefix(path, Consumer) {
+	if !strings.HasPrefix(path, schemeDubbo) && !strings.HasPrefix(path, schemeConsumer) {
 		return nil
 	}
 	ss := strings.SplitN(path, "/", 4)

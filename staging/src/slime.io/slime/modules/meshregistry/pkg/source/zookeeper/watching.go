@@ -110,7 +110,7 @@ type ServiceEvent struct {
 }
 
 type EndpointWatcherOpts struct {
-	conn                       *zkConn
+	conn                       ZkConn
 	endpointUpdateFunc         func(providers, consumers, configurators []string, serverPath string)
 	serviceDeleteFunc          func(path string)
 	consumerPath, providerPath string
@@ -143,7 +143,7 @@ func NewEndpointWatcher(servicePath string, opts EndpointWatcherOpts) *EndpointW
 }
 
 type EndpointWatcher struct {
-	conn *zkConn
+	conn ZkConn
 
 	// /{root:dubbo}/{service:<service-name>}
 	// - /{root:dubbo}/{service:<service-name>}/providers/dubbo://ip:port/{provider_service}}?xxx
@@ -422,7 +422,7 @@ var dubboExcludeServicePath = []string{
 type ServiceWatcher struct {
 	ctx context.Context
 
-	conn                       *zkConn
+	conn                       ZkConn
 	rootPath                   string
 	endpointUpdateFunc         func([]string, []string, []string, string)
 	serviceDeleteFunc          func(string)

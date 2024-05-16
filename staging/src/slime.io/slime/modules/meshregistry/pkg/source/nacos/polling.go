@@ -40,7 +40,7 @@ func (s *Source) refresh() {
 	log.Infof("nacos refresh start : %d", t0.UnixNano())
 	if err := s.updateServiceInfo(); err != nil {
 		monitoring.RecordPolling(SourceName, t0, time.Now(), false)
-		log.Errorf("eureka update service info failed: %v", err)
+		log.Errorf("nacos update service info failed: %v", err)
 		return
 	}
 	t1 := time.Now()
