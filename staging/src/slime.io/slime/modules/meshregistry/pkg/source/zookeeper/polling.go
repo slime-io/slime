@@ -1,6 +1,7 @@
 package zookeeper
 
 import (
+	"fmt"
 	"time"
 
 	"slime.io/slime/framework/util"
@@ -28,21 +29,28 @@ func (s *Source) Polling() {
 func (s *Source) refresh() {
 	t0 := time.Now()
 	log.Infof("zk refresh start : %d", t0.UnixNano())
+	if err := s.updateServiceInfo(); err != nil {
+		monitoring.RecordPolling(SourceName, t0, time.Now(), false)
+		log.Errorf("nacos update service info failed: %v", err)
+		return
+	}
+	t1 := time.Now()
+	log.Infof("zk refresh finish : %d", t1.UnixNano())
+	monitoring.RecordPolling(SourceName, t0, t1, true)
+	s.markServiceEntryInitDone()
+}
+
+func (s *Source) updateServiceInfo() error {
 	interfaces, err := s.Con.Children(s.args.RegistryRootNode)
 	monitoring.RecordSourceClientRequest(SourceName, err == nil)
 	if err != nil {
-		monitoring.RecordPolling(SourceName, t0, time.Now(), false)
-		log.Errorf("zk path %s get child error: %s", s.args.RegistryRootNode, err.Error())
-		return
+		return fmt.Errorf("zk path %s get child error: %s", s.args.RegistryRootNode, err.Error())
 	}
 	for _, iface := range interfaces {
 		s.iface(iface)
 	}
 	s.handleInterfacesDelete(interfaces)
-	t1 := time.Now()
-	log.Infof("zk refresh finish : %d", t1.UnixNano())
-	monitoring.RecordPolling(SourceName, t0, t1, true)
-	s.markServiceEntryInitDone()
+	return nil
 }
 
 func (s *Source) iface(service string) {

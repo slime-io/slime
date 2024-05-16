@@ -112,6 +112,9 @@ func TestUpdateServiceInfo(t *testing.T) {
 				},
 			},
 		},
+		// TODO: add test cases for:
+		// - mock merged ServiceEntry
+		// - ...
 	}
 
 	initTest := func(s *Source) {

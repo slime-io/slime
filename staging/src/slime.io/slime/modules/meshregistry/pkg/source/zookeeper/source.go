@@ -58,6 +58,13 @@ const (
 
 var log = model.ModuleLog.WithField(frameworkmodel.LogFieldKeyPkg, "zk")
 
+type ZkConn interface {
+	Store(*zk.Conn)
+	Load() any
+	Children(string) ([]string, error)
+	ChildrenW(string) ([]string, <-chan zk.Event, error)
+}
+
 type zkConn struct {
 	conn atomic.Value // store *zk.Conn
 }
@@ -66,7 +73,7 @@ func (z *zkConn) Store(conn *zk.Conn) {
 	z.conn.Store(conn)
 }
 
-func (z *zkConn) Load() interface{} {
+func (z *zkConn) Load() any {
 	return z.conn.Load()
 }
 
@@ -90,7 +97,6 @@ type Source struct {
 	args *bootstrap.ZookeeperSourceArgs
 
 	ignoreLabelsMap map[string]string
-	watchingRoot    bool // TODO useless?
 
 	serviceMethods map[string]string
 
@@ -113,7 +119,7 @@ type Source struct {
 	refreshSidecarNotifyCh chan struct{}
 	stop                   chan struct{}
 
-	Con               *zkConn
+	Con               ZkConn
 	seMergePortMocker *source.ServiceEntryMergePortMocker
 
 	// instanceFilter fitler which instance of a service should be include
@@ -184,7 +190,6 @@ func New(
 		dubboPortsCache:        map[uint32]*networkingapi.Port{},
 		seInitCh:               make(chan struct{}),
 		stop:                   make(chan struct{}),
-		watchingRoot:           false,
 		refreshSidecarNotifyCh: make(chan struct{}, 1),
 		Con:                    &zkConn{},
 		seMergePortMocker:      svcMocker,
@@ -203,7 +208,7 @@ func New(
 	}
 	if src.seMergePortMocker != nil {
 		src.handlers = append(src.handlers, src.seMergePortMocker)
-		svcMocker.SetDispatcher(src.dispatchMergePortsServiceEntry)
+		src.seMergePortMocker.SetDispatcher(src.dispatchMergePortsServiceEntry)
 		src.initWg.Add(1) // merge ports se init-sync ready
 	}
 
@@ -250,9 +255,6 @@ func (l zkLogger) Printf(format string, args ...interface{}) {
 
 func (s *Source) reConFunc(reconCh chan<- struct{}) {
 	monitoring.RecordSourceConnectionStatus(SourceName, false)
-	if s.watchingRoot {
-		return // ??
-	}
 
 	// TODO: use the zk.Conn.hostProvider.Len() replace the len(s.args.Address)?
 	connectTimeout := time.Duration(len(s.args.Address)+1) * time.Second
@@ -695,14 +697,14 @@ func (s *Source) handleServiceDelete(iface string, ignoredSes frameworkutil.Set[
 			ses.Set(se, &seValueCopy)
 			sem = &seValueCopy
 			event, err := buildServiceEntryEvent(event.Updated, sem.ServiceEntry, sem.Meta, false)
-			if err == nil {
+			if err != nil {
+				log.Errorf("delete(update) svc %s failed, case: %v", se, err.Error())
+			} else {
 				log.Infof("delete(update) zk se, hosts: %s, ep size: %d ",
 					sem.ServiceEntry.Hosts[0], len(sem.ServiceEntry.Endpoints))
 				for _, h := range s.handlers {
 					h.Handle(event)
 				}
-			} else {
-				log.Errorf("delete(update) svc %s failed, case: %v", se, err.Error())
 			}
 			monitoring.RecordServiceEntryDeletion(SourceName, false, err == nil)
 		}

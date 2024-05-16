@@ -123,6 +123,7 @@ func TestUpdateServiceInfo(t *testing.T) {
 		// - hostalias
 		// - ServiceEntry meta modifier
 		// - regroup instances
+		// - mock merged ServiceEntry
 		// - ...
 	}
 
