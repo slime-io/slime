@@ -8,6 +8,7 @@ package controllers
 import (
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -42,13 +43,17 @@ const (
 	riderPackagePath  = "/usr/local/lib/rider/?/init.lua;/usr/local/lib/rider/?.lua;"
 	RiderEnvKey       = "ISTIO_RIDER_ENV"
 
-	applyToDubboVirtualHost   = "DUBBO_SUB_ROUTE_CONFIG"
-	applyToDubboRoute         = "DUBBO_ROUTE"
-	applyToGenericVirtualHost = "GENERIC_PROXY_VIRTUAL_HOST"
-	appToGenericRoute         = "GENERIC_PROXY_ROUTE"
-	applyToGenericFilter      = "GENERIC_PROXY_FILTER"
-	applyToDubboFilter        = "DUBBO_FILTER"
-	applyToHTTPFilter         = "HTTP_FILTER"
+	applyToHTTPFilter = "HTTP_FILTER"
+
+	applyToDubboRouteConfiguration = "DUBBO_ROUTE_CONFIGURATION"
+	applyToDubboVirtualHost        = "DUBBO_SUB_ROUTE_CONFIG"
+	applyToDubboRoute              = "DUBBO_ROUTE"
+	applyToDubboFilter             = "DUBBO_FILTER"
+
+	applyToGenericRouteConfiguration = "GENERIC_PROXY_ROUTE_CONFIGURATION"
+	applyToGenericVirtualHost        = "GENERIC_PROXY_VIRTUAL_HOST"
+	appToGenericRoute                = "GENERIC_PROXY_ROUTE"
+	applyToGenericFilter             = "GENERIC_PROXY_FILTER"
 )
 
 // genGatewayInlineCfps is a custom func to handle EnvoyPlugin gateway
@@ -60,8 +65,8 @@ var genGatewayInlineCfps func(
 ) []*networkingapi.EnvoyFilter_EnvoyConfigObjectPatch
 
 type target struct {
-	applyToVh   bool
-	host, route string
+	applyToRc, applyToVh                   bool
+	routeConfiguration, virtualHost, route string
 }
 
 var directPatchingPlugins = []string{
@@ -186,10 +191,20 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 	var configPatched []translateOutputConfigPatch
 
 	var targets []target
+	for _, l := range in.Listener {
+		for _, rc := range buildRouteConfigurationName(l) {
+			if rc != "" {
+				targets = append(targets, target{
+					applyToRc:          true,
+					routeConfiguration: rc,
+				})
+			}
+		}
+	}
 	for _, h := range in.Host {
 		targets = append(targets, target{
-			applyToVh: true,
-			host:      h,
+			applyToVh:   true,
+			virtualHost: h,
 		})
 	}
 	for _, fullRoute := range in.Route {
@@ -199,8 +214,8 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 		}
 
 		targets = append(targets, target{
-			host:  host,
-			route: route,
+			virtualHost: host,
+			route:       route,
 		})
 	}
 
@@ -221,7 +236,7 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 			}
 
 			patchCtx := networkingapi.EnvoyFilter_ANY
-			if !strings.HasPrefix(t.host, "inbound|") { // keep backward compatibility
+			if !strings.HasPrefix(t.virtualHost, "inbound|") { // keep backward compatibility
 				switch p.ListenerType {
 				case v1alpha1.Plugin_Outbound:
 					patchCtx = networkingapi.EnvoyFilter_SIDECAR_OUTBOUND
@@ -284,8 +299,8 @@ func (r *EnvoyPluginReconciler) translateEnvoyPlugin(cr *v1alpha1.EnvoyPlugin) t
 				if patchCtx == networkingapi.EnvoyFilter_SIDECAR_OUTBOUND || patchCtx == networkingapi.EnvoyFilter_GATEWAY {
 					// ':*' is appended if port info is not specified in outbound and gateway
 					// it will match all port in same host after istio adapted
-					if len(t.host) > 0 && !strings.Contains(t.host, ":") {
-						t.host += ":*"
+					if len(t.virtualHost) > 0 && !strings.Contains(t.virtualHost, ":") {
+						t.virtualHost += ":*"
 					}
 				}
 
@@ -306,8 +321,9 @@ func generateInlineCfp(t target, patchCtx networkingapi.EnvoyFilter_PatchContext
 	p *v1alpha1.Plugin, inline *v1alpha1.Inline, proxyVersion string,
 ) translateOutputConfigPatch {
 	var (
+		cfp = &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{}
+
 		extraPatch *structpb.Struct
-		cfp        = &networkingapi.EnvoyFilter_EnvoyConfigObjectPatch{}
 		applyTo    string
 		match      *structpb.Struct
 	)
@@ -320,14 +336,24 @@ func generateInlineCfp(t target, patchCtx networkingapi.EnvoyFilter_PatchContext
 
 	switch p.Protocol {
 	case v1alpha1.Plugin_HTTP:
-		vhMatch := &networkingapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{Name: t.host}
-		if !t.applyToVh {
-			vhMatch.Route = &networkingapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
+		rcMatch := &networkingapi.EnvoyFilter_RouteConfigurationMatch{}
+		if t.routeConfiguration != "" {
+			rcMatch.Name = t.routeConfiguration
+		}
+		if t.virtualHost != "" {
+			rcMatch.Vhost = &networkingapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{}
+			rcMatch.Vhost.Name = t.virtualHost
+		}
+		if t.route != "" {
+			if rcMatch.Vhost == nil {
+				rcMatch.Vhost = &networkingapi.EnvoyFilter_RouteConfigurationMatch_VirtualHostMatch{}
+			}
+			rcMatch.Vhost.Route = &networkingapi.EnvoyFilter_RouteConfigurationMatch_RouteMatch{Name: t.route}
 		}
 		cfp.Match = &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch{
 			Context: patchCtx,
 			ObjectTypes: &networkingapi.EnvoyFilter_EnvoyConfigObjectMatch_RouteConfiguration{
-				RouteConfiguration: &networkingapi.EnvoyFilter_RouteConfigurationMatch{Vhost: vhMatch},
+				RouteConfiguration: rcMatch,
 			},
 		}
 
@@ -338,59 +364,80 @@ func generateInlineCfp(t target, patchCtx networkingapi.EnvoyFilter_PatchContext
 				ProxyVersion: proxyVersion,
 			}
 		}
-		if t.applyToVh {
+		if t.applyToRc {
+			cfp.ApplyTo = networkingapi.EnvoyFilter_ROUTE_CONFIGURATION
+		} else if t.applyToVh {
 			cfp.ApplyTo = networkingapi.EnvoyFilter_VIRTUAL_HOST
 		} else {
 			cfp.ApplyTo = networkingapi.EnvoyFilter_HTTP_ROUTE
 		}
 	case v1alpha1.Plugin_Dubbo:
-		// dubbo does not support vh-level filter config
-		if t.applyToVh {
+		// NOTE: dubbo does not support rc-level and vh-level filter config
+
+		// ```yaml
+		// dubboRouteConfiguration:
+		//   name: xxx
+		//   routeConfig:
+		//     name: yyy
+		//     route:
+		//       name: zzz
+		// ```
+		rcMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+		if t.routeConfiguration != "" {
+			addStructField(rcMatch, "name", stringToValue(t.routeConfiguration))
+		}
+		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+		addStructField(rcMatch, "routeConfig", structToValue(vhMatch))
+		if t.virtualHost != "" {
+			addStructField(vhMatch, "name", stringToValue(t.virtualHost))
+		}
+		if t.route != "" {
+			routeMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+			addStructField(routeMatch, "name", stringToValue(t.route))
+			addStructField(vhMatch, "route", structToValue(routeMatch))
+		}
+		match = wrapStructToStruct("dubboRouteConfiguration", rcMatch)
+
+		if t.applyToRc {
+			applyTo = applyToDubboRouteConfiguration
+		} else if t.applyToVh {
 			applyTo = applyToDubboVirtualHost
 		} else {
 			applyTo = applyToDubboRoute
 		}
-		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
-		// ```yaml
-		// dubboRouteConfiguration:
-		//   routeConfig:
-		//     name: xxx
-		//     route:
-		//       name: yyy
-		// ```
-		if t.host != "" {
-			addStructField(vhMatch, "name", stringToValue(t.host))
-		}
-		if !t.applyToVh && t.route != "" {
-			addStructField(vhMatch, "route", &structpb.Value{
-				Kind: &structpb.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
-			})
-		}
-		match = wrapStructToStruct("dubboRouteConfiguration",
-			wrapStructToStruct("routeConfig", vhMatch))
 	case v1alpha1.Plugin_Generic:
-		if t.applyToVh {
+		// NOTE: generic does not support rc-level and vh-level filter config
+
+		// ```yaml
+		// genericProxyRouteConfiguration:
+		//   name: xxx
+		//   vhost:
+		//     name: yyy
+		//     route:
+		//       name: zzz
+		rcMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+		if t.routeConfiguration != "" {
+			addStructField(rcMatch, "name", stringToValue(t.routeConfiguration))
+		}
+		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+		addStructField(rcMatch, "vhost", structToValue(vhMatch))
+		if t.virtualHost != "" {
+			addStructField(vhMatch, "name", stringToValue(t.virtualHost))
+		}
+		if t.route != "" {
+			routeMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
+			addStructField(routeMatch, "name", stringToValue(t.route))
+			addStructField(vhMatch, "route", structToValue(routeMatch))
+		}
+		match = wrapStructToStruct("genericProxyRouteConfiguration", rcMatch)
+
+		if t.applyToRc {
+			applyTo = applyToGenericRouteConfiguration
+		} else if t.applyToVh {
 			applyTo = applyToGenericVirtualHost
 		} else {
 			applyTo = appToGenericRoute
 		}
-		vhMatch := &structpb.Struct{Fields: map[string]*structpb.Value{}}
-		// ```yaml
-		// genericProxyRouteConfiguration:
-		//   vhost:
-		//     name: xxx
-		//     route:
-		//       name: yyy
-		if t.host != "" {
-			addStructField(vhMatch, "name", stringToValue(t.host))
-		}
-		if !t.applyToVh && t.route != "" {
-			addStructField(vhMatch, "route", &structpb.Value{
-				Kind: &structpb.Value_StructValue{StructValue: fieldToStruct("name", stringToValue(t.route))},
-			})
-		}
-		match = wrapStructToStruct("genericProxyRouteConfiguration",
-			wrapStructToStruct("vhost", vhMatch))
 	}
 
 	if p.Protocol != v1alpha1.Plugin_HTTP {
@@ -1088,4 +1135,45 @@ func (r *PluginManagerReconciler) convertImagePullSecret(name, content, ns strin
 		return "", fmt.Errorf("plugin: use secret %s but get secret met err %+v", name, err)
 	}
 	return string(secretBytes), nil
+}
+
+func buildRouteConfigurationName(l *v1alpha1.EnvoyPluginSpec_Listener) []string {
+	var ret []string
+	if l.Port == 0 {
+		// Match the UDS case
+		return append(ret, l.Bind)
+	}
+	p := strconv.Itoa(int(l.Port))
+	if l.Sidecar {
+		for _, h := range l.Hosts {
+			if h != "" {
+				ret = append(ret, h+":"+p)
+			}
+		}
+		if len(ret) > 0 {
+			return ret
+		}
+		return append(ret, p)
+	}
+	var items []string
+	if strings.HasPrefix(l.PortName, "http") {
+		items = append(items, "http", p)
+	} else if strings.HasPrefix(l.PortName, "generic") {
+		items = append(items, "generic", parseGenericAppProtolName(l.PortName), p)
+	}
+	if l.Bind != "" {
+		items = append(items, l.Bind)
+	}
+	return append(ret, strings.Join(items, "."))
+}
+
+func parseGenericAppProtolName(portName string) string {
+	// format: generic-<app_protocol>[-xxx]
+	idx := strings.Index(portName, "-")
+	portName = portName[idx+1:]
+	idx = strings.Index(portName, "-")
+	if idx >= 0 {
+		return portName[:idx]
+	}
+	return portName
 }

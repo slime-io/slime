@@ -1,0 +1,20 @@
+apiVersion: microservice.slime.io/v1alpha1
+kind: EnvoyPlugin
+metadata:
+  name: gateway_rc_patch
+  namespace: default
+spec:
+  listener:
+    - port: 80
+      portName: http
+  plugins:
+    - enable: true
+      inline:
+        settings:
+          abort:
+            http_status: 429
+            percentage:
+              denominator: HUNDRED
+              numerator: 30
+      listenerType: Gateway
+      name: envoy.filters.http.fault
