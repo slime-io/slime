@@ -1,0 +1,25 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: gateway_rc_patch
+  namespace: default
+spec:
+  configPatches:
+    - applyTo: ROUTE_CONFIGURATION
+      match:
+        context: GATEWAY
+        routeConfiguration:
+          name: http.80
+      patch:
+        operation: MERGE
+        value:
+          typedPerFilterConfig:
+            envoy.filters.http.fault:
+              "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+              type_url: ""
+              value:
+                abort:
+                  http_status: 429
+                  percentage:
+                    denominator: HUNDRED
+                    numerator: 30

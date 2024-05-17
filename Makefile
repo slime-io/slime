@@ -139,4 +139,4 @@ format-go:
 
 .PHONY: lint-go
 lint-go:
-	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run
+	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run -c ./.golangci.yaml

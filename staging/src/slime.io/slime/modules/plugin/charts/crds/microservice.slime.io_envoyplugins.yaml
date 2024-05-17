@@ -33,14 +33,24 @@ spec:
           metadata:
             type: object
           spec:
+            description: "EnvoyPluginSpec used to specify the configuration of EnvoyFilter.
+              The generated EnvoyFilter can be applied to all level of the RDS: \n
+              - Route: route level - VirtualHost: virtual host level - RouteConfiguration:
+              route configuration level \n example: ``` apiVersion: microservice.slime.io/v1alpha1
+              kind: EnvoyPlugin metadata: \n name: project1-3-458-rewrite \n spec:
+              \n host: - 103.196.65.178 plugins: - name: com.netease.rewrite settings:
+              request_transformations: - conditions: - headers: - name: :path regex_match:
+              /aaaaaaa/(.*) transformation_template: extractors: $1: header: :path
+              regex: /aaaaaaa/(.*) subgroup: 1 headers: :path: text: /{{$1}} parse_body_behavior:
+              DontParse \n ```"
             properties:
               gateway:
-                description: which gateway should use this plugin setting
+                description: which gateway should use this plugin setting Not implemented
                 items:
                   type: string
                 type: array
               host:
-                description: host level plugin
+                description: virtualHost level plugin
                 items:
                   type: string
                 type: array
@@ -48,14 +58,42 @@ spec:
                 description: Deprecated
                 type: boolean
               listener:
-                description: listener level
+                description: Listener used to build the name of RouteConfiguration,
+                  which means the RouteConfiguration level plugin
                 items:
+                  description: 'Listener used to build the name of RouteConfiguration,
+                    which means the RouteConfiguration level plugin For sidecar proxy,
+                    it could be: - UDS - hostname:port - port For gateway proxy, it
+                    could be: - http.port[.bind] - generic.appprotocol.port[.bind]
+                    - https(todo)'
                   properties:
+                    bind:
+                      description: Bind address of the server listening on. If the
+                        port is equal to 0, the bind should be UDS. Optional.
+                      type: string
+                    hosts:
+                      description: Hosts is a list of sniffed services. It is used
+                        to build route name for sidecar proxy. Optional.
+                      items:
+                        type: string
+                      type: array
                     outbound:
+                      description: Outbound ... Unused and will be deleted
                       type: boolean
                     port:
+                      description: Port number of the server listening on. Required.
                       format: int32
                       type: integer
+                    portName:
+                      description: PortName is the name of the port. Valid formal
+                        is "http[-xxx]" or "generic-appprotocl[-xxx]". It is used
+                        to build route name for gateway proxy. Required.
+                      type: string
+                    sidecar:
+                      description: Sidecar indicates whether the config is for sidecar
+                        proxy. If set to false means the config is for gateway proxy.
+                        otherwise, it is for sidecar proxy.
+                      type: boolean
                   type: object
                 type: array
               plugins:
@@ -125,12 +163,13 @@ spec:
                   type: string
                 type: array
               service:
-                description: service level plugin
+                description: service level plugin Not implemented and will be deleted
                 items:
                   type: string
                 type: array
               user:
-                description: which user should use this plugin setting
+                description: which user should use this plugin setting Not implemented
+                  and will be deleted
                 items:
                   type: string
                 type: array
