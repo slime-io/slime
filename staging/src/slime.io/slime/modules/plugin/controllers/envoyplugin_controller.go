@@ -31,7 +31,7 @@ import (
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
 	"slime.io/slime/modules/plugin/api/config"
-	microserviceslimeiov1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
+	pluginv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
 // EnvoyPluginReconciler reconciles a EnvoyPlugin object
@@ -49,7 +49,7 @@ type EnvoyPluginReconciler struct {
 func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	EnvoypluginReconciles.Increment()
 	// Fetch the EnvoyPlugin instance
-	instance := &microserviceslimeiov1alpha1.EnvoyPlugin{}
+	instance := &pluginv1alpha1.EnvoyPlugin{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -94,18 +94,20 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	}
 
 	if found == nil {
-		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
+		log.Infof("creating a new EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 		err = r.Client.Create(ctx, ef)
 		if err != nil {
+			log.Errorf("create new EnvoyFilter %s/%s met err %v", ef.Namespace, ef.Name, err)
 			EnvoypluginReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
 		EnvoyfilterCreations.With(resourceName.Value("envoyplugin")).Increment()
+		log.Infof("create a new EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.Env.RevInScope(foundRev) {
 		log.Debugf("existed envoyfilter %v istioRev %s but our rev %s, skip updating to %+v",
 			req.NamespacedName, foundRev, r.Env.IstioRev(), ef)
 	} else {
-		log.Infof("Update a EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
+		log.Infof("updating EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.Client.Update(ctx, ef)
 		if err != nil {
@@ -113,12 +115,13 @@ func (r *EnvoyPluginReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 			return reconcile.Result{}, err
 		}
 		EnvoyfilterRefreshes.With(resourceName.Value("envoyplugin")).Increment()
+		log.Infof("update a EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 	}
 
 	return ctrl.Result{}, nil
 }
 
-func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microserviceslimeiov1alpha1.EnvoyPlugin,
+func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *pluginv1alpha1.EnvoyPlugin,
 ) *networkingv1alpha3.EnvoyFilter {
 	out := r.translateEnvoyPlugin(cr)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
@@ -132,6 +135,6 @@ func (r *EnvoyPluginReconciler) newEnvoyFilterForEnvoyPlugin(cr *microservicesli
 
 func (r *EnvoyPluginReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&microserviceslimeiov1alpha1.EnvoyPlugin{}).
+		For(&pluginv1alpha1.EnvoyPlugin{}).
 		Complete(r)
 }

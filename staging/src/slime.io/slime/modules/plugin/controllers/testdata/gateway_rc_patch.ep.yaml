@@ -1,8 +1,10 @@
 apiVersion: microservice.slime.io/v1alpha1
 kind: EnvoyPlugin
 metadata:
-  name: gateway_rc_patch
+  name: gateway-rc-patch
   namespace: default
+  labels:
+    istio.io/rev: default
 spec:
   listener:
     - port: 80

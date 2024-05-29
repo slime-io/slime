@@ -1,8 +1,10 @@
 apiVersion: networking.istio.io/v1alpha3
 kind: EnvoyFilter
 metadata:
-  name: gateway_rc_patch
+  name: gateway-rc-patch
   namespace: default
+  labels:
+    istio.io/rev: default
 spec:
   configPatches:
     - applyTo: ROUTE_CONFIGURATION

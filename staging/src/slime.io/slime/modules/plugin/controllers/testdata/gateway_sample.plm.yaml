@@ -1,0 +1,21 @@
+apiVersion: microservice.slime.io/v1alpha1
+kind: PluginManager
+metadata:
+  labels:
+    istio.io/rev: default
+  name: gateway-sample
+  namespace: default
+spec:
+  plugin:
+    - disableOnFilterLevel: true
+      enable: true
+      inline: {}
+      listenerType: Gateway
+      name: envoy.filters.http.fault
+      port: 80
+    - disableOnFilterLevel: true
+      enable: true
+      inline: {}
+      listenerType: Gateway
+      name: envoy.filters.http.rbac
+      port: 80

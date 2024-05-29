@@ -51,8 +51,11 @@ spec:
                     generic_app_protocol:
                       type: string
                     listenerType:
-                      format: int32
-                      type: integer
+                      enum:
+                      - Outbound
+                      - Inbound
+                      - Gateway
+                      type: string
                     name:
                       type: string
                     port:

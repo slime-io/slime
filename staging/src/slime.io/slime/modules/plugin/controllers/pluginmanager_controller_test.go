@@ -27,22 +27,22 @@ import (
 	pluginv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
-var _ = Describe("EnvoyPluginReconciler", func() {
-	DescribeTable("cvonversion",
+var _ = Describe("PluginManagerReconciler", func() {
+	DescribeTable("conversion",
 		func(input, expect string) {
-			envoyPlugin := &pluginv1alpha1.EnvoyPlugin{}
-			// load yaml test envoyplugin
-			Expect(loadYamlTestData(envoyPlugin, input)).Should(Succeed())
-			// apply envoyplugin to k8s
-			Expect(k8sClient.Create(ctx, envoyPlugin)).Should(Succeed())
+			pluginManager := &pluginv1alpha1.PluginManager{}
+			// load yaml test pluginmanager
+			Expect(loadYamlTestData(pluginManager, input)).Should(Succeed())
+			// apply pluginmanager to k8s
+			Expect(k8sClient.Create(ctx, pluginManager)).Should(Succeed())
 			// load expect envoyfilter
 			want := &networkingv1alpha3.EnvoyFilter{}
 			Expect(loadYamlTestData(want, expect)).Should(Succeed())
 
 			// get envoyfilter from k8s
 			key := types.NamespacedName{
-				Name:      envoyPlugin.Name,
-				Namespace: envoyPlugin.Namespace,
+				Name:      pluginManager.Name,
+				Namespace: pluginManager.Namespace,
 			}
 
 			Eventually(func(g Gomega) {
@@ -54,6 +54,6 @@ var _ = Describe("EnvoyPluginReconciler", func() {
 				g.Expect(cmp.Diff(&got.Spec, &want.Spec, protocmp.Transform())).To(BeEmpty())
 			}).Should(Succeed())
 		},
-		Entry("gateway_rc_patch", "./testdata/gateway_rc_patch.ep.yaml", "./testdata/gateway_rc_patch.ep.expect.yaml"),
+		Entry("gateway_sample", "./testdata/gateway_sample.plm.yaml", "./testdata/gateway_sample.plm.expect.yaml"),
 	)
 })

@@ -33,9 +33,8 @@ import (
 
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model"
-	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/plugin/api/config"
-	"slime.io/slime/modules/plugin/api/v1alpha1"
+	pluginv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
 
 // PluginManagerReconciler reconciles a PluginManager object
@@ -84,7 +83,7 @@ func (r *PluginManagerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 
 func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.NamespacedName) (ctrl.Result, error) {
 	// Fetch the PluginManager instance
-	instance := &v1alpha1.PluginManager{}
+	instance := &pluginv1alpha1.PluginManager{}
 	err := r.client.Get(ctx, nn, instance)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -99,23 +98,18 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	if !r.env.RevInScope(istioRev) {
 		log.Debugf("existing pluginmanager %v istiorev %s but out %s, skip ...",
 			nn, istioRev, r.env.IstioRev())
+		log.Errorf("existing pluginmanager %v istiorev %s but out %s, skip ...",
+			nn, istioRev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	}
 
-	// 资源更新
-	pluginManager := &v1alpha1.PluginManagerSpec{}
-	if err = util.FromJSONMapToMessage(instance.Spec, pluginManager); err != nil {
-		log.Errorf("unable to convert pluginManager to envoyFilter, %+v", err)
-		// 由于配置错误导致的，因此直接返回nil，避免reconcile重试
-		return reconcile.Result{}, nil
-	}
-
+	pluginManager := &instance.Spec
 	watchSecrets := getPluginManagerWatchSecrets(nn.Namespace, pluginManager)
 	r.updateWatchSecrets(nn, watchSecrets) // XXX concurrent...
 
 	ef := r.translatePluginManagerToEnvoyFilter(instance, pluginManager)
 	if ef == nil {
-		// 由于配置错误导致的，因此直接返回nil，避免reconcile重试
+		// The plugin manager is invalid, skip it
 		return reconcile.Result{}, nil
 	}
 	if r.scheme != nil {
@@ -137,19 +131,20 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 	}
 
 	if found == nil {
-		log.Infof("Creating a new EnvoyFilter in %s:%s", ef.Namespace, ef.Name)
+		log.Infof("Creating a new EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 		err := r.client.Create(ctx, ef)
 		if err != nil {
 			PluginManagerReconcilesFailed.Increment()
 			return reconcile.Result{}, err
 		}
 		EnvoyfilterCreations.With(resourceName.Value("pluginmanager")).Increment()
+		log.Infof("create a new EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Debugf("existing envoyfilter %v istioRev %s but our %s, skip ...",
 			nsName, foundRev, r.env.IstioRev())
 		return reconcile.Result{}, nil
 	} else {
-		log.Infof("Update a EnvoyFilter in %v", nsName)
+		log.Infof("Updating EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 		ef.ResourceVersion = found.ResourceVersion
 		err := r.client.Update(ctx, ef)
 		if err != nil {
@@ -157,14 +152,15 @@ func (r *PluginManagerReconciler) reconcile(ctx context.Context, nn types.Namesp
 			return reconcile.Result{}, err
 		}
 		EnvoyfilterRefreshes.With(resourceName.Value("pluginmanager")).Increment()
+		log.Infof("update EnvoyFilter %s/%s", ef.Namespace, ef.Name)
 	}
 
 	return ctrl.Result{}, nil
 }
 
 func (r *PluginManagerReconciler) translatePluginManagerToEnvoyFilter(
-	cr *v1alpha1.PluginManager,
-	pluginManager *v1alpha1.PluginManagerSpec,
+	cr *pluginv1alpha1.PluginManager,
+	pluginManager *pluginv1alpha1.PluginManagerSpec,
 ) *networkingv1alpha3.EnvoyFilter {
 	out := r.translatePluginManager(cr.ObjectMeta, pluginManager)
 	envoyFilterWrapper, err := translateOutputToEnvoyFilterWrapper(out)
@@ -185,13 +181,13 @@ func (r *PluginManagerReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		})
 	})
 
-	r.kubeInformer.Start(nil)
-	r.kubeInformer.WaitForCacheSync(nil)
+	r.kubeInformer.Start(r.env.Stop)
+	r.kubeInformer.WaitForCacheSync(r.env.Stop)
 
 	go r.handleSecretChange()
 
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1alpha1.PluginManager{}).
+		For(&pluginv1alpha1.PluginManager{}).
 		Complete(r)
 }
 
@@ -290,7 +286,7 @@ func (r *PluginManagerReconciler) getConfigDiscoveryDefaultConfig(url string) *s
 	return defaultConfig
 }
 
-func getPluginManagerWatchSecrets(ns string, in *v1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {
+func getPluginManagerWatchSecrets(ns string, in *pluginv1alpha1.PluginManagerSpec) map[types.NamespacedName]struct{} {
 	ret := map[types.NamespacedName]struct{}{}
 	for _, p := range in.GetPlugin() {
 		wasm := p.GetWasm()
