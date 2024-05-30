@@ -72,7 +72,7 @@ option go_package = "slime.io/slime/slime-modules/limiter/api/v1alpha2";
 //        target:
 //          direction: outbound
 //          route: a.test.com:80/r1
-
+// +kubebuilder:pruning:PreserveUnknownFields
 message SmartLimiterSpec {
     // subset rate-limit,the key is subset name.
     map<string, SmartLimitDescriptors> sets = 1;
@@ -94,6 +94,7 @@ message SmartLimiterStatus {
 }
 
 message SmartLimitDescriptor {
+    // +kubebuilder:pruning:PreserveUnknownFields
     message Matcher {
         string name = 1;
         // If specified, this regex string is a regular expression rule which implies the entire request
@@ -144,6 +145,7 @@ message SmartLimitDescriptor {
         Source matchSource = 11;
     }
 
+    // +kubebuilder:pruning:PreserveUnknownFields
     message Action {
         string quota = 1;  // 配额
         Duration fill_interval = 2; // 时间

@@ -1,0 +1,23 @@
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  labels:
+    istio.io/rev: default
+  name: hello
+  namespace: default
+spec:
+  sets:
+    _base:
+      descriptor:
+        - action:
+            fillInterval:
+              seconds: 1
+            quota: "10"
+            strategy: single
+          condition: "true"
+          match:
+            - exact_match: GET
+              name: :method
+          target: {}
+  workloadSelector:
+    app: hello

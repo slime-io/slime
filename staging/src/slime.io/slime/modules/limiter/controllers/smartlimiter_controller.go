@@ -37,7 +37,7 @@ import (
 	"slime.io/slime/framework/model/trigger"
 	"slime.io/slime/framework/util"
 	"slime.io/slime/modules/limiter/api/config"
-	microservicev1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
+	limiterv1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 	"slime.io/slime/modules/limiter/model"
 )
 
@@ -71,7 +71,7 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	log.Infof("begin reconcile, get smartlimiter %+v", req)
 	ReconcilesTotal.Increment()
 
-	instance := &microservicev1alpha2.SmartLimiter{}
+	instance := &limiterv1alpha2.SmartLimiter{}
 	if err := r.Client.Get(ctx, req.NamespacedName, instance); err != nil {
 		if errors.IsNotFound(err) {
 			instance = nil
@@ -113,7 +113,7 @@ func (r *SmartLimiterReconciler) Reconcile(ctx context.Context, req ctrl.Request
 
 func (r *SmartLimiterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&microservicev1alpha2.SmartLimiter{}).
+		For(&limiterv1alpha2.SmartLimiter{}).
 		Complete(r)
 }
 
@@ -184,7 +184,7 @@ func NewProducerConfig(env bootstrap.Environment, cfg *config.Limiter) (*metric.
 }
 
 func (r *SmartLimiterReconciler) RegisterInterest(
-	instance *microservicev1alpha2.SmartLimiter,
+	instance *limiterv1alpha2.SmartLimiter,
 	req ctrl.Request,
 	sidecarOutbound bool,
 	gateway bool,
@@ -231,11 +231,11 @@ func (r *SmartLimiterReconciler) RemoveInterested(req ctrl.Request) {
 	}
 }
 
-func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLimiter) (bool, bool, error) {
+func (r *SmartLimiterReconciler) Validate(instance *limiterv1alpha2.SmartLimiter) (bool, bool, error) {
 	gateway := instance.Spec.Gateway
 	sidecarOutbound := false
 
-	var target *microservicev1alpha2.Target
+	var target *limiterv1alpha2.Target
 
 	for _, descriptors := range instance.Spec.Sets {
 		for _, descriptor := range descriptors.Descriptor_ {
@@ -272,7 +272,7 @@ func (r *SmartLimiterReconciler) Validate(instance *microservicev1alpha2.SmartLi
 // RefreshResource refresh smartlimiter and ef on time
 // even if reconcile fails, there are still ticker tasks to refresh
 // only logging errors, no errors return
-func (r *SmartLimiterReconciler) RefreshResource(instance *microservicev1alpha2.SmartLimiter) {
+func (r *SmartLimiterReconciler) RefreshResource(instance *limiterv1alpha2.SmartLimiter) {
 	log := log.WithField("function", "RefreshResource")
 
 	queryMap := r.handleEvent(types.NamespacedName{
