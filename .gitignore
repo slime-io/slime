@@ -95,3 +95,5 @@ boot/helm-charts/slimeboot/templates/modules/*
 ### netease ###
 /efficiency.json
 
+### binary tools for test ###
+/testdata/bin

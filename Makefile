@@ -73,42 +73,51 @@ gen-slimeboot-crd:
 	controller-gen crd:ignoreUnexportedFields=true paths="./apis/config/..." output:crd:dir="./charts/crds" 1>/dev/null 2>&1; \
 	popd 1>/dev/null 2>&1
 
+.PHONY: format-go
+format-go:
+	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run --fix -c ./.golangci-format.yaml
+
+.PHONY: lint-go
+lint-go:
+	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run -c ./.golangci.yaml
+
+TEST_K8S_VERSION ?= 1.26.0
+.PHONY: modules-test
+modules-test:
+	$(eval BIN_ASSETS:=$(shell setup-envtest --bin-dir=./testdata/bin -p path use $(TEST_K8S_VERSION) --os $(shell go env GOOS) --arch $(shell go env GOARCH)))
+	@export KUBEBUILDER_ASSETS=$${PWD}/$(BIN_ASSETS) && \
+	go test -cover ./staging/src/slime.io/slime/modules/{limiter,meshregistry,plugin}/...
 
 # Generate code
-.PHONY: generate-module generate-framework
+.PHONY: generate-module generate-framework format lint test
 ifeq ($(IN_CONTAINER),1)
 generate-module: modules-api-gen modules-k8s-gen
 generate-framework: framework-api-gen gen-slimeboot-crd
 generate-all: generate-module generate-framework
+format: format-go
+lint: lint-go
+test: modules-test
 else
-generate-module:
-	@docker run --rm \
-		--env IN_CONTAINER=1 \
+generate-module generate-all:
+	@$(DOCKER_RUN) \
 		--env MODULES_ROOT=$(MODULES_ROOT) \
 		--env MODULES="$(MODULES)" \
-		-v $(root_dir):/workspaces/slime \
-		--workdir /workspaces/slime \
-		--user $(shell id -u):$(shell id -g) \
 		$(IMG)  \
 		make $@
 
 generate-framework:
-	@docker run --rm \
-		--env IN_CONTAINER=1 \
-		-v $(root_dir):/workspaces/slime \
-		--workdir /workspaces/slime \
-		--user $(shell id -u):$(shell id -g) \
+	@$(DOCKER_RUN) \
 		$(IMG)  \
 		make $@
 
-generate-all:
-	@docker run --rm \
-		--env IN_CONTAINER=1 \
-		--env MODULES_ROOT=$(MODULES_ROOT) \
-		--env MODULES="$(MODULES)" \
-		-v $(root_dir):/workspaces/slime \
-		--workdir /workspaces/slime \
-		--user $(shell id -u):$(shell id -g) \
+format lint:
+	@$(DOCKER_RUN) \
+		--env GOLANGCI_LINT_CACHE=/go/.cache \
+		$(IMG)  \
+		make $@
+
+test:
+	@$(DOCKER_RUN) \
 		$(IMG)  \
 		make $@
 endif
@@ -119,24 +128,18 @@ shell:
 	@echo "already in a container"
 else
 shell:
-	@docker run --rm -ti \
-		--env IN_CONTAINER=1 \
-		-v $(root_dir):/workspaces/slime \
-		--workdir /workspaces/slime \
-		--user $(shell id -u):$(shell id -g) \
+	@$(DOCKER_RUN) -it \
 		$(IMG)  \
 		bash
 endif
+
+DOCKER_RUN := docker run --rm \
+				-v $(root_dir):/workspaces/slime \
+				--workdir /workspaces/slime \
+				--user $(shell id -u):$(shell id -g) \
+				--env IN_CONTAINER=1 \
 
 MODULE_NAME?=
 .PHONY: new-module
 new-module:
 	bash bin/gen_module.sh $(MODULE_NAME)
-
-.PHONY: format-go
-format-go:
-	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run --fix -c ./.golangci-format.yaml
-
-.PHONY: lint-go
-lint-go:
-	go list -f '{{.Dir}}/...' -m | xargs golangci-lint run -c ./.golangci.yaml
