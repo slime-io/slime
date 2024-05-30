@@ -29,6 +29,7 @@ ENV GOLANG_PROTOBUF_VERSION=v1.31.0
 ENV PROTOC_VERSION=3.20.1
 ENV K8S_API_VERSION=0.26.0
 ENV GOLANGCI_LINT_VERSION=v1.53.3
+ENV ENVTEST_VERSION=v0.0.0-20230216140739-c98506dc3b8e
 
 RUN \
     # install controller-gen
@@ -38,7 +39,10 @@ RUN \
     # install istio code-generator
     CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-jsonshim@${ISTIO_TOOLS_VERSION} && \
     CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' istio.io/tools/cmd/protoc-gen-golang-deepcopy@${ISTIO_TOOLS_VERSION} && \
-    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION}
+    # install linter
+    curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin ${GOLANGCI_LINT_VERSION} && \
+    # install integration test binaries
+    CGO_ENABLED=0 go install -ldflags='-extldflags -static -s -w' sigs.k8s.io/controller-runtime/tools/setup-envtest@${ENVTEST_VERSION}
 
 # install k8s api protobuf
 RUN mkdir -p ${GOPATH}/src/k8s.io && \
