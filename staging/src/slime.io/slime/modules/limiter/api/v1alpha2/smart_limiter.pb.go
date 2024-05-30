@@ -80,6 +80,34 @@ func (SmartLimitDescriptor_Matcher_Source) EnumDescriptor() ([]byte, []int) {
 	return file_smart_limiter_proto_rawDescGZIP(), []int{2, 0, 0}
 }
 
+// dispatch envoyFilter to pods with labels 'gw_cluster: prod-gateway'
+// and take effect in outbound a.test.com:80/r1
+// apiVersion: microservice.slime.io/v1alpha2
+// kind: SmartLimiter
+// metadata:
+//
+//	name: b
+//	namespace: powerful
+//
+// spec:
+//
+//	gateway: true
+//	workloadSelector:
+//	  gw_cluster: prod-gateway
+//	sets:
+//	  _base:
+//	    descriptor:
+//	    - action:
+//	        fill_interval:
+//	          seconds: 60
+//	        quota: "10"
+//	        strategy: "single"
+//	      conditon: "true"
+//	      target:
+//	        direction: outbound
+//	        route: a.test.com:80/r1
+//
+// +kubebuilder:pruning:PreserveUnknownFields
 type SmartLimiterSpec struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -553,6 +581,7 @@ func (x *Header) GetValue() string {
 	return ""
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type SmartLimitDescriptor_Matcher struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -697,6 +726,7 @@ func (x *SmartLimitDescriptor_Matcher) GetMatchSource() SmartLimitDescriptor_Mat
 	return SmartLimitDescriptor_Matcher_HeadMatch
 }
 
+// +kubebuilder:pruning:PreserveUnknownFields
 type SmartLimitDescriptor_Action struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache

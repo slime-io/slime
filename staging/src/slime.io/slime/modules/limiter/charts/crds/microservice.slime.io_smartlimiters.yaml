@@ -33,6 +33,12 @@ spec:
           metadata:
             type: object
           spec:
+            description: "dispatch envoyFilter to pods with labels 'gw_cluster: prod-gateway'
+              and take effect in outbound a.test.com:80/r1 apiVersion: microservice.slime.io/v1alpha2
+              kind: SmartLimiter metadata: \n name: b namespace: powerful \n spec:
+              \n gateway: true workloadSelector: gw_cluster: prod-gateway sets: _base:
+              descriptor: - action: fill_interval: seconds: 60 quota: \"10\" strategy:
+              \"single\" conditon: \"true\" target: direction: outbound route: a.test.com:80/r1"
             properties:
               gateway:
                 description: is gateway
@@ -88,6 +94,7 @@ spec:
                               strategy:
                                 type: string
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                           condition:
                             type: string
                           custom_key:
@@ -114,8 +121,12 @@ spec:
                                 matchSource:
                                   description: match source, from header or query
                                     or json body
-                                  format: int32
-                                  type: integer
+                                  enum:
+                                  - HeadMatch
+                                  - QueryMatch
+                                  - JsonBodyMatch
+                                  - SourceIpMatch
+                                  type: string
                                 name:
                                   type: string
                                 prefix_match:
@@ -151,6 +162,7 @@ spec:
                                     ues query match instead of header match
                                   type: boolean
                               type: object
+                              x-kubernetes-preserve-unknown-fields: true
                             type: array
                           target:
                             properties:
@@ -196,6 +208,7 @@ spec:
                 description: workload selector , it should not be nil in Gateway Scenarios
                 type: object
             type: object
+            x-kubernetes-preserve-unknown-fields: true
           status:
             properties:
               metricStatus:
@@ -247,6 +260,7 @@ spec:
                               strategy:
                                 type: string
                             type: object
+                            x-kubernetes-preserve-unknown-fields: true
                           condition:
                             type: string
                           custom_key:
@@ -310,6 +324,7 @@ spec:
                                     ues query match instead of header match
                                   type: boolean
                               type: object
+                              x-kubernetes-preserve-unknown-fields: true
                             type: array
                           target:
                             properties:

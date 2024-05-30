@@ -1,0 +1,67 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  labels:
+    istio.io/rev: default
+  name: hello.default.ratelimit
+  namespace: default
+spec:
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      context: SIDECAR_INBOUND
+      routeConfiguration:
+        vhost:
+          route:
+            name: default
+    patch:
+      operation: MERGE
+      value:
+        route:
+          rate_limits:
+          - actions:
+            - query_parameter_value_match:
+                descriptor_value: Service[hello.default]-Id[2850371279]
+                query_parameters:
+                - name: foo
+                  string_match:
+                    prefix: bar
+  - applyTo: HTTP_ROUTE
+    match:
+      context: SIDECAR_INBOUND
+      routeConfiguration:
+        vhost:
+          route:
+            name: default
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.local_ratelimit:
+            '@type': type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              descriptors:
+              - entries:
+                - key: query_match
+                  value: Service[hello.default]-Id[2850371279]
+                tokenBucket:
+                  fillInterval: 1s
+                  maxTokens: 10
+                  tokensPerFill: 10
+              filterEnabled:
+                defaultValue:
+                  numerator: 100
+                runtimeKey: local_rate_limit_enabled
+              filterEnforced:
+                defaultValue:
+                  numerator: 100
+                runtimeKey: local_rate_limit_enforced
+              statPrefix: http_local_rate_limiter
+              tokenBucket:
+                fillInterval: 1s
+                maxTokens: 100000
+                tokensPerFill: 100000
+  workloadSelector:
+    labels:
+      app: hello

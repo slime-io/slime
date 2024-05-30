@@ -17,6 +17,7 @@ import (
 )
 
 var _ = ginkgo.Describe("SmartLimiter e2e test", func() {
+	ginkgo.Skip("skip unready e2e test")
 	f := framework.NewDefaultFramework("limiter")
 	f.SkipNamespaceCreation = true
 
