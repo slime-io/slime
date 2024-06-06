@@ -1,0 +1,84 @@
+# override the default value
+ExcludedResourceKinds:
+  - "-"
+# override the default value
+Snapshots:
+  - "-"
+# default value
+RegistryStartDelay: 5s
+# default MCP configs
+MCP:
+  ServerUrl: "xds://0.0.0.0:16010"
+  EnableAnnoResVer: true
+  EnableIncPush: true
+# default K8S configs
+K8S:
+  ClusterID: "Kubernetes"
+  ClusterRegistriesNamespace: "istio-system"
+K8SSource:
+  Enabled: false
+EurekaSource:
+  Address:
+    - "http://127.0.0.1/eureka"
+  Enabled: true
+  GatewayModel: true
+  RefreshPeriod: 15s
+  SvcPort: 80
+  # below is the default value
+  DefaultServiceNs: "eureka"
+  LabelPatch: true
+  NsHost: true
+  ResourceNs: "eureka"
+  SvcProtocol: "HTTP"
+NacosSource:
+  Address:
+    - "127.0.0.1:8848"
+  Enabled: true
+  GatewayModel: true
+  Mode: polling
+  RefreshPeriod: 15s
+  SvcPort: 80
+  # below is the default value
+  DefaultServiceNs: "nacos"
+  LabelPatch: true
+  NsHost: true
+  ResourceNs: "nacos"
+  SvcProtocol: "HTTP"
+ZookeeperSource:
+  Address:
+    - 127.0.0.1:2181
+  Enabled: true
+  EndpointSelectors:
+    - MatchLabels:
+        interface: foo
+        group: bar
+        version: v1
+      ExcludeIPRanges:
+        IPs:
+          - 1.1.1.1
+          - 2.2.2.2
+          - 3.3.3.3
+  ServicedEndpointSelectors:
+    "foo:bar:v1":
+      - ExcludeIPRanges:
+          IPs:
+            - 4.4.4.4
+  GatewayModel: true
+  HostSuffix: ".dubbo"
+  InstancePortAsSvcPort: false
+  Mode: watching
+  RefreshPeriod: 30s
+  SvcPort: 80
+  # below is the default value
+  ConnectionTimeout: 30s
+  DubboWorkloadAppLabel: app
+  IgnoreLabel:
+    - pid
+    - timestamp
+    - dubbo
+  LabelPatch: true
+  RegistryRootNode: "/dubbo"
+  ResourceNs: "dubbo"
+  SvcProtocol: "DUBBO"
+  TrimDubboRemoveDepInterval: 24h
+  WatchingWorkerCount: 10

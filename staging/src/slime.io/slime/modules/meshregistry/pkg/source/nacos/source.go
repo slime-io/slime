@@ -84,38 +84,12 @@ func New(
 		return nil, nil, false, true, nil
 	}
 
-	var argsCopy *bootstrap.NacosSourceArgs
-	if args.GatewayModel || args.NsfNacos {
-		cp := *args
-		argsCopy = &cp
-
-		if args.GatewayModel {
-			argsCopy.InstancePortAsSvcPort = false
-			argsCopy.K8sDomainSuffix = false
-		}
-		if args.NsfNacos {
-			argsCopy.EnableProjectCode = true
-			argsCopy.DomSuffix = "nsf"
-		}
-	}
-	if argsCopy != nil {
-		args = argsCopy
-	}
-
-	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
-		return nil, nil, false, false, fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
-	}
-
 	if args.Mode != source.ModePolling {
 		log.Warningf("nacos source only support polling mode, but got %s, will use polling mode", args.Mode)
 	}
 
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
-		if args.MockServiceName == "" {
-			return nil, nil, false, false,
-				fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
-		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
 			args.MockServiceMergeInstancePort, args.MockServiceMergeServicePort,

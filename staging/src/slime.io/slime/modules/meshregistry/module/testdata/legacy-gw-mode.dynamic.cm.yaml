@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: slime
+  namespace: default
+data:
+  cfg_meshregistry: |
+    name: meshregistry
+    kind: meshregistry
+    enable: true
+    mode: BundleItem
+    general:
+      LEGACY:
+        # override the default value
+        ExcludedResourceKinds:
+        - "-"
+        # override the default value
+        Snapshots:
+        - "-"
+        K8SSource:
+          Enabled: false
+        EurekaSource:
+          Enabled: true
+          Address:
+          - "http://127.0.0.1/eureka"
+          RefreshPeriod: 15s
+          SvcPort: 80
+          GatewayModel: true
+        NacosSource:
+          Enabled: true
+          Address:
+          - "127.0.0.1:8848"
+          RefreshPeriod: 15s
+          Mode: polling
+          SvcPort: 80
+          GatewayModel: true
+          ServiceHostAliases:
+          - Host: foo.bar
+            Aliases:
+            - foo1.bar
+            - foo2.bar
+        ZookeeperSource:
+          Enabled: true
+          Mode: watching
+          RefreshPeriod: 30s
+          Address:
+          - 127.0.0.1:2181
+          GatewayModel: true
+          EndpointSelectors:
+          - ExcludeIPRanges:
+              IPS:
+              - 10.1.1.1
+          - matchLabels:
+              env: prod
