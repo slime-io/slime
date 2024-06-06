@@ -111,7 +111,7 @@ func ParseArgsFromModuleConfig(config *structWrapper) (*meshregbootstrap.Registr
 		}
 	}
 
-	return regArgs, nil
+	return regArgs.Rectify(), nil
 }
 
 type singleConfigMapCache struct {
@@ -199,7 +199,7 @@ func (m *Module) prepareDynamicConfigController(
 				return nil, err
 			}
 		}
-		return args, nil
+		return args.Rectify(), nil
 	}
 
 	m.reloadDynamicConfigTask = func(ctx context.Context) {
@@ -243,15 +243,14 @@ func (m *Module) prepareCmDynamicConfigController(
 	staticRegArgs *meshregbootstrap.RegistryArgs,
 ) (func() (*meshregbootstrap.RegistryArgs, error), func() bool) {
 	client := opts.Env.K8SClient
-	ctx := context.Background() // TODO
 
 	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String()}
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.CoreV1().ConfigMaps(PodNamespace).List(ctx, listOptions)
+			return client.CoreV1().ConfigMaps(PodNamespace).List(context.Background(), listOptions)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.CoreV1().ConfigMaps(PodNamespace).Watch(ctx, listOptions)
+			return client.CoreV1().ConfigMaps(PodNamespace).Watch(context.Background(), listOptions)
 		},
 	}
 
@@ -322,10 +321,10 @@ func (m *Module) prepareCmDynamicConfigController(
 		UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
 		DeleteFunc: func(obj interface{}) { notify(obj, nil) },
 	})
-	go controller.Run(ctx.Done())
+	go controller.Run(opts.Env.Stop)
 
 	return loadArgFromCache, func() bool {
-		return cache.WaitForCacheSync(ctx.Done(), controller.HasSynced)
+		return cache.WaitForCacheSync(opts.Env.Stop, controller.HasSynced)
 	}
 }
 
@@ -335,15 +334,14 @@ func (m *Module) prepareCrDynamicConfigController(
 	opts module.ModuleOptions,
 ) (func(*meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error), func() bool) {
 	client := opts.Env.DynamicClient
-	ctx := context.Background() // TODO
 
 	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String()}
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).List(ctx, listOptions)
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).List(context.Background(), listOptions)
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).Watch(ctx, listOptions)
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).Watch(context.Background(), listOptions)
 		},
 	}
 
@@ -360,7 +358,7 @@ func (m *Module) prepareCrDynamicConfigController(
 			UpdateFunc: func(oldObj, newObj interface{}) { notify(oldObj, newObj) },
 			DeleteFunc: func(obj interface{}) { notify(obj, nil) },
 		})
-	go controller.Run(ctx.Done())
+	go controller.Run(opts.Env.Stop)
 
 	patcher := func(src *meshregbootstrap.RegistryArgs) (*meshregbootstrap.RegistryArgs, error) {
 		got, exist, err := store.GetByKey(PodNamespace + "/" + name)
@@ -386,7 +384,7 @@ func (m *Module) prepareCrDynamicConfigController(
 	}
 
 	return patcher, func() bool {
-		return cache.WaitForCacheSync(ctx.Done(), controller.HasSynced)
+		return cache.WaitForCacheSync(opts.Env.Stop, controller.HasSynced)
 	}
 }
 
@@ -431,7 +429,7 @@ func (m *Module) Setup(opts module.ModuleOptions) error {
 	if dynRegArgs != nil {
 		bs, err := json.MarshalIndent(regArgs, "", "  ")
 		log.Infof("init registry args but override by dynamic reg args: %s, err %v", string(bs), err)
-		regArgs = dynRegArgs
+		regArgs = dynRegArgs.Rectify()
 	}
 
 	if err := regArgs.Validate(); err != nil {

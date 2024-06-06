@@ -43,13 +43,10 @@ const (
 	DubboCallModelPath        = "/dubboCallModel"
 	SidecarDubboCallModelPath = "/sidecarDubboCallModel"
 
-	ConsumerNode        = "consumers"
-	ProviderNode        = "providers"
-	ConfiguratorNode    = "configurators"
-	providerPathSuffix  = "/" + ProviderNode
-	consumerPathSuffix  = "/" + ConsumerNode
-	disableConsumerPath = "-"
-	configuratorSuffix  = "/" + ConfiguratorNode
+	ProviderNode       = "providers"
+	ConfiguratorNode   = "configurators"
+	providerPathSuffix = "/" + ProviderNode
+	configuratorSuffix = "/" + ConfiguratorNode
 
 	AttachmentDubboCallModel = "ATTACHMENT_DUBBO_CALL_MODEL"
 
@@ -94,6 +91,8 @@ func init() {
 }
 
 type Source struct {
+	// args is the read-only config of the source, must not modify this field in package scope,
+	// we read from it directly at many places without lock.
 	args *bootstrap.ZookeeperSourceArgs
 
 	ignoreLabelsMap map[string]string
@@ -145,19 +144,6 @@ func New(
 		return nil, nil, false, true, nil
 	}
 
-	// XXX refactor to config
-	if args.GatewayModel {
-		args.SvcPort = 80
-		args.InstancePortAsSvcPort = false
-		args.HostSuffix = ".dubbo"
-		// not fetch consumer data by default for gw
-	} else if args.ConsumerPath == "" {
-		args.ConsumerPath = consumerPathSuffix
-	}
-	if args.ConsumerPath == disableConsumerPath {
-		args.ConsumerPath = ""
-	}
-
 	ignoreLabels := make(map[string]string, 0)
 	for _, v := range args.IgnoreLabel {
 		ignoreLabels[v] = v
@@ -165,10 +151,6 @@ func New(
 
 	var svcMocker *source.ServiceEntryMergePortMocker
 	if args.MockServiceEntryName != "" {
-		if args.MockServiceName == "" {
-			return nil, nil, false, false,
-				fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
-		}
 		svcMocker = source.NewServiceEntryMergePortMocker(
 			args.MockServiceEntryName, args.ResourceNs, args.MockServiceName,
 			args.MockServiceMergeInstancePort, args.MockServiceMergeServicePort,
@@ -597,7 +579,7 @@ func (s *Source) markServiceEntryInitDone() {
 // nolint: lll
 func (s *Source) onConfig(args *bootstrap.ZookeeperSourceArgs) {
 	var prevArgs *bootstrap.ZookeeperSourceArgs
-	prevArgs, s.args = s.args, args // XXX should be atomic
+	prevArgs, s.args = s.args, args
 
 	var (
 		updateDetails     error

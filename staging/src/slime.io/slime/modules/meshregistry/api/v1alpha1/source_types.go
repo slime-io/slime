@@ -45,7 +45,7 @@ type Zookeeper struct {
 	//   - key: name of the dubbo interface, format: interface:group:version
 	//   - value: abnormal instance ip list of the specified interface
 	// +optional
-	AbnormalInstanceIPs map[string][]string `json:"AbnormalInstanceIPs,omitempty"`
+	AbnormalInstanceIPs map[string][]string `json:"abnormalInstanceIPs,omitempty"`
 }
 
 // RegistrySourceSpec defines the desired state of RegistrySource

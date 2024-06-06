@@ -1,0 +1,20 @@
+apiVersion: microservice.slime.io/v1alpha1
+kind: RegistrySource
+metadata:
+  name: slime
+  namespace: default
+spec:
+  zookeeper:
+    availableInterfaces:
+      - interface: foo
+        group: bar
+        version: v1
+    globalAbnormalInstanceIPs:
+      ipset1:
+        - 1.1.1.1
+        - 2.2.2.2
+      ipset2:
+        - 3.3.3.3
+    abnormalInstanceIPs:
+      "foo:bar:v1":
+        - 4.4.4.4

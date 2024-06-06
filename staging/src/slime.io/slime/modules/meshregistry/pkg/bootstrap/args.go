@@ -7,6 +7,7 @@ package bootstrap
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"istio.io/libistio/pkg/config/schema/collections"
@@ -19,14 +20,16 @@ import (
 )
 
 const (
-	defaultMeshConfigFolder = "/etc/mesh-config/"
-	defaultMeshConfigFile   = defaultMeshConfigFolder + "mesh"
+	// zookeeper
+	defaultConsumerPath = "/consumers"
+	disableConsumerPath = "-"
 )
 
 var podNamespace = env.RegisterStringVar("POD_NAMESPACE", "istio-system", "").Get()
 
 type Args struct {
 	// Path to the mesh config file
+	// UNSUPPORTED
 	MeshConfigFile string `json:"MeshConfigFile,omitempty"`
 
 	EnableGRPCTracing bool `json:"EnableGRPCTracing,omitempty"`
@@ -53,7 +56,6 @@ type Args struct {
 func DefaultArgs() *Args {
 	return &Args{
 		ResyncPeriod:          0,
-		MeshConfigFile:        defaultMeshConfigFile,
 		ExcludedResourceKinds: collections.LegacyDefaultExcludeKubeResourceKinds(),
 		Snapshots:             []string{CollectionsLegacyDefault},
 	}
@@ -83,10 +85,12 @@ type RegistryArgs struct {
 	// istio revision
 	Revision string `json:"Revision,omitempty"`
 	// istio revision match for crds
+	// UNSUPPORTED for now
 	RevCrds            string        `json:"RevCrds,omitempty"`
 	RegistryStartDelay util.Duration `json:"RegistryStartDelay,omitempty"`
 }
 
+// Validate validates the registry args. It should be called after the args are rectified.
 func (args *RegistryArgs) Validate() error {
 	if err := args.ZookeeperSource.Validate(); err != nil {
 		return err
@@ -98,6 +102,16 @@ func (args *RegistryArgs) Validate() error {
 		return err
 	}
 	return nil
+}
+
+func (args *RegistryArgs) Rectify() *RegistryArgs {
+	if args == nil {
+		return args
+	}
+	args.ZookeeperSource.Rectify()
+	args.NacosSource.Rectify()
+	args.EurekaSource.Rectify()
+	return args
 }
 
 type SourceArgs struct {
@@ -255,6 +269,17 @@ type InstanceMetaRelabelItem struct {
 	ValuesMapping map[string]string `json:"ValuesMapping,omitempty"`
 }
 
+func (args *SourceArgs) Validate() error {
+	if args.MockServiceEntryName != "" && args.MockServiceName == "" {
+		return fmt.Errorf("args MockServiceName empty but MockServiceEntryName %s", args.MockServiceEntryName)
+	}
+
+	if !args.InstancePortAsSvcPort && args.SvcPort == 0 {
+		return fmt.Errorf("SvcPort == 0 while InstancePortAsSvcPort false is not permitted")
+	}
+	return nil
+}
+
 const (
 	CollectionsAll           = "all"
 	CollectionsIstio         = "istio"
@@ -293,7 +318,8 @@ type ZookeeperSourceArgs struct {
 	IgnoreLabel       []string      `json:"IgnoreLabel,omitempty"`
 	ConnectionTimeout util.Duration `json:"ConnectionTimeout,omitempty"`
 	// dubbo register node in Zookeeper
-	RegistryRootNode            string `json:"RegistryRootNode,omitempty"`
+	RegistryRootNode string `json:"RegistryRootNode,omitempty"`
+	// NOSUPPORTED
 	ApplicationRegisterRootNode string `json:"ApplicationRegisterRootNode,omitempty"`
 	// zk mode for get zk info
 	Mode                string            `json:"Mode,omitempty"`
@@ -337,14 +363,39 @@ type WatchingDebounce struct {
 	MaxDelay         util.Duration `json:"MaxDelay,omitempty"`
 }
 
-func (zkArgs *ZookeeperSourceArgs) Validate() error {
-	if !zkArgs.Enabled {
+func (args *ZookeeperSourceArgs) Validate() error {
+	if args == nil || !args.Enabled {
 		return nil
 	}
-	if len(zkArgs.Address) == 0 {
+
+	if err := args.SourceArgs.Validate(); err != nil {
+		return fmt.Errorf("invalid args for zookeeper source: %v", err)
+	}
+
+	if len(args.Address) == 0 {
 		return errors.New("zookeeper server address must be set when zookeeper source is enabled")
 	}
 	return nil
+}
+
+func (args *ZookeeperSourceArgs) Rectify() {
+	if args == nil {
+		return
+	}
+
+	if args.GatewayModel {
+		args.SvcPort = 80 // backwards compatible
+		args.InstancePortAsSvcPort = false
+		args.HostSuffix = ".dubbo"
+		// gateway mode no need to get consumers information to generate sidecar
+		args.EnableDubboSidecar = false
+	} else if args.ConsumerPath == "" {
+		args.ConsumerPath = defaultConsumerPath
+	}
+
+	if args.ConsumerPath == disableConsumerPath {
+		args.ConsumerPath = ""
+	}
 }
 
 type EurekaSourceArgs struct {
@@ -379,20 +430,39 @@ func (eurekaServer *EurekaServer) Validate() error {
 	return nil
 }
 
-func (eurekaArgs *EurekaSourceArgs) Validate() error {
-	if !eurekaArgs.Enabled {
+func (args *EurekaSourceArgs) Validate() error {
+	if args == nil || !args.Enabled {
 		return nil
 	}
-	if len(eurekaArgs.Servers) == 0 {
-		return eurekaArgs.EurekaServer.Validate()
+
+	if err := args.SourceArgs.Validate(); err != nil {
+		return fmt.Errorf("invalid args for eureka source: %v", err)
 	}
-	for _, server := range eurekaArgs.Servers {
+
+	if len(args.Servers) == 0 {
+		return args.EurekaServer.Validate()
+	}
+	for _, server := range args.Servers {
 		err := server.Validate()
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (args *EurekaSourceArgs) Rectify() {
+	if args == nil {
+		return
+	}
+	if args.GatewayModel {
+		args.InstancePortAsSvcPort = false
+		args.K8sDomainSuffix = false
+	}
+	if args.NsfEureka {
+		args.EnableProjectCode = true
+		args.AppSuffix = "nsf"
+	}
 }
 
 type NacosSourceArgs struct {
@@ -444,20 +514,37 @@ func (nacosServer *NacosServer) Validate() error {
 	return nil
 }
 
-func (nacosArgs *NacosSourceArgs) Validate() error {
-	if !nacosArgs.Enabled {
+func (args *NacosSourceArgs) Validate() error {
+	if args == nil || !args.Enabled {
 		return nil
 	}
-	if len(nacosArgs.Servers) == 0 {
-		return nacosArgs.NacosServer.Validate()
+	if err := args.SourceArgs.Validate(); err != nil {
+		return fmt.Errorf("invalid args for nacos source: %v", err)
 	}
-	for _, server := range nacosArgs.Servers {
+	if len(args.Servers) == 0 {
+		return args.NacosServer.Validate()
+	}
+	for _, server := range args.Servers {
 		err := server.Validate()
 		if err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (args *NacosSourceArgs) Rectify() {
+	if args == nil || !args.Enabled {
+		return
+	}
+	if args.GatewayModel {
+		args.InstancePortAsSvcPort = false
+		args.K8sDomainSuffix = false
+	}
+	if args.NsfNacos {
+		args.EnableProjectCode = true
+		args.DomSuffix = "nsf"
+	}
 }
 
 type McpArgs struct {
@@ -491,8 +578,7 @@ type K8SArgs struct {
 func NewRegistryArgs() *RegistryArgs {
 	a := *DefaultArgs()
 	ret := &RegistryArgs{
-		Args:    a,
-		RevCrds: "sidecars,destinationrules,envoyfilters,gateways,virtualservices",
+		Args: a,
 		Mcp: &McpArgs{
 			ServerUrl:           "xds://0.0.0.0:16010",
 			EnableAnnoResVer:    true,
@@ -518,15 +604,14 @@ func NewRegistryArgs() *RegistryArgs {
 				InstancePortAsSvcPort: true,
 				ResourceNs:            "dubbo",
 			},
-			IgnoreLabel:                 []string{"pid", "timestamp", "dubbo"},
-			Mode:                        "polling",
-			WatchingWorkerCount:         10,
-			ConnectionTimeout:           util.Duration(30 * time.Second),
-			RegistryRootNode:            "/dubbo",
-			ApplicationRegisterRootNode: "/services",
-			TrimDubboRemoveDepInterval:  util.Duration(24 * time.Hour),
-			EnableDubboSidecar:          true,
-			DubboWorkloadAppLabel:       "app",
+			IgnoreLabel:                []string{"pid", "timestamp", "dubbo"},
+			Mode:                       "polling",
+			WatchingWorkerCount:        10,
+			ConnectionTimeout:          util.Duration(30 * time.Second),
+			RegistryRootNode:           "/dubbo",
+			TrimDubboRemoveDepInterval: util.Duration(24 * time.Hour),
+			EnableDubboSidecar:         true,
+			DubboWorkloadAppLabel:      "app",
 		},
 		EurekaSource: &EurekaSourceArgs{
 			SourceArgs: SourceArgs{
@@ -552,7 +637,7 @@ func NewRegistryArgs() *RegistryArgs {
 				DefaultServiceNs:      "nacos",
 				ResourceNs:            "nacos",
 			},
-			Mode:            "watching",
+			Mode:            "polling",
 			K8sDomainSuffix: true,
 			NsHost:          true,
 		},
