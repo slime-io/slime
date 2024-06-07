@@ -20,37 +20,57 @@ import (
 	"path/filepath"
 	"testing"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/client-go/kubernetes/scheme"
+	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
+	k8sscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	microserviceslimeiov1alpha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
-	// +kubebuilder:scaffold:imports
+	logf "sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+
+	testutil "slime.io/slime/framework/test/util"
+	lazyloadv1aplha1 "slime.io/slime/modules/lazyload/api/v1alpha1"
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg       *rest.Config
-	k8sClient client.Client
-	testEnv   *envtest.Environment
+	cfg           *rest.Config
+	testEnv       *envtest.Environment
+	k8sClient     *kubernetes.Clientset
+	dynamicClient dynamic.Interface
+
+	scheme = runtime.NewScheme()
 )
 
 func TestAPIs(t *testing.T) {
 	RegisterFailHandler(Fail)
 
-	RunSpecsWithDefaultAndCustomReporters(t,
-		"Controller Suite",
-		[]Reporter{})
+	RunSpecs(t, "lazyload Controller Suite")
 }
 
-var _ = BeforeSuite(func(done Done) {
+var _ = BeforeSuite(func() {
+	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
+
 	By("bootstrapping test environment")
+
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			// crd of plugin
+			filepath.Join("..", "charts", "crds"),
+			// crd of common
+			"../../../../../../../testdata/common/crds",
+		},
+		ErrorIfCRDPathMissing: true,
+		// In CI, we use the environment KUBEBUILDER_ASSETS to set the BinaryAssetsDirectory field.
+		// For local testing, please configure environment variables or set this field.
+		// BinaryAssetsDirectory: "../../../../../../../testdata/bin/k8s/{version}-{os}-{arch}",
 	}
 
 	var err error
@@ -58,20 +78,35 @@ var _ = BeforeSuite(func(done Done) {
 	Expect(err).ToNot(HaveOccurred())
 	Expect(cfg).ToNot(BeNil())
 
-	err = microserviceslimeiov1alpha1.AddToScheme(scheme.Scheme)
+	// add k8s scheme
+	err = k8sscheme.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	// +kubebuilder:scaffold:scheme
+	// add istio scheme
+	err = networkingv1alpha3.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
 
-	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-	Expect(err).ToNot(HaveOccurred())
-	Expect(k8sClient).ToNot(BeNil())
+	// add lazyload scheme
+	err = lazyloadv1aplha1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
 
-	close(done)
-}, 60)
+	k8sClient, err = kubernetes.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred())
+
+	dynamicClient, err = dynamic.NewForConfig(cfg)
+	Expect(err).NotTo(HaveOccurred())
+})
 
 var _ = AfterSuite(func() {
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).ToNot(HaveOccurred())
 })
+
+func loadYamlTestData[T any](receiver *T, path string) error {
+	return testutil.LoadYamlTestData(receiver, path)
+}
+
+func loadYamlObjects(path string) ([]client.Object, error) {
+	return testutil.LoadYamlObjects(scheme, path)
+}

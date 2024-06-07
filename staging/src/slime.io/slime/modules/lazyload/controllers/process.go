@@ -59,6 +59,22 @@ func (r *ServicefenceReconciler) WatchMetric(ctx context.Context) {
 	}
 }
 
+// ConsumeMetric is a helper function to consume metric from watcher or ticker.
+// the key of metric is <namespace>/<name> which is represent the namespace and name of servicefence
+// the value of metric is a list of map[string]string, which key is the destination service and value is the count
+// an json format example:
+// ``` json
+//
+//	{
+//	  "default/foo": [
+//	    {
+//	      '{destination_service="bar.default.svc"}': "1",
+//	      '{destination_service="bar.default.svc.cluster.local"}': "1"
+//	    }
+//	  ]
+//	}
+//
+// ```
 func (r *ServicefenceReconciler) ConsumeMetric(metric metric.Metric) {
 	for meta, results := range metric {
 		log.Debugf("got metric for %s", meta)

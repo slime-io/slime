@@ -64,7 +64,7 @@ func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request
 		return ctrl.Result{}, nil
 	}
 
-	// 资源更新
+	// update resource
 	m := parseDestination(instance)
 	log.Debugf("get destination after parse, %+v", m)
 	for k, v := range m {
@@ -74,6 +74,7 @@ func (r *VirtualServiceReconciler) Reconcile(_ context.Context, req ctrl.Request
 	return ctrl.Result{}, nil
 }
 
+// parseDestination returns a hosts to destination list mapping
 func parseDestination(instance *networkingv1alpha3.VirtualService) map[string][]string {
 	ret := make(map[string][]string)
 

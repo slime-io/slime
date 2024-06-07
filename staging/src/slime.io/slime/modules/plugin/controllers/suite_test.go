@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -35,10 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/yaml"
 
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
+	testutil "slime.io/slime/framework/test/util"
 	"slime.io/slime/modules/plugin/api/config"
 	pluginv1alpha1 "slime.io/slime/modules/plugin/api/v1alpha1"
 )
@@ -148,12 +147,5 @@ var _ = AfterSuite(func() {
 })
 
 func loadYamlTestData[T any](receiver *T, path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	if err := yaml.Unmarshal(data, receiver); err != nil {
-		return err
-	}
-	return nil
+	return testutil.LoadYamlTestData(receiver, path)
 }

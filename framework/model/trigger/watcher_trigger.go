@@ -68,11 +68,10 @@ func (t *WatcherTrigger) Start() {
 		go func(w watch.Interface, ch chan struct{}) {
 			for {
 				select {
-				case _, ok := <-ch:
-					if !ok {
-						l.Debugf("stop a watcher")
-						return
-					}
+				case <-ch:
+					l.Debugf("stop a watcher")
+					w.Stop()
+					return
 				case e, ok := <-w.ResultChan():
 					l.Debugf("got watcher event: type %v, kind %v", e.Type, e.Object.GetObjectKind().GroupVersionKind())
 					if !ok {

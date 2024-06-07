@@ -86,7 +86,7 @@ TEST_K8S_VERSION ?= 1.26.0
 modules-test:
 	$(eval BIN_ASSETS:=$(shell setup-envtest --bin-dir=./testdata/bin -p path use $(TEST_K8S_VERSION) --os $(shell go env GOOS) --arch $(shell go env GOARCH)))
 	@export KUBEBUILDER_ASSETS=$${PWD}/$(BIN_ASSETS) && \
-	go test -cover ./staging/src/slime.io/slime/modules/{limiter,meshregistry,plugin}/...
+	go test -cover ./staging/src/slime.io/slime/modules/{lazyload,limiter,meshregistry,plugin}/...
 
 # Generate code
 .PHONY: generate-module generate-framework format lint test

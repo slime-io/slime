@@ -17,9 +17,7 @@ limitations under the License.
 package controllers
 
 import (
-	"bytes"
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -37,11 +35,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/yaml"
 
 	bootconfig "slime.io/slime/framework/apis/config/v1alpha1"
 	"slime.io/slime/framework/bootstrap"
 	"slime.io/slime/framework/model/metric"
+	testutil "slime.io/slime/framework/test/util"
 	"slime.io/slime/modules/limiter/api/config"
 	limiterv1alpha2 "slime.io/slime/modules/limiter/api/v1alpha2"
 )
@@ -179,33 +177,9 @@ var _ = AfterSuite(func() {
 })
 
 func loadYamlObjects(path string) ([]client.Object, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	items := bytes.Split(data, []byte("---\n"))
-	objs := make([]client.Object, 0, len(items))
-	for _, item := range items {
-		item = bytes.TrimSpace(item)
-		if len(item) == 0 {
-			continue
-		}
-		obj, _, err := codecs.UniversalDeserializer().Decode(item, nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		objs = append(objs, obj.(client.Object))
-	}
-	return objs, nil
+	return testutil.LoadYamlObjects(scheme, path)
 }
 
 func loadYamlTestData[T any](receiver *T, path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	if err := yaml.Unmarshal(data, receiver); err != nil {
-		return err
-	}
-	return nil
+	return testutil.LoadYamlTestData(receiver, path)
 }

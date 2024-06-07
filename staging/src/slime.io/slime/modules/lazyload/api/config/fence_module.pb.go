@@ -416,7 +416,7 @@ func (x *Dispatch) GetDomainRegex() string {
 // domainAliases:
 //   - pattern: (?P<service>[^\.]+)\.(?P<namespace>[^\.]+)\.svc\.cluster\.local$
 //     template:
-//   - $namespace.$service.service.mailsaas
+//     - $namespace.$service.service.mailsaas
 type DomainAlias struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
