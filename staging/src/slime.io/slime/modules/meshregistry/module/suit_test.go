@@ -17,7 +17,6 @@ limitations under the License.
 package module
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -30,7 +29,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-	"sigs.k8s.io/yaml"
+
+	testutil "slime.io/slime/framework/test/util"
 )
 
 var (
@@ -87,12 +87,5 @@ var _ = AfterSuite(func() {
 })
 
 func loadYamlTestData[T any](receiver *T, path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	if err := yaml.Unmarshal(data, receiver); err != nil {
-		return err
-	}
-	return nil
+	return testutil.LoadYamlTestData(receiver, path)
 }

@@ -246,11 +246,12 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 	svcToIpsCache *SvcToIpsCache, ipTofenceCache *IpTofence, _ *FenceToIp, enableShortDomain bool,
 ) (map[string]map[string]string, error) {
 	log = log.WithField("reporter", "accesslog convertor").WithField("function", "accessLogHandler")
+	// map sourceSvc to destinationSvc
 	result := make(map[string]map[string]string)
 	tmpResult := make(map[string]map[string]int)
 
 	for _, entry := range logEntry {
-		// fetch sourceEp
+		// fetch source ip
 		sourceIp, err := fetchSourceIp(entry)
 		if err != nil {
 			return nil, err
@@ -259,30 +260,32 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 			continue
 		}
 
-		// fetch sourceSvcMeta
+		// fetch all the services which is the source ip belongs to
 		sourceSvcs, err := spliceSourceSvc(sourceIp, ipToSvcCache)
 		if err != nil {
 			return nil, err
 		}
 
-		// fetch fence
+		// fetch workload fence which is the source ip associated with
 		fenceNN, err := spliceSourcefence(sourceIp, ipTofenceCache)
 		if err != nil {
 			fenceNN = nil
 			return nil, err
 		}
 
+		// the source ip is not a pod ip or the pod is not selected by any service and the workloadfence is not enabled, skip
 		if len(sourceSvcs) == 0 && fenceNN == nil {
 			continue
 		}
 
-		// fetch destinationSvcMeta
+		// fetch all destination services like:
+		// []string{`{destination_service="foo.default.svc.cluster.local"`}
 		destinationSvcs := spliceDestinationSvc(entry, sourceSvcs, svcToIpsCache, fenceNN, enableShortDomain)
 		if len(destinationSvcs) == 0 {
 			continue
 		}
 
-		// tmpResult: source -> dest
+		// record source service -> dest
 		for _, sourceSvc := range sourceSvcs {
 			if _, ok := tmpResult[sourceSvc]; !ok {
 				tmpResult[sourceSvc] = make(map[string]int)
@@ -292,7 +295,7 @@ func accessLogHandler(logEntry []*data_accesslog.HTTPAccessLogEntry, ipToSvcCach
 			}
 		}
 
-		// record the source to dest in fenceNN
+		// record workload servicefence -> dest
 		if fenceNN != nil {
 			nn := fenceNN.String()
 			if _, ok := tmpResult[nn]; !ok {
@@ -359,6 +362,17 @@ func spliceSourcefence(sourceIp string, ipTofence *IpTofence) (*types.Namespaced
 	return nil, nil
 }
 
+// spliceDestinationSvc splices destination service from entry with below rules
+// - only handle inbound access log
+// - only handle request whih non-IP authority
+// - try resolve shortname to FQDN:
+//   - if the dest only contains one label, try add ns suffix from sourceSvc's namespace or workload fence's namespace.
+//     because this domain can only be resolved when the source client and destination service is in the same namespace.
+//   - if the dest contains two labels,like `label[0].lable[1]`, and `label[1]/label[0]` match a service, we append k8s
+//     k8s local domain as suffix. otherwise, we treat it as a fqdn.
+//   - if the dest contains three labels, like `label[0].lable[1].label[2]`, and `label[1]/label[0]` match a service,
+//     and the `label[2]` equals `svc`, we append k8s local domain as suffix. otherwise, we treat it as a fqdn.
+//   - if the dest contains more than three labels, we treat it as a fqdn.
 func spliceDestinationSvc(
 	entry *data_accesslog.HTTPAccessLogEntry,
 	sourceSvcs []string,

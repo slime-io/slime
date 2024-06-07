@@ -28,6 +28,7 @@ func TestE2E(t *testing.T) {
 }
 
 func RunE2ETests(t *testing.T) {
+	t.Skip("skip unready e2e test")
 	gomega.RegisterFailHandler(ginkgo.Fail)
 
 	var r []ginkgo.Reporter

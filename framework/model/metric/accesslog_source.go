@@ -3,6 +3,7 @@ package metric
 import (
 	"net"
 	"strings"
+	"sync"
 
 	service_accesslog "github.com/envoyproxy/go-control-plane/envoy/service/accesslog/v3"
 	log "github.com/sirupsen/logrus"
@@ -10,6 +11,7 @@ import (
 )
 
 type AccessLogSource struct {
+	sync.Once
 	servePort  string
 	convertors []*AccessLogConvertor
 }
@@ -49,23 +51,26 @@ func (s *AccessLogSource) StreamAccessLogs(logServer service_accesslog.AccessLog
 
 // Start grpc server
 func (s *AccessLogSource) Start() error {
-	log := log.WithField("reporter", "AccessLogSource").WithField("function", "Start")
-	lis, err := net.Listen("tcp", s.servePort)
-	if err != nil {
-		return err
-	}
-
-	server := grpc.NewServer()
-	service_accesslog.RegisterAccessLogServiceServer(server, s)
-
-	go func() {
-		log.Infof("accesslog grpc server starts on %s", s.servePort)
-		if err = server.Serve(lis); err != nil {
-			log.Errorf("accesslog grpc server error: %+v", err)
+	var err error
+	s.Do(func() {
+		log := log.WithField("reporter", "AccessLogSource").WithField("function", "Start")
+		var lis net.Listener
+		lis, err = net.Listen("tcp", s.servePort)
+		if err != nil {
+			return
 		}
-	}()
 
-	return nil
+		server := grpc.NewServer()
+		service_accesslog.RegisterAccessLogServiceServer(server, s)
+
+		go func() {
+			log.Infof("accesslog grpc server starts on %s", s.servePort)
+			if errL := server.Serve(lis); errL != nil {
+				log.Errorf("accesslog grpc server error: %+v", errL)
+			}
+		}()
+	})
+	return err
 }
 
 func (s *AccessLogSource) QueryMetric(queryMap QueryMap) (Metric, error) {

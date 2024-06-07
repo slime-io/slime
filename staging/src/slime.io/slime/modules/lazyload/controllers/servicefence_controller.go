@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	"google.golang.org/protobuf/proto"
 	networkingapi "istio.io/api/networking/v1alpha3"
 	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	corev1 "k8s.io/api/core/v1"
@@ -51,26 +52,35 @@ import (
 type ServicefenceReconciler struct {
 	client.Client
 
-	Scheme                     *runtime.Scheme
-	cfg                        *config.Fence
-	env                        bootstrap.Environment
-	interestMeta               map[string]bool
-	interestMetaCopy           map[string]bool // for outside read
-	watcherMetricChan          <-chan metric.Metric
-	tickerMetricChan           <-chan metric.Metric
-	reconcileLock              sync.RWMutex
-	nsSvcCache                 *NsSvcCache
-	labelSvcCache              *LabelSvcCache
-	portProtocolCache          *PortProtocolCache
-	defaultAddNamespaces       []string
-	doAliasRules               []*domainAliasRule
-	ipTofence                  *IpTofence
-	fenceToIp                  *FenceToIp
+	Scheme            *runtime.Scheme
+	cfg               *config.Fence
+	env               bootstrap.Environment
+	interestMeta      map[string]bool
+	interestMetaCopy  map[string]bool // for outside read
+	watcherMetricChan <-chan metric.Metric
+	tickerMetricChan  <-chan metric.Metric
+	reconcileLock     sync.RWMutex
+	// mapping of the namespace to the namespaced name of all the service reside in it
+	nsSvcCache *NsSvcCache
+	// mapping of the label kv pair to the namespaced name of all the service matching it
+	labelSvcCache *LabelSvcCache
+	// mapping of the port number to the protocol to the count it appears in all the services
+	portProtocolCache    *PortProtocolCache
+	defaultAddNamespaces []string
+	doAliasRules         []*domainAliasRule
+
+	// mapping of the pod's ip to auto workload serviceFence's namespaced name, and it's reverse
+	ipTofence *IpTofence
+	fenceToIp *FenceToIp
+
 	workloadFenceLabelKey      string
 	workloadFenceLabelKeyAlias string
-	ipToSvcCache               *IpToSvcCache
-	svcToIpsCache              *SvcToIpsCache
-	factory                    informers.SharedInformerFactory
+
+	// mapping of the pod's ip to the namespaced name of the service it implements, and it's reverse
+	ipToSvcCache  *IpToSvcCache
+	svcToIpsCache *SvcToIpsCache
+
+	factory informers.SharedInformerFactory
 }
 
 type ReconcilerOpts func(*ServicefenceReconciler)
@@ -239,7 +249,7 @@ func (r *ServicefenceReconciler) refreshSidecar(instance *lazyloadv1alpha1.Servi
 	} else if foundRev := model.IstioRevFromLabel(found.Labels); !r.env.RevInScope(foundRev) {
 		log.Infof("existed sidecar %v istioRev %s but our rev %s, skip update ...",
 			nsName, foundRev, r.env.IstioRev())
-	} else if !reflect.DeepEqual(found.Spec, sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
+	} else if !proto.Equal(&found.Spec, &sidecar.Spec) || !reflect.DeepEqual(found.Labels, sidecar.Labels) {
 		log.Infof("Update a Sidecar in %s:%s", sidecar.Namespace, sidecar.Name)
 		sidecar.ResourceVersion = found.ResourceVersion
 		err = r.Client.Update(context.TODO(), sidecar)

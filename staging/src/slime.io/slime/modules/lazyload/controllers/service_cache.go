@@ -23,7 +23,7 @@ func (r *ServicefenceReconciler) StartCache(ctx context.Context) {
 
 	svcInformer := factory.Core().V1().Services().Informer()
 	epInformer := factory.Core().V1().Endpoints().Informer()
-	_ = factory.Core().V1().Namespaces().Informer()
+	_ = factory.Core().V1().Namespaces().Informer() // register namespace cache
 
 	svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {

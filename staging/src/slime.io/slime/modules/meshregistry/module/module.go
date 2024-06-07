@@ -338,10 +338,10 @@ func (m *Module) prepareCrDynamicConfigController(
 	listOptions := metav1.ListOptions{FieldSelector: fields.Set{"metadata.name": name}.AsSelector().String()}
 	lw := &cache.ListWatch{
 		ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
-			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).List(context.Background(), listOptions)
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).List(context.Background(), listOptions) //nolint: lll
 		},
 		WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
-			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).Watch(context.Background(), listOptions)
+			return client.Resource(meshregv1alpha1.RegistrySourcesResource).Namespace(PodNamespace).Watch(context.Background(), listOptions) //nolint: lll
 		},
 	}
 
