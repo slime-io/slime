@@ -235,11 +235,13 @@ func (r *SmartLimiterReconciler) Validate(instance *limiterv1alpha2.SmartLimiter
 	gateway := instance.Spec.Gateway
 	sidecarOutbound := false
 
-	var target *limiterv1alpha2.Target
-
 	for _, descriptors := range instance.Spec.Sets {
 		for _, descriptor := range descriptors.Descriptor_ {
-			if descriptor.Target == nil && instance.Spec.Target == nil {
+			target := instance.Spec.Target
+			if descriptor.Target != nil {
+				target = descriptor.Target
+			}
+			if target == nil {
 				return sidecarOutbound, gateway, fmt.Errorf("invalid target")
 			}
 			if descriptor.Action == nil {

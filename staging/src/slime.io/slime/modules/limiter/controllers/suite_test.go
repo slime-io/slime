@@ -25,7 +25,6 @@ import (
 	. "github.com/onsi/gomega"
 	networkingv1alpha3 "istio.io/client-go/pkg/apis/networking/v1alpha3"
 	"k8s.io/apimachinery/pkg/runtime"
-	serializer "k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
@@ -51,7 +50,6 @@ var (
 	ctx       context.Context
 	cancel    context.CancelFunc
 	scheme    = runtime.NewScheme()
-	codecs    = serializer.NewCodecFactory(scheme)
 
 	slimeEnv bootstrap.Environment
 )
