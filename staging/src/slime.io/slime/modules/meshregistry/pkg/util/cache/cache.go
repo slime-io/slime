@@ -7,8 +7,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/cache"
 
+	"slime.io/slime/modules/meshregistry/model"
 	"slime.io/slime/modules/meshregistry/pkg/multicluster"
 )
+
+var log = model.ModuleLog.WithField("util", "cache") //nolint: unused
 
 type objecjHandler[V, O any] interface {
 	informer(cluster *multicluster.Cluster) cache.SharedIndexInformer
