@@ -3,36 +3,32 @@ kind: EnvoyFilter
 metadata:
   labels:
     istio.io/rev: default
-  name: hello.default.ratelimit
+  name: withselector-missing-match-workload.ratelimit
   namespace: default
 spec:
   configPatches:
   - applyTo: HTTP_ROUTE
     match:
-      context: SIDECAR_INBOUND
+      context: GATEWAY
       routeConfiguration:
         vhost:
           route:
-            name: default
+            name: foo
     patch:
       operation: MERGE
       value:
         route:
           rate_limits:
           - actions:
-            - query_parameter_value_match:
-                descriptor_value: Service[hello.default]-Id[2197174159]
-                query_parameters:
-                - name: foo
-                  string_match:
-                    prefix: bar
+            - generic_key:
+                descriptor_value: Service[withselector-missing-match-workload.default]-Id[2597136639]
   - applyTo: HTTP_ROUTE
     match:
-      context: SIDECAR_INBOUND
+      context: GATEWAY
       routeConfiguration:
         vhost:
           route:
-            name: default
+            name: foo
     patch:
       operation: MERGE
       value:
@@ -43,12 +39,12 @@ spec:
             value:
               descriptors:
               - entries:
-                - key: query_match
-                  value: Service[hello.default]-Id[2197174159]
+                - key: generic_key
+                  value: Service[withselector-missing-match-workload.default]-Id[2597136639]
                 tokenBucket:
-                  fillInterval: 1s
-                  maxTokens: 10
-                  tokensPerFill: 10
+                  fillInterval: 60s
+                  maxTokens: 50
+                  tokensPerFill: 50
               filterEnabled:
                 defaultValue:
                   numerator: 100
@@ -64,4 +60,4 @@ spec:
                 tokensPerFill: 100000
   workloadSelector:
     labels:
-      app: hello
+      app: not-matched-any-workload

@@ -21,7 +21,7 @@ spec:
           rate_limits:
           - actions:
             - header_value_match:
-                descriptor_value: Service[hello.default]-Id[2757373597]
+                descriptor_value: Service[hello.default]-Id[1092235069]
                 headers:
                 - exact_match: GET
                   name: :method
@@ -43,7 +43,7 @@ spec:
               descriptors:
               - entries:
                 - key: header_match
-                  value: Service[hello.default]-Id[2757373597]
+                  value: Service[hello.default]-Id[1092235069]
                 tokenBucket:
                   fillInterval: 1s
                   maxTokens: 10

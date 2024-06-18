@@ -86,28 +86,29 @@ func (r *SmartLimiterReconciler) handleEvent(loc types.NamespacedName) metric.Qu
 }
 
 func (r *SmartLimiterReconciler) handleLocalEvent(meta SmartLimiterMeta, loc types.NamespacedName) metric.QueryMap {
-	queryMap := make(map[string][]metric.Handler, 0)
-
+	var queryMap map[string][]metric.Handler
 	if len(meta.workloadSelector) > 0 {
 		// workloadSelector is specified
 		queryMap = r.genQuerymapWithWorkloadSelector(meta, loc)
 	} else if host := meta.seHost; host != "" {
 		// se host is specified
 		queryMap = r.genQuerymapWithServiceEntry(host, loc)
-	} else {
-		// no workloadSelector and se host
-
-		// in gateway, workloadSelector can be not specified
-		// just build querymap with empty handler
-		if meta.gateway {
-			sm := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
-			queryMap[sm.String()] = []metric.Handler{}
-			return queryMap
-		}
-		// no workloadSelector and se host, not gateway, use k8s service
-		queryMap = r.genQuerymapWithService(loc)
 	}
-	return queryMap
+	if queryMap != nil {
+		return queryMap
+	}
+
+	// no workloadSelector and se host, or can't gen querymap with workloadSelector or se host.
+
+	// if the traffic direction is Outbound, just build querymap with empty handler
+	if meta.sidecarOutbound || meta.gateway {
+		sm := &StaticMeta{Name: loc.Name, Namespace: loc.Namespace}
+		queryMap = map[string][]metric.Handler{sm.String(): {}}
+		return queryMap
+	}
+
+	// return default query map gen from k8s service
+	return r.genQuerymapWithService(loc)
 }
 
 // handlePrometheusEvent means construct query map as following
@@ -350,7 +351,6 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(
 	// here, there is such a semantics
 	// if it is under istioNs, it will match all the pods in cluster
 	// other it will only match the real ns in cluster
-	queryMap := make(map[string][]metric.Handler, 0)
 	ns := loc.Namespace
 	if loc.Namespace == r.env.Config.Global.IstioNamespace {
 		ns = ""
@@ -370,20 +370,17 @@ func (r *SmartLimiterReconciler) genQuerymapWithWorkloadSelector(
 	if metaInfo == "" {
 		return nil
 	}
-	queryMap[metaInfo] = []metric.Handler{}
-	return queryMap
+	return map[string][]metric.Handler{metaInfo: {}}
 }
 
 func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(
 	host string,
 	loc types.NamespacedName,
 ) map[string][]metric.Handler {
-	queryMap := make(map[string][]metric.Handler, 0)
-
 	svc, err := getIstioService(r, types.NamespacedName{Namespace: loc.Namespace, Name: host})
 	if err != nil {
 		log.Errorf("get empty istio service base on %s/%s, %s", loc.Namespace, host, err)
-		return queryMap
+		return nil
 	}
 	serviceLabels := formatLabels(getIstioServiceLabels(svc))
 	subsetInfo := make(map[string]int)
@@ -404,13 +401,11 @@ func (r *SmartLimiterReconciler) genQuerymapWithServiceEntry(
 	if metaInfo == "" {
 		return nil
 	}
-	queryMap[metaInfo] = []metric.Handler{}
-	return queryMap
+	return map[string][]metric.Handler{metaInfo: {}}
 }
 
 func (r *SmartLimiterReconciler) genQuerymapWithService(loc types.NamespacedName) map[string][]metric.Handler {
 	// otherwise, use k8s svc
-	queryMap := make(map[string][]metric.Handler, 0)
 	pods, err := queryServicePods(r.Client, loc)
 	if err != nil {
 		log.Infof("get err in queryServicePods, %+v", err.Error())
@@ -431,6 +426,5 @@ func (r *SmartLimiterReconciler) genQuerymapWithService(loc types.NamespacedName
 	if metaInfo == "" {
 		return nil
 	}
-	queryMap[metaInfo] = []metric.Handler{}
-	return queryMap
+	return map[string][]metric.Handler{metaInfo: {}}
 }

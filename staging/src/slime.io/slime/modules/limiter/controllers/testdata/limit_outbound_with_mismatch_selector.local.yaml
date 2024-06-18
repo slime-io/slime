@@ -1,0 +1,24 @@
+apiVersion: microservice.slime.io/v1alpha2
+kind: SmartLimiter
+metadata:
+  labels:
+    istio.io/rev: default
+  name: withselector-missing-match-workload
+  namespace: default
+spec:
+  gateway: true
+  sets:
+    _base:
+      descriptor:
+      - action:
+          fill_interval:
+            seconds: 60
+          quota: "50"
+          strategy: single
+        condition: "true"
+  target:
+    direction: outbound
+    route:
+    - /foo
+  workloadSelector:
+    app: not-matched-any-workload

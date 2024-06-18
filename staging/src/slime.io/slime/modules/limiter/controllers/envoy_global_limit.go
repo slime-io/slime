@@ -356,6 +356,10 @@ func constructNewConfig(desc []*model.Descriptor, domain string) string {
 }
 
 func generateDescriptorKey(item *microservicev1alpha2.SmartLimitDescriptor, loc types.NamespacedName) string {
+	// Note: Unit tests have revealed unstable results when using the Adler-32 algorithm to
+	// hash the text format of protobuf messages. 
+	// Given Adler-32's inherent determinism and excluding changes to the proto API or test materials,
+	// the source of this instability remains under investigation.
 	id := adler32.Checksum([]byte(item.String() + loc.String()))
 	return fmt.Sprintf("RequestHeader[%s.%s]-Id[%d]", loc.Name, loc.Namespace, id)
 }

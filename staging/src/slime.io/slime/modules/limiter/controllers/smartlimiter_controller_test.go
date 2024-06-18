@@ -83,11 +83,21 @@ var _ = Describe("SmartlimiterReconciler", func() {
 				_ = k8sClient.Delete(ctx, want)
 			}()
 		},
-		Entry("method", "./testdata/base_objs.local.yaml",
-			"./testdata/limit_by_method.local.yaml", "./testdata/limit_by_method.local.ef.expect.yaml"),
-		Entry("query", "./testdata/base_objs.local.yaml",
-			"./testdata/limit_by_query.local.yaml", "./testdata/limit_by_query.local.ef.expect.yaml"),
-		Entry("sourceIP", "./testdata/base_objs.local.yaml",
-			"./testdata/limit_by_sourceIP.local.yaml", "./testdata/limit_by_sourceIP.local.ef.expect.yaml"),
+		Entry("method",
+			"./testdata/base_objs.local.yaml",
+			"./testdata/limit_by_method.local.yaml",
+			"./testdata/limit_by_method.local.ef.expect.yaml"),
+		Entry("query",
+			"./testdata/base_objs.local.yaml",
+			"./testdata/limit_by_query.local.yaml",
+			"./testdata/limit_by_query.local.ef.expect.yaml"),
+		Entry("sourceIP",
+			"./testdata/base_objs.local.yaml",
+			"./testdata/limit_by_sourceIP.local.yaml",
+			"./testdata/limit_by_sourceIP.local.ef.expect.yaml"),
+		Entry("gateway-with-selector-but-mismatch",
+			"./testdata/base_objs.local.yaml",
+			"./testdata/limit_outbound_with_mismatch_selector.local.yaml",
+			"./testdata/limit_outbound_with_mismatch_selector.local.ef.expect.yaml"),
 	)
 })
