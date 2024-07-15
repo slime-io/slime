@@ -135,8 +135,8 @@ type client struct {
 	urls       []string
 	headers    map[string]string
 
-	// fetch instances from a specific namespace and group, or from all of the namespaces.
-	namespaceId, group             string // if not set which means public and DEFAULT_GROUP
+	// fetch instances from a specific namespace and groups, or from all of the namespaces.
+	namespaceGoups                 map[string][]string
 	metaKeyNamespace, metaKeyGroup string
 	fetchAllNamespaces             bool
 	injectNsGroupIntoMeta          bool
@@ -146,6 +146,8 @@ type client struct {
 	password string
 	token    *atomic.Value
 	tokenTTL int64
+
+	namespaceNameToID map[string]string
 }
 
 func newClient(
@@ -158,8 +160,7 @@ func newClient(
 		headers:            headers,
 		registryID:         server.RegistryID,
 		urls:               server.Address,
-		namespaceId:        server.Namespace,
-		group:              server.Group,
+		namespaceGoups:     server.NamespaceToGroups,
 		metaKeyNamespace:   metaKeyNamespace,
 		metaKeyGroup:       metaKeyGroup,
 		fetchAllNamespaces: server.AllNamespaces,
@@ -262,9 +263,7 @@ func (c *client) Instances() ([]*instanceResp, error) {
 	if c.fetchAllNamespaces {
 		fetcher = c.allNamespacesInstances
 	} else {
-		fetcher = func() (map[string][]*instance, error) {
-			return c.namespacedGroupedInstances(c.namespaceId, c.group)
-		}
+		fetcher = c.namespacedGroupsInstances
 	}
 	m, err := fetcher()
 	if err != nil {
@@ -410,6 +409,45 @@ func (c *client) listNamespaces() ([]*nacosNamespace, error) {
 		return nil, err
 	}
 	return nr.Data, nil
+}
+
+func (c *client) getNamespaceID(namespace string) string {
+	if len(c.namespaceNameToID) == 0 {
+		nsList, err := c.listNamespaces()
+		if err != nil {
+			// list namespaces failed, use the input namespace as the id
+			return namespace
+		}
+		c.namespaceNameToID = make(map[string]string, len(nsList))
+		for _, ns := range nsList {
+			c.namespaceNameToID[ns.NamespaceShowName] = ns.Namespace
+		}
+	}
+	id := c.namespaceNameToID[namespace]
+	if id == "" {
+		// the input is a namespaceID or is the public namespace
+		id = namespace
+		c.namespaceNameToID[namespace] = namespace
+	}
+	return id
+}
+
+func (c *client) namespacedGroupsInstances() (map[string][]*instance, error) {
+	svcInstances := map[string][]*instance{}
+	for ns, gs := range c.namespaceGoups {
+		for _, g := range gs {
+			instances, err := c.namespacedGroupedInstances(c.getNamespaceID(ns), g)
+			if err != nil {
+				log.Warnf("get instances of group %q in namespace %q failed: %s", g, ns, err)
+				// try best
+				continue
+			}
+			for k, v := range instances {
+				svcInstances[k] = append(svcInstances[k], v...)
+			}
+		}
+	}
+	return svcInstances, nil
 }
 
 func (c *client) namespacedGroupedInstances(namespaceId, groupName string) (map[string][]*instance, error) {

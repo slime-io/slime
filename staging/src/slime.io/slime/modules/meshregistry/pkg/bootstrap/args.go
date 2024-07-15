@@ -8,6 +8,7 @@ package bootstrap
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"istio.io/libistio/pkg/config/schema/collections"
@@ -505,6 +506,14 @@ type NacosServer struct {
 	Password string `json:"Password,omitempty"`
 	// fetch services from all namespaces, only support Polling mode
 	AllNamespaces bool `json:"AllNamespaces,omitempty"`
+	// NamespaceGroups specific multi namespace and multi groups split by comma. like:
+	// - ns1:g1,g2
+	// - ns2:g1,g2,g3
+	// - ns3
+	NamespaceGroups []string `json:"NamespaceGroups,omitempty"`
+	// NamespaceToGroups store the mapping between namespace and groups,
+	// build from the value of `NamespaceGroups` or `Namespace` and `Group`.
+	NamespaceToGroups map[string][]string `json:"-"`
 }
 
 func (nacosServer *NacosServer) Validate() error {
@@ -512,6 +521,29 @@ func (nacosServer *NacosServer) Validate() error {
 		return errors.New("nacos server address must be set")
 	}
 	return nil
+}
+
+func (nacosServer *NacosServer) Rectify() {
+	if len(nacosServer.NamespaceGroups) == 0 {
+		nacosServer.NamespaceToGroups = map[string][]string{
+			nacosServer.Namespace: {nacosServer.Group},
+		}
+		return
+	}
+
+	nacosServer.NamespaceToGroups = make(map[string][]string, len(nacosServer.NamespaceGroups))
+	for _, ngs := range nacosServer.NamespaceGroups {
+		namespace, groups := parseNamespaceGroups(ngs)
+		nacosServer.NamespaceToGroups[namespace] = groups
+	}
+}
+
+func parseNamespaceGroups(ngs string) (string, []string) {
+	parts := strings.SplitN(ngs, ":", 2)
+	if len(parts) == 1 {
+		return ngs, []string{"DEFAULT_GROUP"}
+	}
+	return parts[0], strings.Split(parts[1], ",")
 }
 
 func (args *NacosSourceArgs) Validate() error {
@@ -544,6 +576,10 @@ func (args *NacosSourceArgs) Rectify() {
 	if args.NsfNacos {
 		args.EnableProjectCode = true
 		args.DomSuffix = "nsf"
+	}
+	args.NacosServer.Rectify()
+	for i := range args.Servers {
+		args.Servers[i].Rectify()
 	}
 }
 
