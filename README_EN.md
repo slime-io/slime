@@ -89,7 +89,6 @@ We encourage you to submit a comment on this issue to include your use case: [#1
 
 ## Community
 
-- Wechat Group: Please contact Wechat ID: `yonka_hust` to join the group
 - QQ Group: 971298863
 - Slack: [https://slimeslime-io.slack.com/invite](https://join.slack.com/t/slimeslime-io/shared_invite/zt-u3nyjxww-vpwuY9856i8iVlZsCPtKpg)
 - email: slimedotio@gmail.com
