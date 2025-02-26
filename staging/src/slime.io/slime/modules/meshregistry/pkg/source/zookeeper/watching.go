@@ -61,6 +61,7 @@ func (s *Source) Watching() {
 		watchConfigurators: s.args.EnableConfiguratorMeta,
 		workers:            make([]*worker, s.args.WatchingWorkerCount),
 		forceUpdateTrigger: s.forceUpdateTrigger,
+		forceUpdate:        false,
 		debounceConfig:     s.args.WatchingDebounce,
 	}
 
@@ -179,8 +180,9 @@ func (ew *EndpointWatcher) Exit() {
 }
 
 type simpleWatchItem struct {
-	data []string
-	err  error
+	data        []string
+	err         error
+	forceUpdate bool
 }
 
 func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
@@ -189,8 +191,9 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			Min: 500 * time.Millisecond,
 			Max: time.Minute,
 		}
-		first = true
-		d     = newDebouncer(ew.debounceConfig)
+		first       = true
+		d           = newDebouncer(ew.debounceConfig)
+		forceUpdate = false
 	)
 
 	for {
@@ -219,8 +222,9 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 		forceUpdateTrigger := ew.forceUpdateTrigger.Load().(chan struct{})
 		select {
 		case ch <- simpleWatchItem{
-			data: paths,
-			err:  err,
+			data:        paths,
+			err:         err,
+			forceUpdate: forceUpdate,
 		}:
 			if first && err != nil { // especially for the first watch failure
 				first = false
@@ -232,15 +236,19 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 			case <-ew.exit:
 				return
 			case <-eventCh:
+				forceUpdate = false
 				d.debounce()
 			case <-forceUpdateTrigger: // force update
+				forceUpdate = true
 				waitDoForceUpdate()
 			}
 		case <-ew.exit:
 			return
 		case <-eventCh: // frequent change may delay the data(`paths`) distribute
+			forceUpdate = false
 			d.debounce()
 		case <-forceUpdateTrigger: // force update
+			forceUpdate = true
 			waitDoForceUpdate()
 		}
 	}
@@ -249,7 +257,7 @@ func (ew *EndpointWatcher) simpleWatch(path string, ch chan simpleWatchItem) {
 // watchService empty path means ignore ...
 func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consumerPath string) {
 	var (
-		providerCache, consumerCache, configuratorCache []string
+		providerCache, consumerCache, configuratorCache, oldProviderCache []string
 		// Try to initialize, but it is not required to be completed,
 		// because the service may have been deleted or for others.
 		// So we consider both either valid data or fetch-err as init-done.
@@ -297,7 +305,15 @@ func (ew *EndpointWatcher) watchService(ctx context.Context, providerPath, consu
 		case item := <-providerEventCh:
 			providerInit = true
 			if item.err == nil {
+				oldProviderCache = providerCache
 				providerCache = item.data
+
+				if item.forceUpdate {
+					deleted, created := calculateDiff(oldProviderCache, providerCache)
+					if len(deleted) != 0 || len(created) != 0 {
+						log.Infof("endpoint watcher maybe failed with delete: %v, create: %v", deleted, created)
+					}
+				}
 			}
 		case item := <-consumerEventCh:
 			consumerInit = true
@@ -438,6 +454,7 @@ type ServiceWatcher struct {
 	initCnt, initThreshold int
 
 	forceUpdateTrigger *atomic.Value
+	forceUpdate        bool
 	debounceConfig     *bootstrap.WatchingDebounce
 }
 
@@ -497,6 +514,7 @@ func (sw *ServiceWatcher) Start(ctx context.Context) {
 			case <-e:
 				d.debounce()
 			case <-forceUpdateTrigger:
+				sw.forceUpdate = true
 				waitDoForceUpdate()
 			}
 		}
@@ -510,6 +528,12 @@ func (sw *ServiceWatcher) handleSvcs(svcs []string) {
 	log.Debugf("service watcher handle event with current services: %v, last services: %v", sw.svcs, oldSvcs)
 	deleted, created := calculateDiff(oldSvcs, sw.svcs)
 	log.Debugf("service watcher calculate diff with delete: %v, create: %v", deleted, created)
+	if sw.forceUpdate {
+		sw.forceUpdate = false
+		if len(deleted) != 0 || len(created) != 0 {
+			log.Infof("service watcher maybe failed with delete: %v, create: %v", deleted, created)
+		}
+	}
 	// dispatch deleted service first
 	for _, d := range deleted {
 		sw.dispatch(ServiceEvent{
